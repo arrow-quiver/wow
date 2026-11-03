@@ -20,6 +20,8 @@ function ago(iso) {
 
 const NAV = [
   ['/', 'Camp', 'home'],
+  ['/raids', 'Raids', 'raids'],
+  ['/loot', 'Loot', 'loot'],
   ['/roster', 'Roster', 'roster'],
   ['/crafters', 'Crafters', 'crafters'],
   ['/requests', 'Crafting requests', 'requests'],
@@ -42,6 +44,7 @@ function layout({ title, active, user, guild, body, csrf, flash }) {
 <link href="https://fonts.googleapis.com/css2?family=Alegreya:wght@500;700;800&family=Alegreya+Sans:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/style.css">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<script src="/app.js" defer></script>
 </head>
 <body>
 <div class="shell${guild ? '' : ' shell--bare'}">
@@ -62,4 +65,11 @@ function layout({ title, active, user, guild, body, csrf, flash }) {
 </html>`;
 }
 
-module.exports = { layout, esc, classInfo, ago };
+// Times are stored in UTC; app.js rewrites <time data-local> into the viewer's own time zone.
+function when(iso, style = 'full') {
+  const d = new Date(iso);
+  const fallback = d.toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
+  return `<time datetime="${esc(d.toISOString())}" data-local="${style}">${esc(fallback)}</time>`;
+}
+
+module.exports = { layout, esc, classInfo, ago, when };

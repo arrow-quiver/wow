@@ -24,6 +24,15 @@ companion/   the desktop app that carries data between the game and the site
 - **Leveling partners:** post where and when you're questing.
 - **Settings:** sync keys, invite link, Discord webhook, members and officers.
 
+## What's in Phase 2
+
+- **Raids:** officers schedule raids (times shown in everyone's own time zone). Members sign up with a character, role and note. Discord gets a post when a raid is scheduled and a reminder an hour before.
+- **Soft reserves with loyalty bonus (SR+):** each raider reserves up to N items. When an item drops, reservers in the raid roll 1–100 plus their bonus. Bonus: +10 per raid attended with the same item reserved. It resets when you win the item, switch reserves, or sign up "Coming" and don't show.
+- **Loot screen (phone):** `/raids/<id>/loot` for the raid leader. Roll, give, and record off-reserve loot. Everything goes to the loot history and Discord.
+- **Loot lists:** officers paste `Boss | Item` lines per instance on the Loot page.
+- **Readiness:** the addon records item level, repair % and consumables at each reload. Sign-ups show it, and flag low repair or no consumables.
+- **In game:** `/wow` shows upcoming raids, whether you're signed up, and your reserves. Login reminds you if you haven't signed up for the next raid.
+
 ## Deploy on Coolify
 
 1. Push this folder to a GitHub repo.

@@ -59,6 +59,16 @@ function GetProfessions() return nil, 2, nil, 4, 5 end
 local profs = { [2] = {"Blacksmithing", 120, 150}, [4] = {"Fishing", 40, 75}, [5] = {"Cooking", 80, 150} }
 function GetProfessionInfo(i) local p = profs[i]; return p[1], "icon", p[2], p[3] end
 C_GuildInfo = { GuildRoster = function() end }
+function GetAverageItemLevel() return 61.4, 58.2 end
+function GetInventoryItemDurability(slot) if slot == 5 then return 30, 100 elseif slot == 7 then return 70, 100 end end
+NUM_BAG_SLOTS = 4
+local bags = { [0] = { {itemID = 118, stackCount = 5}, {itemID = 2581, stackCount = 10}, {itemID = 9999, stackCount = 1} } }
+C_Container = {
+  GetContainerNumSlots = function(bag) return bags[bag] and #bags[bag] or 0 end,
+  GetContainerItemInfo = function(bag, slot) return bags[bag] and bags[bag][slot] end,
+}
+local itemClass = { [118] = {0, 1}, [2581] = {0, 7}, [9999] = {2, 0} }
+C_Item = { GetItemInfoInstant = function(id) local c = itemClass[id]; return id, "t", "s", "", 0, c[1], c[2] end }
 local roster = {
   {"Thrallia-Forever", "Guild Master", 0, 23, "Shaman", "The Barrens", "", "", true, 0, "SHAMAN"},
   {"Grommash Hellscream-Forever", "Officer", 1, 31, "Warrior", "Hillsbrad Foothills", "", "", true, 0, "WARRIOR"},

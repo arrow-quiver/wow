@@ -2,7 +2,7 @@
 ## Title: wow guild
 ## Notes: Syncs your character, professions, recipes and the guild roster to the guild website. Shows notices and crafting requests from the site.
 ## Author: wow
-## Version: 0.1.0
+## Version: 0.2.0
 ## SavedVariables: WowGuildDB
 ## IconTexture: Interface\Icons\Spell_Fire_Fire
 

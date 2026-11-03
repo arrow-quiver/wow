@@ -24,6 +24,47 @@ function ns.collectCharacter()
   rec.guild = GetGuildInfo and GetGuildInfo("player") or nil
   rec.updated = ns.now()
   ns.collectProfessions(rec)
+  ns.collectReadiness(rec)
+end
+
+-- ---------- raid readiness (out of combat) ----------
+-- Item level, repair state and consumables in bags, shown next to raid sign-ups.
+local CONSUMABLE_KIND = { [1] = "potion", [2] = "elixir", [3] = "flask", [5] = "food", [7] = "bandage" }
+
+function ns.collectReadiness(rec)
+  if not safeCombat() then return end
+  rec = rec or charRecord()
+  local r = { at = ns.now(), consumables = {} }
+  if GetAverageItemLevel then
+    local overall, equipped = ns.try(GetAverageItemLevel)
+    r.ilvl = equipped or overall
+  end
+  if GetInventoryItemDurability then
+    local cur, max = 0, 0
+    for slot = 1, 19 do
+      local c, m = ns.try(GetInventoryItemDurability, slot)
+      if c and m and m > 0 then cur, max = cur + c, max + m end
+    end
+    if max > 0 then r.durability = math.floor(cur / max * 100 + 0.5) end
+  end
+  local numSlots = (C_Container and C_Container.GetContainerNumSlots) or GetContainerNumSlots
+  local slotInfo = C_Container and C_Container.GetContainerItemInfo
+  local instant = (C_Item and C_Item.GetItemInfoInstant) or GetItemInfoInstant
+  if numSlots and slotInfo and instant then
+    for bag = 0, (NUM_BAG_SLOTS or 4) do
+      for slot = 1, (ns.try(numSlots, bag) or 0) do
+        local info = ns.try(slotInfo, bag, slot)
+        if info and info.itemID then
+          local _, _, _, _, _, classID, subclassID = ns.try(instant, info.itemID)
+          if classID == 0 then
+            local kind = CONSUMABLE_KIND[subclassID] or "other"
+            r.consumables[kind] = (r.consumables[kind] or 0) + (info.stackCount or 1)
+          end
+        end
+      end
+    end
+  end
+  rec.readiness = r
 end
 
 -- Professions: modern API first, older skill-line API as a fallback, since

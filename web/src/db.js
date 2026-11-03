@@ -129,6 +129,84 @@ const MIGRATIONS = [
      bytes INTEGER,
      received_at TEXT NOT NULL DEFAULT (datetime('now'))
    );`,
+
+  // Phase 2: raids, sign-ups, soft-reserve loot with loyalty bonus, readiness
+  `ALTER TABLE characters ADD COLUMN readiness TEXT;
+   CREATE TABLE raids (
+     id INTEGER PRIMARY KEY,
+     guild_id INTEGER NOT NULL REFERENCES guilds(id),
+     title TEXT NOT NULL,
+     instance TEXT NOT NULL,
+     starts_at TEXT NOT NULL,              -- ISO 8601 UTC
+     size INTEGER,
+     sr_limit INTEGER NOT NULL DEFAULT 2,
+     notes TEXT,
+     status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','locked','done','cancelled')),
+     reminded INTEGER NOT NULL DEFAULT 0,
+     created_by INTEGER REFERENCES users(id),
+     created_at TEXT NOT NULL DEFAULT (datetime('now'))
+   );
+   CREATE INDEX raids_guild_time ON raids(guild_id, starts_at);
+   CREATE TABLE signups (
+     raid_id INTEGER NOT NULL REFERENCES raids(id) ON DELETE CASCADE,
+     user_id INTEGER NOT NULL REFERENCES users(id),
+     character TEXT NOT NULL,
+     role TEXT NOT NULL CHECK (role IN ('tank','healer','dps')),
+     status TEXT NOT NULL CHECK (status IN ('yes','tentative','no','bench')),
+     note TEXT,
+     updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+     PRIMARY KEY (raid_id, user_id)
+   );
+   CREATE TABLE loot_items (
+     id INTEGER PRIMARY KEY,
+     guild_id INTEGER NOT NULL REFERENCES guilds(id),
+     instance TEXT NOT NULL,
+     boss TEXT,
+     name TEXT NOT NULL,
+     UNIQUE (guild_id, instance, name)
+   );
+   CREATE TABLE reserves (
+     raid_id INTEGER NOT NULL REFERENCES raids(id) ON DELETE CASCADE,
+     user_id INTEGER NOT NULL REFERENCES users(id),
+     item_id INTEGER NOT NULL REFERENCES loot_items(id) ON DELETE CASCADE,
+     created_at TEXT NOT NULL DEFAULT (datetime('now')),
+     PRIMARY KEY (raid_id, user_id, item_id)
+   );
+   -- SR+ loyalty: +10 per raid a player attends with the same item reserved and doesn't win it.
+   CREATE TABLE loyalty (
+     guild_id INTEGER NOT NULL REFERENCES guilds(id),
+     user_id INTEGER NOT NULL REFERENCES users(id),
+     item_id INTEGER NOT NULL REFERENCES loot_items(id) ON DELETE CASCADE,
+     bonus INTEGER NOT NULL DEFAULT 0,
+     PRIMARY KEY (guild_id, user_id, item_id)
+   );
+   CREATE TABLE attendance (
+     raid_id INTEGER NOT NULL REFERENCES raids(id) ON DELETE CASCADE,
+     user_id INTEGER NOT NULL REFERENCES users(id),
+     PRIMARY KEY (raid_id, user_id)
+   );
+   CREATE TABLE loot_log (
+     id INTEGER PRIMARY KEY,
+     guild_id INTEGER NOT NULL REFERENCES guilds(id),
+     raid_id INTEGER REFERENCES raids(id) ON DELETE SET NULL,
+     item_id INTEGER REFERENCES loot_items(id) ON DELETE SET NULL,
+     item_name TEXT NOT NULL,
+     user_id INTEGER REFERENCES users(id),
+     character TEXT,
+     kind TEXT NOT NULL CHECK (kind IN ('sr','ms','os','free')),
+     roll INTEGER,
+     bonus INTEGER NOT NULL DEFAULT 0,
+     created_at TEXT NOT NULL DEFAULT (datetime('now'))
+   );
+   CREATE TABLE loot_rolls (
+     raid_id INTEGER NOT NULL REFERENCES raids(id) ON DELETE CASCADE,
+     item_id INTEGER NOT NULL REFERENCES loot_items(id) ON DELETE CASCADE,
+     user_id INTEGER NOT NULL REFERENCES users(id),
+     roll INTEGER NOT NULL,
+     bonus INTEGER NOT NULL,
+     created_at TEXT NOT NULL DEFAULT (datetime('now')),
+     PRIMARY KEY (raid_id, item_id, user_id)
+   );`,
 ];
 
 function migrate(db) {

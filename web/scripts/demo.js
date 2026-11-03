@@ -27,4 +27,23 @@ db.prepare("INSERT INTO craft_requests (guild_id, requester_id, item, notes, sta
 db.prepare("INSERT INTO buddy_posts (guild_id, user_id, character, level, zone, when_text, note) VALUES (?,?,?,?,?,?,?)").run(g, zul, 'Zuljinne', 18, 'Stonetalon Mountains', 'Tonight 8pm', 'Doing the Venture Co. chain');
 db.prepare("INSERT INTO announcements (guild_id, user_id, body) VALUES (?,?,?)").run(g, j, 'Welcome to Forever! Everyone grab the addon and companion from Settings.');
 db.prepare("INSERT INTO activity (guild_id, kind, text) VALUES (?,?,?),(?,?,?)").run(g, 'craft', 'Zul asked for Copper Chain Vest', g, 'buddy', 'Zuljinne is looking for leveling partners in Stonetalon Mountains');
+// Phase 2 sample: loot list, a raid with sign-ups, reserves and readiness.
+const R = require('../src/raids');
+R.importItems(db, g, 'Hyjal Summit', ['Rage Winterchill | Frostbound Greaves', 'Rage Winterchill | Chillheart Band', 'Anetheron | Cloak of the Long Night',
+  'Anetheron | Dreadlord Signet', 'Kaz\'rogal | Mark of the Legion', 'Azgalor | Doomfire Shoulders', 'Archimonde | Tear of the Earthmother', 'Archimonde | Hammer of Nordrassil'].join('\n'));
+const ids = Object.fromEntries(R.itemsForInstance(db, g, 'Hyjal Summit').map((i) => [i.name, i.id]));
+const ready = (ilvl, dur, c) => JSON.stringify({ ilvl, durability: dur, consumables: c, at: now - 3600 });
+db.prepare('UPDATE characters SET readiness = ? WHERE name = ?').run(ready(58, 92, { flask: 2, potion: 8, food: 20 }), 'Thrallia');
+db.prepare('UPDATE characters SET readiness = ? WHERE name = ?').run(ready(61, 24, { potion: 3 }), 'Grommash Hellscream');
+const raidAt = new Date(Date.now() + 2 * 86400000); raidAt.setUTCHours(18, 0, 0, 0);
+const rid = db.prepare("INSERT INTO raids (guild_id, title, instance, starts_at, size, sr_limit, notes, created_by) VALUES (?,?,?,?,?,?,?,?)")
+  .run(g, 'Hyjal week 1', 'Hyjal Summit', raidAt.toISOString(), 20, 2, 'Bring fire resistance gear for Azgalor.', j).lastInsertRowid;
+const raid = R.raidFor(db, g, rid);
+const sign = (u, ch, role, st, note) => db.prepare('INSERT INTO signups (raid_id, user_id, character, role, status, note) VALUES (?,?,?,?,?,?)').run(rid, u, ch, role, st, note || null);
+sign(j, 'Thrallia', 'healer', 'yes'); sign(grom, 'Grommash Hellscream', 'tank', 'yes'); sign(zul, 'Zuljinne', 'dps', 'tentative', 'Might be 15 min late');
+R.setReserves(db, raid, j, [ids['Chillheart Band'], ids['Tear of the Earthmother']]);
+R.setReserves(db, raid, grom, [ids['Frostbound Greaves'], ids['Tear of the Earthmother']]);
+R.setReserves(db, raid, zul, [ids['Cloak of the Long Night']]);
+db.prepare('INSERT INTO loyalty (guild_id, user_id, item_id, bonus) VALUES (?,?,?,20),(?,?,?,10)').run(g, grom, ids['Tear of the Earthmother'], g, j, ids['Chillheart Band']);
+R.rollItem(db, raid, ids['Tear of the Earthmother']);
 console.log('Demo data ready. Sign in (dev) as J#1001.');

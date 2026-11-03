@@ -16,6 +16,9 @@ function config(env = process.env) {
     bnetClientId: env.BNET_CLIENT_ID || '',
     bnetClientSecret: env.BNET_CLIENT_SECRET || '',
     devLogin: env.DEV_LOGIN === '1',
+    // Used only when a browser doesn't send its own offset. -120 = South Africa (UTC+2).
+    defaultTzOffset: Number(env.DEFAULT_TZ_OFFSET ?? -120),
+    timers: env.NODE_ENV !== 'test',
   };
 }
 
@@ -317,6 +320,11 @@ function createApp(cfg, db) {
     db.prepare("UPDATE memberships SET role = 'officer' WHERE user_id = ? AND guild_id = ? AND role = 'member'").run(req.params.id, req.guild.id);
     back(res, '/settings', 'Promoted to officer.');
   });
+
+  // ---- raids & loot (Phase 2) ----
+  const raids = require('./routes/raids')(app, { db, cfg, discord, activity: q.activity, needGuild, needOfficer, back });
+  app.locals.remind = raids.remind;
+  if (cfg.timers) setInterval(() => raids.remind().catch((e) => console.warn('Reminder failed:', e.message)), 60 * 1000).unref();
 
   // ---- companion API ----
   const bearer = (req, res, next) => {

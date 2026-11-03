@@ -20,6 +20,24 @@ local function buildText()
   local function add(s) lines[#lines + 1] = s end
   add("|cffe8a33d" .. (inbox.guild or "Guild") .. "|r  |cff999999updated " .. ago(inbox.generatedAt) .. "|r")
   add("")
+  add("|cffffd100Raids|r")
+  if inbox.raids and #inbox.raids > 0 then
+    for _, r in ipairs(inbox.raids) do
+      local me
+      if r.signup == "yes" then me = "|cff3fbf5ayou're coming|r" .. (r.role and (" as " .. r.role) or "")
+      elseif r.signup == "tentative" then me = "|cffe8a33dyou're a maybe|r"
+      elseif r.signup == "no" then me = "|cff999999you can't make it|r"
+      else me = "|cffe8a33dnot signed up yet|r" end
+      add("  " .. r.title .. "  |cff999999" .. date("%a %d %b %H:%M", r.startsAt or 0) .. ", " .. (r.coming or 0) .. " coming|r")
+      add("    " .. me)
+      if r.reserves and #r.reserves > 0 then
+        local parts = {}
+        for _, x in ipairs(r.reserves) do parts[#parts + 1] = x.name .. ((x.bonus or 0) > 0 and (" (+" .. x.bonus .. ")") or "") end
+        add("    |cff999999reserved:|r " .. table.concat(parts, ", "))
+      end
+    end
+  else add("  |cff999999Nothing scheduled|r") end
+  add("")
   add("|cffffd100Notices|r")
   if inbox.announcements and #inbox.announcements > 0 then
     for _, a in ipairs(inbox.announcements) do add("  " .. a.body .. "  |cff999999" .. (a.by or ""):gsub("#%d+", "") .. "|r") end
@@ -114,6 +132,10 @@ function ns.showLoginNews()
   local notices = inbox.announcements and #inbox.announcements or 0
   local parts = {}
   if craft > 0 then parts[#parts + 1] = craft .. (craft == 1 and " crafting request you can make" or " crafting requests you can make") end
+  local nextRaid = inbox.raids and inbox.raids[1]
+  if nextRaid and not nextRaid.signup then
+    parts[#parts + 1] = nextRaid.title .. " on " .. date("%a %H:%M", nextRaid.startsAt or 0) .. ": you're not signed up yet"
+  end
   if notices > 0 then parts[#parts + 1] = "latest notice: " .. inbox.announcements[1].body end
   if #parts > 0 then ns.print(table.concat(parts, ". ") .. ". Type /wow for more.")
   else ns.print("Type /wow for the guild panel.") end

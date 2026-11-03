@@ -5,19 +5,32 @@ const str = (v, max = 80) => (typeof v === 'string' ? v.slice(0, max) : v == nul
 const int = (v) => (Number.isFinite(Number(v)) ? Math.trunc(Number(v)) : null);
 const list = (v) => (Array.isArray(v) ? v : v && typeof v === 'object' ? Object.values(v) : []);
 
+// Readiness from the addon: item level, repair %, consumables in bags.
+function cleanReadiness(r) {
+  if (!r || typeof r !== 'object') return null;
+  const num = (v, lo, hi) => (Number.isFinite(Number(v)) ? Math.min(hi, Math.max(lo, Number(v))) : null);
+  const consumables = {};
+  for (const k of ['flask', 'elixir', 'potion', 'food', 'bandage', 'other']) {
+    const n = num(r.consumables && r.consumables[k], 0, 9999);
+    if (n) consumables[k] = Math.round(n);
+  }
+  return JSON.stringify({ ilvl: num(r.ilvl, 0, 1000), durability: num(r.durability, 0, 100), consumables, at: num(r.at, 0, 4e9) });
+}
+
 function applyPayload(db, guildId, userId, payload) {
   if (!payload || typeof payload !== 'object') throw new Error('Payload must be an object');
   const stats = { characters: 0, roster: 0, recipes: 0, ctas: [] };
   const now = new Date().toISOString();
 
   const upsertChar = db.prepare(`
-    INSERT INTO characters (guild_id, user_id, name, class, race, level, faction, zone, money, online, last_seen, updated_at)
-    VALUES (@guild_id, @user_id, @name, @class, @race, @level, @faction, @zone, @money, 0, @last_seen, @now)
+    INSERT INTO characters (guild_id, user_id, name, class, race, level, faction, zone, money, online, last_seen, updated_at, readiness)
+    VALUES (@guild_id, @user_id, @name, @class, @race, @level, @faction, @zone, @money, 0, @last_seen, @now, @readiness)
     ON CONFLICT (guild_id, name) DO UPDATE SET
       user_id = excluded.user_id, class = COALESCE(excluded.class, class), race = COALESCE(excluded.race, race),
       level = COALESCE(excluded.level, level), faction = COALESCE(excluded.faction, faction),
       zone = COALESCE(excluded.zone, zone), money = COALESCE(excluded.money, money),
-      last_seen = COALESCE(excluded.last_seen, last_seen), updated_at = excluded.updated_at`);
+      last_seen = COALESCE(excluded.last_seen, last_seen), updated_at = excluded.updated_at,
+      readiness = COALESCE(excluded.readiness, readiness)`);
   const charId = db.prepare('SELECT id FROM characters WHERE guild_id = ? AND name = ?');
   const delProf = db.prepare('DELETE FROM professions WHERE character_id = ?');
   const insProf = db.prepare('INSERT OR REPLACE INTO professions (character_id, name, skill, max_skill) VALUES (?,?,?,?)');
@@ -53,6 +66,7 @@ function applyPayload(db, guildId, userId, payload) {
         class: str(c.class, 20), race: str(c.race, 30), level: int(c.level),
         faction: str(c.faction, 10), zone: str(c.zone, 60), money: int(c.money),
         last_seen: c.updated ? new Date(int(c.updated) * 1000).toISOString() : now, now,
+        readiness: cleanReadiness(c.readiness),
       });
       const { id } = charId.get(guildId, name);
       if (!before) activity.run(guildId, 'character', `${name} linked their character`);
@@ -123,8 +137,21 @@ function buildInbox(db, guildId, userId) {
     WHERE cr.guild_id = ? AND cr.requester_id = ? AND cr.status IN ('open','claimed') ORDER BY cr.id DESC LIMIT 10`).all(guildId, userId);
   const buddies = db.prepare(`SELECT b.character, b.level, b.zone, b.when_text AS whenText, b.note FROM buddy_posts b
     WHERE b.guild_id = ? AND b.active = 1 AND b.user_id != ? ORDER BY b.id DESC LIMIT 10`).all(guildId, userId);
+  const raids = db.prepare(`SELECT r.id, r.title, r.instance, r.starts_at, r.status, s.status AS signup, s.role, s.character,
+      (SELECT COUNT(*) FROM signups x WHERE x.raid_id = r.id AND x.status = 'yes') AS coming
+    FROM raids r LEFT JOIN signups s ON s.raid_id = r.id AND s.user_id = ?
+    WHERE r.guild_id = ? AND r.status IN ('open','locked') AND r.starts_at > ? ORDER BY r.starts_at LIMIT 5`)
+    .all(userId, guildId, new Date(Date.now() - 3 * 3600 * 1000).toISOString());
+  const resv = db.prepare(`SELECT li.name, COALESCE(l.bonus, 0) AS bonus FROM reserves rs JOIN loot_items li ON li.id = rs.item_id
+    LEFT JOIN loyalty l ON l.guild_id = li.guild_id AND l.user_id = rs.user_id AND l.item_id = li.id WHERE rs.raid_id = ? AND rs.user_id = ?`);
+  for (const r of raids) {
+    r.startsAt = Math.floor(new Date(r.starts_at).getTime() / 1000);
+    delete r.starts_at;
+    r.reserves = resv.all(r.id, userId);
+  }
   return {
     guild: guild ? guild.name : '',
+    raids,
     generatedAt: Math.floor(Date.now() / 1000),
     announcements, canCraft, myRequests: mine, buddies,
   };
