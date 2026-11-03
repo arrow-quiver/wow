@@ -8,3 +8,5 @@ companion/dist/
 companion/*.exe
 companion/*.zip
 web/downloads/
+companion.log
+companion.log.old

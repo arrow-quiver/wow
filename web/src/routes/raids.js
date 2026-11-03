@@ -11,7 +11,7 @@ function toUtc(local, tzOffset, fallbackOffset) {
 }
 const unix = (iso) => Math.floor(new Date(iso).getTime() / 1000);
 
-module.exports = function raidRoutes(app, { db, cfg, discord, activity, needGuild, needOfficer, back }) {
+module.exports = function raidRoutes(app, { db, cfg, discord, activity, needGuild, needOfficer, back, audit = () => {} }) {
   const isOfficer = (req) => ['owner', 'officer'].includes(req.guild.role);
   const getRaid = (req, res) => {
     const raid = R.raidFor(db, req.guild.id, req.params.id);
@@ -47,6 +47,7 @@ module.exports = function raidRoutes(app, { db, cfg, discord, activity, needGuil
     const r = db.prepare('INSERT INTO raids (guild_id, title, instance, starts_at, size, sr_limit, notes, created_by, kind) VALUES (?,?,?,?,?,?,?,?,?)')
       .run(req.guild.id, title, instance, startsAt, size, kind === 'raid' ? srLimit : 0, String(req.body.notes || '').slice(0, 300), req.user.id, kind);
     activity.run(req.guild.id, 'raid', `${who(req)} scheduled ${title}`);
+    audit(req, `scheduled ${kind}`, `${title} (${startsAt})`);
     const icon = { raid: '🗓️', pvp: '⚔️', event: '🎉' }[kind];
     await discord(req.guild, `${icon} **${kind === 'pvp' ? 'PvP' : kind === 'event' ? 'Event' : 'Raid'}: ${title}** (${instance})\n<t:${unix(startsAt)}:F>, <t:${unix(startsAt)}:R>\nSign up${kind === 'raid' ? ' and reserve' : ''}: ${cfg.baseUrl}/raids/${r.lastInsertRowid}`);
     res.redirect(`/raids/${r.lastInsertRowid}`);
@@ -100,6 +101,7 @@ module.exports = function raidRoutes(app, { db, cfg, discord, activity, needGuil
     const raid = getRaid(req, res); if (!raid) return;
     if (!from.includes(raid.status)) return back(res, `/raids/${raid.id}`);
     db.prepare('UPDATE raids SET status = ? WHERE id = ?').run(to, raid.id);
+    audit(req, `raid ${to === 'open' ? 'reopened' : to}`, raid.title);
     if (to === 'cancelled') discord(req.guild, `❌ **${raid.title}** on <t:${unix(raid.starts_at)}:F> is cancelled.`);
     back(res, `/raids/${raid.id}`, msg);
   };
@@ -112,6 +114,7 @@ module.exports = function raidRoutes(app, { db, cfg, discord, activity, needGuil
     try {
       const r = R.closeRaid(db, raid, [].concat(req.body.attended || []));
       activity.run(req.guild.id, 'raid', `${raid.title} finished with ${r.attended} raiders`);
+      audit(req, 'raid closed', `${raid.title}: ${r.attended} attended, ${r.noShows} no-shows`);
       back(res, `/raids/${raid.id}`, `Raid closed. ${r.attended} attended${r.noShows ? `, ${r.noShows} no-show${r.noShows === 1 ? '' : 's'}` : ''}. Bonuses updated.`);
     } catch (e) { back(res, `/raids/${raid.id}`, e.message); }
   });
@@ -150,6 +153,7 @@ module.exports = function raidRoutes(app, { db, cfg, discord, activity, needGuil
     try {
       const name = R.awardItem(db, raid, { itemId, itemName: req.body.item_name, userId, character: signup ? signup.character : null, kind });
       activity.run(req.guild.id, 'loot', `${signup ? signup.character : 'Someone'} received ${name}`);
+      audit(req, 'loot given', `${name} → ${signup ? signup.character : '?'} (${kind})`);
       await discord(req.guild, `💎 **${name}** → ${signup ? signup.character : 'someone'} (${kind.toUpperCase()}, ${raid.title})`);
     } catch (e) { return back(res, `/raids/${raid.id}/loot`, e.message); }
     res.redirect(`/raids/${raid.id}/loot`);
@@ -174,11 +178,12 @@ module.exports = function raidRoutes(app, { db, cfg, discord, activity, needGuil
     const instance = String(req.body.instance || '').trim().slice(0, 60);
     if (!instance) return back(res, '/loot', 'Name the instance.');
     const n = R.importItems(db, req.guild.id, instance, req.body.items);
+    if (n) audit(req, 'loot list items added', `${n} to ${instance}`);
     back(res, `/loot?instance=${encodeURIComponent(instance)}`, `${n} item${n === 1 ? '' : 's'} added to ${instance}.`);
   });
   app.post('/loot/items/:id(\\d+)/delete', needOfficer, (req, res) => {
     const it = db.prepare('SELECT * FROM loot_items WHERE id = ? AND guild_id = ?').get(req.params.id, req.guild.id);
-    if (it) db.prepare('DELETE FROM loot_items WHERE id = ?').run(it.id);
+    if (it) { db.prepare('DELETE FROM loot_items WHERE id = ?').run(it.id); audit(req, 'loot list item removed', `${it.name} (${it.instance})`); }
     back(res, `/loot${it ? `?instance=${encodeURIComponent(it.instance)}` : ''}`, it ? `${it.name} removed.` : '');
   });
 

@@ -56,6 +56,46 @@ Built into the guild addon. It only reads profession and bag data, out of combat
 - **Shopping list:** a small movable tracker shows each mat as `have / need`. It also notes how many are on your alts or in the guild bank (from the site). It ticks off as you loot and tells you when everything's ready. The list also appears on the site's Crafters page, with a total cost.
 - Commands: `/wow guide` (show/hide the guide), `/wow list` (show/hide the tracker), `/wow list clear`.
 
+## Running it safely
+
+- **Backups:** the server snapshots the database every day into `/data/backups` and keeps the last 14. Officers can make one on demand under **Officer tools**, and the owner can download them.
+- **Officer tools** (`/admin`):
+  - **Sync health:** last sync and addon/companion version per member. Outdated versions show in red. Grey rows haven't synced for a week.
+  - **Backups.**
+  - **Audit log:** promotions, removals, webhook changes, raids scheduled or closed, loot given, bank requests handled, drives, invite link changes.
+- **Members:** officers can promote and remove members. Only the owner can demote or remove officers. Removing someone also kills their sync keys. **Replace invite link** makes a new one if the old link leaks.
+- **Security:**
+  - Content-Security-Policy and HSTS headers.
+  - Rate limits: 40 uploads a minute per sync key, 20 sign-in attempts a minute per IP, 120 Discord calls a minute.
+  - Sync keys only work while their owner is still in the guild.
+- **Version notices:** the addon tells players in chat when a newer version is on `/get`, and so does the companion window.
+- **Onboarding:** Camp shows each new member a short checklist until they've finished setup:
+  1. Synced
+  2. Professions opened
+  3. Main chosen
+  4. Discord linked
+  5. Signed up for the next raid
+
+### Companion options
+| Command | What it does |
+|---|---|
+| `wow-companion.exe` | Run normally (watch and upload) |
+| `wow-companion.exe --install-startup` | Start automatically with Windows (minimised) |
+| `wow-companion.exe --uninstall-startup` | Stop starting with Windows |
+| `wow-companion.exe --check` | Show which game folders it found and test the sync key |
+
+It writes `companion.log` next to itself. Send that file when something isn't syncing. If the site is unreachable, it retries with growing waits (5 seconds up to 5 minutes) instead of hammering it.
+
+### Addon options
+`/wow options` (or Settings → AddOns → wow guild):
+- login news
+- update notices
+- auto-open the skill-up guide
+- show the shopping list on login
+- share bank data
+
+The addon also records PvP rank and honor, reputations and currencies (for example Merchant's Favor), and shows them on each character's page.
+
 ## Deploy on Coolify
 
 1. Push this folder to a GitHub repo.
@@ -88,6 +128,7 @@ Windows may show a SmartScreen warning the first time, because the exe isn't cod
 | `/wow status` | What's been saved, and when news last arrived |
 | `/wow guide` | Show or hide the skill-up guide next to your profession window |
 | `/wow list` | Show or hide your shopping list tracker (`/wow list clear` empties it) |
+| `/wow options` | Addon settings |
 
 ## Development
 

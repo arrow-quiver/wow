@@ -30,11 +30,12 @@ const NAV = [
   ['/prices', 'Prices', 'prices'],
   ['/drives', 'Supply drives', 'drives'],
   ['/settings', 'Settings', 'settings'],
+  ['/admin', 'Officer tools', 'admin', 'officer'],
 ];
 
 function layout({ title, active, user, guild, body, csrf, flash }) {
   const nav = guild
-    ? NAV.map(([href, label, key]) => `<a href="${href}" class="nav-link${key === active ? ' is-active' : ''}"${key === active ? ' aria-current="page"' : ''}>${label}</a>`).join('')
+    ? NAV.filter((n) => n[3] !== 'officer' || ['owner', 'officer'].includes(guild.role)).map(([href, label, key]) => `<a href="${href}" class="nav-link${key === active ? ' is-active' : ''}"${key === active ? ' aria-current="page"' : ''}>${label}</a>`).join('')
     : '';
   return `<!doctype html>
 <html lang="en">

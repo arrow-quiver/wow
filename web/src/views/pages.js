@@ -81,8 +81,17 @@ function campRing(online, scannedAt) {
   </section>`;
 }
 
-function home({ csrf, online, scannedAt, ctas, announcements, activity, isOfficer, mySync }) {
-  return `${campRing(online, scannedAt)}
+function onboardingBox(steps) {
+  if (!steps || steps.every((x) => x.done)) return '';
+  const done = steps.filter((x) => x.done).length;
+  return `<section class="onboard" aria-labelledby="ob-h">
+    <h2 id="ob-h">Get set up <span class="muted small">${done} of ${steps.length} done</span></h2>
+    <ol>${steps.map((x) => `<li class="${x.done ? 'is-done' : ''}">${x.done ? `<span>${esc(x.label)}</span>` : `<a href="${esc(x.href)}">${esc(x.label)}</a>`}</li>`).join('')}</ol>
+  </section>`;
+}
+
+function home({ csrf, online, scannedAt, ctas, announcements, activity, isOfficer, mySync, onboarding }) {
+  return `${onboardingBox(onboarding)}${campRing(online, scannedAt)}
   <div class="cols">
     <section class="col-main">
       <h2>Call to arms</h2>
@@ -140,6 +149,38 @@ function roster({ chars, scannedAt }) {
   </table></div>`;
 }
 
+const STANDING = ['', 'Hated', 'Hostile', 'Unfriendly', 'Neutral', 'Friendly', 'Honored', 'Revered', 'Exalted'];
+function extrasSection(raw) {
+  let x; try { x = raw ? JSON.parse(raw) : null; } catch { x = null; }
+  if (!x) return '';
+  const parts = [];
+  if (x.pvp) {
+    const p = x.pvp;
+    const facts = [
+      p.rankName ? `Rank: <strong>${esc(p.rankName)}</strong>${p.rank ? ` (${esc(p.rank)})` : ''}` : '',
+      p.highestRank ? `Highest rank ${esc(p.highestRank)}` : '',
+      p.honor != null ? `Honor: ${esc(p.honor.toLocaleString('en'))}` : '',
+      p.honorLevel ? `Honor level ${esc(p.honorLevel)}` : '',
+      p.hk != null ? `${esc(p.hk.toLocaleString('en'))} honorable kills` : '',
+      p.weekHk != null ? `This week: ${esc(p.weekHk)} kills${p.weekContribution ? `, ${esc(p.weekContribution.toLocaleString('en'))} honor` : ''}` : '',
+      p.lastWeekRank ? `Last week's standing: ${esc(p.lastWeekRank)}` : '',
+    ].filter(Boolean);
+    if (facts.length) parts.push(`<h2>PvP</h2><ul class="facts">${facts.map((f) => `<li>${f}</li>`).join('')}</ul>`);
+  }
+  if (x.currencies && x.currencies.length) {
+    parts.push(`<h2>Currencies</h2><ul class="facts">${x.currencies.map((cc) => `<li>${esc(cc.name)}: <strong>${esc(cc.qty.toLocaleString('en'))}</strong>${cc.max ? ` <span class="muted">of ${esc(cc.max.toLocaleString('en'))}</span>` : ''}</li>`).join('')}</ul>`);
+  }
+  if (x.reputations && x.reputations.length) {
+    const reps = x.reputations.filter((r) => r.standing && r.standing !== 4 || r.value);
+    parts.push(`<details class="recipes"><summary>Reputations (${reps.length})</summary><ul class="profs">${reps.map((r) => {
+      const pct = r.max ? Math.max(0, Math.min(100, Math.round((r.value / r.max) * 100))) : null;
+      return `<li><strong>${esc(r.name)}</strong>${pct != null ? `<span class="bar" role="img" aria-label="${pct}% to next standing"><span style="width:${pct}%"></span></span>` : '<span></span>'}
+        <span class="muted">${esc(STANDING[r.standing] || '')}</span></li>`;
+    }).join('')}</ul></details>`);
+  }
+  return parts.join('');
+}
+
 function character({ c, profs, recipes, csrf, isOwner, alts }) {
   const [label, color] = classInfo(c.class);
   const byProf = {};
@@ -149,6 +190,7 @@ function character({ c, profs, recipes, csrf, isOwner, alts }) {
   <p class="lede">Level ${esc(c.level ?? '?')} ${esc(c.race || '')} ${esc(label)}${c.zone ? `, last in ${esc(c.zone)}` : ''}${c.rank ? `. ${esc(c.rank)}` : ''}.</p>
   ${isOwner && !c.is_main ? `<form method="post" action="/characters/${encodeURIComponent(c.name)}/main">${csrfField(csrf)}<button class="btn">Make this my main</button></form>` : ''}
   ${alts.length ? `<p>Same player: ${alts.map((a) => charName(a)).join(', ')}</p>` : ''}
+  ${extrasSection(c.extras)}
   <h2>Professions</h2>
   ${profs.length ? `<ul class="profs">${profs.map((p) => `<li><strong>${esc(p.name)}</strong>
      <span class="bar" role="img" aria-label="${esc(p.skill)} of ${esc(p.max_skill)}"><span style="width:${Math.min(100, (p.skill / (p.max_skill || 300)) * 100)}%"></span></span>
@@ -248,7 +290,11 @@ function buddies({ csrf, posts, myChars, userId }) {
 
 // ---------- Settings ----------
 
-function settings({ csrf, tokens, newToken, guild, baseUrl, isOfficer, members, discordInfo = {} }) {
+function memberAction(id, verb, label, csrf, confirm) {
+  return `<form method="post" action="/members/${id}/${verb}">${csrfField(csrf)}<button class="btn btn-small btn-quiet"${confirm ? ` data-confirm="${esc(confirm)}"` : ''}>${label}</button></form>`;
+}
+
+function settings({ csrf, tokens, newToken, guild, baseUrl, isOfficer, isOwner, me, members, discordInfo = {} }) {
   return `<h1>Settings</h1>
   <section class="setting">
     <h2>Connect the game</h2>
@@ -294,7 +340,10 @@ function settings({ csrf, tokens, newToken, guild, baseUrl, isOfficer, members, 
   <section class="setting">
     <h2>Members</h2>
     <ul class="tokens">${members.map((m) => `<li>${esc(m.battletag)} <span class="pill">${esc(m.role)}</span>
-      ${m.role === 'member' ? `<form method="post" action="/members/${m.id}/promote">${csrfField(csrf)}<button class="btn btn-small btn-quiet">Make officer</button></form>` : ''}</li>`).join('')}</ul>
+      ${m.role === 'member' ? memberAction(m.id, 'promote', 'Make officer', csrf) : ''}
+      ${m.role === 'officer' && isOwner ? memberAction(m.id, 'demote', 'Make member', csrf) : ''}
+      ${m.role !== 'owner' && m.id !== me && (m.role === 'member' || isOwner) ? memberAction(m.id, 'remove', 'Remove', csrf, `Remove ${m.battletag} from the guild? Their sync keys stop working.`) : ''}</li>`).join('')}</ul>
+    <form method="post" action="/settings/invite/reset">${csrfField(csrf)}<button class="btn btn-small btn-quiet" data-confirm="Make a new invite link? The current one will stop working.">Replace invite link</button></form>
   </section>` : ''}`;
 }
 
@@ -319,8 +368,40 @@ function downloads({ addon, companion, baseUrl, signedIn }) {
   </section>`;
 }
 
+function semverLess(a, b) {
+  if (!a || !b) return false;
+  const pa = a.split('.').map(Number); const pb = b.split('.').map(Number);
+  for (let i = 0; i < 3; i++) { if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) < (pb[i] || 0); }
+  return false;
+}
+
+function admin({ latest, isOwner, members, backups, auditRows }) {
+  const stale = (iso) => !iso || Date.now() - new Date(iso.replace(' ', 'T') + (iso.includes('Z') ? '' : 'Z')).getTime() > 7 * 86400000;
+  const ver = (v, newest) => (!v ? '<span class="muted">not yet</span>' : semverLess(v, newest) ? `<span class="warn">${esc(v)}</span>` : esc(v));
+  return `<h1>Officer tools</h1>
+  <section class="setting">
+    <h2>Sync health</h2>
+    <p class="muted">Latest versions: addon ${esc(latest.addon || '?')}, companion ${esc(latest.companion || '?')}. Red means outdated, so point them to the downloads page. Grey rows haven't synced for a week.</p>
+    <div class="table-wrap"><table><thead><tr><th>Member</th><th>Role</th><th class="num">Characters</th><th>Last sync</th><th>Addon</th><th>Companion</th><th>Discord</th></tr></thead><tbody>
+      ${members.map((m) => `<tr${stale(m.last_sync_at) ? ' class="is-stale-row"' : ''}><td>${esc(m.battletag)}</td><td>${esc(m.role)}</td><td class="num">${m.chars}</td>
+        <td>${m.last_sync_at ? ago(m.last_sync_at) : `<span class="warn">never</span>${m.keys ? '' : ' <span class="muted">(no sync key)</span>'}`}</td>
+        <td>${ver(m.addon_version, latest.addon)}</td><td>${ver(m.companion_version, latest.companion)}</td><td>${m.discord_id ? 'linked' : '<span class="muted">no</span>'}</td></tr>`).join('')}
+    </tbody></table></div>
+  </section>
+  <section class="setting">
+    <h2>Backups</h2>
+    <p class="muted">The database is copied every day and the last 14 copies are kept on the server. ${isOwner ? 'As owner you can download them.' : 'The guild owner can download them.'}</p>
+    <ul class="board">${backups.slice(0, 14).map((b) => `<li>${isOwner ? `<a href="/admin/backups/${encodeURIComponent(b.file)}">${esc(b.file)}</a>` : esc(b.file)} <span class="muted">${Math.max(1, Math.round(b.bytes / 1024))} KB, ${ago(b.at)}</span></li>`).join('') || '<li class="empty">No backups yet. The first one runs shortly after the server starts.</li>'}</ul>
+  </section>
+  <section class="setting">
+    <h2>Audit log</h2>
+    <p class="muted">Officer and account actions, newest first.</p>
+    <ul class="board">${auditRows.map((a) => `<li><strong>${esc((a.battletag || 'system').split('#')[0])}</strong> ${esc(a.action)}${a.detail ? `: ${esc(a.detail)}` : ''} <span class="muted">${ago(a.created_at)}</span></li>`).join('') || '<li class="empty">Nothing yet.</li>'}</ul>
+  </section>`;
+}
+
 function notFound() {
   return '<h1>Nothing here</h1><p>That page doesn’t exist. <a href="/">Back to camp</a>.</p>';
 }
 
-module.exports = { downloads, landing, setup, home, roster, character, crafters, requests, buddies, settings, notFound };
+module.exports = { admin, semverLess, downloads, landing, setup, home, roster, character, crafters, requests, buddies, settings, notFound };

@@ -13,3 +13,4 @@ companion/config.json
 .coolify-token
 .bnet
 .discord
+companion/companion.log*

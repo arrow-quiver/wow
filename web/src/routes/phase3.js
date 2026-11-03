@@ -23,7 +23,7 @@ function mountDiscord(app, { db, cfg, discord }) {
   });
 }
 
-function routes(app, { db, cfg, discord, activity, needGuild, needOfficer, back }) {
+function routes(app, { db, cfg, discord, activity, needGuild, needOfficer, back, audit = () => {} }) {
   const isOfficer = (req) => ['owner', 'officer'].includes(req.guild.role);
   const who = (req) => req.user.battletag.split('#')[0];
   const nameOf = db.prepare('SELECT name FROM item_names WHERE item_id = ?');
@@ -40,7 +40,7 @@ function routes(app, { db, cfg, discord, activity, needGuild, needOfficer, back 
   });
   app.post('/settings/discord/register', needOfficer, async (req, res) => {
     if (!cfg.discordAppId || !cfg.discordBotToken) return back(res, '/settings', 'The Discord app details aren’t set on the server yet.');
-    try { const n = await D.registerCommands(cfg); back(res, '/settings', `${n} slash commands registered with Discord.`); } catch (e) { back(res, '/settings', e.message); }
+    try { const n = await D.registerCommands(cfg); audit(req, 'Discord commands registered', String(n)); back(res, '/settings', `${n} slash commands registered with Discord.`); } catch (e) { back(res, '/settings', e.message); }
   });
 
   // ---------- Bank ----------
@@ -87,6 +87,7 @@ function routes(app, { db, cfg, discord, activity, needGuild, needOfficer, back 
     if (verb !== 'cancel' && !isOfficer(req)) return res.status(403).send('Officers only.');
     db.prepare("UPDATE bank_requests SET status = ?, handled_by = ?, updated_at = datetime('now') WHERE id = ?").run(verb === 'cancel' ? 'cancelled' : verb, req.user.id, r.id);
     if (verb === 'sent') activity.run(req.guild.id, 'bank', `${r.count} × ${r.item} sent from the bank`);
+    if (verb !== 'cancel') audit(req, `bank request ${verb}`, `${r.count} × ${r.item}`);
     back(res, '/bank', verb === 'sent' ? 'Marked as sent.' : verb === 'declined' ? 'Request declined.' : 'Request cancelled.');
   });
   app.post('/bank/alts', needOfficer, (req, res) => {
@@ -94,6 +95,7 @@ function routes(app, { db, cfg, discord, activity, needGuild, needOfficer, back 
     const c = db.prepare('SELECT * FROM characters WHERE guild_id = ? AND name = ?').get(req.guild.id, name);
     if (!c) return back(res, '/bank', 'Character not found.');
     db.prepare('UPDATE characters SET is_bank = ? WHERE id = ?').run(c.is_bank ? 0 : 1, c.id);
+    audit(req, c.is_bank ? 'bank character removed' : 'bank character added', c.name);
     back(res, '/bank', c.is_bank ? `${c.name} is no longer a bank character.` : `${c.name} is now a bank character. Its bags and bank show here after its next sync.`);
   });
 
@@ -142,6 +144,7 @@ function routes(app, { db, cfg, discord, activity, needGuild, needOfficer, back 
     if (!title || !unit || !goal) return back(res, '/drives', 'Give the drive a name, what you’re collecting, and a goal.');
     db.prepare('INSERT INTO drives (guild_id, title, unit, goal, notes, created_by) VALUES (?,?,?,?,?,?)').run(req.guild.id, title, unit, goal, String(req.body.notes || '').slice(0, 300), req.user.id);
     activity.run(req.guild.id, 'drive', `New supply drive: ${title}`);
+    audit(req, 'drive started', title);
     await discord(req.guild, `📦 **Supply drive: ${title}**. Goal: ${goal.toLocaleString('en')} ${unit}.\n${cfg.baseUrl}/drives`);
     back(res, '/drives', 'Drive started.');
   });
@@ -161,7 +164,8 @@ function routes(app, { db, cfg, discord, activity, needGuild, needOfficer, back 
     back(res, '/drives', `Logged ${amount} ${d.unit}.`);
   });
   app.post('/drives/:id(\\d+)/close', needOfficer, (req, res) => {
-    db.prepare("UPDATE drives SET status = 'closed' WHERE id = ? AND guild_id = ? AND status = 'open'").run(req.params.id, req.guild.id);
+    const r = db.prepare("UPDATE drives SET status = 'closed' WHERE id = ? AND guild_id = ? AND status = 'open'").run(req.params.id, req.guild.id);
+    if (r.changes) audit(req, 'drive closed', `#${req.params.id}`);
     back(res, '/drives', 'Drive closed.');
   });
 }

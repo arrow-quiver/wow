@@ -19,20 +19,43 @@ function cleanReadiness(r) {
   return JSON.stringify({ ilvl: num(r.ilvl, 0, 1000), durability: num(r.durability, 0, 100), consumables, at: num(r.at, 0, 4e9) });
 }
 
+// PvP, reputations and currencies. Stored as reported; the site only displays them.
+function cleanExtras(c) {
+  const out = {};
+  const num = (v) => (Number.isFinite(Number(v)) ? Math.trunc(Number(v)) : null);
+  if (c.pvp && typeof c.pvp === 'object') {
+    const p = {};
+    for (const k of ['rank', 'honor', 'honorLevel', 'hk', 'weekHk', 'weekContribution', 'lastWeekHk', 'lastWeekContribution', 'lastWeekRank', 'highestRank']) {
+      const v = num(c.pvp[k]); if (v != null) p[k] = v;
+    }
+    if (typeof c.pvp.rankName === 'string') p.rankName = c.pvp.rankName.slice(0, 40);
+    if (Object.keys(p).length) out.pvp = p;
+  }
+  const reps = list(c.reputations).slice(0, 120).map((r) => ({
+    name: str(r && r.name, 60), standing: num(r && r.standing), value: num(r && r.value), max: num(r && r.max), header: str(r && r.header, 60),
+  })).filter((r) => r.name);
+  if (reps.length) out.reputations = reps;
+  const cur = list(c.currencies).slice(0, 100).map((x) => ({ id: num(x && x.id), name: str(x && x.name, 60), qty: num(x && x.qty), max: num(x && x.max) }))
+    .filter((x) => x.name && x.qty != null);
+  if (cur.length) out.currencies = cur;
+  if (c.addonVersion) out.addonVersion = str(c.addonVersion, 20);
+  return Object.keys(out).length ? JSON.stringify(out) : null;
+}
+
 function applyPayload(db, guildId, userId, payload) {
   if (!payload || typeof payload !== 'object') throw new Error('Payload must be an object');
   const stats = { characters: 0, roster: 0, recipes: 0, ctas: [] };
   const now = new Date().toISOString();
 
   const upsertChar = db.prepare(`
-    INSERT INTO characters (guild_id, user_id, name, class, race, level, faction, zone, money, online, last_seen, updated_at, readiness)
-    VALUES (@guild_id, @user_id, @name, @class, @race, @level, @faction, @zone, @money, 0, @last_seen, @now, @readiness)
+    INSERT INTO characters (guild_id, user_id, name, class, race, level, faction, zone, money, online, last_seen, updated_at, readiness, extras)
+    VALUES (@guild_id, @user_id, @name, @class, @race, @level, @faction, @zone, @money, 0, @last_seen, @now, @readiness, @extras)
     ON CONFLICT (guild_id, name) DO UPDATE SET
       user_id = excluded.user_id, class = COALESCE(excluded.class, class), race = COALESCE(excluded.race, race),
       level = COALESCE(excluded.level, level), faction = COALESCE(excluded.faction, faction),
       zone = COALESCE(excluded.zone, zone), money = COALESCE(excluded.money, money),
       last_seen = COALESCE(excluded.last_seen, last_seen), updated_at = excluded.updated_at,
-      readiness = COALESCE(excluded.readiness, readiness)`);
+      readiness = COALESCE(excluded.readiness, readiness), extras = COALESCE(excluded.extras, extras)`);
   const charId = db.prepare('SELECT id FROM characters WHERE guild_id = ? AND name = ?');
   const delProf = db.prepare('DELETE FROM professions WHERE character_id = ?');
   const insProf = db.prepare('INSERT OR REPLACE INTO professions (character_id, name, skill, max_skill) VALUES (?,?,?,?)');
@@ -69,6 +92,7 @@ function applyPayload(db, guildId, userId, payload) {
         faction: str(c.faction, 10), zone: str(c.zone, 60), money: int(c.money),
         last_seen: c.updated ? new Date(int(c.updated) * 1000).toISOString() : now, now,
         readiness: cleanReadiness(c.readiness),
+        extras: cleanExtras(c),
       });
       const { id } = charId.get(guildId, name);
       if (!before) activity.run(guildId, 'character', `${name} linked their character`);

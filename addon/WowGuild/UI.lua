@@ -124,6 +124,10 @@ end
 
 function ns.showLoginNews()
   local inbox = WowGuildInbox
+  if inbox and inbox.latestAddon and ns.opt("updateNotice") and ns.versionLess(ns.addonVersion(), inbox.latestAddon) then
+    ns.print(string.format("|cffe8a33dA newer version of this addon (%s) is out.|r Get it at %s/get", inbox.latestAddon, inbox.site or "the guild site"))
+  end
+  if not ns.opt("loginNews") then return end
   if not inbox then
     ns.print("Type /wow for the guild panel. No news from the site yet. Is the companion running?")
     return

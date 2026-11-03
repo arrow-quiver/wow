@@ -29,10 +29,38 @@ function ns.charKey()
   return name
 end
 
+function ns.addonVersion()
+  local get = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
+  return get and ns.try(get, ADDON, "Version") or "?"
+end
+
+-- "0.4.0" < "0.10.0"
+function ns.versionLess(a, b)
+  if type(a) ~= "string" or type(b) ~= "string" then return false end
+  local pa, pb = {}, {}
+  for n in string.gmatch(a, "%d+") do pa[#pa + 1] = tonumber(n) end
+  for n in string.gmatch(b, "%d+") do pb[#pb + 1] = tonumber(n) end
+  for i = 1, 3 do
+    local x, y = pa[i] or 0, pb[i] or 0
+    if x ~= y then return x < y end
+  end
+  return false
+end
+
+-- Options (Settings → AddOns → wow guild). Defaults are on.
+ns.DEFAULTS = { loginNews = true, autoGuide = true, trackerOnLogin = true, collectBank = true, updateNotice = true }
+function ns.opt(key)
+  local o = ns.db and ns.db.options
+  if o and o[key] ~= nil then return o[key] end
+  return ns.DEFAULTS[key]
+end
+
 local function initDB()
   WowGuildDB = WowGuildDB or {}
   local db = WowGuildDB
   db.version = ns.VERSION
+  db.addonVersion = ns.addonVersion()
+  db.options = db.options or {}
   db.characters = db.characters or {}
   db.ctaQueue = db.ctaQueue or {}
   db.roster = db.roster or { members = {} }
@@ -112,6 +140,8 @@ SlashCmdList["WOWGUILD"] = function(input)
     ns.prof.toggleGuide()
   elseif cmd == "list" then
     if rest == "clear" then ns.prof.clearList() else ns.prof.toggleTracker() end
+  elseif cmd == "options" or cmd == "config" then
+    ns.openOptions()
   elseif cmd == "help" then
     ns.print("/wow  open the guild panel")
     ns.print("/wow cta [zone] [number] [message]  call guildies to a fight")
@@ -119,6 +149,7 @@ SlashCmdList["WOWGUILD"] = function(input)
     ns.print("/wow status  what's been saved")
     ns.print("/wow guide  show or hide the skill-up guide (next to your profession window)")
     ns.print("/wow list  show or hide your shopping list;  /wow list clear  empties it")
+    ns.print("/wow options  addon settings")
   else
     ns.togglePanel()
   end

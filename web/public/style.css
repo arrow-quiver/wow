@@ -253,3 +253,15 @@ body .side a.brand { color: #fff; }
 .big-steps > li { margin-bottom: 1.6rem; }
 .big-steps > li::marker { font: 800 1.2rem "Alegreya", serif; color: var(--ember-deep); }
 .big-steps h2 { margin: 0 0 .4rem; }
+
+/* ---------- onboarding ---------- */
+.onboard { border: 2px solid var(--ember); border-radius: var(--radius-m); padding: .9rem 1.2rem .6rem; margin-bottom: 1.6rem; background: var(--paper); max-width: 760px; }
+.onboard h2 { margin: 0 0 .4rem; }
+.onboard ol { margin: 0; padding-left: 1.4rem; }
+.onboard li { padding: .2rem 0; }
+.onboard li.is-done { color: var(--ink-2); text-decoration: line-through; }
+.onboard li.is-done::marker { content: "✓  "; color: var(--ok); }
+tr.is-stale-row td { color: var(--ink-2); }
+.tokens form { display: inline; }
+.facts { list-style: none; padding: 0; margin: .3rem 0 0; display: flex; flex-wrap: wrap; gap: .4rem 1.6rem; }
+.profs li { grid-template-columns: 12rem 1fr 6rem; }

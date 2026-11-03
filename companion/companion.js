@@ -6,6 +6,8 @@
 // Usage:  node companion.js            keep running and watch
 //         node companion.js --once     upload once and exit
 //         node companion.js --check    show what it found and exit
+//         wow-companion.exe --install-startup     start automatically with Windows
+//         wow-companion.exe --uninstall-startup   stop starting with Windows
 
 const fs = require('fs');
 const path = require('path');
@@ -18,7 +20,39 @@ const ADDON = 'WowGuild';
 const POLL_MS = 4000;
 const INBOX_REFRESH_MS = 5 * 60 * 1000;
 
-const log = (...a) => console.log(new Date().toLocaleTimeString(), ...a);
+const VERSION = require('./package.json').version;
+const LOG_FILE = path.join(APP_DIR, 'companion.log');
+
+// Log to the window and to companion.log (kept under 1 MB) so problems can be shared.
+function log(...a) {
+  const line = `${new Date().toLocaleTimeString()} ${a.join(' ')}`;
+  console.log(line);
+  try {
+    if (fs.existsSync(LOG_FILE) && fs.statSync(LOG_FILE).size > 1024 * 1024) fs.renameSync(LOG_FILE, LOG_FILE + '.old');
+    fs.appendFileSync(LOG_FILE, `${new Date().toISOString()} ${a.join(' ')}\n`);
+  } catch { /* logging must never stop the companion */ }
+}
+
+function versionLess(a, b) {
+  const pa = String(a || '').split('.').map(Number); const pb = String(b || '').split('.').map(Number);
+  for (let i = 0; i < 3; i++) if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) < (pb[i] || 0);
+  return false;
+}
+
+// Start with Windows: a small .cmd in the user's Startup folder.
+function startupFile() {
+  return path.join(process.env.APPDATA || '', 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup', 'wow-companion.cmd');
+}
+function installStartup() {
+  if (process.platform !== 'win32') throw new Error('Starting with Windows only works on Windows.');
+  const cmd = IS_EXE ? `start "" /min "${process.execPath}"` : `start "" /min "${process.execPath}" "${path.join(__dirname, 'companion.js')}"`;
+  fs.writeFileSync(startupFile(), `@echo off\r\ncd /d "${APP_DIR}"\r\n${cmd}\r\n`);
+  return startupFile();
+}
+function uninstallStartup() {
+  if (fs.existsSync(startupFile())) { fs.unlinkSync(startupFile()); return true; }
+  return false;
+}
 
 function loadConfig() {
   if (!fs.existsSync(CONFIG_FILE)) {
@@ -64,7 +98,7 @@ function savedVariablesFiles(gameDir) {
 async function api(cfg, method, route, body) {
   const res = await fetch(cfg.siteUrl + route, {
     method,
-    headers: { Authorization: `Bearer ${cfg.syncKey}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
+    headers: { Authorization: `Bearer ${cfg.syncKey}`, 'X-Companion-Version': VERSION, ...(body ? { 'Content-Type': 'application/json' } : {}) },
     body: body ? JSON.stringify(body) : undefined,
     signal: AbortSignal.timeout(20000),
   });
@@ -124,6 +158,10 @@ async function upload(cfg, file) {
   if (auc) db.prices = auc.prices;
   const result = JSON.parse(await api(cfg, 'POST', '/api/sync', db));
   if (auc) auctionatorSent.set(auc.file, auc.mtime);
+  if (result.latest && result.latest.companion && versionLess(VERSION, result.latest.companion) && !upload.nagged) {
+    upload.nagged = true;
+    log(`A newer companion (${result.latest.companion}) is available at ${cfg.siteUrl}/get (you have ${VERSION}).`);
+  }
   const extra = [result.ctas ? `${result.ctas} call(s) to arms` : '', result.prices ? `${result.prices} auction prices` : '', result.bank ? `${result.bank} guild bank items` : ''].filter(Boolean);
   log(`Uploaded: ${result.characters} character(s), ${result.roster} roster entries, ${result.recipes} recipes${extra.length ? `, ${extra.join(', ')}` : ''}.`);
 }
@@ -139,6 +177,9 @@ async function writeInbox(cfg, gameDir) {
 
 async function main() {
   const args = new Set(process.argv.slice(2));
+  if (args.has('--install-startup')) { log(`Will start with Windows: ${installStartup()}`); return; }
+  if (args.has('--uninstall-startup')) { log(uninstallStartup() ? 'Removed from Windows startup.' : 'It wasn’t set to start with Windows.'); return; }
+  log(`wow companion ${VERSION}`);
   const cfg = loadConfig();
   const games = findGameFolders(cfg);
   if (!games.length) {
@@ -146,37 +187,61 @@ async function main() {
       + '(the one containing Interface and WTF, e.g. C:\\Program Files (x86)\\World of Warcraft\\_forever_) in config.json as "wowFolder".');
   }
   for (const g of games) log(`Game folder: ${g} (${savedVariablesFiles(g).length} account(s) with saved data)`);
+  // Check the site and sync key before watching, so setup problems are obvious.
+  try {
+    await api(cfg, 'GET', '/api/inbox');
+    log(`Connected to ${cfg.siteUrl}.`);
+  } catch (e) {
+    if (/\(401\)/.test(e.message)) throw new Error('The site doesn’t recognise your sync key. Create a new one on the site under Settings and paste it into config.json.');
+    log(`Can't reach ${cfg.siteUrl} right now (${e.message}). Will keep trying.`);
+  }
   if (args.has('--check')) return;
 
   const seen = new Map();
+  const failures = new Map(); // file → { count, retryAt }
+  let busy = false;
   const syncAll = async (force) => {
-    for (const g of games) {
-      let uploaded = false;
-      for (const f of savedVariablesFiles(g)) {
-        const m = fs.statSync(f).mtimeMs;
-        if (!force && seen.get(f) === m) continue;
-        // Wait until WoW has finished writing the file.
-        await new Promise((r) => setTimeout(r, force ? 0 : 1500));
-        if (fs.statSync(f).mtimeMs !== m && !force) continue;
-        try { await upload(cfg, f); uploaded = true; seen.set(f, m); } catch (e) { log(e.message); }
+    if (busy) return; // a slow upload must not overlap the next poll
+    busy = true;
+    try {
+      for (const g of games) {
+        let uploaded = false;
+        for (const f of savedVariablesFiles(g)) {
+          const m = fs.statSync(f).mtimeMs;
+          const fail = failures.get(f);
+          if (!force && seen.get(f) === m) continue;
+          if (!force && fail && Date.now() < fail.retryAt) continue;
+          // Wait until WoW has finished writing the file.
+          await new Promise((r) => setTimeout(r, force ? 0 : 1500));
+          if (fs.statSync(f).mtimeMs !== m && !force) continue;
+          try {
+            await upload(cfg, f); uploaded = true; seen.set(f, m); failures.delete(f);
+          } catch (e) {
+            const count = (fail ? fail.count : 0) + 1;
+            const wait = Math.min(5 * 60, 5 * 2 ** (count - 1)); // 5s, 10s, 20s ... up to 5 min
+            failures.set(f, { count, retryAt: Date.now() + wait * 1000 });
+            log(`${e.message} Trying again in ${wait < 60 ? `${wait}s` : `${Math.round(wait / 60)} min`}.`);
+          }
+        }
+        if (uploaded || force) {
+          try { await writeInbox(cfg, g); log('Guild news saved for the addon. It shows after your next /reload.'); } catch (e) { log(e.message); }
+        }
       }
-      if (uploaded || force) {
-        try { await writeInbox(cfg, g); log('Guild news saved for the addon. It shows after your next /reload.'); } catch (e) { log(e.message); }
-      }
-    }
+    } finally { busy = false; }
   };
 
   await syncAll(true);
   if (args.has('--once')) return;
-  log('Watching for logouts and reloads. Leave this window open while you play.');
+  log('Watching for logouts and reloads. Leave this window open while you play (or run with --install-startup).');
   setInterval(() => syncAll(false).catch((e) => log(e.message)), POLL_MS);
   setInterval(async () => {
     for (const g of games) { try { await writeInbox(cfg, g); } catch (e) { log(e.message); } }
   }, INBOX_REFRESH_MS);
+  process.on('SIGINT', () => { log('Stopped.'); process.exit(0); });
 }
 
 if (require.main === module) {
-  main().catch((e) => { console.error(e.message); if (process.platform === 'win32' && !process.argv.includes('--once')) setTimeout(() => {}, 60000); process.exitCode = 1; });
+  main().catch((e) => { log(`Problem: ${e.message}`); if (process.platform === 'win32' && !process.argv.includes('--once')) setTimeout(() => {}, 60000); process.exitCode = 1; });
 }
 
-module.exports = { findGameFolders, savedVariablesFiles, extractPrices };
+module.exports = { findGameFolders, savedVariablesFiles, extractPrices, versionLess };

@@ -305,6 +305,21 @@ const MIGRATIONS = [
      items TEXT NOT NULL,
      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
    );`,
+
+  // Hardening: versions and last sync per member, audit trail, extra character data (PvP, reps, currencies).
+  `ALTER TABLE users ADD COLUMN addon_version TEXT;
+   ALTER TABLE users ADD COLUMN companion_version TEXT;
+   ALTER TABLE users ADD COLUMN last_sync_at TEXT;
+   ALTER TABLE characters ADD COLUMN extras TEXT;
+   CREATE TABLE audit_log (
+     id INTEGER PRIMARY KEY,
+     guild_id INTEGER NOT NULL REFERENCES guilds(id),
+     user_id INTEGER REFERENCES users(id),
+     action TEXT NOT NULL,
+     detail TEXT,
+     created_at TEXT NOT NULL DEFAULT (datetime('now'))
+   );
+   CREATE INDEX audit_guild ON audit_log(guild_id, id);`,
 ];
 
 function migrate(db) {

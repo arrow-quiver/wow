@@ -109,7 +109,7 @@ function P.refreshGuide()
 end
 
 function P.showGuideIfWanted()
-  if ui().guideHidden then return end
+  if ui().guideHidden or not ns.opt("autoGuide") then return end
   guide = guide or createGuide()
   placeGuide()
   guide:Show()

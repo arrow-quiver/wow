@@ -6,6 +6,9 @@ const A = require('./auth');
 const { applyPayload, buildInbox, toLua } = require('./sync');
 const { layout } = require('./views/layout');
 const P = require('./views/pages');
+const { rateLimit } = require('./ratelimit');
+const backup = require('./backup');
+const fs = require('fs');
 
 function config(env = process.env) {
   return {
@@ -38,6 +41,11 @@ function createApp(cfg, db) {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'same-origin');
     res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Content-Security-Policy', [
+      "default-src 'self'", "script-src 'self'", "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "font-src https://fonts.gstatic.com", "img-src 'self' data:", "form-action 'self'", "frame-ancestors 'none'", "base-uri 'self'",
+    ].join('; '));
+    if (secureCookie) res.setHeader('Strict-Transport-Security', 'max-age=15552000');
     next();
   });
   app.use(express.static(path.join(__dirname, '..', 'public'), { maxAge: '1h' }));
@@ -47,6 +55,10 @@ function createApp(cfg, db) {
     maxAge: '10m',
     setHeaders: (res, file) => { if (/\.zip$/.test(file)) res.setHeader('Content-Disposition', `attachment; filename="${path.basename(file)}"`); },
   }));
+  // Rate limits: generous for people, tight enough to stop scripts hammering the server.
+  app.use('/discord', rateLimit({ max: 120 }));
+  app.use('/api', rateLimit({ max: 40, key: (req) => (req.headers.authorization || req.ip).slice(0, 80), message: 'Too many uploads. The companion will retry shortly.' }));
+  app.use(['/auth', '/login'], rateLimit({ max: 20 }));
   const phase3 = require('./routes/phase3');
   // Discord calls this with its own signature; it must skip the session and CSRF checks below.
   phase3.mountDiscord(app, { db, cfg, discord: (...a) => discord(...a) });
@@ -58,7 +70,13 @@ function createApp(cfg, db) {
     user: db.prepare('SELECT * FROM users WHERE id = ?'),
     membership: db.prepare(`SELECT g.*, m.role FROM memberships m JOIN guilds g ON g.id = m.guild_id WHERE m.user_id = ? ORDER BY m.joined_at LIMIT 1`),
     activity: db.prepare('INSERT INTO activity (guild_id, kind, text) VALUES (?,?,?)'),
+    audit: db.prepare('INSERT INTO audit_log (guild_id, user_id, action, detail) VALUES (?,?,?,?)'),
   };
+  // Record officer and account actions so the guild can see who changed what.
+  const audit = (req, action, detail = '') => {
+    if (req.guild) q.audit.run(req.guild.id, req.user ? req.user.id : null, action, String(detail).slice(0, 300));
+  };
+  const readDownload = (f) => { try { return fs.readFileSync(path.join(DOWNLOADS, f), 'utf8').trim(); } catch { return null; } };
   const setCookie = (res, name, value, maxAgeSec) => {
     res.append('Set-Cookie', `${name}=${encodeURIComponent(value)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSec}${secureCookie ? '; Secure' : ''}`);
   };
@@ -168,6 +186,24 @@ function createApp(cfg, db) {
     }) });
   });
 
+  // First steps for each member, shown on Camp until they're all done.
+  function onboardingFor(req) {
+    const gid = req.guild.id; const uid = req.user.id;
+    const synced = db.prepare('SELECT 1 FROM sync_log WHERE guild_id = ? AND user_id = ? LIMIT 1').get(gid, uid);
+    const chars = db.prepare('SELECT COUNT(*) n, MAX(is_main) main FROM characters WHERE guild_id = ? AND user_id = ?').get(gid, uid);
+    const profs = db.prepare('SELECT 1 FROM professions p JOIN characters c ON c.id = p.character_id WHERE c.guild_id = ? AND c.user_id = ? LIMIT 1').get(gid, uid);
+    const nextRaid = db.prepare("SELECT id, title FROM raids WHERE guild_id = ? AND status IN ('open','locked') AND starts_at > ? ORDER BY starts_at LIMIT 1").get(gid, new Date().toISOString());
+    const myChar = db.prepare('SELECT name FROM characters WHERE guild_id = ? AND user_id = ? ORDER BY level DESC LIMIT 1').get(gid, uid);
+    const steps = [
+      { done: Boolean(synced), label: 'Install the addon and companion, then log in once', href: '/get' },
+      { done: Boolean(profs), label: 'Open each profession window in game, then /reload', href: '/crafters' },
+      { done: Boolean(chars.main), label: 'Pick your main character', href: myChar ? `/characters/${encodeURIComponent(myChar.name)}` : '/roster' },
+    ];
+    if (cfg.discordPublicKey) steps.push({ done: Boolean(req.user.discord_id), label: 'Link your Discord', href: '/settings' });
+    if (nextRaid) steps.push({ done: Boolean(db.prepare('SELECT 1 FROM signups WHERE raid_id = ? AND user_id = ?').get(nextRaid.id, uid)), label: `Sign up for ${nextRaid.title}`, href: `/raids/${nextRaid.id}` });
+    return steps;
+  }
+
   // ---- camp ----
   app.get('/', (req, res) => {
     if (!req.user) return res.page({ title: '', body: P.landing({ devLogin: cfg.devLogin, bnetEnabled }) });
@@ -184,6 +220,7 @@ function createApp(cfg, db) {
         activity: db.prepare('SELECT * FROM activity WHERE guild_id = ? ORDER BY id DESC LIMIT 12').all(gid),
         isOfficer: ['owner', 'officer'].includes(req.guild.role),
         mySync: (db.prepare('SELECT MAX(received_at) t FROM sync_log WHERE guild_id = ? AND user_id = ?').get(gid, req.user.id) || {}).t,
+        onboarding: onboardingFor(req),
       }),
     });
   });
@@ -204,6 +241,7 @@ function createApp(cfg, db) {
     const body = String(req.body.body || '').trim().slice(0, 500);
     if (!body) return back(res, '/');
     db.prepare('INSERT INTO announcements (guild_id, user_id, body) VALUES (?,?,?)').run(req.guild.id, req.user.id, body);
+    audit(req, 'notice posted', body.slice(0, 80));
     await discord(req.guild, `📜 **Notice**\n${body}`);
     back(res, '/', 'Notice posted.');
   });
@@ -343,6 +381,7 @@ function createApp(cfg, db) {
     body: P.settings({
       csrf: req.csrf, tokens: tokensFor(req), newToken, guild: req.guild, baseUrl: cfg.baseUrl,
       isOfficer: ['owner', 'officer'].includes(req.guild.role),
+      isOwner: req.guild.role === 'owner', me: req.user.id,
       members: db.prepare('SELECT u.id, u.battletag, m.role FROM memberships m JOIN users u ON u.id = m.user_id WHERE m.guild_id = ? ORDER BY m.role, u.battletag').all(req.guild.id),
       discordInfo: {
         configured: Boolean(cfg.discordPublicKey && cfg.discordAppId), appId: cfg.discordAppId,
@@ -354,33 +393,96 @@ function createApp(cfg, db) {
   app.post('/settings/token', needGuild, (req, res) => {
     const t = A.newApiToken();
     db.prepare('INSERT INTO api_tokens (user_id, guild_id, token_hash, prefix) VALUES (?,?,?,?)').run(req.user.id, req.guild.id, t.hash, t.prefix);
+    audit(req, 'sync key created', t.prefix);
     settingsPage(req, res, t.raw);
   });
   app.post('/settings/token/:id/revoke', needGuild, (req, res) => {
-    db.prepare('DELETE FROM api_tokens WHERE id = ? AND user_id = ?').run(req.params.id, req.user.id);
+    const r = db.prepare('DELETE FROM api_tokens WHERE id = ? AND user_id = ?').run(req.params.id, req.user.id);
+    if (r.changes) audit(req, 'sync key revoked');
     back(res, '/settings', 'Sync key revoked.');
   });
   app.post('/settings/webhook', needOfficer, (req, res) => {
     const url = String(req.body.webhook || '').trim();
     if (url && !/^https:\/\/(discord|discordapp)\.com\/api\/webhooks\/[\w/-]+$/.test(url)) return back(res, '/settings', 'That isn’t a Discord webhook URL.');
     db.prepare('UPDATE guilds SET discord_webhook = ? WHERE id = ?').run(url || null, req.guild.id);
+    audit(req, url ? 'Discord webhook set' : 'Discord webhook removed');
     back(res, '/settings', url ? 'Webhook saved.' : 'Webhook removed.');
   });
-  app.post('/members/:id/promote', needOfficer, (req, res) => {
-    db.prepare("UPDATE memberships SET role = 'officer' WHERE user_id = ? AND guild_id = ? AND role = 'member'").run(req.params.id, req.guild.id);
-    back(res, '/settings', 'Promoted to officer.');
+  // ---- members ----
+  const memberRow = (req) => db.prepare('SELECT m.role, u.battletag, u.id FROM memberships m JOIN users u ON u.id = m.user_id WHERE m.user_id = ? AND m.guild_id = ?').get(req.params.id, req.guild.id);
+  app.post('/members/:id(\\d+)/promote', needOfficer, (req, res) => {
+    const m = memberRow(req);
+    if (!m || m.role !== 'member') return back(res, '/settings');
+    db.prepare("UPDATE memberships SET role = 'officer' WHERE user_id = ? AND guild_id = ?").run(m.id, req.guild.id);
+    audit(req, 'promoted to officer', m.battletag);
+    back(res, '/settings', `${m.battletag.split('#')[0]} is now an officer.`);
+  });
+  app.post('/members/:id(\\d+)/demote', needOfficer, (req, res) => {
+    const m = memberRow(req);
+    if (req.guild.role !== 'owner') return res.status(403).send('Only the guild owner can demote officers.');
+    if (!m || m.role !== 'officer') return back(res, '/settings');
+    db.prepare("UPDATE memberships SET role = 'member' WHERE user_id = ? AND guild_id = ?").run(m.id, req.guild.id);
+    audit(req, 'demoted to member', m.battletag);
+    back(res, '/settings', `${m.battletag.split('#')[0]} is now a member.`);
+  });
+  app.post('/members/:id(\\d+)/remove', needOfficer, (req, res) => {
+    const m = memberRow(req);
+    if (!m || m.role === 'owner' || m.id === req.user.id) return back(res, '/settings', 'You can’t remove that member.');
+    if (m.role === 'officer' && req.guild.role !== 'owner') return res.status(403).send('Only the guild owner can remove officers.');
+    db.transaction(() => {
+      db.prepare('DELETE FROM memberships WHERE user_id = ? AND guild_id = ?').run(m.id, req.guild.id);
+      db.prepare('DELETE FROM api_tokens WHERE user_id = ? AND guild_id = ?').run(m.id, req.guild.id);
+      db.prepare('UPDATE characters SET user_id = NULL, is_main = 0 WHERE user_id = ? AND guild_id = ?').run(m.id, req.guild.id);
+    })();
+    audit(req, 'removed from guild', m.battletag);
+    back(res, '/settings', `${m.battletag.split('#')[0]} was removed. Their sync keys no longer work.`);
+  });
+  app.post('/settings/invite/reset', needOfficer, (req, res) => {
+    db.prepare('UPDATE guilds SET invite_code = ? WHERE id = ?').run(A.inviteCode(), req.guild.id);
+    audit(req, 'invite link replaced');
+    back(res, '/settings', 'New invite link made. The old one no longer works.');
+  });
+
+  // ---- officers: sync health, backups, audit log ----
+  const latest = () => ({ addon: readDownload('addon-version.txt'), companion: readDownload('companion-version.txt') });
+  app.get('/admin', needOfficer, (req, res) => {
+    const gid = req.guild.id;
+    res.page({
+      title: 'Officer tools', active: 'admin',
+      body: P.admin({
+        latest: latest(), isOwner: req.guild.role === 'owner',
+        members: db.prepare(`SELECT u.id, u.battletag, u.addon_version, u.companion_version, u.last_sync_at, u.discord_id, m.role, m.joined_at,
+            (SELECT COUNT(*) FROM characters c WHERE c.user_id = u.id AND c.guild_id = m.guild_id) AS chars,
+            (SELECT COUNT(*) FROM api_tokens t WHERE t.user_id = u.id AND t.guild_id = m.guild_id) AS keys
+          FROM memberships m JOIN users u ON u.id = m.user_id WHERE m.guild_id = ? ORDER BY u.last_sync_at IS NULL, u.last_sync_at DESC`).all(gid),
+        backups: backup.listBackups(backup.backupDir(cfg.dbFile)),
+        auditRows: db.prepare(`SELECT a.*, u.battletag FROM audit_log a LEFT JOIN users u ON u.id = a.user_id WHERE a.guild_id = ? ORDER BY a.id DESC LIMIT 100`).all(gid),
+      }),
+    });
+  });
+  app.get('/admin/backups/:file', needOfficer, (req, res) => {
+    if (req.guild.role !== 'owner') return res.status(403).send('Only the guild owner can download backups.');
+    const ok = backup.listBackups(backup.backupDir(cfg.dbFile)).find((b) => b.file === req.params.file);
+    if (!ok) return res.status(404).send('Backup not found');
+    audit(req, 'downloaded backup', ok.file);
+    res.download(path.join(backup.backupDir(cfg.dbFile), ok.file));
+  });
+  app.post('/admin/backups', needOfficer, (req, res) => {
+    try { const f = backup.runBackup(db, backup.backupDir(cfg.dbFile)); audit(req, 'backup made', path.basename(f)); back(res, '/admin', 'Backup made.'); } catch (e) { back(res, '/admin', `Backup failed: ${e.message}`); }
   });
 
   // ---- raids & loot (Phase 2) ----
-  const raids = require('./routes/raids')(app, { db, cfg, discord, activity: q.activity, needGuild, needOfficer, back });
+  const raids = require('./routes/raids')(app, { db, cfg, discord, activity: q.activity, needGuild, needOfficer, back, audit });
   app.locals.remind = raids.remind;
-  phase3.routes(app, { db, cfg, discord, activity: q.activity, needGuild, needOfficer, back });
+  phase3.routes(app, { db, cfg, discord, activity: q.activity, needGuild, needOfficer, back, audit });
   if (cfg.timers) setInterval(() => raids.remind().catch((e) => console.warn('Reminder failed:', e.message)), 60 * 1000).unref();
 
   // ---- companion API ----
   const bearer = (req, res, next) => {
     const m = /^Bearer (wowg_[\w-]+)$/.exec(req.headers.authorization || '');
-    const row = m && db.prepare('SELECT t.*, g.discord_webhook, g.name AS guild_name FROM api_tokens t JOIN guilds g ON g.id = t.guild_id WHERE token_hash = ?').get(A.hashToken(m[1]));
+    // The key must belong to someone who is still in the guild.
+    const row = m && db.prepare(`SELECT t.*, g.discord_webhook, g.name AS guild_name FROM api_tokens t JOIN guilds g ON g.id = t.guild_id
+      JOIN memberships ms ON ms.user_id = t.user_id AND ms.guild_id = t.guild_id WHERE token_hash = ?`).get(A.hashToken(m[1]));
     if (!row) return res.status(401).json({ error: 'Sync key not recognised. Create a new one in Settings.' });
     db.prepare("UPDATE api_tokens SET last_used_at = datetime('now') WHERE id = ?").run(row.id);
     req.tok = row;
@@ -390,18 +492,22 @@ function createApp(cfg, db) {
     try {
       const stats = applyPayload(db, req.tok.guild_id, req.tok.user_id, req.body);
       db.prepare('INSERT INTO sync_log (guild_id, user_id, bytes) VALUES (?,?,?)').run(req.tok.guild_id, req.tok.user_id, Number(req.headers['content-length']) || 0);
+      const ver = (v) => (typeof v === 'string' && /^[\w.+-]{1,20}$/.test(v) ? v : null);
+      db.prepare("UPDATE users SET addon_version = COALESCE(?, addon_version), companion_version = COALESCE(?, companion_version), last_sync_at = datetime('now') WHERE id = ?")
+        .run(ver(req.body && req.body.addonVersion), ver(req.get('X-Companion-Version')), req.tok.user_id);
       for (const c of stats.ctas) {
         await discord({ discord_webhook: req.tok.discord_webhook }, `⚔️ **Call to arms: ${c.zone}**${c.needed ? ` (need ${c.needed})` : ''}\n${c.message || ''}\n— ${c.character || 'someone'} (from in game)`);
       }
       res.json({ ok: true, characters: stats.characters, roster: stats.roster, recipes: stats.recipes, ctas: stats.ctas.length,
-        inventory: stats.inventory, bank: stats.bank, prices: stats.prices });
+        inventory: stats.inventory, bank: stats.bank, prices: stats.prices, latest: latest() });
     } catch (e) {
       res.status(400).json({ error: e.message });
     }
   });
-  app.get('/api/inbox', bearer, (req, res) => res.json(buildInbox(db, req.tok.guild_id, req.tok.user_id)));
+  const inboxFor = (req) => ({ ...buildInbox(db, req.tok.guild_id, req.tok.user_id), latestAddon: latest().addon, site: cfg.baseUrl });
+  app.get('/api/inbox', bearer, (req, res) => res.json(inboxFor(req)));
   app.get('/api/inbox.lua', bearer, (req, res) => {
-    res.type('text/plain').send(`-- Written by the wow companion. Do not edit.\nWowGuildInbox = ${toLua(buildInbox(db, req.tok.guild_id, req.tok.user_id))}\n`);
+    res.type('text/plain').send(`-- Written by the wow companion. Do not edit.\nWowGuildInbox = ${toLua(inboxFor(req))}\n`);
   });
   app.get('/healthz', (req, res) => res.json({ ok: true }));
 
@@ -413,6 +519,11 @@ if (require.main === module) {
   const cfg = config();
   const db = dbm.open(cfg.dbFile);
   createApp(cfg, db).listen(cfg.port, () => console.log(`wow listening on ${cfg.port} (${cfg.baseUrl})`));
+  // Daily database backups into /data/backups (kept 14 days).
+  const dir = backup.backupDir(cfg.dbFile);
+  const tick = () => { try { const f = backup.backupIfDue(db, dir); if (f) console.log('Backup written:', f); } catch (e) { console.error('Backup failed:', e.message); } };
+  setTimeout(tick, 30 * 1000);
+  setInterval(tick, 3600 * 1000);
 }
 
 module.exports = { createApp, config };

@@ -25,6 +25,74 @@ function ns.collectCharacter()
   rec.updated = ns.now()
   ns.collectProfessions(rec)
   ns.collectReadiness(rec)
+  ns.collectExtras(rec)
+end
+
+-- ---------- PvP, reputations, currencies ----------
+-- Read whichever API this game version has; anything missing is simply skipped.
+function ns.collectExtras(rec)
+  if not safeCombat() then return end
+  rec = rec or charRecord()
+  local pvp = {}
+  if UnitPVPRank and GetPVPRankInfo then
+    local rank = ns.try(UnitPVPRank, "player")
+    if rank and rank > 0 then
+      local name, number = ns.try(GetPVPRankInfo, rank)
+      pvp.rankName, pvp.rank = name, number or rank
+    end
+  end
+  if GetPVPLifetimeStats then
+    local hk, _, highest = ns.try(GetPVPLifetimeStats)
+    pvp.hk = hk
+    if highest and highest > 0 and GetPVPRankInfo then pvp.highestRank = (select(2, ns.try(GetPVPRankInfo, highest))) or highest end
+  end
+  if GetPVPThisWeekStats then pvp.weekHk, pvp.weekContribution = ns.try(GetPVPThisWeekStats) end
+  if GetPVPLastWeekStats then
+    local hk, _, contribution, rank = ns.try(GetPVPLastWeekStats)
+    pvp.lastWeekHk, pvp.lastWeekContribution, pvp.lastWeekRank = hk, contribution, rank
+  end
+  if UnitHonorLevel then pvp.honorLevel = ns.try(UnitHonorLevel, "player") end
+  if C_CurrencyInfo and C_CurrencyInfo.GetCurrencyInfo then
+    local honor = ns.try(C_CurrencyInfo.GetCurrencyInfo, Constants and Constants.CurrencyConsts and Constants.CurrencyConsts.HONOR_CURRENCY_ID or 1792)
+    if honor and honor.quantity then pvp.honor = honor.quantity end
+  end
+  if not pvp.honor and GetHonorCurrency then pvp.honor = ns.try(GetHonorCurrency) end
+  rec.pvp = pvp
+
+  local reps, header = {}, nil
+  if C_Reputation and C_Reputation.GetNumFactions and C_Reputation.GetFactionDataByIndex then
+    for i = 1, math.min(ns.try(C_Reputation.GetNumFactions) or 0, 200) do
+      local f = ns.try(C_Reputation.GetFactionDataByIndex, i)
+      if f and f.isHeader and not f.isHeaderWithRep then header = f.name
+      elseif f and f.name then
+        reps[#reps + 1] = { name = f.name, header = header, standing = f.reaction,
+          value = (f.currentStanding or 0) - (f.currentReactionThreshold or 0),
+          max = (f.nextReactionThreshold or 0) - (f.currentReactionThreshold or 0) }
+      end
+    end
+  elseif GetNumFactions and GetFactionInfo then
+    for i = 1, math.min(ns.try(GetNumFactions) or 0, 200) do
+      local name, _, standing, barMin, barMax, barValue, _, _, isHeader, _, hasRep = ns.try(GetFactionInfo, i)
+      if isHeader and not hasRep then header = name
+      elseif name then
+        reps[#reps + 1] = { name = name, header = header, standing = standing,
+          value = (barValue or 0) - (barMin or 0), max = (barMax or 0) - (barMin or 0) }
+      end
+    end
+  end
+  if #reps > 0 then rec.reputations = reps end
+
+  local cur = {}
+  if C_CurrencyInfo and C_CurrencyInfo.GetCurrencyListSize and C_CurrencyInfo.GetCurrencyListInfo then
+    for i = 1, math.min(ns.try(C_CurrencyInfo.GetCurrencyListSize) or 0, 150) do
+      local x = ns.try(C_CurrencyInfo.GetCurrencyListInfo, i)
+      if x and not x.isHeader and x.name and (x.quantity or 0) > 0 then
+        cur[#cur + 1] = { name = x.name, qty = x.quantity, max = (x.maxQuantity or 0) > 0 and x.maxQuantity or nil,
+          id = x.currencyID }
+      end
+    end
+  end
+  if #cur > 0 then rec.currencies = cur end
 end
 
 -- ---------- bags, bank and guild bank ----------
@@ -78,7 +146,7 @@ function ns.scanContainers(bagIDs)
 end
 
 function ns.collectBank()
-  if not safeCombat() then return end
+  if not safeCombat() or not ns.opt("collectBank") then return end
   local rec = charRecord()
   rec.inventory = rec.inventory or {}
   rec.inventory.bank = ns.scanContainers(ns.bankIDs())
@@ -89,7 +157,7 @@ end
 -- so we turn that into an approximate time.
 local guildBankOpen = false
 function ns.collectGuildBank()
-  if not safeCombat() or not guildBankOpen or not GetNumGuildBankTabs then return end
+  if not safeCombat() or not guildBankOpen or not GetNumGuildBankTabs or not ns.opt("collectBank") then return end
   local tabs = {}
   local slotsPerTab = MAX_GUILDBANK_SLOTS_PER_TAB or 98
   for tab = 1, (ns.try(GetNumGuildBankTabs) or 0) do
@@ -329,6 +397,15 @@ ns.on("NEW_RECIPE_LEARNED", function() C_Timer.After(0.5, ns.collectRecipes) end
 ns.on("CRAFT_SHOW", function() C_Timer.After(0.5, ns.collectCrafts) end)
 ns.on("CRAFT_UPDATE", function() C_Timer.After(0.5, ns.collectCrafts) end)
 ns.on("PLAYER_REGEN_ENABLED", function() ns.collectCharacter() end)
+-- Reputation and currency events fire often (every loot); refresh at most every few seconds.
+local extrasPending = false
+local function refreshExtras()
+  if extrasPending then return end
+  extrasPending = true
+  C_Timer.After(3, function() extrasPending = false; if safeCombat() then ns.collectExtras() end end)
+end
+ns.on("UPDATE_FACTION", refreshExtras)
+ns.on("CURRENCY_DISPLAY_UPDATE", refreshExtras)
 ns.on("BANKFRAME_OPENED", function() C_Timer.After(0.5, ns.collectBank) end)
 ns.on("PLAYERBANKSLOTS_CHANGED", function() C_Timer.After(0.5, ns.collectBank) end)
 ns.on("BANKFRAME_CLOSED", function() ns.collectBank() end)
