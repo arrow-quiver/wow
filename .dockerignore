@@ -1,0 +1,15 @@
+.git
+**/node_modules
+web/data
+web/test
+web/scripts
+companion/dist
+companion/config.json
+**/*.exe
+**/*.zip
+**/*.db
+**/*.db-*
+.env
+.coolify-token
+.bnet
+.discord

@@ -41,6 +41,12 @@ function createApp(cfg, db) {
     next();
   });
   app.use(express.static(path.join(__dirname, '..', 'public'), { maxAge: '1h' }));
+  // Player downloads (built into the image by the Dockerfile's "kit" stage). Public on purpose.
+  const DOWNLOADS = path.join(__dirname, '..', 'downloads');
+  app.use('/downloads', express.static(DOWNLOADS, {
+    maxAge: '10m',
+    setHeaders: (res, file) => { if (/\.zip$/.test(file)) res.setHeader('Content-Disposition', `attachment; filename="${path.basename(file)}"`); },
+  }));
   const phase3 = require('./routes/phase3');
   // Discord calls this with its own signature; it must skip the session and CSRF checks below.
   phase3.mountDiscord(app, { db, cfg, discord: (...a) => discord(...a) });
@@ -148,6 +154,18 @@ function createApp(cfg, db) {
     db.prepare("INSERT OR IGNORE INTO memberships (user_id, guild_id, role) VALUES (?,?, 'member')").run(req.user.id, g.id);
     q.activity.run(g.id, 'member', `${req.user.battletag.split('#')[0]} joined the camp`);
     res.redirect('/settings');
+  });
+
+  // ---- downloads page (public, so guildies can grab the tools before signing in) ----
+  app.get('/get', (req, res) => {
+    const fs = require('fs');
+    const read = (f) => { try { return fs.readFileSync(path.join(DOWNLOADS, f), 'utf8').trim(); } catch { return null; } };
+    const size = (f) => { try { const b = fs.statSync(path.join(DOWNLOADS, f)).size; return b < 1048576 ? `${Math.max(1, Math.round(b / 1024))} KB` : `${(b / 1048576).toFixed(1)} MB`; } catch { return null; } };
+    res.page({ title: 'Downloads', active: 'settings', body: P.downloads({
+      addon: size('WowGuild.zip') != null ? { version: read('addon-version.txt'), mb: size('WowGuild.zip') } : null,
+      companion: size('wow-companion.zip') != null ? { version: read('companion-version.txt'), mb: size('wow-companion.zip') } : null,
+      baseUrl: cfg.baseUrl, signedIn: Boolean(req.guild),
+    }) });
   });
 
   // ---- camp ----

@@ -16,6 +16,7 @@ function landing({ devLogin, bnetEnabled }) {
     <h1>Pull up a log.</h1>
     <p class="lede">The guild's camp: who's online, who can craft what, who's leveling where, and where the fighting is.</p>
     <div class="actions">
+      <a href="/get">Get the addon and companion</a>
       ${bnetEnabled ? '<a class="btn btn-primary" href="/auth/bnet">Sign in with Battle.net</a>' : ''}
       ${devLogin ? `<form method="post" action="/login/dev" class="inline-form">
         <label class="sr" for="bt">BattleTag</label>
@@ -252,7 +253,7 @@ function settings({ csrf, tokens, newToken, guild, baseUrl, isOfficer, members, 
   <section class="setting">
     <h2>Connect the game</h2>
     <ol class="steps">
-      <li>Copy the <code>WowGuild</code> folder into <code>World of Warcraft\\_forever_\\Interface\\AddOns</code>. The folder name may differ: use whichever one holds Forever.</li>
+      <li><a href="/get">Download the addon and companion</a>, then copy the <code>WowGuild</code> folder into <code>World of Warcraft\\_forever_\\Interface\\AddOns</code>. The folder name may differ: use whichever one holds Forever.</li>
       <li>Put <code>wow-companion.exe</code> in any folder and run it once. It creates <code>config.json</code> next to itself.</li>
       <li>Create a sync key below. In <code>config.json</code>, set <code>syncKey</code> to it and <code>siteUrl</code> to <code>${esc(baseUrl)}</code>.</li>
       <li>Run the companion again and leave it open while you play. It uploads every time you log out or type <code>/reload</code>.</li>
@@ -297,8 +298,29 @@ function settings({ csrf, tokens, newToken, guild, baseUrl, isOfficer, members, 
   </section>` : ''}`;
 }
 
+function downloads({ addon, companion, baseUrl, signedIn }) {
+  return `<section class="downloads">
+    <h1>Get the guild tools</h1>
+    <p class="lede">Two small downloads connect your game to the guild site: the addon (inside WoW) and the companion (on your PC, carries the data).</p>
+    <ol class="steps big-steps">
+      <li><h2>The addon</h2>
+        ${addon ? `<p><a class="btn btn-primary" href="/downloads/WowGuild.zip" download>Download WowGuild ${esc(addon.version || '')}</a> <span class="muted">${esc(addon.mb)}</span></p>` : '<p class="muted">Not available on this server yet.</p>'}
+        <p>Unzip it into your game's <code>Interface\\AddOns</code> folder, so you end up with <code>Interface\\AddOns\\WowGuild</code>.
+          For Forever that's inside <code>World of Warcraft\\_forever_</code>; for Retail, <code>_retail_</code>.</p></li>
+      <li><h2>The companion</h2>
+        ${companion ? `<p><a class="btn btn-primary" href="/downloads/wow-companion.zip" download>Download companion ${esc(companion.version || '')}</a> <span class="muted">${esc(companion.mb)}, Windows</span></p>` : '<p class="muted">Not available on this server yet.</p>'}
+        <p>Unzip <code>wow-companion.exe</code> anywhere and run it once. It creates <code>config.json</code> next to itself.
+          Windows may warn the first time because the app isn't code-signed: choose <em>More info → Run anyway</em>.</p></li>
+      <li><h2>Connect them</h2>
+        <p>${signedIn ? '<a href="/settings">Settings</a>' : `Sign in at <a href="/">${esc(baseUrl)}</a>, then go to Settings`} → <strong>Create sync key</strong>.
+          In <code>config.json</code>, set <code>syncKey</code> to that key and <code>siteUrl</code> to <code>${esc(baseUrl)}</code>.
+          Run the companion again and leave it open while you play.</p></li>
+    </ol>
+  </section>`;
+}
+
 function notFound() {
   return '<h1>Nothing here</h1><p>That page doesn’t exist. <a href="/">Back to camp</a>.</p>';
 }
 
-module.exports = { landing, setup, home, roster, character, crafters, requests, buddies, settings, notFound };
+module.exports = { downloads, landing, setup, home, roster, character, crafters, requests, buddies, settings, notFound };

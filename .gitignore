@@ -7,3 +7,4 @@ companion/config.json
 companion/dist/
 companion/*.exe
 companion/*.zip
+web/downloads/

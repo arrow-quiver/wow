@@ -184,3 +184,33 @@ test('Phase 3 pages over HTTP, including the Discord endpoint', async () => {
     for (const p of ['/bank', '/bank?find=rune', '/prices', '/prices?q=rune', '/drives', '/settings']) assert.strictEqual((await get(p)).status, 200, p);
   } finally { srv.close(); }
 });
+
+test('download page and files are public', async () => {
+  const fs = require('fs'); const path = require('path');
+  const dir = path.join(__dirname, '..', 'downloads');
+  const hadDir = fs.existsSync(dir);
+  fs.mkdirSync(dir, { recursive: true });
+  const made = [];
+  for (const [f, body] of [['WowGuild.zip', 'zip'], ['addon-version.txt', '9.9.9'], ['wow-companion.zip', 'zip2'], ['companion-version.txt', '1.2.3']]) {
+    if (!fs.existsSync(path.join(dir, f))) { fs.writeFileSync(path.join(dir, f), body); made.push(f); }
+  }
+  const db = dbm.open(':memory:');
+  const app = createApp({ ...config({}), timers: false }, db);
+  const srv = await new Promise((r) => { const s = app.listen(0, '127.0.0.1', () => r(s)); });
+  try {
+    const url = `http://127.0.0.1:${srv.address().port}`;
+    const page = await fetch(`${url}/get`);
+    assert.strictEqual(page.status, 200);
+    const html = await page.text();
+    assert.match(html, /Download WowGuild \d+\.\d+\.\d+/);
+    assert.match(html, /Download companion \d+\.\d+\.\d+/);
+    const zip = await fetch(`${url}/downloads/WowGuild.zip`);
+    assert.strictEqual(zip.status, 200);
+    assert.match(zip.headers.get('content-disposition'), /attachment; filename="WowGuild.zip"/);
+    assert.strictEqual((await fetch(`${url}/downloads/../src/server.js`)).status, 404);
+  } finally {
+    srv.close();
+    for (const f of made) fs.unlinkSync(path.join(dir, f));
+    if (!hadDir) fs.rmdirSync(dir);
+  }
+});

@@ -59,7 +59,7 @@ Built into the guild addon. It only reads profession and bag data, out of combat
 ## Deploy on Coolify
 
 1. Push this folder to a GitHub repo.
-2. In Coolify: **New resource → your repo → Build pack: Dockerfile**, base directory `/web`, port `3000`.
+2. In Coolify: **New resource → your repo → Build pack: Dockerfile**, base directory `/`, Dockerfile location `/web/Dockerfile`, port `3000`. Each build also compiles `wow-companion.exe` and zips the addon. Both are served at `/get` (public download page) and `/downloads/...`.
 3. Add a **persistent storage** volume mounted at `/data`. This holds the database: without it, data is lost on redeploy.
 4. Set the environment variables from `web/.env.example`:
    - `BASE_URL`: the domain you give it in Coolify, e.g. `https://wow.cjplumbing.co.za`

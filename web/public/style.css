@@ -246,3 +246,10 @@ details > summary { cursor: pointer; }
 body .side a.nav-link { color: #cfdcd5; }
 body .side a.nav-link:hover, body .side a.nav-link.is-active { color: #fff; }
 body .side a.brand { color: #fff; }
+
+/* ---------- downloads ---------- */
+.downloads { max-width: 760px; }
+.big-steps { padding-left: 1.6rem; }
+.big-steps > li { margin-bottom: 1.6rem; }
+.big-steps > li::marker { font: 800 1.2rem "Alegreya", serif; color: var(--ember-deep); }
+.big-steps h2 { margin: 0 0 .4rem; }
