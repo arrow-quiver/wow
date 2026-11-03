@@ -4,7 +4,7 @@ const D = require('../discord');
 const V = require('../views/phase3');
 
 // Discord interactions must be mounted before session/CSRF middleware.
-function mountDiscord(app, { db, cfg, discord }) {
+function mountDiscord(app, { db, cfg, discord, notify = () => {} }) {
   app.post('/discord/interactions', express.raw({ type: '*/*', limit: '100kb' }), (req, res) => {
     if (!cfg.discordPublicKey) return res.status(404).end();
     const ok = D.verify(cfg.discordPublicKey, req.get('X-Signature-Ed25519'), req.get('X-Signature-Timestamp'), req.body || Buffer.alloc(0));
@@ -14,7 +14,10 @@ function mountDiscord(app, { db, cfg, discord }) {
     try {
       res.json(D.handle(db, cfg, body, {
         // A call to arms made in Discord is already visible there; nothing else to post.
-        onCta: (guild, zone) => db.prepare('INSERT INTO activity (guild_id, kind, text) VALUES (?,?,?)').run(guild.id, 'cta', `Call to arms in ${zone} (from Discord)`),
+        onCta: (guild, zone) => {
+          db.prepare('INSERT INTO activity (guild_id, kind, text) VALUES (?,?,?)').run(guild.id, 'cta', `Call to arms in ${zone} (from Discord)`);
+          notify(guild.id, 'cta', { title: `⚔️ Call to arms: ${zone}`, body: 'Called from Discord.', url: '/' });
+        },
       }));
     } catch (e) {
       console.error('Discord interaction failed:', e);
@@ -23,7 +26,7 @@ function mountDiscord(app, { db, cfg, discord }) {
   });
 }
 
-function routes(app, { db, cfg, discord, activity, needGuild, needOfficer, back, audit = () => {} }) {
+function routes(app, { db, cfg, discord, activity, needGuild, needOfficer, back, audit = () => {}, notify = () => {} }) {
   const isOfficer = (req) => ['owner', 'officer'].includes(req.guild.role);
   const who = (req) => req.user.battletag.split('#')[0];
   const nameOf = db.prepare('SELECT name FROM item_names WHERE item_id = ?');
@@ -77,6 +80,8 @@ function routes(app, { db, cfg, discord, activity, needGuild, needOfficer, back,
     db.prepare('INSERT INTO bank_requests (guild_id, requester_id, item, count, note) VALUES (?,?,?,?,?)').run(req.guild.id, req.user.id, item, count, String(req.body.note || '').slice(0, 200));
     activity.run(req.guild.id, 'bank', `${who(req)} asked the bank for ${count} × ${item}`);
     await discord(req.guild, `🏦 **Bank request:** ${count} × ${item}, for ${who(req)}`);
+    const officers = db.prepare("SELECT user_id FROM memberships WHERE guild_id = ? AND role IN ('owner','officer')").all(req.guild.id).map((r) => r.user_id);
+    notify(req.guild.id, 'requests', { title: `🏦 Bank request from ${who(req)}`, body: `${count} × ${item}`, url: '/bank' }, { userIds: officers, exceptUserId: req.user.id });
     back(res, '/bank', 'Request sent to the officers.');
   });
   app.post('/bank/requests/:id(\\d+)/:verb(sent|declined|cancel)', needGuild, (req, res) => {

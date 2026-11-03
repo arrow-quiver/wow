@@ -269,3 +269,5 @@ tr.is-stale-row td { color: var(--ink-2); }
 a.wh { text-decoration: none; font-weight: 600; }
 a.wh:hover { text-decoration: underline; }
 .wh-hover { border-bottom: 1px dotted var(--ink-2); cursor: help; }
+[hidden] { display: none !important; }
+label.check input { flex: none; }

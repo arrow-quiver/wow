@@ -295,7 +295,7 @@ function memberAction(id, verb, label, csrf, confirm) {
   return `<form method="post" action="/members/${id}/${verb}">${csrfField(csrf)}<button class="btn btn-small btn-quiet"${confirm ? ` data-confirm="${esc(confirm)}"` : ''}>${label}</button></form>`;
 }
 
-function settings({ csrf, tokens, newToken, guild, baseUrl, isOfficer, isOwner, me, members, discordInfo = {} }) {
+function settings({ csrf, tokens, newToken, guild, baseUrl, isOfficer, isOwner, me, members, discordInfo = {}, calendarUrl, pushDevices = 0, pushPrefs }) {
   return `<h1>Settings</h1>
   <section class="setting">
     <h2>Connect the game</h2>
@@ -319,6 +319,31 @@ function settings({ csrf, tokens, newToken, guild, baseUrl, isOfficer, isOwner, 
     <code class="token">${esc(baseUrl)}/join/${esc(guild.invite_code)}</code>
   </section>
   <section class="setting">
+    <h2>Notifications on your phone and computer</h2>
+    <p>Get a notification for calls to arms, new raids and reminders, guild notices, and crafting or bank requests meant for you.
+      ${pushDevices ? `<strong>On for ${pushDevices} device${pushDevices === 1 ? '' : 's'}.</strong>` : ''}</p>
+    <div class="actions-row" id="push-controls" data-csrf="${esc(csrf)}">
+      <button class="btn btn-primary" type="button" data-push="on">Turn on for this device</button>
+      <button class="btn btn-quiet" type="button" data-push="off" ${pushDevices ? '' : 'hidden'}>Turn off for this device</button>
+      ${pushDevices ? `<form method="post" action="/push/test">${csrfField(csrf)}<button class="btn">Send a test</button></form>` : ''}
+    </div>
+    <p class="hint" id="push-status">On iPhone, first add this site to your Home Screen (Share → Add to Home Screen), then open it from there.</p>
+    ${pushDevices ? `<form method="post" action="/push/prefs" class="inline-form">${csrfField(csrf)}
+      ${[['cta', 'Calls to arms'], ['raids', 'Raids and reminders'], ['notices', 'Guild notices'], ['requests', 'Requests for me']].map(([k, l]) =>
+        `<label class="check"><input type="checkbox" name="${k}"${!pushPrefs || pushPrefs[k] !== false ? ' checked' : ''}> ${l}</label>`).join('')}
+      <button class="btn btn-small">Save choices</button></form>` : ''}
+  </section>
+  <section class="setting">
+    <h2>Raids in your calendar</h2>
+    <p>Add the guild's raids and events to Google, Apple or Outlook calendar. They update by themselves, with a reminder 30 minutes before.</p>
+    <div class="actions-row">
+      <a class="btn btn-primary" href="${esc(calendarUrl.replace(/^https?:/, 'webcal:'))}">Add to Apple or Outlook calendar</a>
+      <a class="btn" href="https://calendar.google.com/calendar/r?cid=${encodeURIComponent(calendarUrl.replace(/^https?:/, 'webcal:'))}" target="_blank" rel="noopener">Add to Google Calendar</a>
+    </div>
+    <p class="hint">Or paste this private address into any calendar app: <code class="token">${esc(calendarUrl)}</code></p>
+    <form method="post" action="/settings/calendar/reset">${csrfField(csrf)}<button class="btn btn-small btn-quiet" data-confirm="Make a new calendar link? The old one stops working.">Replace calendar link</button></form>
+  </section>
+  <section class="setting">
     <h2>Discord commands</h2>
     ${discordInfo.configured ? `<p>Use <code>/online</code>, <code>/raids</code>, <code>/craft</code>, <code>/price</code>, <code>/cta</code> and <code>/signup</code> straight from Discord.
       ${discordInfo.linked ? 'Your Discord is linked.' : 'Link your Discord once so <code>/signup</code> and <code>/cta</code> know who you are.'}</p>
@@ -328,7 +353,7 @@ function settings({ csrf, tokens, newToken, guild, baseUrl, isOfficer, isOwner, 
       </div>
       ${isOfficer ? `<div class="officer-box">
         <p>${discordInfo.serverLinked ? 'Your Discord server is connected.' : 'The server connects automatically the first time someone runs <code>/link</code> in it.'}
-        To add the commands to your server, <a href="https://discord.com/oauth2/authorize?client_id=${esc(discordInfo.appId)}&amp;scope=applications.commands" target="_blank" rel="noopener">invite the app</a>, then register them.</p>
+        To add the commands to your server, <a href="https://discord.com/oauth2/authorize?client_id=${esc(discordInfo.appId)}&amp;scope=bot%20applications.commands&amp;permissions=8589934592" target="_blank" rel="noopener">invite the app</a>, then register them. Inviting it as a bot lets it also put raids in Discord's Events list.</p>
         <form method="post" action="/settings/discord/register">${csrfField(csrf)}<button class="btn">Register slash commands</button></form>
       </div>` : ''}`
     : '<p class="muted">Not set up yet. An officer needs to add the Discord app details to the server.</p>'}
@@ -389,7 +414,7 @@ function semverLess(a, b) {
   return false;
 }
 
-function admin({ latest, isOwner, members, backups, auditRows }) {
+function admin({ latest, isOwner, members, backups, auditRows, blizzard, csrf }) {
   const stale = (iso) => !iso || Date.now() - new Date(iso.replace(' ', 'T') + (iso.includes('Z') ? '' : 'Z')).getTime() > 7 * 86400000;
   const ver = (v, newest) => (!v ? '<span class="muted">not yet</span>' : semverLess(v, newest) ? `<span class="warn">${esc(v)}</span>` : esc(v));
   return `<h1>Officer tools</h1>
@@ -401,6 +426,14 @@ function admin({ latest, isOwner, members, backups, auditRows }) {
         <td>${m.last_sync_at ? ago(m.last_sync_at) : `<span class="warn">never</span>${m.keys ? '' : ' <span class="muted">(no sync key)</span>'}`}</td>
         <td>${ver(m.addon_version, latest.addon)}</td><td>${ver(m.companion_version, latest.companion)}</td><td>${m.discord_id ? 'linked' : '<span class="muted">no</span>'}</td></tr>`).join('')}
     </tbody></table></div>
+  </section>
+  <section class="setting">
+    <h2>Blizzard game data</h2>
+    ${blizzard ? `<p>${blizzard.ok ? 'Your Battle.net app can read Blizzard’s free game data.' : '<span class="warn">Blizzard’s game data isn’t reachable with your Battle.net app.</span>'}
+      ${blizzard.forever ? ` <strong>WoW: Forever data is available</strong> (${esc(blizzard.forever)}).` : ' WoW: Forever isn’t in Blizzard’s API yet. This is checked daily, and it shows here when it arrives.'}
+      ${blizzard.tokenGold ? ` Retail WoW Token (${esc(blizzard.region.toUpperCase())}): ${esc(blizzard.tokenGold.toLocaleString('en'))}g.` : ''}
+      <span class="muted">Checked ${ago(blizzard.checkedAt)}.</span></p>` : '<p class="muted">Not checked yet. The server checks shortly after it starts.</p>'}
+    <form method="post" action="/admin/blizzard"><input type="hidden" name="_csrf" value="${esc(csrf)}"><button class="btn btn-small">Check now</button></form>
   </section>
   <section class="setting">
     <h2>Backups</h2>

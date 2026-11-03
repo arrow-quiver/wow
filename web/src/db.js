@@ -324,6 +324,23 @@ const MIGRATIONS = [
   // Wowhead tooltips: which game's database the guild uses, and item ids on loot lists.
   `ALTER TABLE guilds ADD COLUMN wowhead_game TEXT NOT NULL DEFAULT 'forever';
    ALTER TABLE loot_items ADD COLUMN item_id INTEGER;`,
+
+  // Free services: calendar feeds, web push, Discord events, Blizzard API status.
+  `ALTER TABLE users ADD COLUMN calendar_token TEXT;
+   CREATE UNIQUE INDEX users_calendar ON users(calendar_token) WHERE calendar_token IS NOT NULL;
+   ALTER TABLE raids ADD COLUMN duration_min INTEGER NOT NULL DEFAULT 180;
+   ALTER TABLE raids ADD COLUMN discord_event_id TEXT;
+   CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+   CREATE TABLE push_subs (
+     id INTEGER PRIMARY KEY,
+     user_id INTEGER NOT NULL REFERENCES users(id),
+     guild_id INTEGER NOT NULL REFERENCES guilds(id),
+     endpoint TEXT NOT NULL UNIQUE,
+     p256dh TEXT NOT NULL,
+     auth TEXT NOT NULL,
+     prefs TEXT NOT NULL DEFAULT '{"cta":true,"raids":true,"notices":true,"requests":true}',
+     created_at TEXT NOT NULL DEFAULT (datetime('now'))
+   );`,
 ];
 
 function migrate(db) {

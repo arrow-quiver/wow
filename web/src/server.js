@@ -9,6 +9,9 @@ const P = require('./views/pages');
 const { rateLimit } = require('./ratelimit');
 const backup = require('./backup');
 const wowhead = require('./views/wowhead');
+const { createPush } = require('./push');
+const blizzard = require('./blizzard');
+const { calendarToken } = require('./calendar');
 const fs = require('fs');
 
 function config(env = process.env) {
@@ -27,6 +30,7 @@ function config(env = process.env) {
     discordAppId: env.DISCORD_APP_ID || '',
     discordPublicKey: env.DISCORD_PUBLIC_KEY || '',
     discordBotToken: env.DISCORD_BOT_TOKEN || '',
+    bnetRegion: (env.BNET_REGION || 'eu').toLowerCase(),
   };
 }
 
@@ -47,7 +51,8 @@ function createApp(cfg, db) {
       "default-src 'self'", "script-src 'self' https://wow.zamimg.com https://nether.wowhead.com",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://wow.zamimg.com",
       "font-src https://fonts.gstatic.com https://wow.zamimg.com", "img-src 'self' data: https://wow.zamimg.com https://*.wowhead.com",
-      "connect-src 'self' https://nether.wowhead.com https://*.wowhead.com", "frame-src https://*.wowhead.com", "form-action 'self'", "frame-ancestors 'none'", "base-uri 'self'",
+      "connect-src 'self' https://nether.wowhead.com https://*.wowhead.com", "frame-src https://*.wowhead.com",
+      "worker-src 'self'", "manifest-src 'self'", "form-action 'self'", "frame-ancestors 'none'", "base-uri 'self'",
     ].join('; '));
     if (secureCookie) res.setHeader('Strict-Transport-Security', 'max-age=15552000');
     next();
@@ -96,8 +101,13 @@ function createApp(cfg, db) {
   { const g = db.prepare('SELECT wowhead_game FROM guilds ORDER BY id LIMIT 1').get(); if (g) wowhead.setGame(g.wowhead_game); }
   const phase3 = require('./routes/phase3');
   // Discord calls this with its own signature; it must skip the session and CSRF checks below.
-  phase3.mountDiscord(app, { db, cfg, discord: (...a) => discord(...a) });
+  phase3.mountDiscord(app, { db, cfg, discord: (...a) => discord(...a), notify: (...a) => notify(...a) });
   app.use('/api', express.json({ limit: '15mb' }));
+  app.use('/push', express.json({ limit: '10kb' }));
+  // Web push to phones/desktops. cfg.pushSend lets tests capture notifications.
+  const push = createPush(db, cfg, cfg.pushSend ? { send: cfg.pushSend } : {});
+  app.locals.push = push;
+  const notify = (...a) => push.notify(...a).catch((e) => console.warn('Notify failed:', e.message));
   app.use(express.urlencoded({ extended: false, limit: '50kb' }));
 
   // ---- helpers ----
@@ -270,6 +280,7 @@ function createApp(cfg, db) {
     db.prepare("INSERT INTO ctas (guild_id, user_id, character, zone, message, needed, source) VALUES (?,?,?,?,?,?, 'web')")
       .run(req.guild.id, req.user.id, main ? main.name : null, zone, message, needed);
     await discord(req.guild, `⚔️ **Call to arms: ${zone}**${needed ? ` (need ${needed})` : ''}\n${message}\n— ${main ? main.name : req.user.battletag.split('#')[0]}`);
+    notify(req.guild.id, 'cta', { title: `⚔️ Call to arms: ${zone}`, body: `${needed ? `Need ${needed}. ` : ''}${message} (${main ? main.name : req.user.battletag.split('#')[0]})`, url: '/' }, { exceptUserId: req.user.id });
     back(res, '/', 'Horn sounded.');
   });
 
@@ -279,6 +290,7 @@ function createApp(cfg, db) {
     db.prepare('INSERT INTO announcements (guild_id, user_id, body) VALUES (?,?,?)').run(req.guild.id, req.user.id, body);
     audit(req, 'notice posted', body.slice(0, 80));
     await discord(req.guild, `📜 **Notice**\n${body}`);
+    notify(req.guild.id, 'notices', { title: '📜 Guild notice', body, url: '/' }, { exceptUserId: req.user.id });
     back(res, '/', 'Notice posted.');
   });
 
@@ -372,6 +384,9 @@ function createApp(cfg, db) {
     const who = req.user.battletag.split('#')[0];
     q.activity.run(req.guild.id, 'craft', `${who} asked for ${item}`);
     await discord(req.guild, `🔨 **Crafting request:** ${item}${notes ? ` (${notes})` : ''}, for ${who}`);
+    const crafters = db.prepare(`SELECT DISTINCT c.user_id FROM recipes r JOIN characters c ON c.id = r.character_id
+      WHERE c.guild_id = ? AND c.user_id IS NOT NULL AND lower(r.name) = lower(?)`).all(req.guild.id, item).map((r) => r.user_id);
+    if (crafters.length) notify(req.guild.id, 'requests', { title: `🔨 ${who} needs ${item}`, body: `You can craft it.${notes ? ` ${notes}` : ''}`, url: '/requests' }, { userIds: crafters, exceptUserId: req.user.id });
     back(res, '/requests', 'Request posted.');
   });
   app.post('/requests/:id/:verb(claim|done|cancel)', needGuild, (req, res) => {
@@ -419,6 +434,13 @@ function createApp(cfg, db) {
       isOfficer: ['owner', 'officer'].includes(req.guild.role),
       isOwner: req.guild.role === 'owner', me: req.user.id,
       members: db.prepare('SELECT u.id, u.battletag, m.role FROM memberships m JOIN users u ON u.id = m.user_id WHERE m.guild_id = ? ORDER BY m.role, u.battletag').all(req.guild.id),
+      calendarUrl: (() => {
+        let t = req.user.calendar_token;
+        if (!t) { t = calendarToken(); db.prepare('UPDATE users SET calendar_token = ? WHERE id = ?').run(t, req.user.id); }
+        return `${cfg.baseUrl}/calendar/${t}.ics`;
+      })(),
+      pushDevices: db.prepare('SELECT COUNT(*) n FROM push_subs WHERE user_id = ?').get(req.user.id).n,
+      pushPrefs: (() => { const r = db.prepare('SELECT prefs FROM push_subs WHERE user_id = ? LIMIT 1').get(req.user.id); try { return r ? JSON.parse(r.prefs) : null; } catch { return null; } })(),
       discordInfo: {
         configured: Boolean(cfg.discordPublicKey && cfg.discordAppId), appId: cfg.discordAppId,
         linked: Boolean(req.user.discord_id), serverLinked: Boolean(req.guild.discord_server_id),
@@ -509,12 +531,13 @@ function createApp(cfg, db) {
     res.page({
       title: 'Officer tools', active: 'admin',
       body: P.admin({
-        latest: latest(), isOwner: req.guild.role === 'owner',
+        latest: latest(), isOwner: req.guild.role === 'owner', csrf: req.csrf,
         members: db.prepare(`SELECT u.id, u.battletag, u.addon_version, u.companion_version, u.last_sync_at, u.discord_id, m.role, m.joined_at,
             (SELECT COUNT(*) FROM characters c WHERE c.user_id = u.id AND c.guild_id = m.guild_id) AS chars,
             (SELECT COUNT(*) FROM api_tokens t WHERE t.user_id = u.id AND t.guild_id = m.guild_id) AS keys
           FROM memberships m JOIN users u ON u.id = m.user_id WHERE m.guild_id = ? ORDER BY u.last_sync_at IS NULL, u.last_sync_at DESC`).all(gid),
         backups: backup.listBackups(backup.backupDir(cfg.dbFile)),
+        blizzard: blizzard.load(db),
         auditRows: db.prepare(`SELECT a.*, u.battletag FROM audit_log a LEFT JOIN users u ON u.id = a.user_id WHERE a.guild_id = ? ORDER BY a.id DESC LIMIT 100`).all(gid),
       }),
     });
@@ -531,9 +554,10 @@ function createApp(cfg, db) {
   });
 
   // ---- raids & loot (Phase 2) ----
-  const raids = require('./routes/raids')(app, { db, cfg, discord, activity: q.activity, needGuild, needOfficer, back, audit });
+  const raids = require('./routes/raids')(app, { db, cfg, discord, activity: q.activity, needGuild, needOfficer, back, audit, notify });
   app.locals.remind = raids.remind;
-  phase3.routes(app, { db, cfg, discord, activity: q.activity, needGuild, needOfficer, back, audit });
+  phase3.routes(app, { db, cfg, discord, activity: q.activity, needGuild, needOfficer, back, audit, notify });
+  require('./routes/freebies')(app, { db, cfg, push, needGuild, needOfficer, back, audit });
   if (cfg.timers) setInterval(() => raids.remind().catch((e) => console.warn('Reminder failed:', e.message)), 60 * 1000).unref();
 
   // ---- companion API ----
@@ -556,6 +580,7 @@ function createApp(cfg, db) {
         .run(ver(req.body && req.body.addonVersion), ver(req.get('X-Companion-Version')), req.tok.user_id);
       for (const c of stats.ctas) {
         await discord({ discord_webhook: req.tok.discord_webhook }, `⚔️ **Call to arms: ${c.zone}**${c.needed ? ` (need ${c.needed})` : ''}\n${c.message || ''}\n— ${c.character || 'someone'} (from in game)`);
+        notify(req.tok.guild_id, 'cta', { title: `⚔️ Call to arms: ${c.zone}`, body: `${c.needed ? `Need ${c.needed}. ` : ''}${c.message || ''} (${c.character || 'from in game'})`, url: '/' }, { exceptUserId: req.tok.user_id });
       }
       res.json({ ok: true, characters: stats.characters, roster: stats.roster, recipes: stats.recipes, ctas: stats.ctas.length,
         inventory: stats.inventory, bank: stats.bank, prices: stats.prices, latest: latest() });
@@ -583,6 +608,21 @@ if (require.main === module) {
   const tick = () => { try { const f = backup.backupIfDue(db, dir); if (f) console.log('Backup written:', f); } catch (e) { console.error('Backup failed:', e.message); } };
   setTimeout(tick, 30 * 1000);
   setInterval(tick, 3600 * 1000);
+  // Blizzard API: check daily what's available (and whether WoW: Forever data has appeared).
+  const bliz = async () => {
+    try {
+      const s = await blizzard.check(cfg); blizzard.save(db, s);
+      console.log(`Blizzard API: ${s.ok ? 'reachable' : 'not reachable'}, Retail token ${s.tokenGold ?? '?'}g, Forever namespace: ${s.forever || 'not yet'}`);
+    } catch (e) { console.warn('Blizzard API check failed:', e.message); }
+  };
+  setTimeout(bliz, 20 * 1000);
+  setInterval(bliz, 24 * 3600 * 1000);
+  // Source check: log which free services this server can reach.
+  setTimeout(async () => {
+    for (const [name, url] of [['Wowhead tooltips', 'https://wow.zamimg.com/js/tooltips.js'], ['Wowhead data', 'https://nether.wowhead.com/tooltip/item/2589'], ['Discord', 'https://discord.com/api/v10/gateway']]) {
+      try { const r = await fetch(url, { signal: AbortSignal.timeout(8000) }); console.log(`Source ${name}: ${r.status}`); } catch (e) { console.log(`Source ${name}: unreachable (${e.message})`); }
+    }
+  }, 15 * 1000);
 }
 
 module.exports = { createApp, config };

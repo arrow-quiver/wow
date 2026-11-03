@@ -11,7 +11,9 @@ function toUtc(local, tzOffset, fallbackOffset) {
 }
 const unix = (iso) => Math.floor(new Date(iso).getTime() / 1000);
 
-module.exports = function raidRoutes(app, { db, cfg, discord, activity, needGuild, needOfficer, back, audit = () => {} }) {
+const D = require('../discord');
+
+module.exports = function raidRoutes(app, { db, cfg, discord, activity, needGuild, needOfficer, back, audit = () => {}, notify = async () => 0 }) {
   const isOfficer = (req) => ['owner', 'officer'].includes(req.guild.role);
   const getRaid = (req, res) => {
     const raid = R.raidFor(db, req.guild.id, req.params.id);
@@ -50,6 +52,14 @@ module.exports = function raidRoutes(app, { db, cfg, discord, activity, needGuil
     audit(req, `scheduled ${kind}`, `${title} (${startsAt})`);
     const icon = { raid: '🗓️', pvp: '⚔️', event: '🎉' }[kind];
     await discord(req.guild, `${icon} **${kind === 'pvp' ? 'PvP' : kind === 'event' ? 'Event' : 'Raid'}: ${title}** (${instance})\n<t:${unix(startsAt)}:F>, <t:${unix(startsAt)}:R>\nSign up${kind === 'raid' ? ' and reserve' : ''}: ${cfg.baseUrl}/raids/${r.lastInsertRowid}`);
+    notify(req.guild.id, 'raids', { title: `${icon} ${title}`, body: `${instance}, ${new Date(startsAt).toUTCString().slice(0, 22)} UTC. Sign up on the site.`, url: `/raids/${r.lastInsertRowid}` }, { exceptUserId: req.user.id });
+    // Native Discord event (when the bot is in the server).
+    if (cfg.discordBotToken && req.guild.discord_server_id) {
+      const raid = db.prepare('SELECT * FROM raids WHERE id = ?').get(r.lastInsertRowid);
+      D.createEvent(cfg, req.guild.discord_server_id, raid, `${cfg.baseUrl}/raids/${raid.id}`)
+        .then((id) => db.prepare('UPDATE raids SET discord_event_id = ? WHERE id = ?').run(id, raid.id))
+        .catch((e) => console.warn(e.message));
+    }
     res.redirect(`/raids/${r.lastInsertRowid}`);
   });
 
@@ -102,7 +112,12 @@ module.exports = function raidRoutes(app, { db, cfg, discord, activity, needGuil
     if (!from.includes(raid.status)) return back(res, `/raids/${raid.id}`);
     db.prepare('UPDATE raids SET status = ? WHERE id = ?').run(to, raid.id);
     audit(req, `raid ${to === 'open' ? 'reopened' : to}`, raid.title);
-    if (to === 'cancelled') discord(req.guild, `❌ **${raid.title}** on <t:${unix(raid.starts_at)}:F> is cancelled.`);
+    if (to === 'cancelled') {
+      discord(req.guild, `❌ **${raid.title}** on <t:${unix(raid.starts_at)}:F> is cancelled.`);
+      const signed = db.prepare("SELECT user_id FROM signups WHERE raid_id = ? AND status != 'no'").all(raid.id).map((x) => x.user_id);
+      if (signed.length) notify(req.guild.id, 'raids', { title: `❌ ${raid.title} is cancelled`, body: 'Check the site for details.', url: `/raids/${raid.id}` }, { userIds: signed });
+      if (raid.discord_event_id && cfg.discordBotToken && req.guild.discord_server_id) D.deleteEvent(cfg, req.guild.discord_server_id, raid.discord_event_id).catch(() => {});
+    }
     back(res, `/raids/${raid.id}`, msg);
   };
   app.post('/raids/:id(\\d+)/lock', needOfficer, setStatus(['open'], 'locked', 'Reserves locked.'));
@@ -196,6 +211,7 @@ module.exports = function raidRoutes(app, { db, cfg, discord, activity, needGuil
     for (const r of soon) {
       db.prepare('UPDATE raids SET reminded = 1 WHERE id = ?').run(r.id);
       const c = V.roleCounts(db.prepare('SELECT role, status FROM signups WHERE raid_id = ?').all(r.id));
+      notify(r.guild_id, 'raids', { title: `⏰ ${r.title} starts in an hour`, body: `${c.tank} tanks, ${c.healer} healers, ${c.dps} damage signed up.`, url: `/raids/${r.id}` });
       await discord(r, `⏰ **${r.title}** starts <t:${unix(r.starts_at)}:R>. ${c.tank} tank${c.tank === 1 ? '' : 's'}, ${c.healer} healer${c.healer === 1 ? '' : 's'}, ${c.dps} damage signed up.\n${cfg.baseUrl}/raids/${r.id}`);
     }
     return soon.length;

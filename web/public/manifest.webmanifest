@@ -1,0 +1,14 @@
+{
+  "name": "wow guild",
+  "short_name": "wow",
+  "description": "The guild's camp: who's online, raids, loot, crafters and calls to arms.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#1f3a33",
+  "theme_color": "#1f3a33",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

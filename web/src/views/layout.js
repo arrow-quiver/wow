@@ -48,6 +48,9 @@ function layout({ title, active, user, guild, body, csrf, flash }) {
 <link href="https://fonts.googleapis.com/css2?family=Alegreya:wght@500;700;800&family=Alegreya+Sans:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/style.css">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#1f3a33">
+<link rel="apple-touch-icon" href="/icon-192.png">
 <script src="/app.js" defer></script>
 <script src="/wowhead-config.js" defer></script>
 <script src="https://wow.zamimg.com/js/tooltips.js" defer></script>

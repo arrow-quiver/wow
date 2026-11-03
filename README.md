@@ -118,6 +118,14 @@ The addon also records PvP rank and honor, reputations and currencies (for examp
 
 Windows may show a SmartScreen warning the first time, because the exe isn't code-signed. Choose "More info → Run anyway".
 
+## Free services built in
+
+- **Calendar feed.** Settings → "Raids in your calendar" gives each member a private iCalendar link (Google, Apple, Outlook). Raids update by themselves with a 30-minute reminder. "Replace calendar link" kills the old one.
+- **Phone and desktop notifications.** Standard web push (VAPID keys are made once and kept in the database). Sent for calls to arms, new or cancelled raids, the one-hour reminder, guild notices, crafting requests (only to members who know the recipe) and bank requests (officers). Each member picks which kinds they want. On iPhone the site must be added to the Home Screen first; the site ships a web app manifest and service worker for that.
+- **Discord Events.** If the Discord app is invited as a bot with Manage Events (the invite link in Settings asks for it), new raids also appear in the server's Events list and are removed when cancelled.
+- **Blizzard Game Data API.** Uses the same Battle.net app as sign-in (`BNET_REGION`, default `eu`). The server checks daily whether a WoW: Forever namespace exists yet and reads the Retail WoW Token price; officers see the result in Officer tools.
+- **Wowhead tooltips** on every item and spell (see Addon polish).
+
 ## Addon polish (0.7.0)
 
 - **Looks like the game:** the window uses Blizzard's own frame and bottom tabs where the client has them, and falls back to its own look where it doesn't.

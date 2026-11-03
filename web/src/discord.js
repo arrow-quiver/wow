@@ -159,4 +159,28 @@ function newLinkCode(db, userId, guildId) {
   return code;
 }
 
-module.exports = { verify, handle, registerCommands, COMMANDS, newLinkCode };
+// Native Discord scheduled events for raids (needs the bot in the server with Manage Events).
+async function createEvent(cfg, serverId, raid, url, fetchImpl = fetch) {
+  const start = new Date(raid.starts_at);
+  const end = new Date(start.getTime() + (raid.duration_min || 180) * 60000);
+  const res = await fetchImpl(`https://discord.com/api/v10/guilds/${serverId}/scheduled-events`, {
+    method: 'POST',
+    headers: { Authorization: `Bot ${cfg.discordBotToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: raid.title.slice(0, 100), privacy_level: 2, entity_type: 3,
+      scheduled_start_time: start.toISOString(), scheduled_end_time: end.toISOString(),
+      entity_metadata: { location: `${raid.instance} · ${url}`.slice(0, 100) },
+      description: `${raid.notes ? `${raid.notes}\n\n` : ''}Sign up${raid.kind === 'raid' ? ' and reserve loot' : ''}: ${url}`.slice(0, 1000),
+    }),
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!res.ok) throw new Error(`Discord event: ${res.status} ${(await res.text()).slice(0, 150)}`);
+  return (await res.json()).id;
+}
+async function deleteEvent(cfg, serverId, eventId, fetchImpl = fetch) {
+  await fetchImpl(`https://discord.com/api/v10/guilds/${serverId}/scheduled-events/${eventId}`, {
+    method: 'DELETE', headers: { Authorization: `Bot ${cfg.discordBotToken}` }, signal: AbortSignal.timeout(10000),
+  });
+}
+
+module.exports = { verify, handle, registerCommands, COMMANDS, newLinkCode, createEvent, deleteEvent };

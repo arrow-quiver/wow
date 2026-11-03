@@ -9,12 +9,13 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "DEV_LOGIN=1 node src/server.js",
-    "test": "node --test test/e2e.test.js test/raids.test.js test/phase3.test.js test/professions.test.js test/hardening.test.js test/ui.test.js test/polish.test.js",
+    "test": "node --test test/e2e.test.js test/raids.test.js test/phase3.test.js test/professions.test.js test/hardening.test.js test/ui.test.js test/polish.test.js test/freebies.test.js",
     "demo": "node scripts/demo.js"
   },
   "dependencies": {
     "better-sqlite3": "^11.10.0",
-    "express": "^4.21.2"
+    "express": "^4.21.2",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "fengari": "^0.1.4",
