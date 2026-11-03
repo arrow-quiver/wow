@@ -1,13 +1,15 @@
 -- wow guild: options panel (Settings → AddOns → wow guild, or /wow options).
 local ADDON, ns = ...
 
-local OPTIONS = {
+ns.OPTION_LIST = {
+  { key = "minimapButton", label = "Show the campfire button on the minimap" },
   { key = "loginNews", label = "Show guild news in chat when I log in" },
   { key = "updateNotice", label = "Tell me when a newer version of this addon is out" },
   { key = "autoGuide", label = "Open the skill-up guide with my profession window" },
   { key = "trackerOnLogin", label = "Show my shopping list on login when it has items" },
   { key = "collectBank", label = "Share my bank and the guild bank with the guild site" },
 }
+local OPTIONS = ns.OPTION_LIST
 
 local panel = CreateFrame("Frame")
 panel.name = "wow guild"
@@ -30,6 +32,7 @@ for i, o in ipairs(OPTIONS) do
   cb:SetScript("OnClick", function(self)
     ns.db.options = ns.db.options or {}
     ns.db.options[o.key] = self:GetChecked() and true or false
+    if ns.applyOptions then ns.applyOptions() end
   end)
   cb.key = o.key
   panel.boxes[i] = cb

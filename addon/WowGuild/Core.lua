@@ -48,7 +48,7 @@ function ns.versionLess(a, b)
 end
 
 -- Options (Settings → AddOns → wow guild). Defaults are on.
-ns.DEFAULTS = { loginNews = true, autoGuide = true, trackerOnLogin = true, collectBank = true, updateNotice = true }
+ns.DEFAULTS = { minimapButton = true, loginNews = true, autoGuide = true, trackerOnLogin = true, collectBank = true, updateNotice = true }
 function ns.opt(key)
   local o = ns.db and ns.db.options
   if o and o[key] ~= nil then return o[key] end
@@ -99,7 +99,13 @@ end
 
 function ns.queueCta(text)
   local zone, needed, msg = ns.parseCta(text)
-  table.insert(ns.db.ctaQueue, { zone = zone, needed = needed, msg = msg, at = now(), character = UnitName("player") })
+  ns.addCta(zone, needed, msg)
+end
+
+-- Used by the slash command and the Call to arms form.
+function ns.addCta(zone, needed, msg)
+  if not zone or zone == "" then zone = (GetZoneText and GetZoneText()) or "Unknown" end
+  table.insert(ns.db.ctaQueue, { zone = zone, needed = needed, msg = msg or "", at = now(), character = UnitName("player") })
   ns.print(string.format("Call to arms queued for %s. It goes to Discord when you reload or log out.", zone))
   StaticPopup_Show("WOWGUILD_RELOAD_NOW")
 end
@@ -141,7 +147,7 @@ SlashCmdList["WOWGUILD"] = function(input)
   elseif cmd == "list" then
     if rest == "clear" then ns.prof.clearList() else ns.prof.toggleTracker() end
   elseif cmd == "options" or cmd == "config" then
-    ns.openOptions()
+    ns.ui.show("settings")
   elseif cmd == "help" then
     ns.print("/wow  open the guild panel")
     ns.print("/wow cta [zone] [number] [message]  call guildies to a fight")

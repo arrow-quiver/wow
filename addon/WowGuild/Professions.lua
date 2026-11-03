@@ -175,6 +175,18 @@ function P.addToList(recipe, qty)
   return e
 end
 
+function P.removeFromList(key, delta)
+  local list = P.list()
+  for i, e in ipairs(list) do
+    if e.key == key then
+      if delta then e.qty = e.qty + delta end
+      if not delta or e.qty <= 0 then table.remove(list, i) end
+      break
+    end
+  end
+  P.refreshTracker()
+end
+
 function P.clearList()
   ns.db.shopping = {}
   P.done = {}

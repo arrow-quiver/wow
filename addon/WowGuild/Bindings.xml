@@ -1,0 +1,5 @@
+<Bindings>
+  <Binding name="WOWGUILD_TOGGLE" header="WOWGUILD" category="ADDONS">
+    WowGuild_Toggle()
+  </Binding>
+</Bindings>

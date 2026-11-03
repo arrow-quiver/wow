@@ -118,7 +118,19 @@ The addon also records PvP rank and honor, reputations and currencies (for examp
 
 Windows may show a SmartScreen warning the first time, because the exe isn't code-signed. Choose "More info → Run anyway".
 
-## In-game commands
+## In-game window (addon 0.6.0)
+
+No typing needed. Click the **campfire button on the minimap**. Right-click it for settings, or drag it to move it. In Retail it's also in the addon drawer, and you can set a key under Key Bindings → AddOns → wow guild.
+
+| Tab | What's there |
+|---|---|
+| **Camp** | Upcoming raids and your sign-up status, guild notices, what's been saved, and **Sync now** (saves and reloads so the companion uploads) |
+| **Call to arms** | Where (with *Use my zone*), how many, what's happening, then **Sound the horn**. Shows calls waiting to send |
+| **Professions** | Your skill levels, buttons for the skill-up guide and the on-screen shopping list, each recipe on the list with −1 / +1 / Remove, mats still needed, and **Clear list** |
+| **Guild** | Crafting requests you can make, your own requests, leveling partners |
+| **Settings** | Every option as a tick box (including the minimap button), the guild site address to copy, version and update notice |
+
+## In-game commands (optional)
 
 | Command | What it does |
 |---|---|

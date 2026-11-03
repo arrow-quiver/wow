@@ -173,6 +173,7 @@ function P.trackerText()
 end
 
 function P.refreshTracker()
+  if ns.ui and ns.ui.refreshIfShown then ns.ui.refreshIfShown() end
   if not tracker or not tracker:IsShown() then return end
   tracker.text:SetText(P.trackerText())
   tracker:SetHeight(40 + (tracker.text:GetStringHeight() or 40))
@@ -184,6 +185,9 @@ function P.showTracker()
   tracker:Show()
   P.refreshTracker()
 end
+function P.trackerShown() return tracker and tracker:IsShown() or false end
+function P.guideShown() return guide and guide:IsShown() or false end
+
 function P.toggleTracker()
   tracker = tracker or createTracker()
   if tracker:IsShown() then ui().trackerHidden = true; tracker:Hide() else P.showTracker() end

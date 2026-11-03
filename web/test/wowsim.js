@@ -27,11 +27,29 @@ local function newFrame()
   function f:Show() self.shown = true end
   function f:Hide() self.shown = false end
   function f:IsShown() return self.shown end
-  function f:CreateFontString() local s = newFrame(); function s:SetText(t) self.text = t end; function s:GetStringHeight() return 100 end; return s end
+  function f:CreateFontString() local s = newFrame(); s.parent = self; function s:GetStringHeight() return 100 end; return s end
+  function f:CreateTexture() local t = newFrame(); t.parent = self; return t end
+  function f:SetText(t) rawset(self, "_text", t) end
+  function f:GetText() return rawget(self, "_text") end
+  function f:SetChecked(v) self.checked = v and true or false end
+  function f:GetChecked() return self.checked end
+  function f:GetParent() return self.parent end
+  function f:GetPoint() return "CENTER", nil, "CENTER", 0, 0 end
   frames[#frames + 1] = f
   return f
 end
-function CreateFrame() return newFrame() end
+function CreateFrame(kind, name, parent)
+  local f = newFrame()
+  f.kind, f.parent = kind, parent
+  if name then _G[name] = f end
+  return f
+end
+Minimap = newFrame()
+function Minimap:GetCenter() return 100, 100 end
+function Minimap:GetWidth() return 140 end
+function Minimap:GetEffectiveScale() return 1 end
+function GetCursorPosition() return 100, 200 end
+function __click(f, which) if f.scripts.OnClick then f.scripts.OnClick(f, which or "LeftButton") end end
 function __fire(event, ...)
   for _, f in ipairs(frames) do
     if f.events[event] and f.scripts.OnEvent then f.scripts.OnEvent(f, event, ...) end
