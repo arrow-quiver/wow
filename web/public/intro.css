@@ -1,0 +1,251 @@
+/* Loading screen shown once per visit (intro.js). Everything is scoped to #intro so it can't touch the site's styles. */
+html.intro-on, html.intro-on body { overflow: hidden; }
+html.intro-on body > :not(#intro) { visibility: hidden; }
+#intro {
+  --gold:#d8b777; --pale:#f3dfb6; --red:#a52d26; --blood:#651b20; --ink:#080a0d;
+  position:fixed;inset:0;z-index:99999;overflow:hidden;
+  background:#090d16;isolation:isolate;color:#fff;
+  font-family:Montserrat,sans-serif;
+  transition:opacity 1.6s ease,visibility 1.6s;
+}
+#intro * {box-sizing:border-box}
+#intro.exit {opacity:0;visibility:hidden;pointer-events:none}
+#intro .scene {position:absolute;inset:0;overflow:hidden}
+#intro .scene > svg.world {position:absolute;width:100%;height:100%;inset:0}
+#intro .sky {
+ position:absolute;inset:0;
+ background:
+ radial-gradient(ellipse at 70% 40%,#a14b3820,transparent 35%),
+ linear-gradient(180deg,#0b1422 0%,#202536 45%,#392c30 70%,#080b10 100%);
+}
+#intro .clouds {
+ position:absolute;inset:-20%;opacity:.4;
+ background:
+ radial-gradient(ellipse at 25% 38%,#8391a42b 0%,transparent 23%),
+ radial-gradient(ellipse at 60% 45%,#a2a2a51e 0%,transparent 27%),
+ radial-gradient(ellipse at 85% 27%,#9c81942a 0%,transparent 23%);
+ filter:blur(32px);
+ animation:intro-cloudDrift 35s ease-in-out infinite alternate;
+}
+@keyframes intro-cloudDrift {
+ from {transform:translateX(-3%) scale(1)}
+ to {transform:translateX(4%) scale(1.08)}
+}
+#intro .moon {
+ position:absolute;top:14%;right:21%;width:clamp(90px,11vw,160px);
+ aspect-ratio:1;border-radius:50%;
+ background:radial-gradient(circle at 35% 32%,#fff4d8,#d7c3a1 40%,#8d8990 76%,#5a5260);
+ box-shadow:0 0 35px #e9d6ad55,0 0 120px #b2b9cf33;
+ opacity:.75;
+}
+#intro .moon:after {
+ content:"";position:absolute;inset:0;border-radius:50%;
+ background:radial-gradient(circle at 65% 70%,#4b4a5155,transparent 50%);
+}
+#intro .aurora {
+ position:absolute;top:0;left:15%;width:70%;height:55%;
+ background:linear-gradient(115deg,transparent,#3c716e10,#6d718c16,transparent);
+ filter:blur(40px);transform:rotate(-12deg);
+ animation:intro-aurora 12s ease-in-out infinite alternate;
+}
+@keyframes intro-aurora {to{transform:translate(5%,-5%) rotate(-5deg);opacity:.5}}
+
+/* World landscape */
+#intro .world {position:absolute;inset:0;width:100%;height:100%}
+#intro .world .back {transform-origin:center bottom;animation:intro-worldMove 25s ease-in-out infinite alternate}
+@keyframes intro-worldMove {to {transform:scale(1.055) translate(-1%,1%)}}
+#intro .haze {
+ position:absolute;bottom:12%;left:0;width:100%;height:45%;
+ background:linear-gradient(0deg,#080a0d 0%,transparent 100%);
+ pointer-events:none;
+}
+#intro .castle-glow {
+ position:absolute;left:48%;top:37%;width:25%;height:40%;
+ background:radial-gradient(ellipse,#ba633222,transparent 68%);
+ filter:blur(35px);
+}
+#intro .castle-light {animation:intro-torch 2.4s ease-in-out infinite alternate;transform-origin:center}
+@keyframes intro-torch {to{opacity:.45}}
+
+/* Dragon */
+#intro .dragon {
+ position:absolute;top:17%;left:-30%;width:clamp(300px,40vw,620px);height:auto;
+ filter:drop-shadow(0 12px 25px #0009);
+ animation:intro-dragonFlight 24s linear infinite;
+}
+@keyframes intro-dragonFlight {
+ 0% {transform:translate(-10vw,15vh) scale(.65);opacity:0}
+ 7% {opacity:.8}
+ 50% {transform:translate(60vw,-5vh) scale(1.05)}
+ 90% {opacity:.65}
+ 100% {transform:translate(145vw,9vh) scale(.85);opacity:0}
+}
+#intro .wing {transform-origin:50% 20%;animation:intro-wing 1.8s ease-in-out infinite alternate}
+@keyframes intro-wing {to{transform:scaleY(.65) rotate(-4deg)}}
+
+/* Adventuring party */
+#intro .hero-party {
+  position:absolute;
+  z-index:3;
+  bottom:3%;
+  right:12%;
+  width:clamp(330px,43vw,650px);
+  height:auto;
+  overflow:visible;
+  filter:drop-shadow(0 8px 18px #000);
+  animation:intro-partyReveal 3s ease-out both;
+}
+#intro .hero {
+  transform-box:fill-box;
+  transform-origin:center bottom;
+  animation:intro-heroIdle 5s ease-in-out infinite alternate;
+}
+#intro .hero:nth-child(2) {animation-delay:-1.7s}
+#intro .hero:nth-child(3) {animation-delay:-3s}
+#intro .orb {animation:intro-torch 1.6s ease-in-out infinite alternate}
+@keyframes intro-heroIdle {
+  from {transform:translateY(0)}
+  to {transform:translateY(-3px)}
+}
+@keyframes intro-partyReveal {
+  from {opacity:0;transform:translateY(25px)}
+  to {opacity:1;transform:translateY(0)}
+}
+
+/* Foreground particles */
+#intro-particles {position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+#intro .light-beam {
+ position:absolute;top:-15%;left:50%;width:1px;height:90%;
+ background:linear-gradient(transparent,#e7c28b20,transparent);
+ transform:rotate(18deg);
+ filter:blur(8px);
+}
+#intro .vignette {
+ position:absolute;inset:0;pointer-events:none;
+ background:radial-gradient(ellipse at center,transparent 38%,#0305099c 100%);
+}
+#intro .grain {
+ position:absolute;inset:-50%;pointer-events:none;opacity:.12;
+ background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.95' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.3'/%3E%3C/svg%3E");
+}
+
+/* Ornamental interface */
+#intro .frame {position:absolute;inset:20px;border:1px solid #d8b77730;pointer-events:none}
+#intro .frame:before,#intro .frame:after {content:"";position:absolute;width:85px;height:85px;border:1px solid #d8b77799}
+#intro .frame:before {top:-1px;left:-1px;border-right:0;border-bottom:0}
+#intro .frame:after {bottom:-1px;right:-1px;border-left:0;border-top:0}
+#intro .corner {position:absolute;width:25px;height:25px;border-color:#d8b77777;border-style:solid}
+#intro .c1 {top:24px;right:24px;border-width:1px 1px 0 0}
+#intro .c2 {bottom:24px;left:24px;border-width:0 0 1px 1px}
+
+#intro .top {position:absolute;z-index:4;top:6%;left:0;width:100%;text-align:center;animation:intro-appear 2s both}
+#intro .crest {
+ width:58px;height:68px;margin:auto;position:relative;
+ display:grid;place-items:center;
+ clip-path:polygon(50% 0,95% 15%,87% 75%,50% 100%,13% 75%,5% 15%);
+ background:linear-gradient(145deg,#e1c48a,#77512d 45%,#261b17);
+ filter:drop-shadow(0 0 15px #b67a3b66);
+}
+#intro .crest-inner {
+ position:absolute;inset:3px;
+ clip-path:polygon(50% 0,95% 15%,87% 75%,50% 100%,13% 75%,5% 15%);
+ background:linear-gradient(160deg,#452b26,#140f12);
+ display:grid;place-items:center;
+}
+#intro .crest-inner span {font-family:'Uncial Antiqua',serif;font-size:27px;color:#e5c68d;text-shadow:0 0 15px #c18b4a}
+#intro .guild-name {
+ font-family:Cinzel,serif;font-weight:700;
+ font-size:clamp(29px,4.2vw,58px);
+ letter-spacing:.19em;margin:14px 0 5px;
+ color:#e8d3ac;
+ text-shadow:0 3px 18px #000,0 0 35px #c48d4b33;
+}
+#intro .subtitle {color:#c49b60;font-size:9px;letter-spacing:.55em;text-transform:uppercase}
+#intro .divider {display:flex;align-items:center;justify-content:center;gap:15px;margin:14px auto;color:#b68b53;font-size:12px}
+#intro .divider:before,#intro .divider:after {content:"";width:75px;height:1px;background:linear-gradient(90deg,transparent,#b68b53)}
+#intro .divider:after {transform:scaleX(-1)}
+
+#intro .story {position:absolute;z-index:4;left:8%;bottom:25%;width:min(440px,43%);animation:intro-storyReveal 2.2s .3s both}
+#intro .kicker {color:#d3ae71;font-family:Cinzel,serif;letter-spacing:.34em;font-size:10px}
+#intro .story h1 {
+ font-family:Cinzel,serif;
+ font-size:clamp(29px,4.1vw,57px);
+ line-height:1.22;font-weight:500;
+ margin:19px 0 16px;color:#f1e5ce;
+ text-shadow:0 4px 25px #000;
+}
+#intro .story p {font-size:11px;line-height:2.1;letter-spacing:.08em;color:#c0b9b0;max-width:330px;margin:0 0 1em}
+#intro .story .ornament {width:95px;height:1px;background:#c09a60;margin:23px 0}
+#intro .quote {font-family:Cinzel,serif;font-size:10px;color:#c2a778;letter-spacing:.17em}
+#intro .right-mark {
+ position:absolute;right:7%;bottom:26%;
+ writing-mode:vertical-rl;
+ color:#dfc18b66;font-family:Cinzel,serif;
+ font-size:9px;letter-spacing:.55em;
+ text-transform:uppercase;
+}
+
+/* Loading */
+#intro .bottom {position:absolute;z-index:4;bottom:7%;left:8%;width:min(370px,55%);animation:intro-appear 2.5s .4s both}
+#intro .load-row {
+ display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;
+ font-family:Cinzel,serif;color:#d9bd8b;font-size:9px;letter-spacing:.24em;
+}
+#intro .track {height:2px;background:#ffffff20;width:100%;position:relative;overflow:visible;border-radius:0}
+#intro .loadbar {
+ height:100%;width:0%;
+ background:linear-gradient(90deg,#63251f,#c47d43,#f4d49c);
+ box-shadow:0 0 12px #d39a5c;
+ transition:width .35s ease;
+}
+#intro .loadbar:after {
+ content:"";float:right;width:5px;height:5px;border-radius:50%;
+ background:#ffe4ad;transform:translate(0,-2px);
+ box-shadow:0 0 10px #ffcc82;
+}
+#intro .load-meta {display:flex;justify-content:space-between;margin-top:12px;color:#77787c;font-size:8px;letter-spacing:.2em}
+#intro .enter {
+ margin-top:22px;padding:13px 28px;
+ background:linear-gradient(90deg,#56221e,#762b26);
+ border:1px solid #c9a56a;border-radius:0;
+ color:#f1d9ac;font-family:Cinzel,serif;
+ letter-spacing:.22em;font-size:10px;
+ cursor:pointer;display:none;
+ transition:.3s;
+ box-shadow:inset 0 0 15px #e3a85a19;
+}
+#intro .enter:hover,#intro .enter:focus-visible {background:#a44b36;box-shadow:0 0 30px #b86b4266;outline:none}
+#intro .enter.show {display:inline-block;animation:intro-appear 1s both}
+#intro .skip {
+ position:absolute;z-index:5;top:34px;left:38px;background:none;border:0;padding:6px;
+ color:#8d8b88;font:9px Montserrat,sans-serif;letter-spacing:.25em;cursor:pointer;
+}
+#intro .skip:hover,#intro .skip:focus-visible {color:#e5c68d;outline:none}
+#intro .version {position:absolute;z-index:4;right:5%;bottom:5%;color:#686970;font-size:8px;letter-spacing:.2em}
+@keyframes intro-appear {from{opacity:0}to{opacity:1}}
+@keyframes intro-storyReveal {
+ from{opacity:0;transform:translateY(22px)}
+ to{opacity:1;transform:translateY(0)}
+}
+
+@media(max-width:700px) {
+ #intro .frame {inset:11px}
+ #intro .moon {top:22%;right:12%;width:90px}
+ #intro .top {top:7%}
+ #intro .guild-name {font-size:29px;letter-spacing:.12em}
+ #intro .crest {width:43px;height:52px}
+ #intro .story {left:8%;bottom:31%;width:84%}
+ #intro .story h1 {font-size:34px}
+ #intro .story p {max-width:260px;font-size:10px}
+ #intro .right-mark {display:none}
+ #intro .bottom {left:8%;bottom:8%;width:78%}
+ #intro .dragon {top:24%;width:350px}
+ #intro .scene > svg.world {width:150%;left:-25%}
+ #intro .subtitle {letter-spacing:.3em;font-size:8px}
+ #intro .version {display:none}
+ #intro .skip {top:18px;left:20px}
+ #intro .hero-party {width:85%;right:-5%;bottom:21%;opacity:.55} /* sits behind the text on phones */
+}
+@media(prefers-reduced-motion:reduce) {
+ #intro,#intro *,#intro *:before,#intro *:after {animation:none!important;transition:none!important}
+}
