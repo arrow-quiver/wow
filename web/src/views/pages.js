@@ -252,7 +252,7 @@ function settings({ csrf, tokens, newToken, guild, baseUrl, isOfficer, members, 
   <section class="setting">
     <h2>Connect the game</h2>
     <ol class="steps">
-      <li>Copy the <code>WowGuild</code> folder into <code>World of Warcraft\\_forever_\\Interface\\AddOns</code>. The folder name may differ: use whichever one holds Forever.</li>
+      <li><a class="btn btn-small" href="/downloads/WowGuild.zip" download>Download the addon</a> and unzip it into <code>World of Warcraft\\_forever_\\Interface\\AddOns</code>, so you end up with <code>AddOns\\WowGuild</code>. The folder name may differ: use whichever one holds Forever.</li>
       <li>Put <code>wow-companion.exe</code> in any folder and run it once. It creates <code>config.json</code> next to itself.</li>
       <li>Create a sync key below. In <code>config.json</code>, set <code>syncKey</code> to it and <code>siteUrl</code> to <code>${esc(baseUrl)}</code>.</li>
       <li>Run the companion again and leave it open while you play. It uploads every time you log out or type <code>/reload</code>.</li>

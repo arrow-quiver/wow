@@ -70,7 +70,7 @@ Built into the guild addon. It only reads profession and bag data, out of combat
 
 ## Install for each player
 
-1. Copy `addon/WowGuild` into the game's `Interface\AddOns` folder. For Forever that's probably `World of Warcraft\_forever_\Interface\AddOns` (check which `_xxx_` folder Forever uses).
+1. Download the addon from the site: Settings → **Download the addon**, or `<BASE_URL>/downloads/WowGuild.zip` (no sign-in needed). Unzip it into the game's `Interface\AddOns` folder so you get `AddOns\WowGuild`. For Forever that's probably `World of Warcraft\_forever_\Interface\AddOns` (check which `_xxx_` folder Forever uses).
 2. Put `wow-companion.exe` anywhere and run it once. It creates `config.json` next to itself.
 3. On the site: Settings → **Create sync key**. In `config.json`, set `syncKey` and `siteUrl`. If the companion can't find the game, set `wowFolder` to the folder that contains `Interface` and `WTF`.
 4. Run the companion and leave it open while playing.
@@ -98,6 +98,8 @@ DB_FILE=data/demo.db npm run demo          # sample guild data
 DEV_LOGIN=1 DB_FILE=data/demo.db npm start # http://localhost:3000, sign in as J#1001
 cd ../companion && npm run build:exe       # rebuilds dist/wow-companion.exe
 ```
+
+After changing anything in `addon/WowGuild`, run `cd web && npm run pack-addon` to rebuild the download (`web/public/downloads/WowGuild.zip`). A test fails if the zip is out of date.
 
 The tests run the real addon Lua against a mocked WoW client (`web/test/wowsim.js`), so addon changes are covered too.
 
