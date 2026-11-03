@@ -210,9 +210,26 @@ function buildInbox(db, guildId, userId) {
   const gbQ = db.prepare(`SELECT COALESCE((SELECT SUM(count) FROM guild_bank WHERE guild_id = ? AND item_id = ?), 0)
     + COALESCE((SELECT SUM(i.count) FROM inventory i JOIN characters c ON c.id = i.character_id WHERE c.guild_id = ? AND c.is_bank = 1 AND i.item_id = ?), 0) AS n`);
   const stock = shopIds.map((id) => ({ id, chars: charsQ.all(guildId, userId, id), guildBank: gbQ.get(guildId, id, guildId, id).n }));
+
+  // For item tooltips in game: what you hold on each character, what the guild bank holds,
+  // and which guild characters can craft each recipe.
+  const holdMap = new Map();
+  const hold = (id) => { if (!holdMap.has(id)) holdMap.set(id, { id, chars: [], guildBank: 0 }); return holdMap.get(id); };
+  for (const r of db.prepare(`SELECT i.item_id, c.name, SUM(i.count) AS count FROM inventory i JOIN characters c ON c.id = i.character_id
+      WHERE c.guild_id = ? AND c.user_id = ? GROUP BY i.item_id, c.name`).all(guildId, userId)) hold(r.item_id).chars.push({ name: r.name, count: r.count });
+  for (const r of db.prepare(`SELECT item_id, SUM(n) AS n FROM (
+        SELECT item_id, count AS n FROM guild_bank WHERE guild_id = ?
+        UNION ALL SELECT i.item_id, i.count FROM inventory i JOIN characters c ON c.id = i.character_id WHERE c.guild_id = ? AND c.is_bank = 1)
+      GROUP BY item_id`).all(guildId, guildId)) hold(r.item_id).guildBank = r.n;
+  const holdings = [...holdMap.values()].slice(0, 2500);
+  const crafters = db.prepare(`SELECT r.name, group_concat(DISTINCT c.name) AS who FROM recipes r JOIN characters c ON c.id = r.character_id
+    WHERE c.guild_id = ? GROUP BY r.name ORDER BY r.name LIMIT 4000`).all(guildId);
+  for (const [id, p] of Object.entries(latestPrices(db, guildId, holdings.map((h) => h.id)))) {
+    if (!priceMap[id]) prices.push({ id: Number(id), price: p.price });
+  }
   return {
     guild: guild ? guild.name : '',
-    prices, stock,
+    prices, stock, holdings, crafters,
     raids,
     generatedAt: Math.floor(Date.now() / 1000),
     announcements, canCraft, myRequests: mine, buddies,

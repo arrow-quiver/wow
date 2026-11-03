@@ -64,6 +64,7 @@ end
 local function modernReagents(recipeID)
   local out = {}
   local schematic = ns.try(C_TradeSkillUI.GetRecipeSchematic, recipeID, false)
+  out.outputId = schematic and schematic.outputItemID
   local basic = Enum and Enum.CraftingReagentType and Enum.CraftingReagentType.Basic or 1
   for _, slot in ipairs(schematic and schematic.reagentSlotSchematics or {}) do
     if (slot.reagentType == nil or slot.reagentType == basic) and slot.reagents and slot.reagents[1] then
@@ -87,8 +88,10 @@ function P.scan()
       if info and info.learned and info.name then
         local diff = info.relativeDifficulty
         if diff == nil and info.difficulty then diff = DIFF_BY_NAME[info.difficulty] end
-        recipes[#recipes + 1] = { key = id, id = id, name = info.name, diff = diff or 3,
-          skillUps = info.numSkillUps or 1, reagents = modernReagents(id), canMake = info.numAvailable or 0 }
+        local reagents = modernReagents(id)
+        local outputId = reagents.outputId; reagents.outputId = nil
+        recipes[#recipes + 1] = { key = id, id = id, name = info.name, diff = diff or 3, icon = info.icon, outputId = outputId,
+          skillUps = info.numSkillUps or 1, reagents = reagents, canMake = info.numAvailable or 0 }
       end
     end
   end
@@ -103,7 +106,9 @@ function P.scan()
           local id = link and tonumber(string.match(link, "item:(%d+)"))
           if id then reagents[#reagents + 1] = { id = id, name = rname, qty = count or 1 } end
         end
-        recipes[#recipes + 1] = { key = name, index = i, name = name, diff = DIFF_BY_NAME[kind], skillUps = 1, reagents = reagents, canMake = numAvailable or 0 }
+        local outLink = GetTradeSkillItemLink and ns.try(GetTradeSkillItemLink, i)
+        recipes[#recipes + 1] = { key = name, index = i, name = name, diff = DIFF_BY_NAME[kind], skillUps = 1, reagents = reagents, canMake = numAvailable or 0,
+          icon = GetTradeSkillIcon and ns.try(GetTradeSkillIcon, i), outputId = outLink and tonumber(string.match(outLink, "item:(%d+)")) }
       end
     end
   end
@@ -119,6 +124,60 @@ function P.scan()
   end
   while #ns.db.reagentIds > 1500 do table.remove(ns.db.reagentIds, 1) end
   return P.current
+end
+
+-- ---------- acting on a recipe (from a button click) ----------
+-- Show the recipe in the open profession window.
+function P.select(recipe)
+  if not recipe then return false end
+  if recipe.id and C_TradeSkillUI and C_TradeSkillUI.OpenRecipe then ns.try(C_TradeSkillUI.OpenRecipe, recipe.id); return true end
+  if recipe.index and SelectTradeSkill then
+    ns.try(SelectTradeSkill, recipe.index)
+    if TradeSkillFrame_SetSelection then ns.try(TradeSkillFrame_SetSelection, recipe.index) end
+    if TradeSkillFrame_Update then ns.try(TradeSkillFrame_Update) end
+    return true
+  end
+  return false
+end
+
+-- Craft (needs a real click, which the Make button provides).
+function P.craft(recipe, count)
+  if not recipe or not safeCombat() then return false end
+  count = count or 1
+  if recipe.id and C_TradeSkillUI and C_TradeSkillUI.CraftRecipe then ns.try(C_TradeSkillUI.CraftRecipe, recipe.id, count); return true end
+  if recipe.index and DoTradeSkill then ns.try(DoTradeSkill, recipe.index, count); return true end
+  return false
+end
+
+-- Auction house: search for the mats still missing. Uses Auctionator when it's installed.
+function P.missingNames()
+  local names = {}
+  for _, r in ipairs(P.remaining()) do if not r.done and r.name then names[#names + 1] = r.name end end
+  return names
+end
+function P.hasAuctionator()
+  return Auctionator and Auctionator.API and Auctionator.API.v1 and true or false
+end
+function P.searchAuctionHouse()
+  local names = P.missingNames()
+  if #names == 0 then ns.print("Nothing left to buy on your shopping list."); return false end
+  local api = P.hasAuctionator() and Auctionator.API.v1
+  if api and api.MultiSearchExact then
+    local ok = pcall(api.MultiSearchExact, "WowGuild", names)
+    if ok then return true end
+    ns.print("Open the auction house first, then search again.")
+    return false
+  end
+  ns.print("Install Auctionator to search the auction house from your shopping list.")
+  return false
+end
+function P.makeAuctionatorList()
+  local names = P.missingNames()
+  local api = P.hasAuctionator() and Auctionator.API.v1
+  if #names == 0 or not api or not api.CreateShoppingList then return false end
+  local ok = pcall(api.CreateShoppingList, "WowGuild", "wow guild shopping list", names)
+  if ok then ns.print("Made an Auctionator shopping list called \"wow guild shopping list\".") end
+  return ok
 end
 
 -- ---------- skill-up ranking ----------
@@ -201,7 +260,11 @@ local function stockElsewhere(id)
     inboxStock = {}
     local inbox = WowGuildInbox
     local me = UnitName("player")
-    for _, s in ipairs(inbox and inbox.stock or {}) do
+    -- Shopping-list stock first, then general holdings (covers items added since the last sync).
+    local sources = {}
+    for _, s in ipairs(inbox and inbox.holdings or {}) do sources[#sources + 1] = s end
+    for _, s in ipairs(inbox and inbox.stock or {}) do sources[#sources + 1] = s end
+    for _, s in ipairs(sources) do
       local alts = 0
       for _, c in ipairs(s.chars or {}) do
         if c.name ~= me then alts = alts + (c.count or 0) end

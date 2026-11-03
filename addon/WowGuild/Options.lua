@@ -3,6 +3,7 @@ local ADDON, ns = ...
 
 ns.OPTION_LIST = {
   { key = "minimapButton", label = "Show the campfire button on the minimap" },
+  { key = "tooltips", label = "Show guild crafters, alts and guild bank on item tooltips" },
   { key = "loginNews", label = "Show guild news in chat when I log in" },
   { key = "updateNotice", label = "Tell me when a newer version of this addon is out" },
   { key = "autoGuide", label = "Open the skill-up guide with my profession window" },

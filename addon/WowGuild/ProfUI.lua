@@ -39,7 +39,7 @@ local guide
 
 local function createGuide()
   local f = CreateFrame("Frame", "WowGuildSkillGuide", UIParent, "BackdropTemplate")
-  f:SetSize(330, 60 + ROWS * 34)
+  f:SetSize(354, 60 + ROWS * 34)
   f:SetFrameStrata("HIGH")
   f:SetMovable(true); f:EnableMouse(true); f:RegisterForDrag("LeftButton"); f:SetClampedToScreen(true)
   f:SetScript("OnDragStart", f.StartMoving)
@@ -58,17 +58,40 @@ local function createGuide()
 
   f.rows = {}
   for i = 1, ROWS do
-    local row = CreateFrame("Frame", nil, f)
-    row:SetSize(306, 32)
-    row:SetPoint("TOPLEFT", 12, -48 - (i - 1) * 34)
+    -- The whole row is a button: hover for the item tooltip, click to open the recipe, shift-click to link it.
+    local row = CreateFrame("Button", nil, f)
+    row:SetSize(330, 32)
+    row:SetPoint("TOPLEFT", 10, -48 - (i - 1) * 34)
+    row:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
+    row.icon = row:CreateTexture(nil, "ARTWORK")
+    row.icon:SetSize(26, 26); row.icon:SetPoint("LEFT", 2, 0)
     row.name = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    row.name:SetPoint("TOPLEFT", 0, 0); row.name:SetWidth(240); row.name:SetJustifyH("LEFT")
+    row.name:SetPoint("TOPLEFT", 34, -1); row.name:SetWidth(186); row.name:SetJustifyH("LEFT")
     row.info = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    row.info:SetPoint("TOPLEFT", 0, -16); row.info:SetWidth(240); row.info:SetJustifyH("LEFT")
+    row.info:SetPoint("TOPLEFT", 34, -17); row.info:SetWidth(186); row.info:SetJustifyH("LEFT")
     row.add = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
-    row.add:SetSize(60, 22); row.add:SetPoint("RIGHT", 0, 0)
+    row.add:SetSize(52, 22); row.add:SetPoint("RIGHT", 0, 0)
     row.add:SetText("+5 list")
     row.add:SetScript("OnClick", function(self) if self.recipe then P.addToList(self.recipe, 5) end end)
+    row.make = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+    row.make:SetSize(48, 22); row.make:SetPoint("RIGHT", row.add, "LEFT", -4, 0)
+    row.make:SetText("Make")
+    row.make:SetScript("OnClick", function(self) if self.recipe then P.craft(self.recipe, 1) end end)
+    row:SetScript("OnEnter", function(self)
+      local r = self.recipe
+      if r and r.outputId then ns.items.showTooltip(self, r.outputId)
+      elseif r and GameTooltip then
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT"); GameTooltip:AddLine(r.name)
+        for _, g in ipairs(r.reagents or {}) do GameTooltip:AddLine(string.format("%d × %s", g.qty, g.name or "?"), 1, 1, 1) end
+        GameTooltip:Show()
+      end
+    end)
+    row:SetScript("OnLeave", function() ns.items.hideTooltip() end)
+    row:SetScript("OnClick", function(self)
+      local r = self.recipe
+      if not r then return end
+      if ns.items.shiftDown() and r.outputId then ns.items.insertLink(r.outputId) else P.select(r) end
+    end)
     f.rows[i] = row
   end
   f:Hide()
@@ -101,6 +124,10 @@ function P.refreshGuide()
       if r.points < 1 then bits[#bits + 1] = string.format("%d%% chance", r.points * 100 / (r.recipe.skillUps or 1)) end
       row.info:SetText(table.concat(bits, "  ·  "))
       row.add.recipe = r.recipe
+      row.make.recipe = r.recipe
+      row.recipe = r.recipe
+      row.icon:SetTexture(r.recipe.icon or (r.recipe.outputId and ns.items.icon(r.recipe.outputId)) or "Interface\\Icons\\INV_Misc_QuestionMark")
+      if r.fromBags > 0 then row.make:Show() else row.make:Hide() end
       row:Show()
     else
       row:Hide()

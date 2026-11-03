@@ -118,6 +118,18 @@ The addon also records PvP rank and honor, reputations and currencies (for examp
 
 Windows may show a SmartScreen warning the first time, because the exe isn't code-signed. Choose "More info → Run anyway".
 
+## Addon polish (0.7.0)
+
+- **Looks like the game:** the window uses Blizzard's own frame and bottom tabs where the client has them, and falls back to its own look where it doesn't.
+- **Item rows:** mats on the Professions tab and recipes in the skill-up guide show icons and quality colours, with the real item tooltip on hover. Shift-click links an item in chat.
+- **Guide actions:**
+  - click a recipe to open it in the profession window
+  - **Make** crafts one when you have the mats
+  - **+5 list** adds it to the shopping list
+- **Auction house:** with Auctionator installed, **Search auction house** searches every missing mat, and **Auctionator list** saves them as an Auctionator shopping list.
+- **Item tooltips:** guild crafters who can make the item, how many your other characters hold, and the guild bank count. The guild auction price also shows when Auctionator isn't installed. You can switch this off in Settings.
+- **Plays well with other addons:** if LibDataBroker or LibDBIcon is loaded (Titan Panel, ElvUI, Bazooka, minimap button collectors…), the addon registers there instead of adding its own minimap button.
+
 ## In-game window (addon 0.6.0)
 
 No typing needed. Click the **campfire button on the minimap**. Right-click it for settings, or drag it to move it. In Retail it's also in the addon drawer, and you can set a key under Key Bindings → AddOns → wow guild.

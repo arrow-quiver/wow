@@ -22,6 +22,15 @@ local function skin(f, alpha)
   end
 end
 
+-- Try Blizzard templates first so the window looks like the rest of the game; fall back if a client lacks one.
+local function tryFrame(kind, name, parent, ...)
+  for _, template in ipairs({ ... }) do
+    local ok, f = pcall(CreateFrame, kind, name, parent, template)
+    if ok and f then return f, template end
+  end
+  return CreateFrame(kind, name, parent), nil
+end
+
 local function button(parent, text, width)
   local b = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
   b:SetSize(width or 120, 24)
@@ -64,6 +73,50 @@ local function scrollText(page, top, bottom)
       content:SetHeight((text:GetStringHeight() or 0) + 10)
     end,
     text = text,
+  }
+end
+
+-- A scrolling list of item rows: icon, quality-coloured name, a right-hand note.
+-- Hover shows the real item tooltip; shift-click links the item in chat.
+local function itemList(page, top, bottom)
+  local scroll = CreateFrame("ScrollFrame", nil, page, "UIPanelScrollFrameTemplate")
+  scroll:SetPoint("TOPLEFT", 0, top or 0)
+  scroll:SetPoint("BOTTOMRIGHT", -26, bottom or 0)
+  local content = CreateFrame("Frame", nil, scroll)
+  content:SetSize(WIDTH - 70, 10)
+  scroll:SetScrollChild(content)
+  local empty = label(content, "", "GameFontDisable"); empty:SetPoint("TOPLEFT", 4, -4); empty:SetWidth(WIDTH - 80)
+  local rows = {}
+  local function row(i)
+    if rows[i] then return rows[i] end
+    local r = CreateFrame("Button", nil, content)
+    r:SetSize(WIDTH - 74, 22)
+    r:SetPoint("TOPLEFT", 0, -(i - 1) * 23)
+    r:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
+    r.icon = r:CreateTexture(nil, "ARTWORK"); r.icon:SetSize(18, 18); r.icon:SetPoint("LEFT", 2, 0)
+    r.name = label(r, "", "GameFontHighlight"); r.name:SetPoint("LEFT", 26, 0); r.name:SetWidth(250)
+    r.note = label(r, "", "GameFontHighlightSmall"); r.note:SetPoint("RIGHT", -4, 0); r.note:SetJustifyH("RIGHT"); r.note:SetWidth(WIDTH - 360)
+    r:SetScript("OnEnter", function(self) ns.items.showTooltip(self, self.itemId) end)
+    r:SetScript("OnLeave", function() ns.items.hideTooltip() end)
+    r:SetScript("OnClick", function(self) if ns.items.shiftDown() then ns.items.insertLink(self.itemId) end end)
+    rows[i] = r
+    return r
+  end
+  return {
+    rows = rows,
+    set = function(items, emptyText)
+      for i, it in ipairs(items) do
+        local r = row(i)
+        r.itemId = it.id
+        r.icon:SetTexture(ns.items.icon(it.id))
+        r.name:SetText(it.done and ("|cff40bf40" .. (it.name or "") .. "|r") or ns.items.coloredName(it.id, it.name))
+        r.note:SetText(it.note or "")
+        r:Show()
+      end
+      for i = #items + 1, #rows do rows[i]:Hide() end
+      empty:SetText(#items == 0 and (emptyText or "") or "")
+      content:SetHeight(math.max(10, #items * 23))
+    end,
   }
 end
 
@@ -166,8 +219,14 @@ function pages.prof(page)
     row.remove:SetScript("OnClick", function(self) P.removeFromList(self:GetParent().key) end)
     page.rows[i] = row
   end
-  -- Mats needed: scrolls, so a long list never runs off the window.
-  local mats = scrollText(page, -110 - LIST_ROWS * 26, 0)
+  -- Mats needed: icon rows with real item tooltips; scrolls so a long list never runs off the window.
+  local matsHead = label(page, "Mats still needed", "GameFontNormal"); matsHead:SetPoint("TOPLEFT", 0, -108 - LIST_ROWS * 26)
+  local ahBtn = button(page, "Search auction house", 170); ahBtn:SetPoint("TOPRIGHT", -150, -102 - LIST_ROWS * 26)
+  ahBtn:SetScript("OnClick", function() P.searchAuctionHouse() end)
+  local listBtn = button(page, "Auctionator list", 140); listBtn:SetPoint("TOPRIGHT", 0, -102 - LIST_ROWS * 26)
+  listBtn:SetScript("OnClick", function() P.makeAuctionatorList() end)
+  local mats = itemList(page, -130 - LIST_ROWS * 26, 0)
+  page.mats, page.ahBtn, page.listBtn = mats, ahBtn, listBtn
   page.trackBtn, page.guideBtn = trackBtn, guideBtn
 
   page.refresh = function()
@@ -189,12 +248,18 @@ function pages.prof(page)
         row:Hide()
       end
     end
-    if #list == 0 then
-      mats.set("|cff999999Empty. Open a profession window and click \"+5 list\" in the skill-up guide to add recipes.|r")
-    else
-      local more = #list > LIST_ROWS and string.format("|cff999999and %d more recipes|r\n", #list - LIST_ROWS) or ""
-      mats.set(more .. P.trackerText())
+    local items = {}
+    for _, r in ipairs(P.remaining()) do
+      local where = {}
+      if not r.done and r.alts > 0 then where[#where + 1] = r.alts .. " on alts" end
+      if not r.done and r.guildBank > 0 then where[#where + 1] = r.guildBank .. " in guild bank" end
+      items[#items + 1] = { id = r.id, name = r.name, done = r.done,
+        note = string.format("%s%d / %d|r%s", r.done and "|cff40bf40" or "|cffffffff", math.min(r.have, r.need), r.need,
+          #where > 0 and ("  |cffe8a33d" .. table.concat(where, ", ") .. "|r") or "") }
     end
+    mats.set(items, #list == 0 and "Empty. Open a profession window and click \"+5 list\" in the skill-up guide to add recipes." or nil)
+    local showAH = P.hasAuctionator() and #items > 0
+    if showAH then ahBtn:Show(); listBtn:Show() else ahBtn:Hide(); listBtn:Hide() end
   end
 end
 
@@ -241,8 +306,17 @@ end
 -- ---------- window ----------
 local win
 
+local function setTitle(f, text)
+  if f.SetTitle then f:SetTitle(text)
+  elseif f.TitleText then f.TitleText:SetText(text)
+  elseif f.TitleContainer and f.TitleContainer.TitleText then f.TitleContainer.TitleText:SetText(text)
+  elseif f.title then f.title:SetText(text) end
+end
+W.setTitle = setTitle
+
 local function createWindow()
-  local f = CreateFrame("Frame", "WowGuildWindow", UIParent, "BackdropTemplate")
+  local f, template = tryFrame("Frame", "WowGuildWindow", UIParent, "ButtonFrameTemplate", "BackdropTemplate")
+  f.native = template == "ButtonFrameTemplate"
   f:SetSize(WIDTH, HEIGHT)
   f:SetFrameStrata("DIALOG")
   f:SetMovable(true); f:EnableMouse(true); f:RegisterForDrag("LeftButton"); f:SetClampedToScreen(true)
@@ -253,28 +327,55 @@ local function createWindow()
     ns.db.ui = ns.db.ui or {}
     ns.db.ui.windowPos = { point = point, rel = rel, x = x, y = y }
   end)
-  skin(f)
   tinsert(UISpecialFrames, "WowGuildWindow") -- Escape closes it
 
-  local title = label(f, "wow guild", "GameFontNormalLarge"); title:SetPoint("TOPLEFT", 16, -12)
-  f.title = title
-  local close = CreateFrame("Button", nil, f, "UIPanelCloseButton"); close:SetPoint("TOPRIGHT", -2, -2)
+  if f.native then
+    if ButtonFrameTemplate_HidePortrait then ButtonFrameTemplate_HidePortrait(f) end
+    if ButtonFrameTemplate_HideButtonBar then ButtonFrameTemplate_HideButtonBar(f) end
+    -- Without a portrait the inner panel can start right under the title bar.
+    if f.Inset then
+      f.Inset:ClearAllPoints()
+      f.Inset:SetPoint("TOPLEFT", 4, -26)
+      f.Inset:SetPoint("BOTTOMRIGHT", -6, 4)
+    end
+  else
+    skin(f)
+    f.title = label(f, "", "GameFontNormalLarge"); f.title:SetPoint("TOPLEFT", 16, -12)
+    local close = CreateFrame("Button", nil, f, "UIPanelCloseButton"); close:SetPoint("TOPRIGHT", -2, -2)
+  end
+  setTitle(f, "wow guild")
 
+  -- Tabs along the bottom edge, like the character and guild windows.
   f.tabs, f.pages = {}, {}
-  local x = 14
+  local prev
   for i, t in ipairs(TABS) do
-    local tab = button(f, t.label, 110)
-    tab:SetPoint("TOPLEFT", x, -40)
-    x = x + 116
+    local tab, tabTemplate = tryFrame("Button", "WowGuildWindowTab" .. i, f, "PanelTabButtonTemplate", "CharacterFrameTabButtonTemplate", "UIPanelButtonTemplate")
+    tab:SetID(i)
+    tab:SetText(t.label)
+    if tabTemplate == "UIPanelButtonTemplate" then
+      tab:SetSize(110, 24)
+      tab:SetPoint("TOPLEFT", f, "TOPLEFT", 14 + (i - 1) * 116, -40)
+    else
+      if PanelTemplates_TabResize then PanelTemplates_TabResize(tab, 0) end
+      if prev then tab:SetPoint("LEFT", prev, "RIGHT", 3, 0) else tab:SetPoint("TOPLEFT", f, "BOTTOMLEFT", 11, 2) end
+    end
+    f.bottomTabs = tabTemplate ~= "UIPanelButtonTemplate"
     tab:SetScript("OnClick", function() W.show(t.key) end)
     f.tabs[t.key] = tab
+    prev = tab
     local page = CreateFrame("Frame", nil, f)
-    page:SetPoint("TOPLEFT", 18, -78)
-    page:SetPoint("BOTTOMRIGHT", -14, 14)
+    if f.native and f.Inset then
+      page:SetPoint("TOPLEFT", f.Inset, "TOPLEFT", 12, -10)
+      page:SetPoint("BOTTOMRIGHT", f.Inset, "BOTTOMRIGHT", -8, 8)
+    else
+      page:SetPoint("TOPLEFT", 18, f.bottomTabs and -34 or -78)
+      page:SetPoint("BOTTOMRIGHT", -14, f.bottomTabs and 12 or 14)
+    end
     pages[t.key](page)
     page:Hide()
     f.pages[t.key] = page
   end
+  if PanelTemplates_SetNumTabs then PanelTemplates_SetNumTabs(f, #TABS) end
 
   local pos = ns.db.ui and ns.db.ui.windowPos
   if pos then f:SetPoint(pos.point or "CENTER", UIParent, pos.rel or "CENTER", pos.x or 0, pos.y or 0) else f:SetPoint("CENTER") end
@@ -291,12 +392,13 @@ function W.show(key)
   local f = W.window()
   key = key or W.current or "camp"
   W.current = key
-  for k, page in pairs(f.pages) do
-    if k == key then page:Show() else page:Hide() end
-    local tab = f.tabs[k]
-    if tab.LockHighlight then if k == key then tab:LockHighlight() else tab:UnlockHighlight() end end
+  for i, t in ipairs(TABS) do
+    local page, tab = f.pages[t.key], f.tabs[t.key]
+    if t.key == key then page:Show() else page:Hide() end
+    if t.key == key and PanelTemplates_SetTab and f.bottomTabs then PanelTemplates_SetTab(f, i) end
+    if not f.bottomTabs and tab.LockHighlight then if t.key == key then tab:LockHighlight() else tab:UnlockHighlight() end end
   end
-  f.title:SetText("wow guild  |cff999999" .. ((WowGuildInbox and WowGuildInbox.guild) or "") .. "|r")
+  setTitle(f, "wow guild" .. ((WowGuildInbox and WowGuildInbox.guild) and ("  |cff999999" .. WowGuildInbox.guild .. "|r") or ""))
   f:Show()
   f.pages[key].refresh()
 end
@@ -371,8 +473,38 @@ local function createMini()
   return b
 end
 
+-- If another addon provides LibDataBroker / LibDBIcon (Titan Panel, ElvUI, Bazooka, minimap button bags…),
+-- use them: the button then behaves like every other addon's and minimap addons can manage it.
+local ldbObject, dbicon
+local function setupBroker()
+  if ldbObject or not LibStub then return end
+  local ldb = LibStub("LibDataBroker-1.1", true)
+  if not ldb then return end
+  ldbObject = ldb:NewDataObject("wow guild", {
+    type = "launcher", label = "wow guild", icon = "Interface\\Icons\\Spell_Fire_Fire",
+    OnClick = function(_, which) if which == "RightButton" then W.show("settings") else W.toggle() end end,
+    OnTooltipShow = function(tt)
+      tt:AddLine("wow guild")
+      tt:AddLine("Click: open the guild window", 1, 1, 1)
+      tt:AddLine("Right-click: settings", 1, 1, 1)
+    end,
+  })
+  dbicon = LibStub("LibDBIcon-1.0", true)
+  if dbicon then
+    ns.db.ui = ns.db.ui or {}
+    ns.db.ui.dbicon = ns.db.ui.dbicon or {}
+    dbicon:Register("wow guild", ldbObject, ns.db.ui.dbicon)
+  end
+end
+ns.broker = function() return ldbObject, dbicon end
+
 function ns.applyOptions()
-  if Minimap then
+  setupBroker()
+  if dbicon then
+    ns.db.ui.dbicon.hide = not ns.opt("minimapButton")
+    if ns.opt("minimapButton") then dbicon:Show("wow guild") else dbicon:Hide("wow guild") end
+    if mini then mini:Hide() end
+  elseif Minimap then
     if ns.opt("minimapButton") then
       mini = mini or createMini()
       placeMini()

@@ -18,8 +18,12 @@ DEFAULT_CHAT_FRAME = { AddMessage = function(self, m) table.insert(__printed, m)
 local frames = {}
 local function newFrame()
   local f = { events = {}, scripts = {}, shown = false }
+  -- Like real frames: method names resolve to (no-op) functions, anything else is nil.
   local mt = { __index = function(t, k)
-    return function(self, ...) return nil end
+    if type(k) == "string" and (string.match(k, "^%u%l+%u") or string.match(k, "^%u%l+$")) then
+      return function(self, ...) return nil end
+    end
+    return nil
   end }
   setmetatable(f, mt)
   function f:RegisterEvent(e) self.events[e] = true end
@@ -38,12 +42,21 @@ local function newFrame()
   frames[#frames + 1] = f
   return f
 end
-function CreateFrame(kind, name, parent)
+function CreateFrame(kind, name, parent, template)
   local f = newFrame()
-  f.kind, f.parent = kind, parent
+  f.kind, f.parent, f.template = kind, parent, template
+  if template == "ButtonFrameTemplate" then
+    f.Inset = newFrame(); f.Inset.parent = f
+    f.TitleText = newFrame()
+    function f:SetTitle(t) self.TitleText:SetText(t) end
+  end
   if name then _G[name] = f end
   return f
 end
+function PanelTemplates_SetNumTabs(f, n) f.numTabs = n end
+function PanelTemplates_SetTab(f, i) f.selectedTab = i end
+function PanelTemplates_TabResize() end
+function ButtonFrameTemplate_HidePortrait() end
 Minimap = newFrame()
 function Minimap:GetCenter() return 100, 100 end
 function Minimap:GetWidth() return 140 end
