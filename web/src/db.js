@@ -320,6 +320,10 @@ const MIGRATIONS = [
      created_at TEXT NOT NULL DEFAULT (datetime('now'))
    );
    CREATE INDEX audit_guild ON audit_log(guild_id, id);`,
+
+  // Wowhead tooltips: which game's database the guild uses, and item ids on loot lists.
+  `ALTER TABLE guilds ADD COLUMN wowhead_game TEXT NOT NULL DEFAULT 'forever';
+   ALTER TABLE loot_items ADD COLUMN item_id INTEGER;`,
 ];
 
 function migrate(db) {

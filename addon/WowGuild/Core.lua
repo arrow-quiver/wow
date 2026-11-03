@@ -24,6 +24,18 @@ function ns.try(fn, ...)
   return passOk(pcall(fn, ...))
 end
 
+-- Errors: remember the last few and hand them to the game's error handler, so they show
+-- with /console scriptErrors 1 (or in BugSack) instead of disappearing.
+ns.errors = {}
+function ns.reportError(err)
+  err = tostring(err)
+  ns.debugError = err
+  table.insert(ns.errors, 1, date("%H:%M:%S") .. " " .. err)
+  while #ns.errors > 5 do table.remove(ns.errors) end
+  local handler = geterrorhandler and geterrorhandler()
+  if handler then pcall(handler, "wow guild: " .. err) end
+end
+
 function ns.charKey()
   local name = UnitName("player")
   return name
@@ -148,6 +160,8 @@ SlashCmdList["WOWGUILD"] = function(input)
     if rest == "clear" then ns.prof.clearList() else ns.prof.toggleTracker() end
   elseif cmd == "options" or cmd == "config" then
     ns.ui.show("settings")
+  elseif cmd == "debug" then
+    ns.showReport()
   elseif cmd == "help" then
     ns.print("/wow  open the guild panel")
     ns.print("/wow cta [zone] [number] [message]  call guildies to a fight")
@@ -156,6 +170,7 @@ SlashCmdList["WOWGUILD"] = function(input)
     ns.print("/wow guide  show or hide the skill-up guide (next to your profession window)")
     ns.print("/wow list  show or hide your shopping list;  /wow list clear  empties it")
     ns.print("/wow options  addon settings")
+    ns.print("/wow debug  problem report to copy and send")
   else
     ns.togglePanel()
   end
@@ -179,7 +194,7 @@ f:SetScript("OnEvent", function(self, event, ...)
   if ns.handlers and ns.handlers[event] then
     for _, fn in ipairs(ns.handlers[event]) do
       local ok, err = pcall(fn, ...)
-      if not ok then ns.debugError = err end
+      if not ok then ns.reportError(err) end
     end
   end
 end)

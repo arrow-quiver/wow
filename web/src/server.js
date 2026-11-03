@@ -8,6 +8,7 @@ const { layout } = require('./views/layout');
 const P = require('./views/pages');
 const { rateLimit } = require('./ratelimit');
 const backup = require('./backup');
+const wowhead = require('./views/wowhead');
 const fs = require('fs');
 
 function config(env = process.env) {
@@ -42,8 +43,11 @@ function createApp(cfg, db) {
     res.setHeader('Referrer-Policy', 'same-origin');
     res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('Content-Security-Policy', [
-      "default-src 'self'", "script-src 'self'", "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-      "font-src https://fonts.gstatic.com", "img-src 'self' data:", "form-action 'self'", "frame-ancestors 'none'", "base-uri 'self'",
+      // Wowhead tooltips load their script, styles, icons and item data from these hosts.
+      "default-src 'self'", "script-src 'self' https://wow.zamimg.com https://nether.wowhead.com",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://wow.zamimg.com",
+      "font-src https://fonts.gstatic.com https://wow.zamimg.com", "img-src 'self' data: https://wow.zamimg.com https://*.wowhead.com",
+      "connect-src 'self' https://nether.wowhead.com https://*.wowhead.com", "frame-src https://*.wowhead.com", "form-action 'self'", "frame-ancestors 'none'", "base-uri 'self'",
     ].join('; '));
     if (secureCookie) res.setHeader('Strict-Transport-Security', 'max-age=15552000');
     next();
@@ -51,6 +55,36 @@ function createApp(cfg, db) {
   app.use(express.static(path.join(__dirname, '..', 'public'), { maxAge: '1h' }));
   // Player downloads (built into the image by the Dockerfile's "kit" stage). Public on purpose.
   const DOWNLOADS = path.join(__dirname, '..', 'downloads');
+  // The companion zip gets a config.json with this site's address (and, from Settings, a sync key),
+  // so nobody has to edit it by hand. The exe is copied through without recompressing.
+  const zipkit = require('./zipkit');
+  let exeCache = null;
+  const companionExe = () => {
+    const src = path.join(DOWNLOADS, 'wow-companion.zip');
+    const m = fs.statSync(src).mtimeMs;
+    if (!exeCache || exeCache.m !== m) exeCache = { m, entry: zipkit.readEntries(fs.readFileSync(src)).find((e) => /\.exe$/i.test(e.name)) };
+    return exeCache.entry;
+  };
+  const README = (key) => [
+    'wow guild companion', '',
+    '1. Keep wow-companion.exe and config.json together in any folder.',
+    key ? '2. Your sync key is already in config.json. Keep it private.' : '2. Sign in on the guild site, go to Settings, choose "Create sync key" and paste it into config.json as syncKey.',
+    '3. Run wow-companion.exe and leave it open while you play (or run it once with --install-startup).',
+    '4. Install the addon (WowGuild) into your game\'s Interface\\AddOns folder.', '',
+    `Guild site: ${cfg.baseUrl}`,
+  ].join('\r\n');
+  const companionZip = (key) => zipkit.writeZip([
+    companionExe(),
+    { name: 'config.json', data: JSON.stringify({ siteUrl: cfg.baseUrl, syncKey: key || 'paste-your-sync-key-here', wowFolder: '' }, null, 2) },
+    { name: 'READ ME.txt', data: README(key) },
+  ]);
+  app.get('/downloads/wow-companion.zip', (req, res, next) => {
+    try {
+      const buf = companionZip(null);
+      res.setHeader('Content-Disposition', 'attachment; filename="wow-companion.zip"');
+      res.type('application/zip').send(buf);
+    } catch (e) { next(); }
+  });
   app.use('/downloads', express.static(DOWNLOADS, {
     maxAge: '10m',
     setHeaders: (res, file) => { if (/\.zip$/.test(file)) res.setHeader('Content-Disposition', `attachment; filename="${path.basename(file)}"`); },
@@ -59,6 +93,7 @@ function createApp(cfg, db) {
   app.use('/discord', rateLimit({ max: 120 }));
   app.use('/api', rateLimit({ max: 40, key: (req) => (req.headers.authorization || req.ip).slice(0, 80), message: 'Too many uploads. The companion will retry shortly.' }));
   app.use(['/auth', '/login'], rateLimit({ max: 20 }));
+  { const g = db.prepare('SELECT wowhead_game FROM guilds ORDER BY id LIMIT 1').get(); if (g) wowhead.setGame(g.wowhead_game); }
   const phase3 = require('./routes/phase3');
   // Discord calls this with its own signature; it must skip the session and CSRF checks below.
   phase3.mountDiscord(app, { db, cfg, discord: (...a) => discord(...a) });
@@ -99,6 +134,7 @@ function createApp(cfg, db) {
     req.user = s ? q.user.get(s.userId) : null;
     req.csrf = s ? s.csrf : '';
     req.guild = req.user ? q.membership.get(req.user.id) : null;
+    if (req.guild && req.guild.wowhead_game) wowhead.setGame(req.guild.wowhead_game);
     res.page = (opts) => res.send(layout({ user: req.user, guild: req.guild, csrf: req.csrf, flash: req.query.m, ...opts }));
     next();
   });
@@ -182,7 +218,7 @@ function createApp(cfg, db) {
     res.page({ title: 'Downloads', active: 'settings', body: P.downloads({
       addon: size('WowGuild.zip') != null ? { version: read('addon-version.txt'), mb: size('WowGuild.zip') } : null,
       companion: size('wow-companion.zip') != null ? { version: read('companion-version.txt'), mb: size('wow-companion.zip') } : null,
-      baseUrl: cfg.baseUrl, signedIn: Boolean(req.guild),
+      baseUrl: cfg.baseUrl, signedIn: Boolean(req.guild), csrf: req.csrf,
     }) });
   });
 
@@ -260,7 +296,7 @@ function createApp(cfg, db) {
       body: P.character({
         c, csrf: req.csrf, isOwner: c.user_id === req.user.id,
         profs: db.prepare('SELECT * FROM professions WHERE character_id = ? ORDER BY skill DESC').all(c.id),
-        recipes: db.prepare('SELECT profession, name FROM recipes WHERE character_id = ? ORDER BY profession, name').all(c.id),
+        recipes: db.prepare('SELECT profession, name, recipe_id FROM recipes WHERE character_id = ? ORDER BY profession, name').all(c.id),
         alts: c.user_id ? db.prepare('SELECT * FROM characters WHERE guild_id = ? AND user_id = ? AND id != ? ORDER BY level DESC').all(req.guild.id, c.user_id, c.id) : [],
       }),
     });
@@ -281,12 +317,12 @@ function createApp(cfg, db) {
     let results = [];
     let profSummary = [];
     if (qstr) {
-      const rows = db.prepare(`SELECT r.name AS recipe, c.name, c.class, c.online FROM recipes r JOIN characters c ON c.id = r.character_id
+      const rows = db.prepare(`SELECT r.name AS recipe, r.recipe_id, c.name, c.class, c.online FROM recipes r JOIN characters c ON c.id = r.character_id
         WHERE c.guild_id = ? AND r.name LIKE ? ESCAPE '\\' ORDER BY r.name, c.online DESC, c.name LIMIT 300`)
         .all(req.guild.id, `%${qstr.replace(/[\\%_]/g, (m) => '\\' + m)}%`);
       const map = new Map();
       for (const r of rows) { if (!map.has(r.recipe)) map.set(r.recipe, []); map.get(r.recipe).push(r); }
-      results = [...map].map(([recipe, crafters]) => ({ recipe, crafters }));
+      results = [...map].map(([recipe, crafters]) => ({ recipe, recipeId: (crafters.find((c) => c.recipe_id) || {}).recipe_id, crafters }));
     } else {
       const rows = db.prepare(`SELECT p.name AS prof, p.skill, c.name, c.class FROM professions p JOIN characters c ON c.id = p.character_id
         WHERE c.guild_id = ? ORDER BY p.name, p.skill DESC`).all(req.guild.id);
@@ -396,6 +432,22 @@ function createApp(cfg, db) {
     audit(req, 'sync key created', t.prefix);
     settingsPage(req, res, t.raw);
   });
+  // One click: companion with this site's address and a brand-new sync key already in config.json.
+  app.post('/settings/companion', needGuild, (req, res) => {
+    let buf;
+    const t = A.newApiToken();
+    try {
+      db.prepare('INSERT INTO api_tokens (user_id, guild_id, token_hash, prefix) VALUES (?,?,?,?)').run(req.user.id, req.guild.id, t.hash, t.prefix);
+      buf = companionZip(t.raw);
+    } catch (e) {
+      db.prepare('DELETE FROM api_tokens WHERE token_hash = ?').run(t.hash);
+      return back(res, '/settings', 'The companion download isn’t available on this server yet.');
+    }
+    audit(req, 'companion downloaded with new sync key', t.prefix);
+    res.setHeader('Content-Disposition', 'attachment; filename="wow-companion.zip"');
+    res.setHeader('Cache-Control', 'no-store');
+    res.type('application/zip').send(buf);
+  });
   app.post('/settings/token/:id/revoke', needGuild, (req, res) => {
     const r = db.prepare('DELETE FROM api_tokens WHERE id = ? AND user_id = ?').run(req.params.id, req.user.id);
     if (r.changes) audit(req, 'sync key revoked');
@@ -436,6 +488,13 @@ function createApp(cfg, db) {
     })();
     audit(req, 'removed from guild', m.battletag);
     back(res, '/settings', `${m.battletag.split('#')[0]} was removed. Their sync keys no longer work.`);
+  });
+  app.post('/settings/wowhead', needOfficer, (req, res) => {
+    const game = wowhead.GAMES.includes(req.body.game) ? req.body.game : 'forever';
+    db.prepare('UPDATE guilds SET wowhead_game = ? WHERE id = ?').run(game, req.guild.id);
+    wowhead.setGame(game);
+    audit(req, 'Wowhead tooltips set', game);
+    back(res, '/settings', `Item tooltips now use Wowhead's ${game === 'retail' ? 'Retail' : game === 'classic' ? 'Classic' : 'Forever'} database.`);
   });
   app.post('/settings/invite/reset', needOfficer, (req, res) => {
     db.prepare('UPDATE guilds SET invite_code = ? WHERE id = ?').run(A.inviteCode(), req.guild.id);

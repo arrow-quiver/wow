@@ -1,4 +1,5 @@
 const { esc, classInfo, ago } = require('./layout');
+const { itemLink, spellLink, game: wowheadGame, GAMES } = require('./wowhead');
 
 const csrfField = (csrf) => `<input type="hidden" name="_csrf" value="${esc(csrf)}">`;
 
@@ -184,7 +185,7 @@ function extrasSection(raw) {
 function character({ c, profs, recipes, csrf, isOwner, alts }) {
   const [label, color] = classInfo(c.class);
   const byProf = {};
-  for (const r of recipes) (byProf[r.profession] ||= []).push(r.name);
+  for (const r of recipes) (byProf[r.profession] ||= []).push(r);
   return `<p class="crumb"><a href="/roster">Roster</a></p>
   <h1 class="char-h" style="--cc:${color}">${esc(c.name)}</h1>
   <p class="lede">Level ${esc(c.level ?? '?')} ${esc(c.race || '')} ${esc(label)}${c.zone ? `, last in ${esc(c.zone)}` : ''}${c.rank ? `. ${esc(c.rank)}` : ''}.</p>
@@ -197,7 +198,7 @@ function character({ c, profs, recipes, csrf, isOwner, alts }) {
      <span class="muted">${esc(p.skill)} / ${esc(p.max_skill)}</span></li>`).join('')}</ul>`
     : '<p class="empty">No professions synced. Open each profession window once in game, then reload.</p>'}
   ${Object.entries(byProf).map(([p, names]) => `<details class="recipes"><summary>${esc(p)} recipes (${names.length})</summary>
-     <ul class="cols-list">${names.map((n) => `<li>${esc(n)}</li>`).join('')}</ul></details>`).join('')}`;
+     <ul class="cols-list">${names.map((n) => `<li>${spellLink(n.recipe_id, n.name)}</li>`).join('')}</ul></details>`).join('')}`;
 }
 
 // ---------- Crafters ----------
@@ -211,7 +212,7 @@ function shoppingSection(shopping) {
     <p class="muted">From the addon, as of ${ago(shopping.updatedAt)}: ${shopping.items.map((e) => `${esc(e.qty)} × ${esc(e.name)}`).join(', ')}.
       ${total ? `Buying everything would cost about ${esc(money(total))}.` : ''} Manage it in game with <code>/wow list</code>.</p>
     <div class="table-wrap"><table><thead><tr><th>Mat</th><th class="num">Need</th><th>Where you have it</th><th class="num">Guild bank</th><th class="num">Each</th></tr></thead><tbody>
-      ${shopping.mats.map((m) => `<tr><td>${esc(m.name || `Item ${m.id}`)}</td><td class="num">${esc(m.need)}</td>
+      ${shopping.mats.map((m) => `<tr><td>${itemLink(m.id, m.name)}</td><td class="num">${esc(m.need)}</td>
         <td>${m.chars.length ? m.chars.map((c) => `${esc(c.name)} ${esc(c.n)}`).join(', ') : '<span class="muted">none synced</span>'}</td>
         <td class="num">${m.guildBank || ''}</td><td class="num">${m.price != null ? esc(money(m.price)) : ''}</td></tr>`).join('')}
     </tbody></table></div>
@@ -228,7 +229,7 @@ function crafters({ q, results, profSummary, shopping }) {
   </form>
   ${q ? `<h2>${results.length ? `Who can make “${esc(q)}”` : `Nobody has a recipe matching “${esc(q)}”`}</h2>
     ${results.length ? `<ul class="results">${results.map((r) => `<li>
-      <span class="r-name">${esc(r.recipe)}</span>
+      <span class="r-name">${spellLink(r.recipeId, r.recipe)}</span>
       <span>${r.crafters.map((c) => `${c.online ? '<span class="dot" title="Online"></span>' : ''}${charName(c)}`).join(', ')}</span>
       <a class="btn btn-small" href="/requests?item=${encodeURIComponent(r.recipe)}">Request</a></li>`).join('')}</ul>`
       : '<p class="muted">Try part of the name. Recipes only show up once their owner has opened that profession in game and synced.</p>'}`
@@ -300,10 +301,13 @@ function settings({ csrf, tokens, newToken, guild, baseUrl, isOfficer, isOwner, 
     <h2>Connect the game</h2>
     <ol class="steps">
       <li><a href="/get">Download the addon and companion</a>, then copy the <code>WowGuild</code> folder into <code>World of Warcraft\\_forever_\\Interface\\AddOns</code>. The folder name may differ: use whichever one holds Forever.</li>
-      <li>Put <code>wow-companion.exe</code> in any folder and run it once. It creates <code>config.json</code> next to itself.</li>
-      <li>Create a sync key below. In <code>config.json</code>, set <code>syncKey</code> to it and <code>siteUrl</code> to <code>${esc(baseUrl)}</code>.</li>
-      <li>Run the companion again and leave it open while you play. It uploads every time you log out or type <code>/reload</code>.</li>
+      <li>Download the companion below. It comes set up with this site's address and your own sync key. Unzip it anywhere.</li>
+      <li>Run <code>wow-companion.exe</code> and leave it open while you play. It uploads every time you log out or reload.</li>
     </ol>
+    <form method="post" action="/settings/companion" class="actions-row">${csrfField(csrf)}<button class="btn btn-primary">Download companion, ready to go</button></form>
+    <details><summary>Set it up by hand instead</summary><ol class="steps">
+      <li>Create a sync key below. In <code>config.json</code>, set <code>syncKey</code> to it and <code>siteUrl</code> to <code>${esc(baseUrl)}</code>.</li>
+    </ol></details>
     ${newToken ? `<div class="token-once"><p>Your new sync key. Copy it now, because it won't be shown again:</p><code class="token">${esc(newToken)}</code></div>` : ''}
     <form method="post" action="/settings/token">${csrfField(csrf)}<button class="btn btn-primary">Create sync key</button></form>
     ${tokens.length ? `<ul class="tokens">${tokens.map((t) => `<li><code>${esc(t.prefix)}…</code> <span class="muted">created ${ago(t.created_at)}, last used ${ago(t.last_used_at)}</span>
@@ -338,6 +342,14 @@ function settings({ csrf, tokens, newToken, guild, baseUrl, isOfficer, isOwner, 
       <button class="btn">Save webhook</button></form>
   </section>
   <section class="setting">
+    <h2>Item tooltips</h2>
+    <p>Hovering an item anywhere on the site shows its Wowhead tooltip. Pick the game your guild plays so the stats match.</p>
+    <form method="post" action="/settings/wowhead" class="inline-form">${csrfField(csrf)}
+      <label class="sr" for="whg">Game</label>
+      <select id="whg" name="game">${GAMES.map((g) => `<option value="${g}"${g === wowheadGame() ? ' selected' : ''}>${g === 'forever' ? 'WoW: Forever' : g === 'retail' ? 'Retail' : 'Classic'}</option>`).join('')}</select>
+      <button class="btn">Save</button></form>
+  </section>
+  <section class="setting">
     <h2>Members</h2>
     <ul class="tokens">${members.map((m) => `<li>${esc(m.battletag)} <span class="pill">${esc(m.role)}</span>
       ${m.role === 'member' ? memberAction(m.id, 'promote', 'Make officer', csrf) : ''}
@@ -347,7 +359,7 @@ function settings({ csrf, tokens, newToken, guild, baseUrl, isOfficer, isOwner, 
   </section>` : ''}`;
 }
 
-function downloads({ addon, companion, baseUrl, signedIn }) {
+function downloads({ addon, companion, baseUrl, signedIn, csrf }) {
   return `<section class="downloads">
     <h1>Get the guild tools</h1>
     <p class="lede">Two small downloads connect your game to the guild site: the addon (inside WoW) and the companion (on your PC, carries the data).</p>
@@ -357,13 +369,15 @@ function downloads({ addon, companion, baseUrl, signedIn }) {
         <p>Unzip it into your game's <code>Interface\\AddOns</code> folder, so you end up with <code>Interface\\AddOns\\WowGuild</code>.
           For Forever that's inside <code>World of Warcraft\\_forever_</code>; for Retail, <code>_retail_</code>.</p></li>
       <li><h2>The companion</h2>
-        ${companion ? `<p><a class="btn btn-primary" href="/downloads/wow-companion.zip" download>Download companion ${esc(companion.version || '')}</a> <span class="muted">${esc(companion.mb)}, Windows</span></p>` : '<p class="muted">Not available on this server yet.</p>'}
-        <p>Unzip <code>wow-companion.exe</code> anywhere and run it once. It creates <code>config.json</code> next to itself.
-          Windows may warn the first time because the app isn't code-signed: choose <em>More info → Run anyway</em>.</p></li>
-      <li><h2>Connect them</h2>
-        <p>${signedIn ? '<a href="/settings">Settings</a>' : `Sign in at <a href="/">${esc(baseUrl)}</a>, then go to Settings`} → <strong>Create sync key</strong>.
-          In <code>config.json</code>, set <code>syncKey</code> to that key and <code>siteUrl</code> to <code>${esc(baseUrl)}</code>.
-          Run the companion again and leave it open while you play.</p></li>
+        ${!companion ? '<p class="muted">Not available on this server yet.</p>' : signedIn
+          ? `<form method="post" action="/settings/companion"><input type="hidden" name="_csrf" value="${esc(csrf)}">
+              <button class="btn btn-primary">Download companion ${esc(companion.version || '')}, ready to go</button> <span class="muted">${esc(companion.mb)}, Windows</span></form>
+            <p>It comes with <code>config.json</code> already filled in: this site's address and a new sync key that's yours alone. Unzip both files into any folder and run <code>wow-companion.exe</code>.</p>`
+          : `<p><a class="btn btn-primary" href="/downloads/wow-companion.zip" download>Download companion ${esc(companion.version || '')}</a> <span class="muted">${esc(companion.mb)}, Windows</span></p>
+            <p>Comes with <code>config.json</code> already pointing at this site. <a href="/">Sign in</a> first and this button gives you a version with your sync key filled in too.</p>`}
+        <p class="muted">Windows may warn the first time because the app isn't code-signed: choose <em>More info → Run anyway</em>.</p></li>
+      <li><h2>Play</h2>
+        <p>Leave the companion open while you play. In game, click the campfire on the minimap. On the Camp tab, <strong>Sync now</strong> sends everything to the site.</p></li>
     </ol>
   </section>`;
 }

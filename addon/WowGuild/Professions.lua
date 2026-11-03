@@ -113,6 +113,8 @@ function P.scan()
     end
   end
   P.current = { name = prof, recipes = recipes, at = ns.now() }
+  P.lastScan = { at = ns.now(), prof = prof, recipes = #recipes,
+    method = (C_TradeSkillUI and C_TradeSkillUI.GetAllRecipeIDs) and "modern" or (GetNumTradeSkills and "classic" or "none") }
   -- Remember which reagents we care about so the site can send their guild prices and stock.
   ns.db.reagentIds = ns.db.reagentIds or {}
   local seen = {}
@@ -334,9 +336,22 @@ end
 ns.on("BAG_UPDATE_DELAYED", onBags)
 ns.on("BANKFRAME_OPENED", onBags)
 
+-- Is a profession window open right now?
+function P.professionOpen()
+  local f = ProfessionsFrame or TradeSkillFrame
+  return f and f.IsShown and f:IsShown() or false
+end
+
+function P.safeScan()
+  local ok, res = pcall(P.scan)
+  if not ok then ns.reportError(res); P.lastScan = { at = ns.now(), error = tostring(res) }; return nil end
+  if not res then P.lastScan = P.lastScan or { at = ns.now(), prof = "none found" } end
+  return res
+end
+
 local function onTradeSkill()
   C_Timer.After(0.6, function()
-    if P.scan() then P.refreshGuide() end
+    if P.safeScan() then P.refreshGuide() end
   end)
 end
 ns.on("TRADE_SKILL_SHOW", function() onTradeSkill(); P.showGuideIfWanted() end)

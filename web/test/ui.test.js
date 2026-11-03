@@ -146,3 +146,30 @@ test('key binding, addon drawer and /wow all open the same window', () => {
   assert.match(bindings, /<Binding name="WOWGUILD_TOGGLE"[^>]*>\s*WowGuild_Toggle\(\)\s*<\/Binding>/);
   assert.strictEqual(wow.eval('BINDING_NAME_WOWGUILD_TOGGLE'), 'Open or close the guild window');
 });
+
+test('skill-up guide opened without a profession shows a hint, not blank rows', () => {
+  const wow = new WowClient();
+  wow.exec('C_TradeSkillUI = nil; GetNumTradeSkills = nil');
+  wow.fire('ADDON_LOADED', 'WowGuild');
+  wow.fire('PLAYER_LOGIN');
+  wow.slash('guide');
+  assert.strictEqual(text(wow, 'WowGuildSkillGuide:IsShown()'), 'true');
+  assert.strictEqual(text(wow, 'WowGuildSkillGuide.rows[1]:IsShown()'), 'false', 'no empty Make / +5 rows');
+  assert.match(wow.eval('WowGuildSkillGuide.sub:GetText()'), /Open a profession window/);
+});
+
+test('errors are reported, and the problem report explains the state', () => {
+  const wow = client();
+  wow.exec('__handled = {}; function geterrorhandler() return function(e) table.insert(__handled, e) end end');
+  wow.exec('__ns.on("WOWGUILD_TEST", function() error("boom") end); __fire("WOWGUILD_TEST")');
+  assert.match(wow.eval('__handled[1]'), /wow guild: .*boom/);
+  wow.fire('TRADE_SKILL_SHOW');
+  wow.exec('__ns.showReport()');
+  const report = wow.eval('WowGuildReport.edit:GetText()');
+  assert.match(report, /addon: /);
+  assert.match(report, /profession API: modern/);
+  assert.match(report, /last scan: Tailoring, 1 recipes, modern/);
+  assert.match(report, /recent errors:\n {2}\d\d:\d\d:\d\d .*boom/);
+  wow.exec('__ns.ui.show("settings"); __click(WowGuildWindow.pages.settings.report)');
+  assert.strictEqual(text(wow, 'WowGuildReport:IsShown()'), 'true');
+});

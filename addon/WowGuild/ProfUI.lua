@@ -92,6 +92,7 @@ local function createGuide()
       if not r then return end
       if ns.items.shiftDown() and r.outputId then ns.items.insertLink(r.outputId) else P.select(r) end
     end)
+    row:Hide() -- rows only show once there's a recipe to put in them
     f.rows[i] = row
   end
   f:Hide()
@@ -107,9 +108,24 @@ local function placeGuide()
   else guide:SetPoint("CENTER", UIParent, "CENTER", 300, 0) end
 end
 
+local function hideRows() for _, row in ipairs(guide.rows) do row:Hide() end end
+
 function P.refreshGuide()
-  if not guide or not guide:IsShown() or not P.current then return end
-  local ranked = P.rank(P.current.recipes, ROWS)
+  if not guide or not guide:IsShown() then return end
+  if not P.current then
+    guide.title:SetText("Skill-up guide")
+    guide.sub:SetText("Open a profession window and this list fills in with the cheapest skill-ups.")
+    hideRows()
+    return
+  end
+  local ok, ranked = pcall(P.rank, P.current.recipes, ROWS)
+  if not ok then
+    ns.reportError(ranked)
+    guide.title:SetText(P.current.name .. " skill-ups")
+    guide.sub:SetText("|cffff6040Couldn't rank these recipes.|r Settings tab → Problem report, and send it to your officer.")
+    hideRows()
+    return
+  end
   guide.title:SetText(P.current.name .. " skill-ups")
   local hasAuctionator = Auctionator and Auctionator.API and Auctionator.API.v1
   guide.sub:SetText(#ranked == 0 and "Nothing gives skill points right now. Train new recipes."
@@ -138,6 +154,7 @@ end
 function P.showGuideIfWanted()
   if ui().guideHidden or not ns.opt("autoGuide") then return end
   guide = guide or createGuide()
+  if P.professionOpen() then P.safeScan() end
   placeGuide()
   guide:Show()
   P.refreshGuide()
@@ -148,7 +165,8 @@ function P.toggleGuide()
   if guide:IsShown() then ui().guideHidden = true; guide:Hide()
   else
     ui().guideHidden = false
-    if not P.current then ns.print("Open a profession window first, then the guide fills in.") end
+    if P.professionOpen() then P.safeScan() end
+    if not P.current then ns.print("Open a profession window and the guide fills in.") end
     placeGuide(); guide:Show(); P.refreshGuide()
   end
 end

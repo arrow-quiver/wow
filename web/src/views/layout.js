@@ -49,6 +49,8 @@ function layout({ title, active, user, guild, body, csrf, flash }) {
 <link rel="stylesheet" href="/style.css">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <script src="/app.js" defer></script>
+<script src="/wowhead-config.js" defer></script>
+<script src="https://wow.zamimg.com/js/tooltips.js" defer></script>
 </head>
 <body>
 <div class="shell${guild ? '' : ' shell--bare'}">

@@ -292,6 +292,9 @@ function pages.settings(page)
   local ver = label(page, "", "GameFontDisableSmall"); ver:SetPoint("TOPLEFT", 0, y - 52)
   local blizz = button(page, "Key binding and more", 170); blizz:SetPoint("TOPLEFT", 0, y - 80)
   blizz:SetScript("OnClick", function() ns.openOptions() end)
+  local report = button(page, "Problem report", 150); report:SetPoint("LEFT", blizz, "RIGHT", 10, 0)
+  report:SetScript("OnClick", function() ns.showReport() end)
+  page.report = report
   page.site = site
   page.refresh = function()
     for _, cb in ipairs(page.boxes) do cb:SetChecked(ns.opt(cb.key) and true or false) end

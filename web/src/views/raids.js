@@ -1,4 +1,5 @@
 const { esc, classInfo, ago, when } = require('./layout');
+const { itemLink, itemHover } = require('./wowhead');
 
 const csrfField = (csrf) => `<input type="hidden" name="_csrf" value="${esc(csrf)}">`;
 const ROLE_LABEL = { tank: 'Tanks', healer: 'Healers', dps: 'Damage' };
@@ -94,7 +95,7 @@ function raidPage({ raid, csrf, signups, mySignup, myChars, items, myReserves, b
     <form method="post" action="/raids/${raid.id}/reserves">${csrfField(csrf)}
       <div class="loot-grid">${Object.entries(byBoss).map(([boss, list]) => `<fieldset><legend>${esc(boss)}</legend>
         ${list.map((it) => `<label class="check"><input type="checkbox" name="item" value="${it.id}"${reservedIds.has(it.id) ? ' checked' : ''}${raid.status !== 'open' ? ' disabled' : ''}>
-          <span>${esc(it.name)}</span>${it.bonus ? `<span class="pill bonus">+${it.bonus}</span>` : ''}${boardCount[it.id] ? `<span class="muted"> ${boardCount[it.id]} reserved</span>` : ''}</label>`).join('')}
+          <span>${itemHover(it.wh_id, it.name)}</span>${it.bonus ? `<span class="pill bonus">+${it.bonus}</span>` : ''}${boardCount[it.id] ? `<span class="muted"> ${boardCount[it.id]} reserved</span>` : ''}</label>`).join('')}
       </fieldset>`).join('')}</div>
       ${raid.status === 'open' ? '<button class="btn btn-primary">Save reserves</button>' : '<p class="muted">Reserves are locked.</p>'}
     </form>`}
@@ -114,11 +115,11 @@ function raidPage({ raid, csrf, signups, mySignup, myChars, items, myReserves, b
   </section>
 
   ${board.length ? `<section class="setting"><h2>Reserve list</h2>
-    <ul class="board">${board.map((b) => `<li><strong>${esc(b.item)}</strong> ${b.reservers.map((r) => `${esc(r.character || r.battletag.split('#')[0])}${r.bonus ? ` <span class="pill bonus">+${r.bonus}</span>` : ''}`).join(', ')}</li>`).join('')}</ul>
+    <ul class="board">${board.map((b) => `<li><strong>${itemLink(b.wh_id, b.item)}</strong> ${b.reservers.map((r) => `${esc(r.character || r.battletag.split('#')[0])}${r.bonus ? ` <span class="pill bonus">+${r.bonus}</span>` : ''}`).join(', ')}</li>`).join('')}</ul>
     <details><summary>Copy as text for raid chat</summary><textarea readonly rows="6" class="copybox">${esc(board.map((b) => `${b.item}: ${b.reservers.map((r) => `${r.character || r.battletag.split('#')[0]}${r.bonus ? ` (+${r.bonus})` : ''}`).join(', ')}`).join('\n'))}</textarea></details>
   </section>` : ''}
 
-  ${loot.length ? `<section class="setting"><h2>Loot given out</h2><ul class="board">${loot.map((l) => `<li><strong>${esc(l.item_name)}</strong> to ${esc(l.character || '?')} <span class="muted">${esc(l.kind.toUpperCase())}${l.roll != null ? `, rolled ${l.roll}${l.bonus ? ` + ${l.bonus}` : ''}` : ''}</span></li>`).join('')}</ul></section>` : ''}
+  ${loot.length ? `<section class="setting"><h2>Loot given out</h2><ul class="board">${loot.map((l) => `<li><strong>${itemLink(l.wh_id, l.item_name)}</strong> to ${esc(l.character || '?')} <span class="muted">${esc(l.kind.toUpperCase())}${l.roll != null ? `, rolled ${l.roll}${l.bonus ? ` + ${l.bonus}` : ''}` : ''}</span></li>`).join('')}</ul></section>` : ''}
 
   ${isOfficer ? `<section class="setting officer-box">
     <h2>Raid leader</h2>
@@ -149,7 +150,7 @@ function lootScreen({ raid, csrf, board, rolls, items, attending, awarded }) {
   <ul class="loot-live">${board.map((b) => {
     const r = rolls[b.item_id] || [];
     return `<li class="loot-card" id="item-${b.item_id}">
-      <div class="loot-head"><strong>${esc(b.item)}</strong>${b.boss ? ` <span class="muted">${esc(b.boss)}</span>` : ''}</div>
+      <div class="loot-head"><strong>${itemLink(b.wh_id, b.item)}</strong>${b.boss ? ` <span class="muted">${esc(b.boss)}</span>` : ''}</div>
       <p class="muted">${b.reservers.map((x) => `${esc(x.character || x.battletag.split('#')[0])}${x.bonus ? ` +${x.bonus}` : ''}${x.signup !== 'yes' && x.signup !== 'bench' ? ' (not in raid)' : ''}`).join(', ')}</p>
       ${r.length ? `<ol class="rolls">${r.map((x, i) => `<li${i === 0 ? ' class="top"' : ''}><span>${esc(x.character || x.battletag.split('#')[0])}</span>
           <span class="muted">${x.roll}${x.bonus ? ` + ${x.bonus}` : ''} =</span> <strong>${x.total}</strong>
@@ -170,7 +171,7 @@ function lootScreen({ raid, csrf, board, rolls, items, attending, awarded }) {
       <button class="btn">Record</button>
     </form>
   </section>
-  ${awarded.length ? `<h2>Given out tonight</h2><ul class="board">${awarded.map((l) => `<li><strong>${esc(l.item_name)}</strong> to ${esc(l.character || '?')} <span class="muted">${esc(l.kind.toUpperCase())}</span></li>`).join('')}</ul>` : ''}`;
+  ${awarded.length ? `<h2>Given out tonight</h2><ul class="board">${awarded.map((l) => `<li><strong>${itemLink(l.wh_id, l.item_name)}</strong> to ${esc(l.character || '?')} <span class="muted">${esc(l.kind.toUpperCase())}</span></li>`).join('')}</ul>` : ''}`;
 }
 
 // ---------- loot catalogue, bonuses, history ----------
@@ -186,20 +187,20 @@ function lootPage({ csrf, isOfficer, catalog, focus, history, myLoyalty }) {
   <section class="setting">
     <h2>Loot lists</h2>
     ${instances.length ? instances.map((inst) => `<details${inst === focus ? ' open' : ''}><summary>${esc(inst)} <span class="muted">(${catalog[inst].length} items)</span></summary>
-      <ul class="cols-list">${catalog[inst].map((i) => `<li>${esc(i.name)}${i.boss ? ` <span class="muted">${esc(i.boss)}</span>` : ''}${isOfficer ? ` <form class="inline" method="post" action="/loot/items/${i.id}/delete">${csrfField(csrf)}<button class="link-btn danger" aria-label="Remove ${esc(i.name)}">remove</button></form>` : ''}</li>`).join('')}</ul></details>`).join('')
+      <ul class="cols-list">${catalog[inst].map((i) => `<li>${itemLink(i.wh_id, i.name)}${i.boss ? ` <span class="muted">${esc(i.boss)}</span>` : ''}${isOfficer ? ` <form class="inline" method="post" action="/loot/items/${i.id}/delete">${csrfField(csrf)}<button class="link-btn danger" aria-label="Remove ${esc(i.name)}">remove</button></form>` : ''}</li>`).join('')}</ul></details>`).join('')
       : '<p class="empty">No loot lists yet.</p>'}
     ${isOfficer ? `<form method="post" action="/loot/items" class="stack narrow-wide">${csrfField(csrf)}
       <h3>Add items</h3>
       <label>Instance<input name="instance" required maxlength="60" list="inst-list" value="${esc(focus || '')}" placeholder="Hyjal Summit"></label>
       <datalist id="inst-list">${instances.map((i) => `<option value="${esc(i)}">`).join('')}</datalist>
-      <label><span>One item per line. Put the boss first if you like: <code>Boss | Item</code></span><textarea name="items" rows="6" required placeholder="Rage Winterchill | Frostbound Greaves&#10;Anetheron | Cloak of the Long Night"></textarea></label>
+      <label><span>One item per line. Put the boss first if you like: <code>Boss | Item</code>. Add <code>| 12345</code> or a Wowhead link at the end for hover tooltips.</span><textarea name="items" rows="6" required placeholder="Rage Winterchill | Frostbound Greaves&#10;Anetheron | Cloak of the Long Night"></textarea></label>
       <button class="btn btn-primary">Add items</button>
     </form>` : ''}
   </section>
   <section class="setting">
     <h2>Loot history</h2>
     ${history.length ? `<div class="table-wrap"><table><thead><tr><th>Item</th><th>To</th><th>How</th><th>Raid</th><th>When</th></tr></thead><tbody>
-      ${history.map((h) => `<tr><td>${esc(h.item_name)}</td><td>${esc(h.character || '')}</td><td>${esc(h.kind.toUpperCase())}${h.roll != null ? ` <span class="muted">${h.roll}${h.bonus ? `+${h.bonus}` : ''}</span>` : ''}</td>
+      ${history.map((h) => `<tr><td>${itemLink(h.wh_id, h.item_name)}</td><td>${esc(h.character || '')}</td><td>${esc(h.kind.toUpperCase())}${h.roll != null ? ` <span class="muted">${h.roll}${h.bonus ? `+${h.bonus}` : ''}</span>` : ''}</td>
         <td>${h.raid_id ? `<a href="/raids/${h.raid_id}">${esc(h.title || '')}</a>` : ''}</td><td class="muted">${ago(h.created_at)}</td></tr>`).join('')}</tbody></table></div>`
       : '<p class="empty">Nothing handed out yet.</p>'}
   </section>`;

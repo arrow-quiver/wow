@@ -165,3 +165,72 @@ function GetAddOnMetadata(a, k) if k == "Version" then return "0.5.0" end end`;
   wow.slash('options');
   assert.strictEqual(wow.eval('__ns.debugError'), null);
 });
+
+test('Wowhead tooltips: links on item pages, game setting, loot list ids, CSP allows the script', async () => {
+  const { db, srv, login, post, get } = await site();
+  try {
+    const s = await login('Owner#1');
+    await post(s, '/guild/create', { name: 'wow', faction: 'Horde' });
+    const page = await get(s, '/');
+    assert.match(page.text, /<script src="https:\/\/wow\.zamimg\.com\/js\/tooltips\.js" defer>/);
+    assert.match(page.headers.get('content-security-policy'), /script-src 'self' https:\/\/wow\.zamimg\.com/);
+    await post(s, '/loot/items', { instance: 'Hyjal Summit', items: 'Rage Winterchill | Frostbound Greaves | 30893\nAnetheron | Cloak of the Long Night | https://www.wowhead.com/forever/item=30884/cloak\nPlain Ring' });
+    const ids = db.prepare('SELECT name, item_id FROM loot_items ORDER BY name').all();
+    assert.deepStrictEqual(ids, [{ name: 'Cloak of the Long Night', item_id: 30884 }, { name: 'Frostbound Greaves', item_id: 30893 }, { name: 'Plain Ring', item_id: null }]);
+    // Names without an id pick one up from items members carry.
+    db.prepare("INSERT INTO item_names (item_id, name) VALUES (1234, 'Plain Ring')").run();
+    const loot = await get(s, '/loot?instance=Hyjal%20Summit');
+    assert.match(loot.text, /href="https:\/\/www\.wowhead\.com\/forever\/item=30893"[^>]*>Frostbound Greaves/);
+    assert.match(loot.text, /href="https:\/\/www\.wowhead\.com\/forever\/item=1234"[^>]*>Plain Ring/);
+    await post(s, '/settings/wowhead', { game: 'retail' });
+    assert.match((await get(s, '/loot?instance=Hyjal%20Summit')).text, /href="https:\/\/www\.wowhead\.com\/item=30893"/);
+    await post(s, '/settings/wowhead', { game: 'forever' });
+    // Raid reserve checkboxes use hover tooltips instead of links.
+    const r = await post(s, '/raids', { title: 'Hyjal', instance: 'Hyjal Summit', starts: '2026-12-09T20:00', tz_offset: '-120' });
+    assert.match((await get(s, r.headers.get('location'))).text, /data-wowhead="item=30893&amp;domain=forever"|data-wowhead="item=30893&domain=forever"/);
+  } finally { srv.close(); }
+});
+
+test('companion downloads come with config.json filled in', async () => {
+  const { execFileSync } = require('child_process');
+  const zipkit = require('../src/zipkit');
+  const dir = path.join(__dirname, '..', 'downloads');
+  const had = fs.existsSync(path.join(dir, 'wow-companion.zip'));
+  fs.mkdirSync(dir, { recursive: true });
+  if (!had) {
+    // A tiny stand-in "exe", deflated like the real build's zip.
+    const data = Buffer.from('MZ fake exe '.repeat(200));
+    const zlib = require('zlib');
+    fs.writeFileSync(path.join(dir, 'wow-companion.zip'), zipkit.writeZip([{ name: 'wow-companion.exe', method: 8, crc: zlib.crc32(data) >>> 0, size: data.length, compressed: zlib.deflateRawSync(data) }]));
+  }
+  const { db, srv, url, login, post, cfg } = await site();
+  try {
+    const readZip = (buf) => {
+      const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'zip-')), 'c.zip');
+      fs.writeFileSync(f, buf);
+      return JSON.parse(execFileSync('python3', ['-c', `import zipfile,json,sys
+z=zipfile.ZipFile(sys.argv[1]); assert z.testzip() is None
+print(json.dumps({'names': z.namelist(), 'config': json.loads(z.read('config.json')), 'exeStart': z.read('wow-companion.exe')[:2].decode('latin1')}))`, f]).toString());
+    };
+    const pub = await fetch(`${url}/downloads/wow-companion.zip`);
+    assert.match(pub.headers.get('content-disposition'), /wow-companion\.zip/);
+    const p = readZip(Buffer.from(await pub.arrayBuffer()));
+    assert.deepStrictEqual(p.names, ['wow-companion.exe', 'config.json', 'READ ME.txt']);
+    assert.strictEqual(p.exeStart, 'MZ', 'exe survives intact (CRC checked)');
+    assert.strictEqual(p.config.syncKey, 'paste-your-sync-key-here');
+    const s = await login('Owner#1');
+    await post(s, '/guild/create', { name: 'wow', faction: 'Horde' });
+    const mine = await post(s, '/settings/companion');
+    assert.strictEqual(mine.status, 200);
+    const z = readZip(Buffer.from(await mine.arrayBuffer()));
+    assert.match(z.config.syncKey, /^wowg_/);
+    assert.strictEqual(z.config.siteUrl, cfg.baseUrl);
+    // The key really works.
+    const ok = await fetch(`${url}/api/inbox`, { headers: { Authorization: `Bearer ${z.config.syncKey}` } });
+    assert.strictEqual(ok.status, 200);
+    assert.ok(db.prepare("SELECT 1 FROM audit_log WHERE action = 'companion downloaded with new sync key'").get());
+  } finally {
+    srv.close();
+    if (!had) fs.unlinkSync(path.join(dir, 'wow-companion.zip'));
+  }
+});

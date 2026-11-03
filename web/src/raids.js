@@ -14,7 +14,7 @@ function raidFor(db, guildId, raidId) {
 }
 
 function itemsForInstance(db, guildId, instance) {
-  return db.prepare('SELECT * FROM loot_items WHERE guild_id = ? AND instance = ? ORDER BY boss, name').all(guildId, instance);
+  return db.prepare(`SELECT li.*, COALESCE(li.item_id, (SELECT n.item_id FROM item_names n WHERE n.name = li.name LIMIT 1)) AS wh_id FROM loot_items li WHERE li.guild_id = ? AND li.instance = ? ORDER BY li.boss, li.name`).all(guildId, instance);
 }
 
 function bonusOf(db, guildId, userId, itemId) {
@@ -30,7 +30,7 @@ function myReserves(db, raid, userId) {
 
 // Every item with at least one reserve, with who reserved it and their bonus.
 function reserveBoard(db, raid) {
-  const rows = db.prepare(`SELECT li.id AS item_id, li.name AS item, li.boss, r.user_id, u.battletag,
+  const rows = db.prepare(`SELECT li.id AS item_id, li.name AS item, li.boss, COALESCE(li.item_id, (SELECT n.item_id FROM item_names n WHERE n.name = li.name LIMIT 1)) AS wh_id, r.user_id, u.battletag,
       COALESCE(s.character, '') AS character, COALESCE(l.bonus, 0) AS bonus, s.status AS signup
     FROM reserves r JOIN loot_items li ON li.id = r.item_id JOIN users u ON u.id = r.user_id
     LEFT JOIN signups s ON s.raid_id = r.raid_id AND s.user_id = r.user_id
@@ -38,7 +38,7 @@ function reserveBoard(db, raid) {
     WHERE r.raid_id = ? ORDER BY li.boss, li.name, bonus DESC`).all(raid.guild_id, raid.id);
   const map = new Map();
   for (const r of rows) {
-    if (!map.has(r.item_id)) map.set(r.item_id, { item_id: r.item_id, item: r.item, boss: r.boss, reservers: [] });
+    if (!map.has(r.item_id)) map.set(r.item_id, { item_id: r.item_id, item: r.item, boss: r.boss, wh_id: r.wh_id, reservers: [] });
     map.get(r.item_id).reservers.push(r);
   }
   return [...map.values()];
@@ -126,15 +126,24 @@ function closeRaid(db, raid, attendeeIds) {
 
 // "Boss | Item" per line (boss optional) → rows added to the catalog.
 function importItems(db, guildId, instance, text) {
-  const ins = db.prepare('INSERT OR IGNORE INTO loot_items (guild_id, instance, boss, name) VALUES (?,?,?,?)');
+  // Each line: "Item", "Boss | Item", optionally followed by "| 12345" or a Wowhead link for the tooltip.
+  const ins = db.prepare(`INSERT INTO loot_items (guild_id, instance, boss, name, item_id) VALUES (?,?,?,?,?)
+    ON CONFLICT (guild_id, instance, name) DO UPDATE SET item_id = COALESCE(excluded.item_id, item_id), boss = COALESCE(excluded.boss, boss)`);
+  const exists = db.prepare('SELECT 1 FROM loot_items WHERE guild_id = ? AND instance = ? AND name = ?');
   let added = 0;
   db.transaction(() => {
     for (const line of String(text || '').split(/\r?\n/)) {
-      const parts = line.split('|').map((s) => s.trim()).filter(Boolean);
+      let parts = line.split('|').map((s) => s.trim()).filter(Boolean);
       if (!parts.length) continue;
+      let itemId = null;
+      const last = parts[parts.length - 1];
+      const m = /item=(\d+)/.exec(last) || /^(\d{2,7})$/.exec(last);
+      if (m && parts.length > 1) { itemId = Number(m[1]); parts = parts.slice(0, -1); }
       const [boss, name] = parts.length > 1 ? [parts[0], parts.slice(1).join(' | ')] : [null, parts[0]];
-      if (name.length > 100) continue;
-      added += ins.run(guildId, instance, boss ? boss.slice(0, 60) : null, name).changes;
+      if (!name || name.length > 100) continue;
+      const isNew = !exists.get(guildId, instance, name);
+      ins.run(guildId, instance, boss ? boss.slice(0, 60) : null, name, itemId);
+      if (isNew) added += 1;
     }
   })();
   return added;

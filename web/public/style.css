@@ -265,3 +265,7 @@ tr.is-stale-row td { color: var(--ink-2); }
 .tokens form { display: inline; }
 .facts { list-style: none; padding: 0; margin: .3rem 0 0; display: flex; flex-wrap: wrap; gap: .4rem 1.6rem; }
 .profs li { grid-template-columns: 12rem 1fr 6rem; }
+/* Wowhead item links keep our layout; their script adds the icon and quality colour. */
+a.wh { text-decoration: none; font-weight: 600; }
+a.wh:hover { text-decoration: underline; }
+.wh-hover { border-bottom: 1px dotted var(--ink-2); cursor: help; }

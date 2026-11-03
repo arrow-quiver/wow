@@ -57,7 +57,7 @@ module.exports = function raidRoutes(app, { db, cfg, discord, activity, needGuil
   app.get('/raids/:id(\\d+)', needGuild, (req, res) => {
     const raid = getRaid(req, res); if (!raid) return;
     const gid = req.guild.id;
-    const items = db.prepare(`SELECT li.*, COALESCE(l.bonus, 0) AS bonus FROM loot_items li
+    const items = db.prepare(`SELECT li.*, COALESCE(li.item_id, (SELECT n.item_id FROM item_names n WHERE n.name = li.name LIMIT 1)) AS wh_id, COALESCE(l.bonus, 0) AS bonus FROM loot_items li
       LEFT JOIN loyalty l ON l.guild_id = li.guild_id AND l.item_id = li.id AND l.user_id = ?
       WHERE li.guild_id = ? AND li.instance = ? ORDER BY li.boss, li.name`).all(req.user.id, gid, raid.instance);
     res.page({
@@ -69,7 +69,7 @@ module.exports = function raidRoutes(app, { db, cfg, discord, activity, needGuil
         myChars: db.prepare('SELECT name FROM characters WHERE guild_id = ? AND user_id = ? ORDER BY is_main DESC, level DESC').all(gid, req.user.id),
         myReserves: R.myReserves(db, raid, req.user.id),
         board: R.reserveBoard(db, raid),
-        loot: db.prepare('SELECT * FROM loot_log WHERE raid_id = ? ORDER BY id').all(raid.id),
+        loot: db.prepare(`SELECT lg.*, COALESCE(COALESCE(li.item_id, NULL), (SELECT n.item_id FROM item_names n WHERE n.name = lg.item_name LIMIT 1)) AS wh_id FROM loot_log lg LEFT JOIN loot_items li ON li.id = lg.item_id WHERE lg.raid_id = ? ORDER BY lg.id`).all(raid.id),
       }),
     });
   });
@@ -128,7 +128,7 @@ module.exports = function raidRoutes(app, { db, cfg, discord, activity, needGuil
       raid, board, rolls,
       items: R.itemsForInstance(db, raid.guild_id, raid.instance),
       attending: db.prepare("SELECT user_id, character FROM signups WHERE raid_id = ? AND status IN ('yes','bench') ORDER BY character").all(raid.id),
-      awarded: db.prepare('SELECT * FROM loot_log WHERE raid_id = ? ORDER BY id DESC').all(raid.id),
+      awarded: db.prepare(`SELECT lg.*, COALESCE(COALESCE(li.item_id, NULL), (SELECT n.item_id FROM item_names n WHERE n.name = lg.item_name LIMIT 1)) AS wh_id FROM loot_log lg LEFT JOIN loot_items li ON li.id = lg.item_id WHERE lg.raid_id = ? ORDER BY lg.id DESC`).all(raid.id),
     };
   };
   app.get('/raids/:id(\\d+)/loot', needOfficer, (req, res) => {
@@ -163,12 +163,13 @@ module.exports = function raidRoutes(app, { db, cfg, discord, activity, needGuil
   app.get('/loot', needGuild, (req, res) => {
     const gid = req.guild.id;
     const catalog = {};
-    for (const i of db.prepare('SELECT * FROM loot_items WHERE guild_id = ? ORDER BY instance, boss, name').all(gid)) (catalog[i.instance] ||= []).push(i);
+    for (const i of db.prepare(`SELECT li.*, COALESCE(li.item_id, (SELECT n.item_id FROM item_names n WHERE n.name = li.name LIMIT 1)) AS wh_id FROM loot_items li WHERE li.guild_id = ? ORDER BY li.instance, li.boss, li.name`).all(gid)) (catalog[i.instance] ||= []).push(i);
     res.page({
       title: 'Loot', active: 'loot',
       body: V.lootPage({
         csrf: req.csrf, isOfficer: isOfficer(req), catalog, focus: String(req.query.instance || ''),
-        history: db.prepare('SELECT l.*, r.title FROM loot_log l LEFT JOIN raids r ON r.id = l.raid_id WHERE l.guild_id = ? ORDER BY l.id DESC LIMIT 100').all(gid),
+        history: db.prepare(`SELECT l.*, r.title, COALESCE(li.item_id, (SELECT n.item_id FROM item_names n WHERE n.name = l.item_name LIMIT 1)) AS wh_id FROM loot_log l LEFT JOIN raids r ON r.id = l.raid_id
+          LEFT JOIN loot_items li ON li.id = l.item_id WHERE l.guild_id = ? ORDER BY l.id DESC LIMIT 100`).all(gid),
         myLoyalty: db.prepare(`SELECT li.name, li.instance, l.bonus FROM loyalty l JOIN loot_items li ON li.id = l.item_id
           WHERE l.guild_id = ? AND l.user_id = ? AND l.bonus > 0 ORDER BY l.bonus DESC`).all(gid, req.user.id),
       }),

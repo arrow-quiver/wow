@@ -2,7 +2,7 @@ const { esc, ago } = require('./layout');
 const { money } = require('../economy');
 
 const csrfField = (csrf) => `<input type="hidden" name="_csrf" value="${esc(csrf)}">`;
-const wowhead = (id) => `https://www.wowhead.com/item=${encodeURIComponent(id)}`;
+const { itemLink } = require('./wowhead');
 const coins = (c) => (c == null ? '<span class="muted">no price</span>' : `<span class="coins">${esc(money(c))}</span>`);
 
 // ---------- Bank ----------
@@ -12,7 +12,7 @@ function itemTable(rows, { showWho } = {}) {
   const body = rows.map((r) => {
     const value = r.unit != null ? r.unit * r.count : null;
     if (value) total += value;
-    return `<tr>${showWho ? `<td>${esc(r.character)}</td>` : ''}<td><a href="${wowhead(r.item_id)}" target="_blank" rel="noopener">${esc(r.name)}</a></td>
+    return `<tr>${showWho ? `<td>${esc(r.character)}</td>` : ''}<td>${itemLink(r.item_id, r.name)}</td>
       <td class="num">${esc(r.count)}</td><td class="num">${coins(r.unit)}</td><td class="num">${value != null ? coins(value) : ''}</td></tr>`;
   }).join('');
   return { total, html: `<div class="table-wrap"><table><thead><tr>${showWho ? '<th>Character</th>' : ''}<th>Item</th><th class="num">Count</th><th class="num">Each</th><th class="num">Value</th></tr></thead><tbody>${body}</tbody></table></div>` };
@@ -61,7 +61,7 @@ function bankPage({ csrf, isOfficer, userId, guild, guildBank, alts, bankChars, 
       <input id="find" name="find" value="${esc(find)}" placeholder="Which alt has my Runecloth?">
       <button class="btn">Find</button>
     </form>
-    ${mine ? (mine.length ? `<ul class="board">${mine.map((m) => `<li><strong>${esc(m.name)}</strong> × ${esc(m.count)} <span class="muted">on ${esc(m.character)}, in ${m.location === 'bank' ? 'the bank' : 'bags'}</span></li>`).join('')}</ul>`
+    ${mine ? (mine.length ? `<ul class="board">${mine.map((m) => `<li><strong>${itemLink(m.item_id, m.name)}</strong> × ${esc(m.count)} <span class="muted">on ${esc(m.character)}, in ${m.location === 'bank' ? 'the bank' : 'bags'}</span></li>`).join('')}</ul>`
       : `<p class="empty">None of your synced characters carry “${esc(find)}”. Bank contents update when you open the bank in game.</p>`) : ''}
   </section>
 
@@ -107,7 +107,7 @@ function pricesPage({ q, results, stats, held }) {
 }
 function priceTable(rows) {
   return `<div class="table-wrap"><table><thead><tr><th>Item</th><th class="num">Latest</th><th>Scanned</th><th>Last 2 weeks</th></tr></thead><tbody>
-    ${rows.map((r) => `<tr><td><a href="${wowhead(r.item_id)}" target="_blank" rel="noopener">${esc(r.name || `Item ${r.item_id}`)}</a></td>
+    ${rows.map((r) => `<tr><td>${itemLink(r.item_id, r.name)}</td>
       <td class="num">${r.latest ? coins(r.latest.price) : ''}</td><td class="muted">${r.latest ? esc(r.latest.day) : ''}</td><td>${spark(r.history || [])}</td></tr>`).join('')}
   </tbody></table></div>`;
 }
