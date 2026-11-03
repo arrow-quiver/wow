@@ -271,3 +271,6 @@ a.wh:hover { text-decoration: underline; }
 .wh-hover { border-bottom: 1px dotted var(--ink-2); cursor: help; }
 [hidden] { display: none !important; }
 label.check input { flex: none; }
+.realm-line { margin: 0 0 .75rem; font-size: .95rem; }
+.realm-up { color: #2f7d4f; font-weight: 700; }
+.realm-down { color: var(--alarm); font-weight: 700; }

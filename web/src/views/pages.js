@@ -91,8 +91,8 @@ function onboardingBox(steps) {
   </section>`;
 }
 
-function home({ csrf, online, scannedAt, ctas, announcements, activity, isOfficer, mySync, onboarding }) {
-  return `${onboardingBox(onboarding)}${campRing(online, scannedAt)}
+function home({ csrf, online, scannedAt, ctas, announcements, activity, isOfficer, mySync, onboarding, realm }) {
+  return `${onboardingBox(onboarding)}${realmLine(realm)}${campRing(online, scannedAt)}
   <div class="cols">
     <section class="col-main">
       <h2>Call to arms</h2>
@@ -133,6 +133,12 @@ function home({ csrf, online, scannedAt, ctas, announcements, activity, isOffice
 
 // ---------- Roster & characters ----------
 
+function realmLine(r) {
+  if (!r || !r.found) return '';
+  const state = r.up === false ? '<span class="realm-down">Down</span>' : r.up ? '<span class="realm-up">Up</span>' : 'Unknown';
+  return `<p class="realm-line"><strong>${esc(r.name)}</strong> ${state}${r.queue ? ' · <strong>login queue</strong>' : ''}${r.population ? ` · ${esc(r.population)} population` : ''} <span class="muted">· checked ${ago(r.checkedAt)}</span></p>`;
+}
+
 function roster({ chars, scannedAt }) {
   const rows = chars.map((c) => {
     const [label] = classInfo(c.class);
@@ -140,7 +146,7 @@ function roster({ chars, scannedAt }) {
       <td>${c.online ? '<span class="dot" title="Online"></span>' : ''}${charName(c)}${c.is_main ? ' <span class="pill">main</span>' : ''}</td>
       <td>${esc(c.level ?? '')}</td><td>${esc(label)}</td><td>${esc(c.rank || '')}</td>
       <td>${esc(c.zone || '')}</td><td>${esc(c.battletag ? c.battletag.split('#')[0] : '')}</td>
-      <td class="muted">${c.online ? 'now' : ago(c.last_seen)}</td></tr>`;
+      <td class="muted">${c.online ? 'now' : c.last_seen ? ago(c.last_seen) : c.in_official_roster ? '<span title="From Blizzard\'s official guild list">in guild</span>' : ''}</td></tr>`;
   }).join('');
   return `<h1>Roster</h1>
   <p class="muted">${chars.length} characters. Roster as of ${ago(scannedAt)}. A player name means that member has linked the character with the companion.</p>
@@ -295,7 +301,7 @@ function memberAction(id, verb, label, csrf, confirm) {
   return `<form method="post" action="/members/${id}/${verb}">${csrfField(csrf)}<button class="btn btn-small btn-quiet"${confirm ? ` data-confirm="${esc(confirm)}"` : ''}>${label}</button></form>`;
 }
 
-function settings({ csrf, tokens, newToken, guild, baseUrl, isOfficer, isOwner, me, members, discordInfo = {}, calendarUrl, pushDevices = 0, pushPrefs }) {
+function settings({ csrf, tokens, newToken, guild, baseUrl, isOfficer, isOwner, me, members, discordInfo = {}, calendarUrl, pushDevices = 0, pushPrefs, gameData = {} }) {
   return `<h1>Settings</h1>
   <section class="setting">
     <h2>Connect the game</h2>
@@ -373,6 +379,18 @@ function settings({ csrf, tokens, newToken, guild, baseUrl, isOfficer, isOwner, 
       <label class="sr" for="whg">Game</label>
       <select id="whg" name="game">${GAMES.map((g) => `<option value="${g}"${g === wowheadGame() ? ' selected' : ''}>${g === 'forever' ? 'WoW: Forever' : g === 'retail' ? 'Retail' : 'Classic'}</option>`).join('')}</select>
       <button class="btn">Save</button></form>
+  </section>
+  <section class="setting">
+    <h2>Realm and official Blizzard data</h2>
+    <p>The site reads Blizzard's free game data: item names and stats, ${gameData.ns && gameData.ns.dynamic ? 'whether your realm is up (with a notification when it comes back), and the official guild list' : 'and, once Blizzard adds WoW: Forever to its API, your realm status and the official guild list'}.
+      <span class="muted">Using: ${esc(gameData.ns ? gameData.ns.label : 'nothing yet')}. ${esc(gameData.items || 0)} items known.</span></p>
+    ${guild.official_roster_note ? `<p class="muted">Official guild list: ${esc(guild.official_roster_note)}, ${ago(guild.official_roster_at)}.</p>` : ''}
+    ${gameData.realmStatus && gameData.realmStatus.found === false ? `<p class="warn">Blizzard doesn't list a realm called “${esc(guild.realm)}” yet.</p>` : ''}
+    <form method="post" action="/settings/realm" class="inline-form">${csrfField(csrf)}
+      <label class="grow">Realm<input name="realm" maxlength="60" value="${esc(guild.realm || '')}" placeholder="Filled in by the addon"></label>
+      <label class="grow">Guild name in game<input name="game_guild" maxlength="60" value="${esc(guild.game_guild || '')}" placeholder="wow"></label>
+      <button class="btn">Save</button></form>
+    <form method="post" action="/settings/gamedata/refresh">${csrfField(csrf)}<button class="btn btn-small btn-quiet">Refresh now</button></form>
   </section>
   <section class="setting">
     <h2>Members</h2>

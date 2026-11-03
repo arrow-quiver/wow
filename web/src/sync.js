@@ -95,6 +95,8 @@ function applyPayload(db, guildId, userId, payload) {
         extras: cleanExtras(c),
       });
       const { id } = charId.get(guildId, name);
+      // The first synced character in the guild tells us the realm and the in-game guild name.
+      if (c.realm && c.guild) db.prepare('UPDATE guilds SET realm = COALESCE(realm, ?), game_guild = COALESCE(game_guild, ?) WHERE id = ?').run(str(c.realm, 60), str(c.guild, 60), guildId);
       if (!before) activity.run(guildId, 'character', `${name} linked their character`);
       stats.characters += 1;
 

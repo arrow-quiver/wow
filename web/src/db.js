@@ -341,6 +341,21 @@ const MIGRATIONS = [
      prefs TEXT NOT NULL DEFAULT '{"cta":true,"raids":true,"notices":true,"requests":true}',
      created_at TEXT NOT NULL DEFAULT (datetime('now'))
    );`,
+
+  // Official Blizzard game data: realm, realm status, item details, official roster.
+  `ALTER TABLE guilds ADD COLUMN realm TEXT;
+   ALTER TABLE guilds ADD COLUMN game_guild TEXT;
+   ALTER TABLE guilds ADD COLUMN realm_status TEXT;
+   ALTER TABLE guilds ADD COLUMN official_roster_at TEXT;
+   ALTER TABLE guilds ADD COLUMN official_roster_note TEXT;
+   ALTER TABLE characters ADD COLUMN in_official_roster INTEGER;
+   CREATE TABLE item_info (
+     item_id INTEGER PRIMARY KEY,
+     name TEXT, quality TEXT, ilvl INTEGER, req_level INTEGER,
+     item_class TEXT, item_subclass TEXT, slot TEXT,
+     namespace TEXT, found INTEGER NOT NULL DEFAULT 1,
+     fetched_at TEXT NOT NULL DEFAULT (datetime('now'))
+   );`,
 ];
 
 function migrate(db) {

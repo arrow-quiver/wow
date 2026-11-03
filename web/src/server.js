@@ -11,6 +11,7 @@ const backup = require('./backup');
 const wowhead = require('./views/wowhead');
 const { createPush } = require('./push');
 const blizzard = require('./blizzard');
+const gamedata = require('./gamedata');
 const { calendarToken } = require('./calendar');
 const fs = require('fs');
 
@@ -267,6 +268,7 @@ function createApp(cfg, db) {
         isOfficer: ['owner', 'officer'].includes(req.guild.role),
         mySync: (db.prepare('SELECT MAX(received_at) t FROM sync_log WHERE guild_id = ? AND user_id = ?').get(gid, req.user.id) || {}).t,
         onboarding: onboardingFor(req),
+        realm: (() => { try { return req.guild.realm_status ? JSON.parse(req.guild.realm_status) : null; } catch { return null; } })(),
       }),
     });
   });
@@ -439,6 +441,11 @@ function createApp(cfg, db) {
         if (!t) { t = calendarToken(); db.prepare('UPDATE users SET calendar_token = ? WHERE id = ?').run(t, req.user.id); }
         return `${cfg.baseUrl}/calendar/${t}.ics`;
       })(),
+      gameData: {
+        ns: gamedata.namespaces(blizzard.load(db), req.guild.wowhead_game, cfg.bnetRegion),
+        items: db.prepare('SELECT COUNT(*) n FROM item_info WHERE found = 1').get().n,
+        realmStatus: (() => { try { return req.guild.realm_status ? JSON.parse(req.guild.realm_status) : null; } catch { return null; } })(),
+      },
       pushDevices: db.prepare('SELECT COUNT(*) n FROM push_subs WHERE user_id = ?').get(req.user.id).n,
       pushPrefs: (() => { const r = db.prepare('SELECT prefs FROM push_subs WHERE user_id = ? LIMIT 1').get(req.user.id); try { return r ? JSON.parse(r.prefs) : null; } catch { return null; } })(),
       discordInfo: {
@@ -558,6 +565,32 @@ function createApp(cfg, db) {
   app.locals.remind = raids.remind;
   phase3.routes(app, { db, cfg, discord, activity: q.activity, needGuild, needOfficer, back, audit, notify });
   require('./routes/freebies')(app, { db, cfg, push, needGuild, needOfficer, back, audit });
+
+  // Official Blizzard game data (gamedata.js). cfg.gameFetch lets tests stand in for Blizzard.
+  const gameRun = (opts = {}) => gamedata.run(db, cfg, { fetchImpl: cfg.gameFetch, notify, ...opts });
+  app.post('/settings/realm', needOfficer, (req, res) => {
+    const realm = String(req.body.realm || '').trim().slice(0, 60) || null;
+    const gameGuild = String(req.body.game_guild || '').trim().slice(0, 60) || null;
+    db.prepare('UPDATE guilds SET realm = ?, game_guild = ?, realm_status = NULL, official_roster_at = NULL WHERE id = ?').run(realm, gameGuild, req.guild.id);
+    audit(req, 'realm set', `${realm || '-'} / ${gameGuild || '-'}`);
+    back(res, '/settings', 'Saved. Use "Refresh now" to fetch realm status and the official roster.');
+  });
+  app.post('/settings/gamedata/refresh', needOfficer, async (req, res) => {
+    try {
+      const realm = await gameRun({ only: 'realm' }); const roster = await gameRun({ only: 'roster' });
+      back(res, '/settings', [...realm, ...roster].join('. ') || 'Refreshed.');
+    } catch (e) { back(res, '/settings', `Refresh failed: ${e.message}`); }
+  });
+  if (cfg.timers) {
+    let busy = false;
+    const loop = (only) => async () => {
+      if (busy) return; busy = true;
+      try { for (const l of await gameRun({ only })) console.log('Game data:', l); } catch (e) { console.warn('Game data failed:', e.message); } finally { busy = false; }
+    };
+    setTimeout(loop(), 60 * 1000);
+    setInterval(loop(), 3600 * 1000).unref();
+    setInterval(loop('realm'), 5 * 60 * 1000).unref();
+  }
   if (cfg.timers) setInterval(() => raids.remind().catch((e) => console.warn('Reminder failed:', e.message)), 60 * 1000).unref();
 
   // ---- companion API ----

@@ -22,6 +22,7 @@ function ns.collectCharacter()
   rec.zone = GetRealZoneText and GetRealZoneText() or GetZoneText()
   rec.money = GetMoney and GetMoney() or nil
   rec.guild = GetGuildInfo and GetGuildInfo("player") or nil
+  rec.realm = GetRealmName and GetRealmName() or nil
   rec.updated = ns.now()
   ns.collectProfessions(rec)
   ns.collectReadiness(rec)

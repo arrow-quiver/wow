@@ -125,6 +125,7 @@ Windows may show a SmartScreen warning the first time, because the exe isn't cod
 - **Discord Events.** If the Discord app is invited as a bot with Manage Events (the invite link in Settings asks for it), new raids also appear in the server's Events list and are removed when cancelled.
 - **Blizzard Game Data API.** Uses the same Battle.net app as sign-in (`BNET_REGION`, default `eu`). The server checks daily whether a WoW: Forever namespace exists yet and reads the Retail WoW Token price; officers see the result in Officer tools.
 - **Wowhead tooltips** on every item and spell (see Addon polish).
+- **Official game data** (`src/gamedata.js`). Item names and details for every item the guild has seen, from Blizzard's API (Classic Era item data until WoW: Forever is in the API, then Forever's own). Once Forever is there: realm status on the camp page every 5 minutes, with a "realm is back up" notification after downtime, and Blizzard's official guild list merged into the roster twice a day. The addon (0.7.2+) reports the realm and in-game guild name; officers can correct them in Settings → "Realm and official Blizzard data".
 
 ## Addon polish (0.7.0)
 
