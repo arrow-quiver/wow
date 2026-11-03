@@ -1,0 +1,9 @@
+node_modules/
+web/data/
+*.db
+*.db-*
+.env
+companion/config.json
+companion/dist/
+companion/*.exe
+companion/*.zip

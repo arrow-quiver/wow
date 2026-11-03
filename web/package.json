@@ -1,0 +1,24 @@
+{
+  "name": "wow-guild-site",
+  "version": "0.1.0",
+  "description": "wow guild website",
+  "main": "src/server.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "DEV_LOGIN=1 node src/server.js",
+    "test": "node --test test/e2e.test.js",
+    "demo": "node scripts/demo.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.10.0",
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "fengari": "^0.1.4",
+    "luaparse": "^0.3.1"
+  },
+  "private": true
+}
