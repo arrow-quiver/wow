@@ -20,12 +20,15 @@ function ago(iso) {
 
 const NAV = [
   ['/', 'Camp', 'home'],
-  ['/raids', 'Raids', 'raids'],
+  ['/raids', 'Raids &amp; events', 'raids'],
   ['/loot', 'Loot', 'loot'],
   ['/roster', 'Roster', 'roster'],
   ['/crafters', 'Crafters', 'crafters'],
   ['/requests', 'Crafting requests', 'requests'],
   ['/buddies', 'Leveling partners', 'buddies'],
+  ['/bank', 'Bank', 'bank'],
+  ['/prices', 'Prices', 'prices'],
+  ['/drives', 'Supply drives', 'drives'],
   ['/settings', 'Settings', 'settings'],
 ];
 

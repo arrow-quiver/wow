@@ -207,6 +207,92 @@ const MIGRATIONS = [
      created_at TEXT NOT NULL DEFAULT (datetime('now')),
      PRIMARY KEY (raid_id, item_id, user_id)
    );`,
+
+  // Phase 3: Discord bot, price index, inventory & guild bank, supply drives, event kinds
+  `ALTER TABLE guilds ADD COLUMN discord_server_id TEXT;
+   ALTER TABLE guilds ADD COLUMN bank_money INTEGER;
+   ALTER TABLE guilds ADD COLUMN bank_scanned_at TEXT;
+   ALTER TABLE users ADD COLUMN discord_id TEXT;
+   CREATE UNIQUE INDEX users_discord ON users(discord_id) WHERE discord_id IS NOT NULL;
+   ALTER TABLE raids ADD COLUMN kind TEXT NOT NULL DEFAULT 'raid';
+   ALTER TABLE characters ADD COLUMN is_bank INTEGER NOT NULL DEFAULT 0;
+   CREATE TABLE link_codes (
+     code TEXT PRIMARY KEY,
+     user_id INTEGER NOT NULL REFERENCES users(id),
+     guild_id INTEGER NOT NULL REFERENCES guilds(id),
+     expires_at TEXT NOT NULL
+   );
+   CREATE TABLE item_names (
+     item_id INTEGER PRIMARY KEY,
+     name TEXT NOT NULL,
+     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+   );
+   CREATE INDEX item_names_name ON item_names(name);
+   CREATE TABLE prices (
+     guild_id INTEGER NOT NULL REFERENCES guilds(id),
+     item_id INTEGER NOT NULL,
+     day TEXT NOT NULL,                     -- YYYY-MM-DD of the scan
+     price INTEGER NOT NULL,                -- copper
+     PRIMARY KEY (guild_id, item_id, day)
+   );
+   CREATE TABLE inventory (
+     character_id INTEGER NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
+     location TEXT NOT NULL CHECK (location IN ('bags','bank')),
+     item_id INTEGER NOT NULL,
+     count INTEGER NOT NULL,
+     PRIMARY KEY (character_id, location, item_id)
+   );
+   CREATE TABLE guild_bank (
+     guild_id INTEGER NOT NULL REFERENCES guilds(id),
+     tab TEXT NOT NULL,
+     item_id INTEGER NOT NULL,
+     count INTEGER NOT NULL,
+     PRIMARY KEY (guild_id, tab, item_id)
+   );
+   CREATE TABLE bank_log (
+     id INTEGER PRIMARY KEY,
+     guild_id INTEGER NOT NULL REFERENCES guilds(id),
+     kind TEXT NOT NULL,
+     who TEXT,
+     item_id INTEGER,
+     count INTEGER,
+     amount INTEGER,
+     at TEXT NOT NULL,
+     dedupe TEXT NOT NULL,
+     UNIQUE (guild_id, dedupe)
+   );
+   CREATE TABLE bank_requests (
+     id INTEGER PRIMARY KEY,
+     guild_id INTEGER NOT NULL REFERENCES guilds(id),
+     requester_id INTEGER NOT NULL REFERENCES users(id),
+     item TEXT NOT NULL,
+     count INTEGER NOT NULL DEFAULT 1,
+     note TEXT,
+     status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','sent','declined','cancelled')),
+     handled_by INTEGER REFERENCES users(id),
+     created_at TEXT NOT NULL DEFAULT (datetime('now')),
+     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+   );
+   CREATE TABLE drives (
+     id INTEGER PRIMARY KEY,
+     guild_id INTEGER NOT NULL REFERENCES guilds(id),
+     title TEXT NOT NULL,
+     unit TEXT NOT NULL,
+     goal INTEGER NOT NULL,
+     notes TEXT,
+     status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','done','closed')),
+     created_by INTEGER REFERENCES users(id),
+     created_at TEXT NOT NULL DEFAULT (datetime('now'))
+   );
+   CREATE TABLE drive_contribs (
+     id INTEGER PRIMARY KEY,
+     drive_id INTEGER NOT NULL REFERENCES drives(id) ON DELETE CASCADE,
+     user_id INTEGER NOT NULL REFERENCES users(id),
+     character TEXT,
+     amount INTEGER NOT NULL,
+     note TEXT,
+     created_at TEXT NOT NULL DEFAULT (datetime('now'))
+   );`,
 ];
 
 function migrate(db) {

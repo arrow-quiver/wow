@@ -77,12 +77,55 @@ async function api(cfg, method, route, body) {
   return text;
 }
 
+// Auctionator keeps its scan results in its own SavedVariables file next to ours.
+// We send the minimum price per item for days scanned in the last two weeks.
+const auctionatorSent = new Map(); // file → mtime already uploaded
+function auctionatorPrices(svFile) {
+  const file = path.join(path.dirname(svFile), 'Auctionator.lua');
+  if (!fs.existsSync(file)) return null;
+  const m = fs.statSync(file).mtimeMs;
+  if (auctionatorSent.get(file) === m) return null;
+  try {
+    const db = parseSavedVariables(fs.readFileSync(file)).AUCTIONATOR_PRICE_DATABASE;
+    if (!db || typeof db !== 'object') return null;
+    return { file, mtime: m, prices: extractPrices(db) };
+  } catch (e) {
+    log(`Couldn't read Auctionator prices (${e.message}). Everything else still uploads.`);
+    auctionatorSent.set(file, m);
+    return null;
+  }
+}
+
+function extractPrices(db, now = Date.now()) {
+  const today = Math.floor((now - Date.UTC(2020, 0, 1)) / 86400000);
+  const best = new Map(); // itemId → [price, day]
+  for (const [realm, items] of Object.entries(db)) {
+    if (realm.startsWith('__') || !items || typeof items !== 'object') continue;
+    for (const [key, rec] of Object.entries(items)) {
+      const m = /^(?:g:)?(\d+)/.exec(key);
+      if (!m || !rec || typeof rec !== 'object') continue;
+      const days = rec.h && typeof rec.h === 'object' ? Object.keys(rec.h).map(Number).filter(Number.isFinite) : [];
+      const day = days.length ? Math.max(...days) : null;
+      const price = Number(rec.m) || (day != null ? Number(rec.h[String(day)]) : 0);
+      if (!price || day == null || today - day > 14) continue;
+      const id = Number(m[1]);
+      const prev = best.get(id);
+      if (!prev || day > prev[1] || (day === prev[1] && price < prev[0])) best.set(id, [price, day]);
+    }
+  }
+  return { items: [...best].map(([id, [price, day]]) => [id, price, day]) };
+}
+
 async function upload(cfg, file) {
   const parsed = parseSavedVariables(fs.readFileSync(file));
   const db = parsed.WowGuildDB;
   if (!db) { log(`No data in ${file} yet. Log in and out once.`); return; }
+  const auc = auctionatorPrices(file);
+  if (auc) db.prices = auc.prices;
   const result = JSON.parse(await api(cfg, 'POST', '/api/sync', db));
-  log(`Uploaded: ${result.characters} character(s), ${result.roster} roster entries, ${result.recipes} recipes${result.ctas ? `, ${result.ctas} call(s) to arms` : ''}.`);
+  if (auc) auctionatorSent.set(auc.file, auc.mtime);
+  const extra = [result.ctas ? `${result.ctas} call(s) to arms` : '', result.prices ? `${result.prices} auction prices` : '', result.bank ? `${result.bank} guild bank items` : ''].filter(Boolean);
+  log(`Uploaded: ${result.characters} character(s), ${result.roster} roster entries, ${result.recipes} recipes${extra.length ? `, ${extra.join(', ')}` : ''}.`);
 }
 
 async function writeInbox(cfg, gameDir) {
@@ -136,4 +179,4 @@ if (require.main === module) {
   main().catch((e) => { console.error(e.message); if (process.platform === 'win32' && !process.argv.includes('--once')) setTimeout(() => {}, 60000); process.exitCode = 1; });
 }
 
-module.exports = { findGameFolders, savedVariablesFiles };
+module.exports = { findGameFolders, savedVariablesFiles, extractPrices };

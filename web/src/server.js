@@ -19,6 +19,10 @@ function config(env = process.env) {
     // Used only when a browser doesn't send its own offset. -120 = South Africa (UTC+2).
     defaultTzOffset: Number(env.DEFAULT_TZ_OFFSET ?? -120),
     timers: env.NODE_ENV !== 'test',
+    // Discord app (slash commands). From discord.com/developers/applications.
+    discordAppId: env.DISCORD_APP_ID || '',
+    discordPublicKey: env.DISCORD_PUBLIC_KEY || '',
+    discordBotToken: env.DISCORD_BOT_TOKEN || '',
   };
 }
 
@@ -37,7 +41,10 @@ function createApp(cfg, db) {
     next();
   });
   app.use(express.static(path.join(__dirname, '..', 'public'), { maxAge: '1h' }));
-  app.use('/api', express.json({ limit: '5mb' }));
+  const phase3 = require('./routes/phase3');
+  // Discord calls this with its own signature; it must skip the session and CSRF checks below.
+  phase3.mountDiscord(app, { db, cfg, discord: (...a) => discord(...a) });
+  app.use('/api', express.json({ limit: '15mb' }));
   app.use(express.urlencoded({ extended: false, limit: '50kb' }));
 
   // ---- helpers ----
@@ -298,6 +305,10 @@ function createApp(cfg, db) {
       csrf: req.csrf, tokens: tokensFor(req), newToken, guild: req.guild, baseUrl: cfg.baseUrl,
       isOfficer: ['owner', 'officer'].includes(req.guild.role),
       members: db.prepare('SELECT u.id, u.battletag, m.role FROM memberships m JOIN users u ON u.id = m.user_id WHERE m.guild_id = ? ORDER BY m.role, u.battletag').all(req.guild.id),
+      discordInfo: {
+        configured: Boolean(cfg.discordPublicKey && cfg.discordAppId), appId: cfg.discordAppId,
+        linked: Boolean(req.user.discord_id), serverLinked: Boolean(req.guild.discord_server_id),
+      },
     }),
   });
   app.get('/settings', needGuild, (req, res) => settingsPage(req, res, null));
@@ -324,6 +335,7 @@ function createApp(cfg, db) {
   // ---- raids & loot (Phase 2) ----
   const raids = require('./routes/raids')(app, { db, cfg, discord, activity: q.activity, needGuild, needOfficer, back });
   app.locals.remind = raids.remind;
+  phase3.routes(app, { db, cfg, discord, activity: q.activity, needGuild, needOfficer, back });
   if (cfg.timers) setInterval(() => raids.remind().catch((e) => console.warn('Reminder failed:', e.message)), 60 * 1000).unref();
 
   // ---- companion API ----
@@ -342,7 +354,8 @@ function createApp(cfg, db) {
       for (const c of stats.ctas) {
         await discord({ discord_webhook: req.tok.discord_webhook }, `⚔️ **Call to arms: ${c.zone}**${c.needed ? ` (need ${c.needed})` : ''}\n${c.message || ''}\n— ${c.character || 'someone'} (from in game)`);
       }
-      res.json({ ok: true, characters: stats.characters, roster: stats.roster, recipes: stats.recipes, ctas: stats.ctas.length });
+      res.json({ ok: true, characters: stats.characters, roster: stats.roster, recipes: stats.recipes, ctas: stats.ctas.length,
+        inventory: stats.inventory, bank: stats.bank, prices: stats.prices });
     } catch (e) {
       res.status(400).json({ error: e.message });
     }

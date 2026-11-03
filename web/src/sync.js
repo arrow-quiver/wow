@@ -1,3 +1,5 @@
+const { applyEconomy } = require('./economy');
+
 // Applies a companion upload (the addon's SavedVariables, converted to JSON)
 // and builds the "inbox" the companion writes back into the addon.
 
@@ -88,6 +90,11 @@ function applyPayload(db, guildId, userId, payload) {
         }
       }
     }
+
+    // 1b. Inventory, guild bank and auction prices (economy.js)
+    const owned = db.prepare('SELECT id FROM characters WHERE guild_id = ? AND name = ? AND user_id = ?');
+    const eco = applyEconomy(db, guildId, userId, payload, (name) => { const r = owned.get(guildId, String(name).slice(0, 40), userId); return r && r.id; });
+    Object.assign(stats, eco);
 
     // 2. Guild roster snapshot (one member's scan updates everyone's online status)
     const roster = payload.roster;

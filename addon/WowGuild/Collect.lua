@@ -27,6 +27,129 @@ function ns.collectCharacter()
   ns.collectReadiness(rec)
 end
 
+-- ---------- bags, bank and guild bank ----------
+-- Item name comes from the item link, so it's always in the player's own language.
+local function nameFromLink(link)
+  return link and string.match(link, "%[(.-)%]")
+end
+
+function ns.bagIDs()
+  local ids = {}
+  local last = NUM_TOTAL_EQUIPPED_BAG_SLOTS or NUM_BAG_SLOTS or 4
+  for bag = 0, last do ids[#ids + 1] = bag end
+  return ids
+end
+
+function ns.bankIDs()
+  local ids, seen = {}, {}
+  local function add(id) if id and not seen[id] then seen[id] = true; ids[#ids + 1] = id end end
+  add(BANK_CONTAINER or -1)
+  local first = (NUM_TOTAL_EQUIPPED_BAG_SLOTS or NUM_BAG_SLOTS or 4) + 1
+  for bag = first, first + (NUM_BANKBAGSLOTS or 7) - 1 do add(bag) end
+  if Enum and Enum.BagIndex then
+    for key, id in pairs(Enum.BagIndex) do
+      if type(key) == "string" and string.find(key, "^CharacterBankTab") then add(id) end
+    end
+  end
+  return ids
+end
+
+-- Returns a list of { id, name, count } with stacks added together.
+function ns.scanContainers(bagIDs)
+  local numSlots = (C_Container and C_Container.GetContainerNumSlots) or GetContainerNumSlots
+  local slotInfo = C_Container and C_Container.GetContainerItemInfo
+  local byId, out = {}, {}
+  if not numSlots or not slotInfo then return out end
+  for _, bag in ipairs(bagIDs) do
+    for slot = 1, (ns.try(numSlots, bag) or 0) do
+      local info = ns.try(slotInfo, bag, slot)
+      if info and info.itemID then
+        local e = byId[info.itemID]
+        if not e then
+          e = { id = info.itemID, name = nameFromLink(info.hyperlink), count = 0 }
+          byId[info.itemID] = e
+          out[#out + 1] = e
+        end
+        e.count = e.count + (info.stackCount or 1)
+      end
+    end
+  end
+  return out
+end
+
+function ns.collectBank()
+  if not safeCombat() then return end
+  local rec = charRecord()
+  rec.inventory = rec.inventory or {}
+  rec.inventory.bank = ns.scanContainers(ns.bankIDs())
+  rec.inventory.bankAt = ns.now()
+end
+
+-- Guild bank: readable only while it's open. The game's log says "x hours ago",
+-- so we turn that into an approximate time.
+local guildBankOpen = false
+function ns.collectGuildBank()
+  if not safeCombat() or not guildBankOpen or not GetNumGuildBankTabs then return end
+  local tabs = {}
+  local slotsPerTab = MAX_GUILDBANK_SLOTS_PER_TAB or 98
+  for tab = 1, (ns.try(GetNumGuildBankTabs) or 0) do
+    local name, _, isViewable = ns.try(GetGuildBankTabInfo, tab)
+    if isViewable ~= false then
+      local byId, items = {}, {}
+      for slot = 1, slotsPerTab do
+        local link = ns.try(GetGuildBankItemLink, tab, slot)
+        if link then
+          local _, count = ns.try(GetGuildBankItemInfo, tab, slot)
+          local id = tonumber(string.match(link, "item:(%d+)"))
+          if id then
+            local e = byId[id]
+            if not e then e = { id = id, name = nameFromLink(link), count = 0 }; byId[id] = e; items[#items + 1] = e end
+            e.count = e.count + (count or 1)
+          end
+        end
+      end
+      tabs[#tabs + 1] = { name = name or ("Tab " .. tab), items = items }
+    end
+  end
+  local now = ns.now()
+  local function ago(y, mo, d, h) return now - ((((y or 0) * 365 + (mo or 0) * 30 + (d or 0)) * 24 + (h or 0)) * 3600) end
+  local log = {}
+  if GetNumGuildBankTransactions and GetGuildBankTransaction then
+    for tab = 1, #tabs do
+      for i = 1, (ns.try(GetNumGuildBankTransactions, tab) or 0) do
+        local kind, who, link, count, _, _, y, mo, d, h = ns.try(GetGuildBankTransaction, tab, i)
+        if kind then
+          log[#log + 1] = { kind = kind, who = who, id = link and tonumber(string.match(link, "item:(%d+)")),
+            name = nameFromLink(link), count = count, at = ago(y, mo, d, h) }
+        end
+      end
+    end
+  end
+  if GetNumGuildBankMoneyTransactions and GetGuildBankMoneyTransaction then
+    for i = 1, (ns.try(GetNumGuildBankMoneyTransactions) or 0) do
+      local kind, who, amount, y, mo, d, h = ns.try(GetGuildBankMoneyTransaction, i)
+      if kind then log[#log + 1] = { kind = kind, who = who, amount = amount, at = ago(y, mo, d, h) } end
+    end
+  end
+  ns.db.guildBank = { scannedAt = now, guild = GetGuildInfo("player"), money = ns.try(GetGuildBankMoney), tabs = tabs, log = log }
+end
+
+local function queryGuildBank()
+  if not GetNumGuildBankTabs then return end
+  for tab = 1, (ns.try(GetNumGuildBankTabs) or 0) do
+    ns.try(QueryGuildBankTab, tab)
+    ns.try(QueryGuildBankLog, tab)
+  end
+  ns.try(QueryGuildBankLog, (MAX_GUILDBANK_TABS or 8) + 1)
+end
+
+local gbPending = false
+local function scheduleGuildBank()
+  if gbPending then return end
+  gbPending = true
+  C_Timer.After(1, function() gbPending = false; ns.collectGuildBank() end)
+end
+
 -- ---------- raid readiness (out of combat) ----------
 -- Item level, repair state and consumables in bags, shown next to raid sign-ups.
 local CONSUMABLE_KIND = { [1] = "potion", [2] = "elixir", [3] = "flask", [5] = "food", [7] = "bandage" }
@@ -47,23 +170,17 @@ function ns.collectReadiness(rec)
     end
     if max > 0 then r.durability = math.floor(cur / max * 100 + 0.5) end
   end
-  local numSlots = (C_Container and C_Container.GetContainerNumSlots) or GetContainerNumSlots
-  local slotInfo = C_Container and C_Container.GetContainerItemInfo
   local instant = (C_Item and C_Item.GetItemInfoInstant) or GetItemInfoInstant
-  if numSlots and slotInfo and instant then
-    for bag = 0, (NUM_BAG_SLOTS or 4) do
-      for slot = 1, (ns.try(numSlots, bag) or 0) do
-        local info = ns.try(slotInfo, bag, slot)
-        if info and info.itemID then
-          local _, _, _, _, _, classID, subclassID = ns.try(instant, info.itemID)
-          if classID == 0 then
-            local kind = CONSUMABLE_KIND[subclassID] or "other"
-            r.consumables[kind] = (r.consumables[kind] or 0) + (info.stackCount or 1)
-          end
-        end
-      end
+  local bags = ns.scanContainers(ns.bagIDs())
+  for _, it in ipairs(bags) do
+    local _, _, _, _, _, classID, subclassID = ns.try(instant, it.id)
+    if classID == 0 then
+      local kind = CONSUMABLE_KIND[subclassID] or "other"
+      r.consumables[kind] = (r.consumables[kind] or 0) + it.count
     end
   end
+  rec.inventory = rec.inventory or {}
+  rec.inventory.bags = bags
   rec.readiness = r
 end
 
@@ -212,3 +329,22 @@ ns.on("NEW_RECIPE_LEARNED", function() C_Timer.After(0.5, ns.collectRecipes) end
 ns.on("CRAFT_SHOW", function() C_Timer.After(0.5, ns.collectCrafts) end)
 ns.on("CRAFT_UPDATE", function() C_Timer.After(0.5, ns.collectCrafts) end)
 ns.on("PLAYER_REGEN_ENABLED", function() ns.collectCharacter() end)
+ns.on("BANKFRAME_OPENED", function() C_Timer.After(0.5, ns.collectBank) end)
+ns.on("PLAYERBANKSLOTS_CHANGED", function() C_Timer.After(0.5, ns.collectBank) end)
+ns.on("BANKFRAME_CLOSED", function() ns.collectBank() end)
+ns.on("GUILDBANKFRAME_OPENED", function() guildBankOpen = true; queryGuildBank(); scheduleGuildBank() end)
+ns.on("GUILDBANKBAGSLOTS_CHANGED", scheduleGuildBank)
+ns.on("GUILDBANKLOG_UPDATE", scheduleGuildBank)
+ns.on("GUILDBANK_UPDATE_MONEY", scheduleGuildBank)
+ns.on("GUILDBANKFRAME_CLOSED", function() ns.collectGuildBank(); guildBankOpen = false end)
+-- Newer clients report bank and guild bank windows through one event pair.
+ns.on("PLAYER_INTERACTION_MANAGER_FRAME_SHOW", function(kind)
+  local T = Enum and Enum.PlayerInteractionType
+  if not T then return end
+  if kind == T.Banker then C_Timer.After(0.5, ns.collectBank)
+  elseif kind == T.GuildBanker then guildBankOpen = true; queryGuildBank(); scheduleGuildBank() end
+end)
+ns.on("PLAYER_INTERACTION_MANAGER_FRAME_HIDE", function(kind)
+  local T = Enum and Enum.PlayerInteractionType
+  if T and kind == T.GuildBanker then ns.collectGuildBank(); guildBankOpen = false end
+end)

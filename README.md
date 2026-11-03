@@ -33,6 +33,21 @@ companion/   the desktop app that carries data between the game and the site
 - **Readiness:** the addon records item level, repair % and consumables at each reload. Sign-ups show it, and flag low repair or no consumables.
 - **In game:** `/wow` shows upcoming raids, whether you're signed up, and your reserves. Login reminds you if you haven't signed up for the next raid.
 
+## What's in Phase 3
+
+- **Discord slash commands:** `/online`, `/raids`, `/craft`, `/price`, `/cta`, `/signup` and `/link`. Discord calls the site directly (`/discord/interactions`, signature-checked), so no bot process runs. Members link their Discord once from Settings.
+- **Bank:** guild bank contents, gold and log (read when anyone opens the guild bank), plus "bank characters" for guilds without one. Includes request → sent/declined, and a search across your own alts' bags and banks.
+- **Prices:** a guild price index built from members' Auctionator scans (the companion reads `Auctionator.lua`). Shows a 2-week trend and values the bank stock.
+- **Supply drives:** a goal and a unit (crates, mats, gold), members log contributions, with a progress bar and leaderboard. Discord posts when a drive starts and when it hits its goal.
+- **Event types:** schedule PvP premades and guild events alongside raids (no reserves for those).
+
+### Discord setup (once)
+1. discord.com/developers/applications → **New Application**.
+2. **General Information**: copy the *Application ID* and *Public Key*. Set *Interactions Endpoint URL* to `<BASE_URL>/discord/interactions`.
+3. **Bot** → *Reset Token* → copy it (only needed to register the commands).
+4. Set `DISCORD_APP_ID`, `DISCORD_PUBLIC_KEY` and `DISCORD_BOT_TOKEN` on the server and redeploy.
+5. Site → Settings → *invite the app* to your server → **Register slash commands** → **Link Discord**, then run `/link CODE` in the server.
+
 ## Deploy on Coolify
 
 1. Push this folder to a GitHub repo.

@@ -43,10 +43,12 @@ module.exports = function raidRoutes(app, { db, cfg, discord, activity, needGuil
     if (!title || !instance || !startsAt) return back(res, '/raids', 'Fill in the name, instance and start time.');
     const size = Math.min(40, Math.max(0, Number(req.body.size) || 0)) || null;
     const srLimit = Math.min(5, Math.max(0, Number.isFinite(Number(req.body.sr_limit)) && req.body.sr_limit !== '' ? Number(req.body.sr_limit) : 2));
-    const r = db.prepare('INSERT INTO raids (guild_id, title, instance, starts_at, size, sr_limit, notes, created_by) VALUES (?,?,?,?,?,?,?,?)')
-      .run(req.guild.id, title, instance, startsAt, size, srLimit, String(req.body.notes || '').slice(0, 300), req.user.id);
+    const kind = ['raid', 'pvp', 'event'].includes(req.body.kind) ? req.body.kind : 'raid';
+    const r = db.prepare('INSERT INTO raids (guild_id, title, instance, starts_at, size, sr_limit, notes, created_by, kind) VALUES (?,?,?,?,?,?,?,?,?)')
+      .run(req.guild.id, title, instance, startsAt, size, kind === 'raid' ? srLimit : 0, String(req.body.notes || '').slice(0, 300), req.user.id, kind);
     activity.run(req.guild.id, 'raid', `${who(req)} scheduled ${title}`);
-    await discord(req.guild, `🗓️ **Raid: ${title}** (${instance})\n<t:${unix(startsAt)}:F>, <t:${unix(startsAt)}:R>\nSign up and reserve: ${cfg.baseUrl}/raids/${r.lastInsertRowid}`);
+    const icon = { raid: '🗓️', pvp: '⚔️', event: '🎉' }[kind];
+    await discord(req.guild, `${icon} **${kind === 'pvp' ? 'PvP' : kind === 'event' ? 'Event' : 'Raid'}: ${title}** (${instance})\n<t:${unix(startsAt)}:F>, <t:${unix(startsAt)}:R>\nSign up${kind === 'raid' ? ' and reserve' : ''}: ${cfg.baseUrl}/raids/${r.lastInsertRowid}`);
     res.redirect(`/raids/${r.lastInsertRowid}`);
   });
 

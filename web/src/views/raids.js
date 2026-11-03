@@ -3,6 +3,7 @@ const { esc, classInfo, ago, when } = require('./layout');
 const csrfField = (csrf) => `<input type="hidden" name="_csrf" value="${esc(csrf)}">`;
 const ROLE_LABEL = { tank: 'Tanks', healer: 'Healers', dps: 'Damage' };
 const STATUS_LABEL = { yes: 'Coming', tentative: 'Maybe', bench: 'Bench', no: 'Can’t make it' };
+const KIND_LABEL = { raid: 'Raid', pvp: 'PvP', event: 'Event' };
 const RAID_STATUS = { open: 'Reserves open', locked: 'Reserves locked', done: 'Finished', cancelled: 'Cancelled' };
 
 function cname(name, cls) {
@@ -32,7 +33,7 @@ function roleCounts(signups) {
 function raidsList({ csrf, upcoming, past, isOfficer, instances, mine }) {
   const row = (r) => `<li class="raid-row">
       <div class="raid-when">${when(r.starts_at)}</div>
-      <div class="raid-main"><a href="/raids/${r.id}" class="raid-title">${esc(r.title)}</a>
+      <div class="raid-main"><a href="/raids/${r.id}" class="raid-title">${esc(r.title)}</a>${r.kind && r.kind !== 'raid' ? ` <span class="pill kind-${esc(r.kind)}">${KIND_LABEL[r.kind]}</span>` : ''}
         <span class="muted">${esc(r.instance)}${r.size ? `, ${esc(r.size)} players` : ''}</span></div>
       <div class="raid-counts" aria-label="Signed up">${r.tanks}<small> tank${r.tanks === 1 ? '' : 's'}</small> ${r.healers}<small> heal</small> ${r.dps}<small> dps</small></div>
       <div>${mine[r.id] ? `<span class="pill">${esc(STATUS_LABEL[mine[r.id]])}</span>` : r.status === 'cancelled' ? '<span class="pill">Cancelled</span>' : '<span class="muted">Not signed up</span>'}</div>
@@ -40,8 +41,9 @@ function raidsList({ csrf, upcoming, past, isOfficer, instances, mine }) {
   return `<h1>Raids</h1>
   ${isOfficer ? `<details class="officer-box"${upcoming.length ? '' : ' open'}><summary>Schedule a raid</summary>
     <form method="post" action="/raids" class="grid-form">${csrfField(csrf)}<input type="hidden" name="tz_offset" value="">
+      <label>Type<select name="kind"><option value="raid">Raid (with reserves)</option><option value="pvp">PvP premade</option><option value="event">Guild event</option></select></label>
       <label>Name<input name="title" required maxlength="60" placeholder="Hyjal Summit, week 1"></label>
-      <label>Instance<input name="instance" required maxlength="60" list="instances" placeholder="Hyjal Summit"></label>
+      <label>Instance or place<input name="instance" required maxlength="60" list="instances" placeholder="Hyjal Summit"></label>
       <datalist id="instances">${instances.map((i) => `<option value="${esc(i)}">`).join('')}</datalist>
       <label>Starts<input name="starts" type="datetime-local" required></label>
       <label>Players<input name="size" type="number" min="5" max="40" placeholder="20"></label>
@@ -69,7 +71,7 @@ function raidPage({ raid, csrf, signups, mySignup, myChars, items, myReserves, b
 
   return `<p class="crumb"><a href="/raids">Raids</a></p>
   <h1>${esc(raid.title)}</h1>
-  <p class="lede">${when(raid.starts_at)} · ${esc(raid.instance)}${raid.size ? ` · ${esc(raid.size)} players` : ''} · <span class="pill">${RAID_STATUS[raid.status]}</span></p>
+  <p class="lede">${when(raid.starts_at)} · ${esc(raid.instance)}${raid.size ? ` · ${esc(raid.size)} players` : ''} · <span class="pill">${raid.kind && raid.kind !== 'raid' ? `${KIND_LABEL[raid.kind]} · ` : ''}${RAID_STATUS[raid.status]}</span></p>
   ${raid.notes ? `<p>${esc(raid.notes)}</p>` : ''}
 
   ${canSign ? `<section class="setting">
@@ -84,7 +86,7 @@ function raidPage({ raid, csrf, signups, mySignup, myChars, items, myReserves, b
     </form>
   </section>` : ''}
 
-  <section class="setting">
+  ${raid.kind && raid.kind !== 'raid' ? '' : `<section class="setting">
     <h2>Soft reserves</h2>
     ${!items.length ? `<p class="empty">No loot list for ${esc(raid.instance)} yet. ${isOfficer ? `<a href="/loot?instance=${encodeURIComponent(raid.instance)}">Add the items</a> so people can reserve.` : 'An officer needs to add it.'}</p>`
       : raid.sr_limit === 0 ? '<p class="muted">This raid has no reserves. Everything is open roll.</p>'
@@ -96,7 +98,7 @@ function raidPage({ raid, csrf, signups, mySignup, myChars, items, myReserves, b
       </fieldset>`).join('')}</div>
       ${raid.status === 'open' ? '<button class="btn btn-primary">Save reserves</button>' : '<p class="muted">Reserves are locked.</p>'}
     </form>`}
-  </section>
+  </section>`}
 
   <section class="setting">
     <h2>Who’s coming <span class="muted small">${counts.tank} tank${counts.tank === 1 ? '' : 's'}, ${counts.healer} healer${counts.healer === 1 ? '' : 's'}, ${counts.dps} damage</span></h2>

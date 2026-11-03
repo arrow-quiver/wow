@@ -46,4 +46,22 @@ R.setReserves(db, raid, grom, [ids['Frostbound Greaves'], ids['Tear of the Earth
 R.setReserves(db, raid, zul, [ids['Cloak of the Long Night']]);
 db.prepare('INSERT INTO loyalty (guild_id, user_id, item_id, bonus) VALUES (?,?,?,20),(?,?,?,10)').run(g, grom, ids['Tear of the Earthmother'], g, j, ids['Chillheart Band']);
 R.rollItem(db, raid, ids['Tear of the Earthmother']);
+// Phase 3 sample: bank, prices, drive.
+const { applyPayload: apply3 } = require('../src/sync');
+const today = Math.floor((Date.now() - Date.UTC(2020, 0, 1)) / 86400000);
+const priceRows = [];
+const base = { 14047: 95, 13444: 2400, 13457: 3100, 8932: 180, 12359: 1500, 7910: 21000 };
+for (const [id, p] of Object.entries(base)) for (let d = 13; d >= 0; d--) priceRows.push([Number(id), Math.round(p * (1 + Math.sin(d / 2 + Number(id)) * 0.15)), today - d]);
+apply3(db, g, grom, {
+  characters: { 'Grommash Hellscream': { name: 'Grommash Hellscream', inventory: { bags: [{ id: 14047, name: 'Runecloth', count: 40 }, { id: 8932, name: 'Alterac Swiss', count: 12 }] } } },
+  guildBank: { scannedAt: now - 1800, money: 18734512, tabs: [
+    { name: 'Mats', items: [{ id: 14047, name: 'Runecloth', count: 260 }, { id: 12359, name: 'Thorium Bar', count: 45 }, { id: 7910, name: 'Star Ruby', count: 3 }] },
+    { name: 'Raid', items: [{ id: 13444, name: 'Major Mana Potion', count: 24 }, { id: 13457, name: 'Greater Fire Protection Potion', count: 18 }] }],
+    log: [{ kind: 'deposit', who: 'Grommash', id: 14047, name: 'Runecloth', count: 60, at: now - 7200 }, { kind: 'withdraw', who: 'Thrallia', amount: 500000, at: now - 20000 }] },
+  prices: { items: priceRows },
+});
+db.prepare("INSERT INTO bank_requests (guild_id, requester_id, item, count, note) VALUES (?,?,?,?,?)").run(g, zul, 'Major Mana Potion', 5, 'For Hyjal on Thursday');
+const dr = db.prepare("INSERT INTO drives (guild_id, title, unit, goal, notes, created_by) VALUES (?,?,?,?,?,?)").run(g, 'Durotar Supply crates', 'crates', 200, 'Hand in at the Razor Hill camp, then log it here.', j).lastInsertRowid;
+db.prepare('INSERT INTO drive_contribs (drive_id, user_id, character, amount) VALUES (?,?,?,?),(?,?,?,?),(?,?,?,?)').run(dr, j, 'Thrallia', 48, dr, grom, 'Grommash Hellscream', 71, dr, zul, 'Zuljinne', 22);
+db.prepare("INSERT INTO raids (guild_id, title, instance, starts_at, kind, sr_limit) VALUES (?,?,?,?, 'pvp', 0)").run(g, 'Darkspear premade', 'Darkspear Islands', new Date(Date.now() + 86400000).toISOString());
 console.log('Demo data ready. Sign in (dev) as J#1001.');

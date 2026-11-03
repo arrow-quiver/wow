@@ -62,7 +62,9 @@ C_GuildInfo = { GuildRoster = function() end }
 function GetAverageItemLevel() return 61.4, 58.2 end
 function GetInventoryItemDurability(slot) if slot == 5 then return 30, 100 elseif slot == 7 then return 70, 100 end end
 NUM_BAG_SLOTS = 4
-local bags = { [0] = { {itemID = 118, stackCount = 5}, {itemID = 2581, stackCount = 10}, {itemID = 9999, stackCount = 1} } }
+local bags = { [0] = { {itemID = 118, stackCount = 5, hyperlink = "|cffffffff|Hitem:118::|h[Minor Healing Potion]|h|r"}, {itemID = 2581, stackCount = 10, hyperlink = "|Hitem:2581|h[Heavy Linen Bandage]|h"}, {itemID = 9999, stackCount = 1, hyperlink = "|Hitem:9999|h[Old Sword]|h"} },
+  [-1] = { {itemID = 14047, stackCount = 20, hyperlink = "|Hitem:14047|h[Runecloth]|h"}, {itemID = 14047, stackCount = 15, hyperlink = "|Hitem:14047|h[Runecloth]|h"} } }
+__bags = bags
 C_Container = {
   GetContainerNumSlots = function(bag) return bags[bag] and #bags[bag] or 0 end,
   GetContainerItemInfo = function(bag, slot) return bags[bag] and bags[bag][slot] end,

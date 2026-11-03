@@ -1,6 +1,6 @@
 {
   "name": "wow-companion",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "private": true,
   "description": "Uploads the WowGuild addon's saved data to the guild site",
   "main": "companion.js",

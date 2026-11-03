@@ -226,3 +226,23 @@ form.inline { display: inline; }
 /* Buttons that are links keep button colours in every theme. */
 body .main a.btn { color: var(--ink); text-decoration: none; }
 body .main a.btn-primary { color: #231505; }
+
+/* ---------- Phase 3: bank, prices, drives ---------- */
+th.num, td.num { text-align: right; }
+.coins { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.spark polyline { fill: none; stroke: var(--ember-deep); stroke-width: 2; stroke-linejoin: round; }
+.pill.kind-pvp { background: color-mix(in srgb, var(--alarm) 22%, transparent); }
+.pill.kind-event { background: color-mix(in srgb, var(--ok) 22%, transparent); }
+.drives { list-style: none; padding: 0; margin: .5rem 0 0; }
+.drive { padding: 1.2rem 0 1.4rem; border-bottom: 1px solid var(--line); }
+.drive-head { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; flex-wrap: wrap; }
+.drive-head h2 { margin: 0; }
+.bar.big { height: .9rem; margin: .7rem 0 1rem; max-width: 720px; }
+.leaders { padding-left: 1.4rem; max-width: 420px; margin: .8rem 0; }
+.leaders li { display: flex; justify-content: space-between; padding: .15rem 0; }
+details > summary { cursor: pointer; }
+.setting details { margin: .5rem 0; }
+/* Sidebar links keep their own colours in dark mode too. */
+body .side a.nav-link { color: #cfdcd5; }
+body .side a.nav-link:hover, body .side a.nav-link.is-active { color: #fff; }
+body .side a.brand { color: #fff; }

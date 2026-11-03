@@ -230,7 +230,7 @@ function buddies({ csrf, posts, myChars, userId }) {
 
 // ---------- Settings ----------
 
-function settings({ csrf, tokens, newToken, guild, baseUrl, isOfficer, members }) {
+function settings({ csrf, tokens, newToken, guild, baseUrl, isOfficer, members, discordInfo = {} }) {
   return `<h1>Settings</h1>
   <section class="setting">
     <h2>Connect the game</h2>
@@ -250,8 +250,23 @@ function settings({ csrf, tokens, newToken, guild, baseUrl, isOfficer, members }
     <p>Send this link to guildies. They sign in with Battle.net and they're in.</p>
     <code class="token">${esc(baseUrl)}/join/${esc(guild.invite_code)}</code>
   </section>
+  <section class="setting">
+    <h2>Discord commands</h2>
+    ${discordInfo.configured ? `<p>Use <code>/online</code>, <code>/raids</code>, <code>/craft</code>, <code>/price</code>, <code>/cta</code> and <code>/signup</code> straight from Discord.
+      ${discordInfo.linked ? 'Your Discord is linked.' : 'Link your Discord once so <code>/signup</code> and <code>/cta</code> know who you are.'}</p>
+      <div class="actions-row">
+        <form method="post" action="/settings/discord/link">${csrfField(csrf)}<button class="btn${discordInfo.linked ? '' : ' btn-primary'}">${discordInfo.linked ? 'Get a new link code' : 'Link Discord'}</button></form>
+        ${discordInfo.linked ? `<form method="post" action="/settings/discord/unlink">${csrfField(csrf)}<button class="btn btn-quiet">Unlink</button></form>` : ''}
+      </div>
+      ${isOfficer ? `<div class="officer-box">
+        <p>${discordInfo.serverLinked ? 'Your Discord server is connected.' : 'The server connects automatically the first time someone runs <code>/link</code> in it.'}
+        To add the commands to your server, <a href="https://discord.com/oauth2/authorize?client_id=${esc(discordInfo.appId)}&amp;scope=applications.commands" target="_blank" rel="noopener">invite the app</a>, then register them.</p>
+        <form method="post" action="/settings/discord/register">${csrfField(csrf)}<button class="btn">Register slash commands</button></form>
+      </div>` : ''}`
+    : '<p class="muted">Not set up yet. An officer needs to add the Discord app details to the server.</p>'}
+  </section>
   ${isOfficer ? `<section class="setting">
-    <h2>Discord</h2>
+    <h2>Discord channel posts</h2>
     <p>Paste a Discord webhook URL (Channel settings → Integrations → Webhooks). Calls to arms, notices and crafting requests get posted there.</p>
     <form method="post" action="/settings/webhook" class="inline-form">${csrfField(csrf)}
       <label class="sr" for="wh">Webhook URL</label>
