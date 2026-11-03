@@ -48,6 +48,14 @@ companion/   the desktop app that carries data between the game and the site
 4. Set `DISCORD_APP_ID`, `DISCORD_PUBLIC_KEY` and `DISCORD_BOT_TOKEN` on the server and redeploy.
 5. Site → Settings → *invite the app* to your server → **Register slash commands** → **Link Discord**, then run `/link CODE` in the server.
 
+## Profession helper (addon 0.4.0)
+
+Built into the guild addon. It only reads profession and bag data, out of combat.
+
+- **Skill-up guide:** opens beside the profession window. Lists the recipes that still give skill points, ranked by cost per expected point. Orange counts as 1 point, yellow ¾, green ¼, and grey is skipped. Recipes you can make from your bags come first. Prices come from Auctionator (live, if installed) or the guild price index. Click **+5 list** to add a recipe to your shopping list.
+- **Shopping list:** a small movable tracker shows each mat as `have / need`. It also notes how many are on your alts or in the guild bank (from the site). It ticks off as you loot and tells you when everything's ready. The list also appears on the site's Crafters page, with a total cost.
+- Commands: `/wow guide` (show/hide the guide), `/wow list` (show/hide the tracker), `/wow list clear`.
+
 ## Deploy on Coolify
 
 1. Push this folder to a GitHub repo.
@@ -78,6 +86,8 @@ Windows may show a SmartScreen warning the first time, because the exe isn't cod
 | `/wow cta Crossroads 8 Alliance at the FP` | Call to arms. Zone, then how many you need, then a message. Leave out the zone to use your current one. Offers a reload so it sends immediately. |
 | `/wow sync` | Save everything now (then reload) |
 | `/wow status` | What's been saved, and when news last arrived |
+| `/wow guide` | Show or hide the skill-up guide next to your profession window |
+| `/wow list` | Show or hide your shopping list tracker (`/wow list clear` empties it) |
 
 ## Development
 

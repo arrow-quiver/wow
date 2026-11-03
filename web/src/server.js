@@ -238,7 +238,28 @@ function createApp(cfg, db) {
       for (const r of rows) { if (!map.has(r.prof)) map.set(r.prof, []); map.get(r.prof).push(r); }
       profSummary = [...map].map(([name, chars]) => ({ name, chars }));
     }
-    res.page({ title: 'Crafters', active: 'crafters', body: P.crafters({ q: qstr, results, profSummary }) });
+    // Your shopping list from the addon, with where each mat is.
+    const shopRow = db.prepare('SELECT items, updated_at FROM shopping_lists WHERE user_id = ?').get(req.user.id);
+    let shopping = null;
+    if (shopRow) {
+      const items = JSON.parse(shopRow.items);
+      const need = new Map();
+      for (const e of items) for (const g of e.reagents) {
+        const cur = need.get(g.id) || { id: g.id, name: g.name, need: 0 };
+        cur.need += g.qty * e.qty; need.set(g.id, cur);
+      }
+      const mine = db.prepare(`SELECT c.name, SUM(i.count) n FROM inventory i JOIN characters c ON c.id = i.character_id
+        WHERE c.guild_id = ? AND c.user_id = ? AND i.item_id = ? GROUP BY c.name`);
+      const bank = db.prepare(`SELECT COALESCE((SELECT SUM(count) FROM guild_bank WHERE guild_id = ? AND item_id = ?), 0) AS n`);
+      const pricesFor = require('./economy').latestPrices(db, req.guild.id, [...need.keys()]);
+      shopping = {
+        items, updatedAt: shopRow.updated_at,
+        mats: [...need.values()].map((m) => ({ ...m, chars: mine.all(req.guild.id, req.user.id, m.id), guildBank: bank.get(req.guild.id, m.id).n,
+          price: pricesFor[m.id] ? pricesFor[m.id].price : null })).sort((a, b) => a.name.localeCompare(b.name)),
+      };
+      if (!items.length) shopping = null;
+    }
+    res.page({ title: 'Crafters', active: 'crafters', body: P.crafters({ q: qstr, results, profSummary, shopping }) });
   });
 
   // ---- crafting requests ----

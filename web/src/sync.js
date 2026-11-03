@@ -1,4 +1,4 @@
-const { applyEconomy } = require('./economy');
+const { applyEconomy, latestPrices } = require('./economy');
 
 // Applies a companion upload (the addon's SavedVariables, converted to JSON)
 // and builds the "inbox" the companion writes back into the addon.
@@ -96,6 +96,25 @@ function applyPayload(db, guildId, userId, payload) {
     const eco = applyEconomy(db, guildId, userId, payload, (name) => { const r = owned.get(guildId, String(name).slice(0, 40), userId); return r && r.id; });
     Object.assign(stats, eco);
 
+    // 1c. Profession helper: reagents to price, and the shopping list
+    const ids = list(payload.reagentIds).map(int).filter((x) => x > 0).slice(0, 2000);
+    if (ids.length) {
+      db.prepare('DELETE FROM wanted_items WHERE user_id = ?').run(userId);
+      const ins = db.prepare('INSERT OR IGNORE INTO wanted_items (user_id, item_id) VALUES (?,?)');
+      for (const id of ids) ins.run(userId, id);
+    }
+    if (payload.shopping !== undefined) {
+      const items = list(payload.shopping).slice(0, 50).map((e) => ({
+        name: str(e && e.name, 100), qty: int(e && e.qty) || 1, prof: str(e && e.prof, 40),
+        reagents: list(e && e.reagents).slice(0, 12).map((g) => ({ id: int(g && g.id), name: str(g && g.name, 100), qty: int(g && g.qty) || 1 })).filter((g) => g.id),
+      })).filter((e) => e.name);
+      db.prepare(`INSERT INTO shopping_lists (user_id, items, updated_at) VALUES (?,?, datetime('now'))
+        ON CONFLICT (user_id) DO UPDATE SET items = excluded.items, updated_at = excluded.updated_at`).run(userId, JSON.stringify(items));
+      // Shopping-list reagents also count as wanted.
+      const ins = db.prepare('INSERT OR IGNORE INTO wanted_items (user_id, item_id) VALUES (?,?)');
+      for (const e of items) for (const g of e.reagents) ins.run(userId, g.id);
+    }
+
     // 2. Guild roster snapshot (one member's scan updates everyone's online status)
     const roster = payload.roster;
     if (roster && Array.isArray(roster.members) && roster.members.length) {
@@ -156,8 +175,20 @@ function buildInbox(db, guildId, userId) {
     delete r.starts_at;
     r.reserves = resv.all(r.id, userId);
   }
+  // Profession helper: guild prices for reagents, and where else you have shopping-list mats.
+  const wanted = db.prepare('SELECT item_id FROM wanted_items WHERE user_id = ?').all(userId).map((r) => r.item_id);
+  const priceMap = latestPrices(db, guildId, wanted);
+  const prices = Object.entries(priceMap).map(([id, p]) => ({ id: Number(id), price: p.price }));
+  const shop = db.prepare('SELECT items FROM shopping_lists WHERE user_id = ?').get(userId);
+  const shopIds = [...new Set((shop ? JSON.parse(shop.items) : []).flatMap((e) => e.reagents.map((g) => g.id)))];
+  const charsQ = db.prepare(`SELECT c.name, SUM(i.count) AS count FROM inventory i JOIN characters c ON c.id = i.character_id
+    WHERE c.guild_id = ? AND c.user_id = ? AND i.item_id = ? GROUP BY c.name`);
+  const gbQ = db.prepare(`SELECT COALESCE((SELECT SUM(count) FROM guild_bank WHERE guild_id = ? AND item_id = ?), 0)
+    + COALESCE((SELECT SUM(i.count) FROM inventory i JOIN characters c ON c.id = i.character_id WHERE c.guild_id = ? AND c.is_bank = 1 AND i.item_id = ?), 0) AS n`);
+  const stock = shopIds.map((id) => ({ id, chars: charsQ.all(guildId, userId, id), guildBank: gbQ.get(guildId, id, guildId, id).n }));
   return {
     guild: guild ? guild.name : '',
+    prices, stock,
     raids,
     generatedAt: Math.floor(Date.now() / 1000),
     announcements, canCraft, myRequests: mine, buddies,

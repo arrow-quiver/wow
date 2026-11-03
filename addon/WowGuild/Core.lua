@@ -108,11 +108,17 @@ SlashCmdList["WOWGUILD"] = function(input)
       profs, recipes, #(ns.db.roster.members or {})))
     local inbox = WowGuildInbox
     ns.print(inbox and ("Last news from the site: " .. date("%d %b %H:%M", inbox.generatedAt or 0)) or "No news from the site yet. Is the companion running?")
+  elseif cmd == "guide" then
+    ns.prof.toggleGuide()
+  elseif cmd == "list" then
+    if rest == "clear" then ns.prof.clearList() else ns.prof.toggleTracker() end
   elseif cmd == "help" then
     ns.print("/wow  open the guild panel")
     ns.print("/wow cta [zone] [number] [message]  call guildies to a fight")
     ns.print("/wow sync  save everything now")
     ns.print("/wow status  what's been saved")
+    ns.print("/wow guide  show or hide the skill-up guide (next to your profession window)")
+    ns.print("/wow list  show or hide your shopping list;  /wow list clear  empties it")
   else
     ns.togglePanel()
   end
@@ -132,13 +138,21 @@ f:SetScript("OnEvent", function(self, event, ...)
   elseif event == "PLAYER_LOGOUT" then
     -- Last chance to save. No combat checks needed: logout can't happen mid-fight.
     ns.collectCharacter()
-  elseif ns.handlers and ns.handlers[event] then
-    ns.handlers[event](...)
+  end
+  if ns.handlers and ns.handlers[event] then
+    for _, fn in ipairs(ns.handlers[event]) do
+      local ok, err = pcall(fn, ...)
+      if not ok then ns.debugError = err end
+    end
   end
 end)
 
+-- Several modules can listen to the same event; one failing never stops the others.
 function ns.on(event, fn)
   ns.handlers = ns.handlers or {}
-  ns.handlers[event] = fn
-  ns.try(f.RegisterEvent, f, event)
+  if not ns.handlers[event] then
+    ns.handlers[event] = {}
+    ns.try(f.RegisterEvent, f, event)
+  end
+  table.insert(ns.handlers[event], fn)
 end

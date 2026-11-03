@@ -159,8 +159,25 @@ function character({ c, profs, recipes, csrf, isOwner, alts }) {
 
 // ---------- Crafters ----------
 
-function crafters({ q, results, profSummary }) {
+function shoppingSection(shopping) {
+  if (!shopping) return '';
+  const { money } = require('../economy');
+  const total = shopping.mats.reduce((t, m) => t + (m.price != null ? m.price * m.need : 0), 0);
+  return `<section class="setting">
+    <h2>Your shopping list</h2>
+    <p class="muted">From the addon, as of ${ago(shopping.updatedAt)}: ${shopping.items.map((e) => `${esc(e.qty)} × ${esc(e.name)}`).join(', ')}.
+      ${total ? `Buying everything would cost about ${esc(money(total))}.` : ''} Manage it in game with <code>/wow list</code>.</p>
+    <div class="table-wrap"><table><thead><tr><th>Mat</th><th class="num">Need</th><th>Where you have it</th><th class="num">Guild bank</th><th class="num">Each</th></tr></thead><tbody>
+      ${shopping.mats.map((m) => `<tr><td>${esc(m.name || `Item ${m.id}`)}</td><td class="num">${esc(m.need)}</td>
+        <td>${m.chars.length ? m.chars.map((c) => `${esc(c.name)} ${esc(c.n)}`).join(', ') : '<span class="muted">none synced</span>'}</td>
+        <td class="num">${m.guildBank || ''}</td><td class="num">${m.price != null ? esc(money(m.price)) : ''}</td></tr>`).join('')}
+    </tbody></table></div>
+  </section>`;
+}
+
+function crafters({ q, results, profSummary, shopping }) {
   return `<h1>Crafters</h1>
+  ${shoppingSection(shopping)}
   <form method="get" action="/crafters" class="search" role="search">
     <label class="sr" for="q">Search recipes</label>
     <input id="q" name="q" value="${esc(q)}" placeholder="Search a recipe, e.g. Heavy Silk Bandage" autofocus>

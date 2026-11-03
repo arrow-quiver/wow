@@ -293,6 +293,18 @@ const MIGRATIONS = [
      note TEXT,
      created_at TEXT NOT NULL DEFAULT (datetime('now'))
    );`,
+
+  // Profession helper: which reagents a player cares about, and their shopping list.
+  `CREATE TABLE wanted_items (
+     user_id INTEGER NOT NULL REFERENCES users(id),
+     item_id INTEGER NOT NULL,
+     PRIMARY KEY (user_id, item_id)
+   );
+   CREATE TABLE shopping_lists (
+     user_id INTEGER PRIMARY KEY REFERENCES users(id),
+     items TEXT NOT NULL,
+     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+   );`,
 ];
 
 function migrate(db) {
