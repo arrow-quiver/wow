@@ -356,6 +356,9 @@ const MIGRATIONS = [
      namespace TEXT, found INTEGER NOT NULL DEFAULT 1,
      fetched_at TEXT NOT NULL DEFAULT (datetime('now'))
    );`,
+
+  // Fresh start before launch: game data older than this is ignored.
+  `ALTER TABLE guilds ADD COLUMN reset_at TEXT;`,
 ];
 
 function migrate(db) {

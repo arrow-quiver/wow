@@ -556,6 +556,17 @@ function createApp(cfg, db) {
     audit(req, 'downloaded backup', ok.file);
     res.download(path.join(backup.backupDir(cfg.dbFile), ok.file));
   });
+  app.post('/admin/reset', needOfficer, (req, res) => {
+    if (req.guild.role !== 'owner') return res.status(403).send('Only the guild owner can wipe the guild’s data.');
+    if (String(req.body.confirm || '').trim().toUpperCase() !== 'WIPE') return back(res, '/admin', 'Nothing was wiped. Type WIPE in the box to confirm.');
+    try {
+      const dir = cfg.dbFile && cfg.dbFile !== ':memory:' ? backup.backupDir(cfg.dbFile) : null;
+      const r = require('./reset').resetGuild(db, req.guild.id, dir);
+      const n = Object.values(r.removed).reduce((a, b) => a + b, 0);
+      audit(req, 'wiped guild data for a fresh start', `${n} rows${r.backup ? `, backup ${path.basename(r.backup)}` : ''}`);
+      back(res, '/admin', `Fresh start done: ${n} rows of game data removed${r.backup ? ` (backup ${path.basename(r.backup)} kept)` : ''}. Members, settings and sync keys are untouched.`);
+    } catch (e) { back(res, '/admin', `Wipe failed, nothing changed: ${e.message}`); }
+  });
   app.post('/admin/backups', needOfficer, (req, res) => {
     try { const f = backup.runBackup(db, backup.backupDir(cfg.dbFile)); audit(req, 'backup made', path.basename(f)); back(res, '/admin', 'Backup made.'); } catch (e) { back(res, '/admin', `Backup failed: ${e.message}`); }
   });

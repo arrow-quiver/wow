@@ -458,6 +458,15 @@ function admin({ latest, isOwner, members, backups, auditRows, blizzard, csrf })
     <p class="muted">The database is copied every day and the last 14 copies are kept on the server. ${isOwner ? 'As owner you can download them.' : 'The guild owner can download them.'}</p>
     <ul class="board">${backups.slice(0, 14).map((b) => `<li>${isOwner ? `<a href="/admin/backups/${encodeURIComponent(b.file)}">${esc(b.file)}</a>` : esc(b.file)} <span class="muted">${Math.max(1, Math.round(b.bytes / 1024))} KB, ${ago(b.at)}</span></li>`).join('') || '<li class="empty">No backups yet. The first one runs shortly after the server starts.</li>'}</ul>
   </section>
+  ${isOwner ? `<section class="setting officer-box">
+    <h2>Fresh start</h2>
+    <p>Wipes all game data: characters, roster, raids and loot, bank, prices, drives, requests, calls to arms and activity.
+      Members, roles, settings, sync keys, the invite link and notifications stay. A backup is made first.
+      Data from before the wipe is ignored if an old game folder (for example Retail testing) uploads it again.</p>
+    <form method="post" action="/admin/reset" class="inline-form"><input type="hidden" name="_csrf" value="${esc(csrf)}">
+      <label class="grow">Type WIPE to confirm<input name="confirm" autocomplete="off" required pattern="[Ww][Ii][Pp][Ee]"></label>
+      <button class="btn btn-alarm" data-confirm="Wipe all of the guild's game data? A backup is kept.">Wipe game data</button></form>
+  </section>` : ''}
   <section class="setting">
     <h2>Audit log</h2>
     <p class="muted">Officer and account actions, newest first.</p>

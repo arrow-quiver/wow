@@ -42,8 +42,33 @@ function cleanExtras(c) {
   return Object.keys(out).length ? JSON.stringify(out) : null;
 }
 
+// Drop data that doesn't belong to the guild's game: anything from before a "fresh start"
+// reset, characters on another realm (e.g. Retail test characters), and the guild bank,
+// roster and auction prices from an upload that has no character on the guild's realm.
+function freshOnly(db, guildId, payload) {
+  const g = db.prepare('SELECT realm, game_guild, reset_at FROM guilds WHERE id = ?').get(guildId) || {};
+  const cutoff = g.reset_at ? Math.floor(Date.parse(g.reset_at) / 1000) : 0;
+  const p = { ...payload };
+  const chars = list(p.characters);
+  const keep = chars.filter((c) => c && !(cutoff && int(c.updated) && int(c.updated) < cutoff) && !(g.realm && c.realm && c.realm !== g.realm));
+  if (keep.length !== chars.length) p.characters = keep;
+  const onRealm = !g.realm || !chars.length || chars.some((c) => c && (!c.realm || c.realm === g.realm));
+  const old = (t) => cutoff && int(t) && int(t) < cutoff;
+  const otherGuild = (name) => g.game_guild && name && name !== g.game_guild;
+  if (!onRealm || (p.roster && (old(p.roster.scannedAt) || otherGuild(p.roster.guild)))) delete p.roster;
+  if (!onRealm || (p.guildBank && (old(p.guildBank.scannedAt) || otherGuild(p.guildBank.guild)))) delete p.guildBank;
+  if (!onRealm) delete p.prices;
+  else if (cutoff && p.prices && Array.isArray(p.prices.items)) {
+    const cutoffDay = Math.floor((cutoff * 1000 - Date.UTC(2020, 0, 1)) / 86400000);
+    p.prices = { ...p.prices, items: p.prices.items.filter((r) => Array.isArray(r) && int(r[2]) >= cutoffDay) };
+  }
+  if (cutoff) p.ctaQueue = list(p.ctaQueue).filter((q) => q && !old(q.at));
+  return p;
+}
+
 function applyPayload(db, guildId, userId, payload) {
   if (!payload || typeof payload !== 'object') throw new Error('Payload must be an object');
+  payload = freshOnly(db, guildId, payload);
   const stats = { characters: 0, roster: 0, recipes: 0, ctas: [] };
   const now = new Date().toISOString();
 
