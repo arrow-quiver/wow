@@ -61,3 +61,14 @@
       .then(function () { say('Notifications are off for this device.'); setTimeout(function () { location.reload(); }, 800); });
   });
 })();
+
+// Slow forms (the Coach): show progress and stop double submits.
+document.querySelectorAll('[data-busy]').forEach(function (btn) {
+  var form = btn.form;
+  if (!form) return;
+  form.addEventListener('submit', function () {
+    btn.setAttribute('aria-busy', 'true');
+    btn.disabled = true;
+    btn.textContent = btn.getAttribute('data-busy');
+  });
+});

@@ -2,4 +2,7 @@
   <Binding name="WOWGUILD_TOGGLE" header="WOWGUILD" category="ADDONS">
     WowGuild_Toggle()
   </Binding>
+  <Binding name="WOWGUILD_COACH" header="WOWGUILD" category="ADDONS">
+    WowGuild_ToggleCoach()
+  </Binding>
 </Bindings>

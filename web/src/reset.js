@@ -27,6 +27,7 @@ function resetGuild(db, guildId, backupDir) {
     ['announcements', 'guild_id = ?'], ['activity', 'guild_id = ?'], ['sync_log', 'guild_id = ?'],
     ['prices', 'guild_id = ?'], ['guild_bank', 'guild_id = ?'], ['bank_log', 'guild_id = ?'],
     ['bank_requests', 'guild_id = ?'], ['link_codes', 'guild_id = ?'],
+    ['coach_chars', 'guild_id = ?'], ['coach_qa', 'guild_id = ?'],
   ];
   const removed = {};
   db.transaction(() => {

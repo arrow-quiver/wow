@@ -22,6 +22,7 @@ const NAV = [
   ['/', 'Camp', 'home'],
   ['/raids', 'Raids &amp; events', 'raids'],
   ['/loot', 'Loot', 'loot'],
+  ['/coach', 'Coach', 'coach'],
   ['/roster', 'Roster', 'roster'],
   ['/crafters', 'Crafters', 'crafters'],
   ['/requests', 'Crafting requests', 'requests'],

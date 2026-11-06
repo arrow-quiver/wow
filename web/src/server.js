@@ -12,6 +12,8 @@ const wowhead = require('./views/wowhead');
 const { createPush } = require('./push');
 const blizzard = require('./blizzard');
 const gamedata = require('./gamedata');
+const coach = require('./coach');
+const ai = require('./ai');
 const { calendarToken } = require('./calendar');
 const fs = require('fs');
 
@@ -32,6 +34,10 @@ function config(env = process.env) {
     discordPublicKey: env.DISCORD_PUBLIC_KEY || '',
     discordBotToken: env.DISCORD_BOT_TOKEN || '',
     bnetRegion: (env.BNET_REGION || 'eu').toLowerCase(),
+    // Coach (Claude API). Without a key the Coach still tracks play style; AI features are off.
+    anthropicKey: env.ANTHROPIC_API_KEY || '',
+    coachModel: env.COACH_MODEL || 'claude-sonnet-5-5',
+    coachFastModel: env.COACH_FAST_MODEL || 'claude-haiku-5-5',
   };
 }
 
@@ -441,6 +447,11 @@ function createApp(cfg, db) {
         if (!t) { t = calendarToken(); db.prepare('UPDATE users SET calendar_token = ? WHERE id = ?').run(t, req.user.id); }
         return `${cfg.baseUrl}/calendar/${t}.ics`;
       })(),
+      coachInfo: (() => {
+        const g = db.prepare('SELECT coach_enabled, coach_budget_usd FROM guilds WHERE id = ?').get(req.guild.id);
+        return { hasKey: Boolean(cfg.anthropicKey), enabled: Boolean(g.coach_enabled), budget: g.coach_budget_usd, spent: ai.monthSpend(db, req.guild.id),
+          perDay: coach.LIMITS.questionsPerDay, plansPerDay: coach.LIMITS.plansPerDay };
+      })(),
       gameData: {
         ns: gamedata.namespaces(blizzard.load(db), req.guild.wowhead_game, cfg.bnetRegion),
         items: db.prepare('SELECT COUNT(*) n FROM item_info WHERE found = 1').get().n,
@@ -577,6 +588,15 @@ function createApp(cfg, db) {
   phase3.routes(app, { db, cfg, discord, activity: q.activity, needGuild, needOfficer, back, audit, notify });
   require('./routes/freebies')(app, { db, cfg, push, needGuild, needOfficer, back, audit });
 
+  // Coach (coach.js): plans and answers by Claude.
+  coach.setKeyPresent(cfg.anthropicKey);
+  require('./routes/coach')(app, { db, cfg, needGuild, needOfficer, back, audit });
+  const coachRun = () => coach.processPending(db, cfg, { notify }).then((r) => {
+    if (r.answered || r.plans || r.failed) console.log(`Coach: ${r.answered} answered, ${r.plans} plans, ${r.failed} failed`);
+  }).catch((e) => console.warn('Coach failed:', e.message));
+  app.locals.coachRun = coachRun;
+  if (cfg.timers) setInterval(coachRun, 60 * 1000).unref();
+
   // Official Blizzard game data (gamedata.js). cfg.gameFetch lets tests stand in for Blizzard.
   const gameRun = (opts = {}) => gamedata.run(db, cfg, { fetchImpl: cfg.gameFetch, notify, ...opts });
   app.post('/settings/realm', needOfficer, (req, res) => {
@@ -626,8 +646,12 @@ function createApp(cfg, db) {
         await discord({ discord_webhook: req.tok.discord_webhook }, `⚔️ **Call to arms: ${c.zone}**${c.needed ? ` (need ${c.needed})` : ''}\n${c.message || ''}\n— ${c.character || 'someone'} (from in game)`);
         notify(req.tok.guild_id, 'cta', { title: `⚔️ Call to arms: ${c.zone}`, body: `${c.needed ? `Need ${c.needed}. ` : ''}${c.message || ''} (${c.character || 'from in game'})`, url: '/' }, { exceptUserId: req.tok.user_id });
       }
+      // Questions asked in game, or a plan wanted: start now, and tell the companion to fetch the answer when it's ready.
+      const coachPending = coach.inboxPart(db, req.tok.guild_id, req.tok.user_id).pending;
+      if (coachPending && cfg.anthropicKey) setImmediate(app.locals.coachRun);
+      else if (stats.coach && stats.coach.questions) setImmediate(app.locals.coachRun);
       res.json({ ok: true, characters: stats.characters, roster: stats.roster, recipes: stats.recipes, ctas: stats.ctas.length,
-        inventory: stats.inventory, bank: stats.bank, prices: stats.prices, latest: latest() });
+        inventory: stats.inventory, bank: stats.bank, prices: stats.prices, coachPending, latest: latest() });
     } catch (e) {
       res.status(400).json({ error: e.message });
     }

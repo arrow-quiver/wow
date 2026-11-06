@@ -301,7 +301,7 @@ function memberAction(id, verb, label, csrf, confirm) {
   return `<form method="post" action="/members/${id}/${verb}">${csrfField(csrf)}<button class="btn btn-small btn-quiet"${confirm ? ` data-confirm="${esc(confirm)}"` : ''}>${label}</button></form>`;
 }
 
-function settings({ csrf, tokens, newToken, guild, baseUrl, isOfficer, isOwner, me, members, discordInfo = {}, calendarUrl, pushDevices = 0, pushPrefs, gameData = {} }) {
+function settings({ csrf, tokens, newToken, guild, baseUrl, isOfficer, isOwner, me, members, discordInfo = {}, calendarUrl, pushDevices = 0, pushPrefs, gameData = {}, coachInfo = {} }) {
   return `<h1>Settings</h1>
   <section class="setting">
     <h2>Connect the game</h2>
@@ -378,6 +378,15 @@ function settings({ csrf, tokens, newToken, guild, baseUrl, isOfficer, isOwner, 
     <form method="post" action="/settings/wowhead" class="inline-form">${csrfField(csrf)}
       <label class="sr" for="whg">Game</label>
       <select id="whg" name="game">${GAMES.map((g) => `<option value="${g}"${g === wowheadGame() ? ' selected' : ''}>${g === 'forever' ? 'WoW: Forever' : g === 'retail' ? 'Retail' : 'Classic'}</option>`).join('')}</select>
+      <button class="btn">Save</button></form>
+  </section>
+  <section class="setting">
+    <h2>Coach (Claude AI)</h2>
+    <p>${coachInfo.hasKey ? 'The Coach writes build plans and answers questions with Claude.' : '<span class="warn">No Claude API key on the server yet, so plans and answers are off. Play-style tracking still works.</span>'}
+      <span class="muted">This month: about $${esc((coachInfo.spent || 0).toFixed(2))} of $${esc(Number(coachInfo.budget || 0).toFixed(2))}. Each member can ask ${esc(coachInfo.perDay || 30)} questions and make ${esc(coachInfo.plansPerDay || 5)} plans a day.</span></p>
+    <form method="post" action="/settings/coach" class="inline-form">${csrfField(csrf)}
+      <label class="check"><input type="checkbox" name="enabled"${coachInfo.enabled ? ' checked' : ''}> Coach AI on</label>
+      <label>Monthly budget (USD)<input name="budget" type="number" min="0" max="500" step="1" value="${esc(coachInfo.budget ?? 15)}"></label>
       <button class="btn">Save</button></form>
   </section>
   <section class="setting">

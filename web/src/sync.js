@@ -1,3 +1,4 @@
+const { applyCoach, inboxPart } = require('./coach');
 const { applyEconomy, latestPrices } = require('./economy');
 
 // Applies a companion upload (the addon's SavedVariables, converted to JSON)
@@ -147,6 +148,10 @@ function applyPayload(db, guildId, userId, payload) {
     const eco = applyEconomy(db, guildId, userId, payload, (name) => { const r = owned.get(guildId, String(name).slice(0, 40), userId); return r && r.id; });
     Object.assign(stats, eco);
 
+    // 1d. Coach: play style, talents, gear, and questions asked in game
+    const realm = db.prepare('SELECT realm FROM guilds WHERE id = ?').get(guildId).realm;
+    stats.coach = applyCoach(db, guildId, userId, payload.coach, realm);
+
     // 1c. Profession helper: reagents to price, and the shopping list
     const ids = list(payload.reagentIds).map(int).filter((x) => x > 0).slice(0, 2000);
     if (ids.length) {
@@ -260,6 +265,7 @@ function buildInbox(db, guildId, userId) {
     raids,
     generatedAt: Math.floor(Date.now() / 1000),
     announcements, canCraft, myRequests: mine, buddies,
+    coach: inboxPart(db, guildId, userId),
   };
 }
 

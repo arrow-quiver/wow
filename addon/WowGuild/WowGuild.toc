@@ -2,7 +2,7 @@
 ## Title: wow guild
 ## Notes: Syncs your character, professions, recipes and the guild roster to the guild website. Shows notices and crafting requests from the site. Profession skill-up guide and shopping list.
 ## Author: wow
-## Version: 0.7.2
+## Version: 0.8.0
 ## SavedVariables: WowGuildDB
 ## OptionalDeps: Auctionator
 ## IconTexture: Interface\Icons\Spell_Fire_Fire
@@ -16,6 +16,8 @@ UI.lua
 Professions.lua
 ProfUI.lua
 Options.lua
+Coach.lua
+CoachUI.lua
 MainUI.lua
 Tooltip.lua
 Report.lua

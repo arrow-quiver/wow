@@ -164,6 +164,29 @@ async function upload(cfg, file) {
   }
   const extra = [result.ctas ? `${result.ctas} call(s) to arms` : '', result.prices ? `${result.prices} auction prices` : '', result.bank ? `${result.bank} guild bank items` : ''].filter(Boolean);
   log(`Uploaded: ${result.characters} character(s), ${result.roster} roster entries, ${result.recipes} recipes${extra.length ? `, ${extra.join(', ')}` : ''}.`);
+  return result;
+}
+
+// The Coach answers in game questions on the site, which takes a little while. Keep checking
+// for up to two minutes and save the answer for the addon as soon as it's there.
+const following = new Set();
+async function followCoach(cfg, gameDir, { every = 6000, tries = 20 } = {}) {
+  if (following.has(gameDir)) return;
+  following.add(gameDir);
+  try {
+    log('The Coach is working on your question or build plan...');
+    for (let i = 0; i < tries; i++) {
+      await new Promise((r) => setTimeout(r, every));
+      const inbox = JSON.parse(await api(cfg, 'GET', '/api/inbox'));
+      if (!inbox.coach || !inbox.coach.pending) {
+        await writeInbox(cfg, gameDir);
+        log('The Coach has answered. Type /reload in game (or press "Check for answers" in the Coach) to see it.');
+        return true;
+      }
+    }
+    log('The Coach is taking a while. The answer will show after a later /reload.');
+    return false;
+  } catch (e) { log(`Couldn't check on the Coach: ${e.message}`); return false; } finally { following.delete(gameDir); }
 }
 
 async function writeInbox(cfg, gameDir) {
@@ -205,7 +228,7 @@ async function main() {
     busy = true;
     try {
       for (const g of games) {
-        let uploaded = false;
+        let uploaded = false; let coachPending = 0;
         for (const f of savedVariablesFiles(g)) {
           const m = fs.statSync(f).mtimeMs;
           const fail = failures.get(f);
@@ -215,7 +238,8 @@ async function main() {
           await new Promise((r) => setTimeout(r, force ? 0 : 1500));
           if (fs.statSync(f).mtimeMs !== m && !force) continue;
           try {
-            await upload(cfg, f); uploaded = true; seen.set(f, m); failures.delete(f);
+            const r = await upload(cfg, f); uploaded = true; seen.set(f, m); failures.delete(f);
+            if (r && r.coachPending) coachPending += r.coachPending;
           } catch (e) {
             const count = (fail ? fail.count : 0) + 1;
             const wait = Math.min(5 * 60, 5 * 2 ** (count - 1)); // 5s, 10s, 20s ... up to 5 min
@@ -226,6 +250,7 @@ async function main() {
         if (uploaded || force) {
           try { await writeInbox(cfg, g); log('Guild news saved for the addon. It shows after your next /reload.'); } catch (e) { log(e.message); }
         }
+        if (coachPending) followCoach(cfg, g);
       }
     } finally { busy = false; }
   };
@@ -244,4 +269,4 @@ if (require.main === module) {
   main().catch((e) => { log(`Problem: ${e.message}`); if (process.platform === 'win32' && !process.argv.includes('--once')) setTimeout(() => {}, 60000); process.exitCode = 1; });
 }
 
-module.exports = { findGameFolders, savedVariablesFiles, extractPrices, versionLess };
+module.exports = { findGameFolders, savedVariablesFiles, extractPrices, versionLess, followCoach };

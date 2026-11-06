@@ -125,7 +125,7 @@ test('window uses Blizzard frame and bottom tabs when available', () => {
   wow.exec('__ns.ui.show("guild")');
   assert.strictEqual(wow.eval('tostring(WowGuildWindow.native)'), 'true');
   assert.strictEqual(wow.eval('tostring(WowGuildWindow.bottomTabs)'), 'true');
-  assert.strictEqual(wow.eval('WowGuildWindow.selectedTab'), '4');
+  assert.strictEqual(wow.eval('WowGuildWindow.selectedTab'), '5');
   assert.match(wow.eval('WowGuildWindow.TitleText:GetText()'), /wow guild/);
 });
 

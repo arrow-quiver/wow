@@ -9,6 +9,7 @@ const ADDON_DIR = path.join(__dirname, '..', '..', 'addon', 'WowGuild');
 
 const PRELUDE = `
 time = os.time
+unpack = unpack or table.unpack
 date = os.date
 strsplit = nil
 tinsert = table.insert

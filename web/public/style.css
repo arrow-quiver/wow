@@ -274,3 +274,33 @@ label.check input { flex: none; }
 .realm-line { margin: 0 0 .75rem; font-size: .95rem; }
 .realm-up { color: #2f7d4f; font-weight: 700; }
 .realm-down { color: var(--alarm); font-weight: 700; }
+
+/* ---------- Coach ---------- */
+.chip-row { display: flex; flex-wrap: wrap; gap: .4rem; margin: 0 0 1rem; }
+.chip { padding: .3rem .75rem; border: 1px solid var(--line); border-radius: 999px; text-decoration: none; color: var(--ink); }
+.chip.is-on { border-color: var(--ember); background: color-mix(in srgb, var(--ember) 14%, transparent); font-weight: 700; }
+.coach-hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1.5rem; align-items: start; }
+.coach-name { font-size: 1.6rem; font-weight: 800; margin: 0; text-shadow: 0 1px 0 rgba(0,0,0,.35); }
+.archetype { font-size: 1.15rem; font-weight: 800; margin: .8rem 0 .2rem; color: var(--ember); letter-spacing: .02em; }
+.style-bars { list-style: none; margin: 0; padding: 0; display: grid; gap: .55rem; }
+.style-label { display: flex; justify-content: space-between; font-weight: 700; font-size: .92rem; }
+.style-bar { height: .6rem; margin: .2rem 0 .1rem; }
+.style-bar span { background: linear-gradient(90deg, #63251f, var(--ember), #f4d49c); }
+.style-bars .hint { margin: 0; }
+.plan-headline { font-size: 1.1rem; font-weight: 800; margin: 0 0 .3rem; }
+.coach-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 1.5rem; }
+.coach-grid h3 { font-size: 1rem; margin: 1rem 0 .4rem; }
+.talent-list { padding-left: 1.4rem; margin: 0; display: grid; gap: .45rem; }
+.talent-list li.is-done strong { text-decoration: line-through; opacity: .6; }
+.talent-list li.is-done::after { content: " ✓ taken"; color: var(--ok); font-size: .8rem; font-weight: 700; }
+.stat-chips { list-style: none; counter-reset: s; display: flex; flex-wrap: wrap; gap: .4rem; padding: 0; margin: 0; }
+.stat-chips li { counter-increment: s; padding: .25rem .65rem; border-radius: 999px; background: color-mix(in srgb, var(--ember) 18%, transparent); font-weight: 700; font-size: .88rem; }
+.stat-chips li::before { content: counter(s) ". "; opacity: .6; }
+.ask-form textarea { width: 100%; font: inherit; padding: .6rem; border: 1px solid var(--line); border-radius: .5rem; background: var(--paper); color: var(--ink); resize: vertical; }
+.ask-form .actions-row { margin-top: .5rem; align-items: center; }
+.qa-list { list-style: none; padding: 0; margin: 1rem 0 0; display: grid; gap: .9rem; }
+.qa .q { font-weight: 700; margin: 0 0 .25rem; }
+.qa .a { margin: 0; white-space: normal; }
+.steps-list { padding-left: 1.3rem; display: grid; gap: .4rem; }
+button[aria-busy="true"] { opacity: .7; cursor: progress; }
+@media (max-width: 720px) { .coach-hero, .coach-grid { grid-template-columns: minmax(0, 1fr); } }

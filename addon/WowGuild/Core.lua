@@ -158,6 +158,8 @@ SlashCmdList["WOWGUILD"] = function(input)
     ns.prof.toggleGuide()
   elseif cmd == "list" then
     if rest == "clear" then ns.prof.clearList() else ns.prof.toggleTracker() end
+  elseif cmd == "coach" then
+    if rest == "" then ns.coachUI.toggle() else ns.coachUI.show(rest == "ask" and "ask" or rest == "build" and "build" or "steps") end
   elseif cmd == "options" or cmd == "config" then
     ns.ui.show("settings")
   elseif cmd == "debug" then
@@ -169,6 +171,7 @@ SlashCmdList["WOWGUILD"] = function(input)
     ns.print("/wow status  what's been saved")
     ns.print("/wow guide  show or hide the skill-up guide (next to your profession window)")
     ns.print("/wow list  show or hide your shopping list;  /wow list clear  empties it")
+    ns.print("/wow coach  your play style, build plan and next steps (/wow coach ask to ask a question)")
     ns.print("/wow options  addon settings")
     ns.print("/wow debug  problem report to copy and send")
   else

@@ -359,6 +359,48 @@ const MIGRATIONS = [
 
   // Fresh start before launch: game data older than this is ignored.
   `ALTER TABLE guilds ADD COLUMN reset_at TEXT;`,
+
+  // Coach: play style per character, AI build plans, and questions to Claude.
+  `CREATE TABLE coach_chars (
+     id INTEGER PRIMARY KEY,
+     guild_id INTEGER NOT NULL REFERENCES guilds(id),
+     user_id INTEGER NOT NULL REFERENCES users(id),
+     name TEXT NOT NULL,
+     class TEXT, level INTEGER, realm TEXT,
+     profile TEXT, stats TEXT, quiz TEXT, talents TEXT, gear TEXT,
+     plan TEXT, plan_level INTEGER, plan_at TEXT, plan_requested_at INTEGER,
+     updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+     UNIQUE (guild_id, name)
+   );
+   CREATE TABLE coach_qa (
+     id INTEGER PRIMARY KEY,
+     guild_id INTEGER NOT NULL REFERENCES guilds(id),
+     user_id INTEGER NOT NULL REFERENCES users(id),
+     char_name TEXT,
+     qid TEXT,
+     source TEXT NOT NULL DEFAULT 'web',
+     question TEXT NOT NULL,
+     answer TEXT,
+     sources TEXT,
+     status TEXT NOT NULL DEFAULT 'pending',
+     error TEXT,
+     created_at TEXT NOT NULL DEFAULT (datetime('now')),
+     answered_at TEXT,
+     UNIQUE (user_id, qid)
+   );
+   CREATE TABLE ai_usage (
+     id INTEGER PRIMARY KEY,
+     guild_id INTEGER NOT NULL,
+     user_id INTEGER,
+     kind TEXT NOT NULL,
+     model TEXT,
+     input_tokens INTEGER, output_tokens INTEGER, searches INTEGER,
+     cost_usd REAL NOT NULL DEFAULT 0,
+     created_at TEXT NOT NULL DEFAULT (datetime('now'))
+   );
+   CREATE INDEX ai_usage_guild ON ai_usage (guild_id, created_at);
+   ALTER TABLE guilds ADD COLUMN coach_enabled INTEGER NOT NULL DEFAULT 1;
+   ALTER TABLE guilds ADD COLUMN coach_budget_usd REAL NOT NULL DEFAULT 15;`,
 ];
 
 function migrate(db) {

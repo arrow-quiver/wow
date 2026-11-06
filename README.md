@@ -118,6 +118,20 @@ The addon also records PvP rank and honor, reputations and currencies (for examp
 
 Windows may show a SmartScreen warning the first time, because the exe isn't code-signed. Choose "More info → Run anyway".
 
+## Coach (addon 0.8.0+, companion 0.5.0+)
+
+- **In game:** `/wow coach`, the Coach tab, or a key binding opens the Coach window. It shows your play style, your build plan, your next steps, and lets you ask questions.
+  - **Play style:** five scores (aggression, risk taking, social, PvP focus, pace) and an archetype. They come from a short quiz plus what the addon sees outside combat: fights started, deaths, time flagged or grouped, battlegrounds, honour kills, duels, quests.
+  - **Build plan:** talents in order (already-taken ones are ticked), stat priority, gear and tips.
+  - **Next steps:** worked out locally: unspent talent points, repairs, bag space, class trainer, professions behind your level, raid sign-ups, plus the plan's own steps.
+- **Website:** `/coach` shows the same information and answers questions instantly.
+- **How in-game questions travel:** a question asked in game is saved, sent at the next /reload (the Coach has a "Send now" button), and answered on the site. The companion keeps checking for up to two minutes and saves the answer, so one more /reload shows it. It also arrives as a phone notification.
+- **Claude API:**
+  - Set `ANTHROPIC_API_KEY` on the server.
+  - Plans use `COACH_MODEL` (default `claude-sonnet-5-5`) and answers use `COACH_FAST_MODEL` (default `claude-haiku-5-5`). Both use Claude's web search, limited to Wowhead, warcraft.wiki.gg, Blizzard, Icy Veins and Reddit, so advice about WoW: Forever can be checked against current sources.
+  - Every call is metered. Officers set a monthly budget (default $15) and can switch the AI off in Settings. Each member gets 30 questions and 5 plans a day.
+- **Without a key:** play-style tracking and next steps still work.
+
 ## Free services built in
 
 - **Calendar feed.** Settings → "Raids in your calendar" gives each member a private iCalendar link (Google, Apple, Outlook). Raids update by themselves with a 30-minute reminder. "Replace calendar link" kills the old one.

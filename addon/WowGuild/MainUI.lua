@@ -7,6 +7,7 @@ ns.ui = W
 local WIDTH, HEIGHT = 620, 480
 local TABS = {
   { key = "camp", label = "Camp" },
+  { key = "coach", label = "Coach" },
   { key = "cta", label = "Call to arms" },
   { key = "prof", label = "Professions" },
   { key = "guild", label = "Guild" },
@@ -264,6 +265,16 @@ function pages.prof(page)
 end
 
 -- Guild: crafting requests and leveling partners.
+-- Coach: a summary here; the full Coach has its own window.
+function pages.coach(page)
+  local body = scrollText(page, 0, 36)
+  local open = button(page, "Open the Coach", 150)
+  open:SetPoint("BOTTOMLEFT", 0, 0)
+  open:SetScript("OnClick", function() if win then win:Hide() end; ns.coachUI.show() end)
+  page.open = open
+  page.refresh = function() ns.coach.refresh(); body.set(ns.coach.summary()) end
+end
+
 function pages.guild(page)
   local body = scrollText(page, 0, 0)
   page.refresh = function() body.set(ns.textGuild()) end
@@ -527,3 +538,4 @@ function WowGuild_OnAddonCompartmentClick() W.toggle() end
 function WowGuild_Toggle() W.toggle() end
 BINDING_HEADER_WOWGUILD = "wow guild"
 BINDING_NAME_WOWGUILD_TOGGLE = "Open or close the guild window"
+BINDING_NAME_WOWGUILD_COACH = "Open or close the Coach"
