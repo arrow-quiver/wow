@@ -269,7 +269,7 @@ function buildInbox(db, guildId, userId) {
   };
 }
 
-// Lua serialiser used by the companion to write Data/Inbox.lua (kept here so
+// Lua serialiser used by the companion to write WowGuild_Inbox/Inbox.lua (kept here so
 // the server can also offer it for download if the companion is not running).
 function toLua(value, indent = '') {
   if (value === null || value === undefined) return 'nil';

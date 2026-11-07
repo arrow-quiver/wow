@@ -1,4 +1,4 @@
--- wow guild: core, saved data and slash commands.
+-- Guild Camp: core, saved data and slash commands.
 -- Everything here runs out of combat. Midnight-era rules (which WoW: Forever
 -- uses) hide combat data from addons and block addon messages inside
 -- instances, so we only gather what the game freely shows outside combat and
@@ -11,7 +11,7 @@ local function now() return time() end
 ns.now = now
 
 function ns.print(msg)
-  DEFAULT_CHAT_FRAME:AddMessage("|cffe8a33dwow|r " .. tostring(msg))
+  DEFAULT_CHAT_FRAME:AddMessage("|cffe8a33dGuild Camp|r " .. tostring(msg))
 end
 
 -- Run a function safely: an API that doesn't exist in this game version
@@ -33,7 +33,7 @@ function ns.reportError(err)
   table.insert(ns.errors, 1, date("%H:%M:%S") .. " " .. err)
   while #ns.errors > 5 do table.remove(ns.errors) end
   local handler = geterrorhandler and geterrorhandler()
-  if handler then pcall(handler, "wow guild: " .. err) end
+  if handler then pcall(handler, "Guild Camp: " .. err) end
 end
 
 function ns.charKey()
@@ -59,7 +59,7 @@ function ns.versionLess(a, b)
   return false
 end
 
--- Options (Settings → AddOns → wow guild). Defaults are on.
+-- Options (Settings → AddOns → Guild Camp). Defaults are on.
 ns.DEFAULTS = { tooltips = true, minimapButton = true, loginNews = true, autoGuide = true, trackerOnLogin = true, collectBank = true, updateNotice = true }
 function ns.opt(key)
   local o = ns.db and ns.db.options
@@ -136,6 +136,7 @@ StaticPopupDialogs["WOWGUILD_RELOAD_NOW"] = {
 -- ---------- slash commands ----------
 SLASH_WOWGUILD1 = "/wow"
 SLASH_WOWGUILD2 = "/wowguild"
+SLASH_WOWGUILD3 = "/guildcamp"
 SlashCmdList["WOWGUILD"] = function(input)
   local cmd, rest = string.match(input or "", "^(%S*)%s*(.-)$")
   cmd = string.lower(cmd or "")
@@ -153,7 +154,7 @@ SlashCmdList["WOWGUILD"] = function(input)
     ns.print(string.format("%d professions and %d recipes saved for this character. Guild roster: %d members.",
       profs, recipes, #(ns.db.roster.members or {})))
     local inbox = WowGuildInbox
-    ns.print(inbox and ("Last news from the site: " .. date("%d %b %H:%M", inbox.generatedAt or 0)) or "No news from the site yet. Is the companion running?")
+    ns.print(inbox and ("Last news from the site: " .. date("%d %b %H:%M", inbox.generatedAt or 0)) or "No news from the site yet. Is the companion (0.6.0 or newer) running?")
   elseif cmd == "guide" then
     ns.prof.toggleGuide()
   elseif cmd == "list" then

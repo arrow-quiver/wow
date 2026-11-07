@@ -1,4 +1,4 @@
--- wow guild: the Coach window. Your play style, your build plan, next steps, and questions for the Coach.
+-- Guild Camp: the Coach window. Your play style, your build plan, next steps, and questions for the Coach.
 local ADDON, ns = ...
 local UI = {}
 ns.coachUI = UI

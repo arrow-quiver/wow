@@ -89,7 +89,9 @@ test('companion uploads, site stores it, inbox comes back into the game', async 
     const game = fs.mkdtempSync(path.join(os.tmpdir(), 'wowgame-'));
     const sv = path.join(game, 'WTF', 'Account', 'ACCOUNT1', 'SavedVariables');
     fs.mkdirSync(sv, { recursive: true });
-    fs.mkdirSync(path.join(game, 'Interface', 'AddOns', 'WowGuild', 'Data'), { recursive: true });
+    const addonDir = path.join(game, 'Interface', 'AddOns', 'WowGuild');
+    fs.mkdirSync(addonDir, { recursive: true });
+    fs.copyFileSync(path.join(__dirname, '..', '..', 'addon', 'WowGuild', 'WowGuild.toc'), path.join(addonDir, 'WowGuild.toc'));
     fs.writeFileSync(path.join(sv, 'WowGuild.lua'), wow.saveVariables());
     const cfgFile = path.join(game, 'config.json');
     fs.writeFileSync(cfgFile, JSON.stringify({ siteUrl: url, syncKey: token, wowFolder: game }));
@@ -97,7 +99,7 @@ test('companion uploads, site stores it, inbox comes back into the game', async 
     // 3. Run the companion once (in a child process, like members will).
     const outText = await new Promise((resolve, reject) => {
       require('child_process').execFile(process.execPath, [path.join(__dirname, '..', '..', 'companion', 'companion.js'), '--once'],
-        { env: { ...process.env, WOW_COMPANION_CONFIG: cfgFile } }, (err, stdout, stderr) => (err ? reject(new Error(stderr || err.message)) : resolve(stdout)));
+        { env: { ...process.env, WOW_COMPANION_CONFIG: cfgFile, WOW_COMPANION_NO_SCAN: '1' } }, (err, stdout, stderr) => (err ? reject(new Error(stderr || err.message)) : resolve(stdout)));
     });
     assert.match(outText, /Uploaded: 1 character\(s\), 3 roster entries, 2 recipes, 1 call\(s\) to arms/);
 
@@ -114,9 +116,14 @@ test('companion uploads, site stores it, inbox comes back into the game', async 
       body: JSON.stringify(parseSavedVariables(fs.readFileSync(path.join(sv, 'WowGuild.lua'))).WowGuildDB) });
     assert.strictEqual(db.prepare('SELECT COUNT(*) n FROM ctas').get().n, 1);
 
-    // 5. The inbox the companion wrote loads in game and shows the craft request.
-    const inboxFile = path.join(game, 'Interface', 'AddOns', 'WowGuild', 'Data', 'Inbox.lua');
+    // 5. The inbox the companion wrote loads in game and shows the craft request. It lives in its
+    // own addon folder, so the addon's folder stays exactly as CurseForge shipped it.
+    const inboxFile = path.join(game, 'Interface', 'AddOns', 'WowGuild_Inbox', 'Inbox.lua');
     assert.ok(fs.existsSync(inboxFile));
+    assert.deepStrictEqual(fs.readdirSync(addonDir), ['WowGuild.toc'], 'nothing written into the addon folder');
+    const iface = (t) => /^## Interface:\s*(.+?)\s*$/m.exec(t)[1];
+    assert.strictEqual(iface(fs.readFileSync(path.join(game, 'Interface', 'AddOns', 'WowGuild_Inbox', 'WowGuild_Inbox.toc'), 'utf8')),
+      iface(fs.readFileSync(path.join(addonDir, 'WowGuild.toc'), 'utf8')), 'news addon matches the addon\'s game versions');
     const wow2 = new WowClient({ inboxFile });
     wow2.fire('ADDON_LOADED', 'WowGuild');
     wow2.fire('PLAYER_LOGIN');
@@ -149,4 +156,29 @@ test('API rejects bad tokens and browser POSTs need CSRF', async () => {
   } finally {
     srv.close();
   }
+});
+
+test('the companion keeps feeding addon 0.8 and older, then tidies their old inbox away', async () => {
+  const http = require('http');
+  const { writeInbox } = require('../../companion/companion');
+  const srv = http.createServer((req, res) => res.end('WowGuildInbox = { guild = "wow" }\n'));
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  const cfg = { siteUrl: `http://127.0.0.1:${srv.address().port}`, syncKey: 'wowg_x' };
+  const game = fs.mkdtempSync(path.join(os.tmpdir(), 'wowgame-'));
+  const addonDir = path.join(game, 'Interface', 'AddOns', 'WowGuild');
+  const oldInbox = path.join(addonDir, 'Data', 'Inbox.lua');
+  fs.mkdirSync(addonDir, { recursive: true });
+  try {
+    // An old addon still lists Data\Inbox.lua in its TOC: write there too.
+    fs.writeFileSync(path.join(addonDir, 'WowGuild.toc'), '## Interface: 16001\r\n## Version: 0.8.0\r\n\r\nData\\Inbox.lua\r\nCore.lua\r\n');
+    await writeInbox(cfg, game);
+    assert.match(fs.readFileSync(oldInbox, 'utf8'), /guild = "wow"/);
+    assert.match(fs.readFileSync(path.join(game, 'Interface', 'AddOns', 'WowGuild_Inbox', 'WowGuild_Inbox.toc'), 'utf8'), /^## Interface: 16001\r$/m);
+
+    // After updating the addon, the old file goes and the folder is back to what was shipped.
+    fs.writeFileSync(path.join(addonDir, 'WowGuild.toc'), '## Interface: 16001, 120105\r\n## OptionalDeps: WowGuild_Inbox\r\n\r\nCore.lua\r\n');
+    await writeInbox(cfg, game);
+    assert.ok(!fs.existsSync(path.join(addonDir, 'Data')));
+    assert.match(fs.readFileSync(path.join(game, 'Interface', 'AddOns', 'WowGuild_Inbox', 'WowGuild_Inbox.toc'), 'utf8'), /^## Interface: 16001, 120105\r$/m);
+  } finally { srv.close(); }
 });

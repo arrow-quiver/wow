@@ -162,7 +162,7 @@ test('errors are reported, and the problem report explains the state', () => {
   const wow = client();
   wow.exec('__handled = {}; function geterrorhandler() return function(e) table.insert(__handled, e) end end');
   wow.exec('__ns.on("WOWGUILD_TEST", function() error("boom") end); __fire("WOWGUILD_TEST")');
-  assert.match(wow.eval('__handled[1]'), /wow guild: .*boom/);
+  assert.match(wow.eval('__handled[1]'), /Guild Camp: .*boom/);
   wow.fire('TRADE_SKILL_SHOW');
   wow.exec('__ns.showReport()');
   const report = wow.eval('WowGuildReport.edit:GetText()');
