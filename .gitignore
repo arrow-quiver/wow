@@ -1,0 +1,10 @@
+node_modules/
+dist/
+*.db
+*.db-*
+.env
+.release.json
+server/data/
+app/dist/
+*.log
+.DS_Store

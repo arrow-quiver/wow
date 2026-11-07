@@ -1,0 +1,61 @@
+# electron-builder settings for the Guild Camp desktop app.
+# Build the Windows installer with `npm run dist` (in app/), or let scripts/release.js do it.
+# The output in dist/ (installer, .blockmap, latest.yml) is what gets published to the server;
+# the app then updates itself from <server>/updates/app (electron-updater, generic provider).
+appId: com.arrowquiver.guildcamp
+productName: Guild Camp
+
+directories:
+  output: dist
+  buildResources: build
+
+files:
+  - src/**/*
+  - package.json
+  - "!**/*.test.js"
+
+# The addon ships inside the app, so a fresh install can set it up without a download.
+# At runtime it is at process.resourcesPath/addon/WowGuild.
+extraResources:
+  - from: ../addon/WowGuild
+    to: addon/WowGuild
+    filter:
+      - "**/*"
+
+asar: true
+# No native modules in the app, so there is nothing to rebuild.
+npmRebuild: false
+
+win:
+  target: nsis
+  icon: build/icon.png
+  artifactName: "Guild-Camp-Setup-${version}.${ext}"
+
+nsis:
+  oneClick: true
+  perMachine: false
+  deleteAppDataOnUninstall: false
+  shortcutName: Guild Camp
+
+# guildcamp://join/<code> links from /join/<code> open the app.
+protocols:
+  - name: Guild Camp
+    schemes:
+      - guildcamp
+
+# Always write latest.yml, even for a -beta.N version: without this electron-builder names the
+# manifest after the prerelease tag (beta.yml) and embeds `channel: beta` in app-update.yml, but
+# the server keeps one manifest (updates/app/latest.yml) and the updater reads only that one.
+detectUpdateChannel: false
+
+# Writes latest.yml next to the installer and app-update.yml into the app. The URL here is only
+# the fallback: the app points the updater at the server it is signed in to.
+publish:
+  - provider: generic
+    url: "https://wow.cjplumbing.co.za/updates/app"
+
+mac:
+  target:
+    - dmg
+    - zip
+  category: public.app-category.games

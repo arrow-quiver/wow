@@ -1,0 +1,22 @@
+{
+  "name": "guild-camp-server",
+  "version": "0.11.0",
+  "private": true,
+  "description": "Guild Camp API server (Node + SQLite)",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --env-file-if-exists=.env src/index.js",
+    "test": "node --test \"test/**/*.test.js\""
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.11.1",
+    "express": "^5.3.0"
+  },
+  "devDependencies": {
+    "fengari": "^0.1.5"
+  },
+  "allowScripts": {
+    "better-sqlite3@12.11.1": true
+  }
+}

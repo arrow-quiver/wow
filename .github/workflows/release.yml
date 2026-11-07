@@ -1,0 +1,103 @@
+# Builds and publishes Guild Camp releases to the server.
+#
+#   app-v<version>    tag → build the Windows installer, upload it, make it live
+#   addon-v<version>  tag → zip the addon, upload it (and to CurseForge when CF_API_TOKEN is set)
+#
+# Make the tag with: node scripts/release.js addon --bump patch --tag-only --push
+# (or app). The tag must match the version in the files; this workflow never bumps versions.
+#
+# Repository secrets (Settings → Secrets and variables → Actions):
+#   GUILDCAMP_PUBLISH_TOKEN  same value as PUBLISH_TOKEN on the server (required)
+#   GUILDCAMP_SERVER         server address (optional; defaults to https://wow.cjplumbing.co.za)
+#   CF_API_TOKEN             CurseForge API token (optional; addon only)
+#
+# A version that is already on the server (published from a laptop, then the tag was pushed) is
+# skipped, not an error.
+name: Release
+
+on:
+  push:
+    tags: ['app-v*', 'addon-v*']
+  workflow_dispatch:
+    inputs:
+      kind:
+        description: What to publish (the version already in the files)
+        type: choice
+        options: [addon, app]
+        required: true
+      notes:
+        description: Release notes (leave empty to use the commits since the last tag)
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  app:
+    if: startsWith(github.ref_name, 'app-v') || (github.event_name == 'workflow_dispatch' && inputs.kind == 'app')
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history and tags, for the changelog
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - name: Install app dependencies
+        run: npm ci --prefix app
+      - name: Check the tag matches app/package.json
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          v=$(node -p "require('./app/package.json').version")
+          if [ "$GITHUB_REF_NAME" != "app-v$v" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME doesn't match app/package.json version $v. Bump the version, commit, then tag app-v<version>."
+            exit 1
+          fi
+      - name: Build and publish
+        shell: bash
+        env:
+          GUILDCAMP_SERVER: ${{ secrets.GUILDCAMP_SERVER }}
+          GUILDCAMP_PUBLISH_TOKEN: ${{ secrets.GUILDCAMP_PUBLISH_TOKEN }}
+          NOTES: ${{ inputs.notes }}
+        run: |
+          args=(app --no-bump --skip-published)
+          if [ -n "$NOTES" ]; then args+=(--notes "$NOTES"); else args+=(--notes-from-git); fi
+          node scripts/release.js "${args[@]}"
+
+  addon:
+    if: startsWith(github.ref_name, 'addon-v') || (github.event_name == 'workflow_dispatch' && inputs.kind == 'addon')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history and tags, for the changelog
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Check the tag matches WowGuild.toc
+        if: github.event_name == 'push'
+        run: |
+          v=$(node -p "require('./app/src/shared/toc').tocVersion(require('fs').readFileSync('addon/WowGuild/WowGuild.toc','utf8'))")
+          if [ "$GITHUB_REF_NAME" != "addon-v$v" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME doesn't match \"## Version: $v\" in WowGuild.toc. Bump the version, commit, then tag addon-v<version>."
+            exit 1
+          fi
+      - name: Zip and publish
+        env:
+          GUILDCAMP_SERVER: ${{ secrets.GUILDCAMP_SERVER }}
+          GUILDCAMP_PUBLISH_TOKEN: ${{ secrets.GUILDCAMP_PUBLISH_TOKEN }}
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          NOTES: ${{ inputs.notes }}
+        run: |
+          args=(addon --no-bump --skip-published)
+          if [ -n "$NOTES" ]; then args+=(--notes "$NOTES"); else args+=(--notes-from-git); fi
+          if [ -n "$CF_API_TOKEN" ]; then args+=(--curseforge); fi
+          node scripts/release.js "${args[@]}"
