@@ -1,14 +1,14 @@
-/* WoW: Forever palette: deep sea blue from the logo backdrop, emblem gold, parchment. */
+/* WoW: Forever palette: slate-navy frame, emblem blue, Warcraft gold, cream lettering. */
 :root {
-  --pine: #0b3a4a;
-  --pine-2: #12596f;
-  --ember: #e2b257;
-  --ember-deep: #9c7128;
-  --mist: #edf2f3;
-  --paper: #f9fbfb;
-  --ink: #15232b;
-  --ink-2: #48606b;
-  --line: #cbd8dc;
+  --pine: #18222e;
+  --pine-2: #1a5d8f;
+  --ember: #eaa93a;
+  --ember-deep: #a8701f;
+  --mist: #f4f0e7;
+  --paper: #fbf9f4;
+  --ink: #1a2230;
+  --ink-2: #55606c;
+  --line: #ddd4c2;
   --alarm: #b3392f;
   --ok: #3f8a5a;
   --radius-s: 4px;
@@ -17,13 +17,13 @@
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --mist: #0a1c23; --paper: #10303b; --ink: #e9eff1; --ink-2: #a3b9c0; --line: #23495a;
-    --pine: #06161c; --pine-2: #144a5c; color-scheme: dark;
+    --mist: #10161e; --paper: #18212c; --ink: #f1ebdd; --ink-2: #aab3bd; --line: #2c3a4b;
+    --pine: #0b1017; --pine-2: #1d4f78; color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --mist: #0a1c23; --paper: #10303b; --ink: #e9eff1; --ink-2: #a3b9c0; --line: #23495a;
-  --pine: #06161c; --pine-2: #144a5c; color-scheme: dark;
+  --mist: #10161e; --paper: #18212c; --ink: #f1ebdd; --ink-2: #aab3bd; --line: #2c3a4b;
+  --pine: #0b1017; --pine-2: #1d4f78; color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -49,14 +49,14 @@ code { font-size: .9em; background: color-mix(in srgb, var(--ink) 8%, transparen
 .shell { display: grid; grid-template-columns: 230px 1fr; min-height: 100vh; }
 .shell--bare { grid-template-columns: minmax(0, 1fr); }
 .side, .main { min-width: 0; }
-.side { background: var(--pine); color: #e6eef1; padding: 1.4rem 1rem; display: flex; flex-direction: column; gap: 1.6rem; position: sticky; top: 0; height: 100vh; }
+.side { background: var(--pine); color: #efe8d8; padding: 1.4rem 1rem; display: flex; flex-direction: column; gap: 1.6rem; position: sticky; top: 0; height: 100vh; }
 .side .brand { display: flex; align-items: center; gap: .6rem; color: #fff; text-decoration: none; font: 800 1.6rem "Alegreya", serif; }
 .nav { display: flex; flex-direction: column; gap: .15rem; }
-.side .nav-link { color: #c8d9df; text-decoration: none; padding: .45rem .7rem; border-radius: var(--radius-s); }
+.side .nav-link { color: #d0d7df; text-decoration: none; padding: .45rem .7rem; border-radius: var(--radius-s); }
 .side .nav-link:hover { background: var(--pine-2); color: #fff; }
 .side .nav-link.is-active { background: var(--pine-2); color: #fff; box-shadow: inset 3px 0 0 var(--ember); }
 .side-foot { margin-top: auto; font-size: .9rem; display: flex; flex-direction: column; gap: .3rem; }
-.who { color: #c8d9df; }
+.who { color: #d0d7df; }
 .link-btn { background: none; border: 0; padding: 0; color: var(--ember); cursor: pointer; font: inherit; text-decoration: underline; }
 .main { padding: 2.2rem clamp(16px, 4vw, 3.5rem) 4rem; max-width: 1180px; width: 100%; }
 .flash { background: var(--paper); border-left: 4px solid var(--ok); padding: .6rem .9rem; border-radius: var(--radius-s); }
@@ -84,7 +84,7 @@ label { display: flex; flex-direction: column; gap: .25rem; font-weight: 500; fo
 }
 .btn:hover { border-color: var(--ink-2); }
 .btn-primary { background: var(--ember); border-color: var(--ember-deep); color: #231505; }
-.btn-primary:hover { background: #ecc272; border-color: var(--ember-deep); }
+.btn-primary:hover { background: #f2bd5c; border-color: var(--ember-deep); }
 .btn-alarm { background: var(--alarm); border-color: #8c2a22; color: #fff; }
 .btn-alarm:hover { background: #c4443a; border-color: #8c2a22; }
 .btn-small { padding: .3rem .65rem; font-size: .88rem; }
@@ -244,7 +244,7 @@ th.num, td.num { text-align: right; }
 details > summary { cursor: pointer; }
 .setting details { margin: .5rem 0; }
 /* Sidebar links keep their own colours in dark mode too. */
-body .side a.nav-link { color: #c8d9df; }
+body .side a.nav-link { color: #d0d7df; }
 body .side a.nav-link:hover, body .side a.nav-link.is-active { color: #fff; }
 body .side a.brand { color: #fff; }
 
