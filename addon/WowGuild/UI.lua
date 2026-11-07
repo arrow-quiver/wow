@@ -1,4 +1,4 @@
--- wow guild: guild news text and the login message.
+-- Guild Camp: guild news text and the login message.
 local ADDON, ns = ...
 
 

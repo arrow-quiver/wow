@@ -1,4 +1,4 @@
--- wow guild: the Coach. Learns how you play (outside combat only), keeps your quiz answers,
+-- Guild Camp: the Coach. Learns how you play (outside combat only), keeps your quiz answers,
 -- reads talents and gear, and works out your next steps. The companion carries it to the
 -- site, where Claude writes your build plan and answers questions; they come back in the inbox.
 local ADDON, ns = ...

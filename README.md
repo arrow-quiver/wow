@@ -4,7 +4,7 @@ Phase 1 of the guild platform for **World of Warcraft: Forever** (PvP ruleset). 
 
 ```
 web/         the website (Node + SQLite), deploys to Coolify with the Dockerfile
-addon/       WowGuild, the in-game addon (Forever interface 16001, Retail 120105)
+addon/       WowGuild, the in-game addon, listed as "Guild Camp" (Forever interface 16001, Retail 120105)
 companion/   the desktop app that carries data between the game and the site
 ```
 
@@ -12,7 +12,7 @@ companion/   the desktop app that carries data between the game and the site
 
 1. **The addon** saves data out of combat into WoW's SavedVariables file: your character, professions, learned recipes, the guild roster with who's online, and any `/wow cta` calls.
 2. WoW writes that file when you **log out or `/reload`**. Addons can't send data any other way, and can't talk to other players inside dungeons or raids.
-3. **The companion** sees the file change, uploads it to `/api/sync`, then downloads news and writes it to `addon/WowGuild/Data/Inbox.lua`. News covers notices, crafting requests you can make, and leveling partners.
+3. **The companion** sees the file change, uploads it to `/api/sync`, then downloads news and writes it to `Interface\AddOns\WowGuild_Inbox`. That's a small addon of its own, which WowGuild loads first as an optional dependency. Keeping it separate means the `WowGuild` folder stays exactly as shipped, because CurseForge replaces that folder on every update. News covers notices, crafting requests you can make, and leveling partners. Addon 0.8 and older read `WowGuild\Data\Inbox.lua` instead: companion 0.6.0 still writes that file for them, and removes it once the addon is updated.
 4. On the next reload, the addon shows that news (`/wow` opens the panel).
 
 ## What's in Phase 1
@@ -87,7 +87,7 @@ Built into the guild addon. It only reads profession and bag data, out of combat
 It writes `companion.log` next to itself. Send that file when something isn't syncing. If the site is unreachable, it retries with growing waits (5 seconds up to 5 minutes) instead of hammering it.
 
 ### Addon options
-`/wow options` (or Settings → AddOns → wow guild):
+`/wow options` (or Settings → AddOns → Guild Camp):
 - login news
 - update notices
 - auto-open the skill-up guide
@@ -110,13 +110,35 @@ The addon also records PvP rank and honor, reputations and currencies (for examp
 
 ## Install for each player
 
-1. Copy `addon/WowGuild` into the game's `Interface\AddOns` folder. For Forever that's probably `World of Warcraft\_forever_\Interface\AddOns` (check which `_xxx_` folder Forever uses).
+1. Install **Guild Camp** from CurseForge once it's listed, or copy `addon/WowGuild` into the game's `Interface\AddOns` folder. For Forever that's probably `World of Warcraft\_forever_\Interface\AddOns` (check which `_xxx_` folder Forever uses).
 2. Put `wow-companion.exe` anywhere and run it once. It creates `config.json` next to itself.
 3. On the site: Settings → **Create sync key**. In `config.json`, set `syncKey` and `siteUrl`. If the companion can't find the game, set `wowFolder` to the folder that contains `Interface` and `WTF`.
 4. Run the companion and leave it open while playing.
 5. In game: open each profession window once so its recipes get saved, then `/reload`.
 
 Windows may show a SmartScreen warning the first time, because the exe isn't code-signed. Choose "More info → Run anyway".
+
+## Releasing the addon on CurseForge
+
+The addon is listed as **Guild Camp**. CurseForge rejects names that contain "WoW" or other generic terms. The folder, SavedVariables and slash commands keep the `WowGuild` / `/wow` names, so existing installs carry on working. Addon 0.9.0 needs companion 0.6.0 or newer, because that's the version that writes the news into `WowGuild_Inbox`.
+
+**First time:**
+1. On CurseForge's author site, create a project: World of Warcraft → Addons. The name, summary, description and categories are in `addon/CURSEFORGE.md`.
+2. Run `node web/scripts/curseforge.js --dry-run`. It builds `WowGuild-<version>.zip` in your temp folder. Upload that zip as the first file, tagged **WoW Forever** and **Retail**.
+3. Wait for CurseForge to approve the project.
+4. Copy the project ID from the About Project box and add `## X-Curse-Project-ID: <id>` to `addon/WowGuild/WowGuild.toc`.
+5. In the CurseForge author dashboard, create an API token. Add it to the GitHub repo as the secret `CF_API_TOKEN` (Settings → Secrets and variables → Actions).
+
+**Each release:**
+1. Bump `## Version:` in `WowGuild.toc` and commit. The site's `/get` page and update notices read the same line.
+2. Tag the commit and push the tag:
+   ```
+   git tag addon-v0.9.1
+   git push origin addon-v0.9.1
+   ```
+   `.github/workflows/curseforge.yml` uploads the zip, with a changelog built from commits that touched `addon/WowGuild` since the last `addon-v*` tag. Tags containing `beta` or `alpha` upload as beta or alpha files.
+
+The upload script tags each file with the game versions in `## Interface:`, matching 16001 → Forever 1.60.1 and 120105 → Retail 12.1.5. If CurseForge doesn't list that exact version yet, it uses the newest one below it and prints a warning.
 
 ## Coach (addon 0.8.0+, companion 0.5.0+)
 
@@ -155,7 +177,7 @@ Windows may show a SmartScreen warning the first time, because the exe isn't cod
 
 ## In-game window (addon 0.6.0)
 
-No typing needed. Click the **campfire button on the minimap**. Right-click it for settings, or drag it to move it. In Retail it's also in the addon drawer, and you can set a key under Key Bindings → AddOns → wow guild.
+No typing needed. Click the **campfire button on the minimap**. Right-click it for settings, or drag it to move it. In Retail it's also in the addon drawer, and you can set a key under Key Bindings → AddOns → Guild Camp.
 
 | Tab | What's there |
 |---|---|

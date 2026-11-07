@@ -1,4 +1,4 @@
--- wow guild: profession helper.
+-- Guild Camp: profession helper.
 --   Skill-up guide: ranks the recipes you know by cost per expected skill point.
 --   Shopping list: recipes × quantity → the mats you still need, ticking off as you loot.
 -- Everything here reads profession and bag data out of combat; nothing touches combat.
@@ -177,8 +177,8 @@ function P.makeAuctionatorList()
   local names = P.missingNames()
   local api = P.hasAuctionator() and Auctionator.API.v1
   if #names == 0 or not api or not api.CreateShoppingList then return false end
-  local ok = pcall(api.CreateShoppingList, "WowGuild", "wow guild shopping list", names)
-  if ok then ns.print("Made an Auctionator shopping list called \"wow guild shopping list\".") end
+  local ok = pcall(api.CreateShoppingList, "WowGuild", "Guild Camp shopping list", names)
+  if ok then ns.print("Made an Auctionator shopping list called \"Guild Camp shopping list\".") end
   return ok
 end
 

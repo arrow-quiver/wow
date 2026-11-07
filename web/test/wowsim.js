@@ -163,12 +163,14 @@ class WowClient {
     this.L = L;
     this.exec(PRELUDE, 'prelude');
     if (savedVariables) this.exec(savedVariables, 'SavedVariables');
+    // The companion's news addon (WowGuild_Inbox) is an optional dependency, so WoW loads it first.
+    if (inboxFile) this.exec(fs.readFileSync(inboxFile, 'utf8'), 'WowGuild_Inbox/Inbox.lua');
     // Load addon files in .toc order, each with (addonName, namespace) as varargs like WoW does.
     this.exec('__ns = {}', 'ns');
     const toc = fs.readFileSync(path.join(ADDON_DIR, 'WowGuild.toc'), 'utf8');
     const files = toc.split(/\r?\n/).filter((l) => l.trim() && !l.startsWith('#')).map((l) => l.trim().replace(/\\/g, '/'));
     for (const f of files) {
-      const src = f === 'Data/Inbox.lua' && inboxFile ? fs.readFileSync(inboxFile, 'utf8') : fs.readFileSync(path.join(ADDON_DIR, f), 'utf8');
+      const src = fs.readFileSync(path.join(ADDON_DIR, f), 'utf8');
       run(L, src, f);
       lua.lua_pushstring(L, to_luastring('WowGuild'));
       lua.lua_getglobal(L, to_luastring('__ns'));

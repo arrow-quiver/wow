@@ -1,14 +1,13 @@
 ## Interface: 16001, 120105
-## Title: wow guild
-## Notes: Syncs your character, professions, recipes and the guild roster to the guild website. Shows notices and crafting requests from the site. Profession skill-up guide and shopping list.
-## Author: wow
-## Version: 0.8.0
+## Title: Guild Camp
+## Notes: Profession skill-up guide and shopping list, and a Coach with play-style tracking and next steps. With the companion app, it syncs your characters, professions and guild roster with your guild's website and brings guild news, raids and build plans back into the game.
+## Author: Calvin
+## Version: 0.9.0
 ## SavedVariables: WowGuildDB
-## OptionalDeps: Auctionator
+## OptionalDeps: Auctionator, WowGuild_Inbox
 ## IconTexture: Interface\Icons\Spell_Fire_Fire
 ## AddonCompartmentFunc: WowGuild_OnAddonCompartmentClick
 
-Data\Inbox.lua
 Core.lua
 Items.lua
 Collect.lua
