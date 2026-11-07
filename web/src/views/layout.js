@@ -34,7 +34,7 @@ const NAV = [
   ['/admin', 'Officer tools', 'admin', 'officer'],
 ];
 
-function layout({ title, active, user, guild, body, csrf, flash }) {
+function layout({ title, active, user, guild, body, csrf, flash, preview }) {
   const nav = guild
     ? NAV.filter((n) => n[3] !== 'officer' || ['owner', 'officer'].includes(guild.role)).map(([href, label, key]) => `<a href="${href}" class="nav-link${key === active ? ' is-active' : ''}"${key === active ? ' aria-current="page"' : ''}>${label}</a>`).join('')
     : '';
@@ -69,6 +69,7 @@ function layout({ title, active, user, guild, body, csrf, flash }) {
     </div>
   </header>` : ''}
   <main class="main" id="main">
+    ${preview ? '<p class="flash" role="note">Preview site for testing. Its data is separate, and it sends nothing to Discord, Battle.net or phones.</p>' : ''}
     ${flash ? `<p class="flash" role="status">${esc(flash)}</p>` : ''}
     ${body}
   </main>

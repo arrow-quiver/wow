@@ -17,25 +17,42 @@ const ai = require('./ai');
 const { calendarToken } = require('./calendar');
 const fs = require('fs');
 
+// First URL from Coolify's COOLIFY_URL / COOLIFY_FQDN (may be a comma-separated list, scheme optional).
+function coolifyUrl(env) {
+  const first = String(env.COOLIFY_URL || env.COOLIFY_FQDN || '').split(',').map((u) => u.trim()).find(Boolean);
+  if (!first) return '';
+  return /^https?:\/\//.test(first) ? first : `https://${first}`;
+}
+
 function config(env = process.env) {
+  // Preview deployments (one per pull request). Set PREVIEW=1 in Coolify's *preview* variables only.
+  // A preview uses its own database and never talks to Discord, Battle.net, web push or Claude.
+  const preview = env.PREVIEW === '1' || env.PREVIEW === 'true';
+  // On a preview, Coolify's own URL wins so a BASE_URL copied from production can't leak into links.
+  const baseUrl = ((preview ? coolifyUrl(env) || env.BASE_URL : env.BASE_URL || coolifyUrl(env)) || 'http://localhost:3000').replace(/\/$/, '');
+  const prodDb = env.DB_FILE || path.join(__dirname, '..', 'data', 'wow.db');
+  const off = (v) => (preview ? '' : v || '');
   return {
+    preview,
     port: Number(env.PORT || 3000),
-    baseUrl: (env.BASE_URL || 'http://localhost:3000').replace(/\/$/, ''),
-    sessionSecret: env.SESSION_SECRET || (env.NODE_ENV === 'production' ? null : 'dev-secret-change-me'),
-    dbFile: env.DB_FILE || path.join(__dirname, '..', 'data', 'wow.db'),
-    bnetClientId: env.BNET_CLIENT_ID || '',
-    bnetClientSecret: env.BNET_CLIENT_SECRET || '',
-    devLogin: env.DEV_LOGIN === '1',
+    baseUrl,
+    sessionSecret: env.SESSION_SECRET || (env.NODE_ENV === 'production' && !preview ? null : 'dev-secret-change-me'),
+    // Previews never open the production database file, even if the volume is shared by mistake.
+    dbFile: preview ? env.PREVIEW_DB_FILE || path.join(path.dirname(prodDb), 'preview.db') : prodDb,
+    bnetClientId: off(env.BNET_CLIENT_ID),
+    bnetClientSecret: off(env.BNET_CLIENT_SECRET),
+    // Battle.net needs an exact redirect URL per site, so previews sign in by typing a BattleTag.
+    devLogin: env.DEV_LOGIN === '1' || (preview && env.DEV_LOGIN !== '0'),
     // Used only when a browser doesn't send its own offset. -120 = South Africa (UTC+2).
     defaultTzOffset: Number(env.DEFAULT_TZ_OFFSET ?? -120),
     timers: env.NODE_ENV !== 'test',
     // Discord app (slash commands). From discord.com/developers/applications.
-    discordAppId: env.DISCORD_APP_ID || '',
-    discordPublicKey: env.DISCORD_PUBLIC_KEY || '',
-    discordBotToken: env.DISCORD_BOT_TOKEN || '',
+    discordAppId: off(env.DISCORD_APP_ID),
+    discordPublicKey: off(env.DISCORD_PUBLIC_KEY),
+    discordBotToken: off(env.DISCORD_BOT_TOKEN),
     bnetRegion: (env.BNET_REGION || 'eu').toLowerCase(),
     // Coach (Claude API). Without a key the Coach still tracks play style; AI features are off.
-    anthropicKey: env.ANTHROPIC_API_KEY || '',
+    anthropicKey: off(env.ANTHROPIC_API_KEY),
     coachModel: env.COACH_MODEL || 'claude-sonnet-5-5',
     coachFastModel: env.COACH_FAST_MODEL || 'claude-haiku-5-5',
   };
@@ -112,7 +129,8 @@ function createApp(cfg, db) {
   app.use('/api', express.json({ limit: '15mb' }));
   app.use('/push', express.json({ limit: '10kb' }));
   // Web push to phones/desktops. cfg.pushSend lets tests capture notifications.
-  const push = createPush(db, cfg, cfg.pushSend ? { send: cfg.pushSend } : {});
+  // Previews keep subscriptions but never send, so no real phone buzzes from a test site.
+  const push = createPush(db, cfg, cfg.pushSend ? { send: cfg.pushSend } : cfg.preview ? { send: async () => {} } : {});
   app.locals.push = push;
   const notify = (...a) => push.notify(...a).catch((e) => console.warn('Notify failed:', e.message));
   app.use(express.urlencoded({ extended: false, limit: '50kb' }));
@@ -136,6 +154,7 @@ function createApp(cfg, db) {
 
   async function discord(guild, content) {
     if (!guild.discord_webhook) return;
+    if (cfg.preview) { console.log('[preview] Discord webhook skipped:', content.slice(0, 120)); return; }
     try {
       await fetch(guild.discord_webhook, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -152,7 +171,7 @@ function createApp(cfg, db) {
     req.csrf = s ? s.csrf : '';
     req.guild = req.user ? q.membership.get(req.user.id) : null;
     if (req.guild && req.guild.wowhead_game) wowhead.setGame(req.guild.wowhead_game);
-    res.page = (opts) => res.send(layout({ user: req.user, guild: req.guild, csrf: req.csrf, flash: req.query.m, ...opts }));
+    res.page = (opts) => res.send(layout({ user: req.user, guild: req.guild, csrf: req.csrf, flash: req.query.m, preview: cfg.preview, ...opts }));
     next();
   });
   // CSRF on all browser POSTs (API uses bearer tokens instead)
@@ -670,7 +689,7 @@ function createApp(cfg, db) {
 if (require.main === module) {
   const cfg = config();
   const db = dbm.open(cfg.dbFile);
-  createApp(cfg, db).listen(cfg.port, () => console.log(`wow listening on ${cfg.port} (${cfg.baseUrl})`));
+  createApp(cfg, db).listen(cfg.port, () => console.log(`wow listening on ${cfg.port} (${cfg.baseUrl})${cfg.preview ? ` PREVIEW, database ${cfg.dbFile}` : ''}`));
   // Daily database backups into /data/backups (kept 14 days).
   const dir = backup.backupDir(cfg.dbFile);
   const tick = () => { try { const f = backup.backupIfDue(db, dir); if (f) console.log('Backup written:', f); } catch (e) { console.error('Backup failed:', e.message); } };

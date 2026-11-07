@@ -108,6 +108,34 @@ The addon also records PvP rank and honor, reputations and currencies (for examp
 5. Deploy, open the site, sign in with Battle.net, and create the guild. **The first person to create it becomes the owner.**
 6. Settings → copy the invite link for guildies, and paste a Discord webhook URL.
 
+### Preview deployments (one test site per pull request)
+
+Every pull request on GitHub can get its own throwaway copy of the site, for example `https://pr-12.wow.cjplumbing.co.za`. Coolify builds it from the PR branch and removes it when the PR is closed or merged.
+
+A preview is started with `PREVIEW=1`. In that mode the site:
+
+- uses Coolify's own address for the preview (`COOLIFY_URL`), even if a production `BASE_URL` was copied over
+- opens `preview.db` (or `PREVIEW_DB_FILE`), never the production `wow.db`, even if the volume is shared by mistake
+- ignores the Battle.net, Discord and Claude keys, so it makes no Blizzard API calls, posts nothing to Discord and spends no Claude credit
+- never sends web push notifications, and skips Discord webhooks a tester pastes in (they go to the log instead)
+- signs in by typing a BattleTag, because Battle.net only accepts exact redirect URLs (set `DEV_LOGIN=0` to turn this off)
+- shows a banner saying it's a preview
+
+Anyone who can open a preview URL can sign in to it, so don't put real guild data in one.
+
+**Coolify checklist (once):**
+
+1. **Source:** the app must be connected through a **GitHub App** source (Sources → GitHub App → install it on `arrow-quiver/wow`). A public-repo or deploy-key source can't see pull requests. If the app uses another source now, add the GitHub App and switch the app's source to it.
+2. **DNS:** add a wildcard record `*.wow.cjplumbing.co.za` pointing at the Coolify server (same IP as `wow.cjplumbing.co.za`). Coolify gets a certificate for each preview address on its own.
+3. **App → Preview Deployments:** turn on **Preview Deployments**, and set the **Preview URL Template** to `pr-{{pr_id}}.{{domain}}`.
+4. **App → Environment Variables → Preview Deployments section:** add
+   - `PREVIEW` = `1` (preview section only, never production)
+   - `SESSION_SECRET` = a different random string from production
+   - leave `BNET_*`, `DISCORD_*` and `ANTHROPIC_API_KEY` out. They're ignored on previews anyway.
+5. **Persistent storage:** keep the `/data` volume. Coolify gives each preview its own copy of the volume (named with `-pr-<number>`), and the preview database file is separate as well.
+6. **Pull requests from forks:** leave preview deployments for outside contributors off (or approval-only), so strangers can't run code on the server.
+7. Open a test PR and check that Coolify posts the preview link on it, the banner shows, and BattleTag sign-in works. Close the PR and check that the preview disappears.
+
 ## Install for each player
 
 1. Copy `addon/WowGuild` into the game's `Interface\AddOns` folder. For Forever that's probably `World of Warcraft\_forever_\Interface\AddOns` (check which `_xxx_` folder Forever uses).
