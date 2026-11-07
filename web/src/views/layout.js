@@ -52,7 +52,7 @@ function layout({ title, active, user, guild, body, csrf, flash }) {
 <script src="/intro.js"></script>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="manifest" href="/manifest.webmanifest">
-<meta name="theme-color" content="#0b3a4a">
+<meta name="theme-color" content="#18222e">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <script src="/app.js" defer></script>
 <script src="/wowhead-config.js" defer></script>
