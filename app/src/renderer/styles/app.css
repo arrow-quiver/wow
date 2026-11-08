@@ -318,6 +318,7 @@ th[aria-sort="ascending"] .th-sort .icon, th[aria-sort="descending"] .th-sort .i
 .errorbox-body { display: flex; flex-direction: column; gap: var(--s-2); align-items: flex-start; min-width: 0; }
 
 .notice { display: flex; gap: var(--s-3); align-items: flex-start; padding: var(--s-3) var(--s-4); border-radius: var(--radius-m); border: 1px solid var(--line); background: var(--surface-2); }
+.roster-guild-action { margin-top: var(--s-2); }
 .notice > .icon { width: 20px; height: 20px; flex: none; margin-top: 1px; color: var(--info); }
 .notice--ok > .icon { color: var(--ok); } .notice--warn > .icon { color: var(--warn); } .notice--alarm > .icon { color: var(--alarm); }
 .notice--warn { border-color: color-mix(in srgb, var(--warn) 45%, var(--line)); background: color-mix(in srgb, var(--warn) 9%, var(--surface)); }

@@ -260,6 +260,7 @@ function createSync({ api, store, log, wow, appVersion, coreEvents, ...opts } = 
   let lastEmitted = null;
   let appNagged = false;
   let guildNote = null; // the core's last "none of your characters is in a guild yet" message (logged once)
+  let guildOffer = null; // { name, realm } the roster scan named while guildNote is set: the app asks the player
   let restartMemo = null; // settings.inboxRestart kept here when there is no store, or its last save failed
   let lastGameCheckAt = -Infinity;
 
@@ -370,6 +371,7 @@ function createSync({ api, store, log, wow, appVersion, coreEvents, ...opts } = 
    *   lastSyncAt, lastResult: { characters, roster, recipes, ctas, inventory, bank, prices,
    *     coachPending, account, label, guild: { name, role }|null }|null, lastError,
    *   guildNote: string|null   (the core stored nothing because no character is in a guild yet)
+   *   guildOffer: { name, realm }|null   (with guildNote: the guild the roster scan named, for the player to accept)
    *   files: [{ file, account, install (game folder), label, flavor, lastUploadAt, lastError, nextRetryAt }],
    *   nextRetryAt, installCount, coachWaiting,
    *   restartNeeded: boolean   (a game folder's news folder was made during the game session still running: what the
@@ -397,6 +399,7 @@ function createSync({ api, store, log, wow, appVersion, coreEvents, ...opts } = 
       lastResult: lastResult ? { ...lastResult } : null,
       lastError,
       guildNote,
+      guildOffer: guildOffer ? { ...guildOffer } : null,
       files: fileList.map((f) => {
         const rec = records.get(f.key);
         const fail = failures.get(f.key);
@@ -523,6 +526,10 @@ function createSync({ api, store, log, wow, appVersion, coreEvents, ...opts } = 
         remember({ at, kind: 'guild', ok: false, message: note, ...where });
       }
       guildNote = note;
+      const offer = note && result.rosterGuild && typeof result.rosterGuild === 'object' && typeof result.rosterGuild.name === 'string'
+        ? { name: result.rosterGuild.name, realm: typeof result.rosterGuild.realm === 'string' ? result.rosterGuild.realm : null }
+        : null;
+      guildOffer = offer;
       const guild = result.guild && typeof result.guild === 'object' ? result.guild : null;
       if (guild && result.switched && result.switched.created) {
         const message = `Guild Camp set up ${guild.name || 'your guild'}.`;

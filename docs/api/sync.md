@@ -93,6 +93,13 @@ answers:
 ```
 The app logs this once and does not treat it as a failure.
 
+When the upload's roster scan still names a guild (`roster.guild`: the old addon could save a character before
+the game knew its guild), the message says so and the reply adds `"rosterGuild": { "name", "realm" }`. Nothing
+is set up yet: Addon & sync asks "Is <guild> your guild?", and the player's yes calls
+`POST /api/sync/roster-guild` with `{ "name" }`. The name must match the offer the core stored from that upload
+(else 409); the guild is then set up like a first sync would (realm and faction from the most recently played
+character) and the app syncs again. Any upload that has a guild drops the offer.
+
 ### What the core does with it
 
 All of it is written in one transaction (`applyPayload`).

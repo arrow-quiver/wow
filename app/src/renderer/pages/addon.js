@@ -19,6 +19,7 @@ import {
 } from '../components/index.js';
 import { AuthorChecks } from '../components/AuthorChecks.js';
 import { NoGuild } from '../components/NoGuild.js';
+import { refreshSession } from '../lib/session.js';
 
 const LOG_LINES = 200;
 
@@ -349,6 +350,26 @@ export default function AddonPage({ query = {} }) {
 
 // ---------- summary cards (SyncCard and ShareSection are exported for tests) ----------
 
+// No character has a guild saved, but the roster scan named one: ask before Guild Camp sets it up.
+export function RosterGuildOffer({ note, offer }) {
+  const [busy, setBusy] = useState(false);
+  const accept = async () => {
+    setBusy(true);
+    try {
+      await api.post('/api/sync/roster-guild', { name: offer.name });
+      await refreshSession();
+      try { await gc.sync.now(); } catch { /* the guild is set up; the next /reload syncs it */ }
+      toast(`Guild Camp set up ${offer.name}.`, 'ok');
+    } catch (err) {
+      toast(err?.message || `Could not set up ${offer.name}.`, 'alarm');
+    } finally { setBusy(false); }
+  };
+  return html`<${Notice} kind="info" title=${`Is ${offer.name} your guild?`}>
+    ${note} If that's your guild, Guild Camp can set it up now.
+    <div class="roster-guild-action"><${Button} size="sm" variant="primary" icon="camp" busy=${busy} onClick=${accept}>Use ${offer.name}<//></div>
+  <//>`;
+}
+
 export function SyncCard({ sync, settings, onToggle }) {
   const d = describeSync(sync);
   const enabled = settings ? settings.syncEnabled !== false : sync?.enabled !== false;
@@ -363,7 +384,9 @@ export function SyncCard({ sync, settings, onToggle }) {
       ${result ? html`<p class="hint mb-0">Last sync had ${result}${guild ? ` for ${guild}` : ''}.</p>` : null}
       ${sync?.state === 'error' && sync.lastError ? html`<${Notice} kind="alarm" title="The last sync failed.">
         ${sync.lastError}${sync.nextRetryAt ? html` Trying again <${TimeAgo} t=${sync.nextRetryAt} />.` : null}<//>` : null}
-      ${sync?.guildNote && sync.state !== 'error' ? html`<${Notice} kind="info" title="Waiting for your guild.">${sync.guildNote}<//>` : null}
+      ${sync?.guildNote && sync.state !== 'error' ? (sync.guildOffer?.name
+        ? html`<${RosterGuildOffer} note=${sync.guildNote} offer=${sync.guildOffer} />`
+        : html`<${Notice} kind="info" title="Waiting for your guild.">${sync.guildNote}<//>`) : null}
       ${sync?.state === 'no-game' ? html`<${Notice} kind="warn">Guild Camp can't find World of Warcraft. Add your game folder below.<//>` : null}
       ${restartNoticeText(sync) && sync.state !== 'off' ? html`<${Notice} kind="info">${restartNoticeText(sync)}<//>` : null}
       ${sync && !['error', 'no-game', 'off'].includes(sync.state) && !sync.lastSyncAt && !sync.guildNote

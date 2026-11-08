@@ -1006,6 +1006,22 @@ describe('not in a guild yet', () => {
   const NO_GUILD = { ok: true, noGuild: true, message: NOTE, characters: 0, roster: 0, recipes: 0, ctas: 0, inventory: 0, bank: 0, prices: 0, coachPending: 0, latest: { app: null, addon: null } };
   const EMPTY_INBOX = { guild: '', generatedAt: 1730000000, coach: { pending: 0 }, latestAddon: '0.11.1' };
 
+  test('a roster guild the core offers shows in the status until an upload has a guild', async () => {
+    const offerNote = 'None of your characters has a guild saved, but your last guild roster scan was for Camp Fire.';
+    let reply = { ...NO_GUILD, message: offerNote, rosterGuild: { name: 'Camp Fire', realm: 'Zul\'jin', extra: 1 } };
+    const h = setup({ routes: { 'POST /api/sync': () => reply, 'GET /api/inbox': () => EMPTY_INBOX } });
+    let s = await h.sync.start();
+    assert.equal(s.guildNote, offerNote);
+    assert.deepEqual(s.guildOffer, { name: 'Camp Fire', realm: 'Zul\'jin' });
+    reply = NO_GUILD;
+    touch(h.forever.sv.ACCOUNT1);
+    await h.sync.poll();
+    s = h.sync.status();
+    assert.equal(s.guildOffer, null, 'no roster guild in the reply: no offer');
+    assert.equal(s.guildNote, NOTE);
+    h.sync.stop();
+  });
+
   test('the core stores nothing and says why: logged once, not a failure, and the next save goes up as usual', async () => {
     const h = setup({ routes: { 'POST /api/sync': () => NO_GUILD, 'GET /api/inbox': () => EMPTY_INBOX } });
     let s = await h.sync.start();

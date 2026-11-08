@@ -212,6 +212,41 @@ test('the first upload from the game sets the guild up: characters, roster, reci
   await srv.close();
 });
 
+test('no character has a guild but the roster scan names one: offered, and set up only when the player says yes', async (t) => {
+  const { db, owner, count } = await setup(t, { guild: false });
+  const old = {
+    addonVersion: '0.8.0',
+    characters: {
+      Gorm: { name: 'Gorm', level: 9, class: 'HUNTER', faction: 'Horde', realm: 'CAMWOW EU5 Realm 6 PvP', updated: 1794050747 },
+      Actual: { name: 'Actual', level: 4, faction: 'Horde', realm: 'CAMWOW EU5 Realm 6 PvP', updated: 1794058356 },
+    },
+    roster: { scannedAt: 1794050709, guild: 'Cheesy Dreamboys', members: [{ name: 'Gorm', rankIndex: 3, level: 9, class: 'HUNTER', online: true }] },
+  };
+  // A wrong name before any offer is refused.
+  let r = await owner.raw('POST', '/api/sync/roster-guild', { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Cheesy Dreamboys' }) });
+  assert.strictEqual(r.status, 409);
+
+  r = await upload(owner, old);
+  assert.strictEqual(r.body.noGuild, true);
+  assert.deepStrictEqual(r.body.rosterGuild, { name: 'Cheesy Dreamboys', realm: 'CAMWOW EU5 Realm 6 PvP' });
+  assert.match(r.body.message, /last guild roster scan was for Cheesy Dreamboys on CAMWOW/);
+  assert.strictEqual(count('guilds'), 0, 'nothing is set up without the player');
+
+  const accept = (name) => owner.raw('POST', '/api/sync/roster-guild', { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
+  assert.strictEqual((await accept('Some Other Guild')).status, 409, 'only the guild the game named');
+  r = await accept('cheesy dreamboys');
+  assert.strictEqual(r.status, 200);
+  assert.deepStrictEqual([r.body.guild.name, r.body.guild.faction, r.body.created], ['Cheesy Dreamboys', 'Horde', true]);
+  assert.strictEqual(db.prepare('SELECT realm FROM guilds').get().realm, 'CAMWOW EU5 Realm 6 PvP');
+  assert.strictEqual((await accept('Cheesy Dreamboys')).status, 409, 'the offer is used up');
+
+  // The same old save now goes up into that guild.
+  r = await upload(owner, old);
+  assert.strictEqual(r.body.noGuild, undefined);
+  assert.strictEqual(r.body.guild.name, 'Cheesy Dreamboys');
+  assert.ok(r.body.characters >= 2);
+});
+
 test('uploads before any guild, and the upload itself are checked', async (t) => {
   const fresh = await setup(t, { guild: false });
   // No character in a guild yet: accepted, nothing stored, and the reply says why in plain words.

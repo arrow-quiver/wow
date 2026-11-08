@@ -157,6 +157,21 @@ function guildFromPayload(payload) {
   return { name: s(c.guild, 60), realm: s(c.realm, 60), faction: faction(c.faction), updated: Number.isFinite(updated) && updated > 0 ? Math.trunc(updated) : 0 };
 }
 
+// When no character carries a guild (the old addon could save a character before the game knew its guild),
+// the guild named by the upload's roster scan, with the realm and faction of the most recently played character.
+// Only offered to the player (routes/sync.js): it is never picked without them saying yes.
+function rosterGuildFromPayload(payload) {
+  const roster = payload && payload.roster;
+  const name = roster && typeof roster === 'object' ? s(roster.guild, 60) : null;
+  if (!name) return null;
+  const chars = list(payload.characters)
+    .filter((c) => c && typeof c === 'object')
+    .sort((a, b) => (Number(b.updated) || 0) - (Number(a.updated) || 0));
+  const c = chars[0] || {};
+  const scanned = Number(roster.scannedAt);
+  return { name, realm: s(c.realm, 60), faction: faction(c.faction), updated: Number.isFinite(scanned) && scanned > 0 ? Math.trunc(scanned) : 0 };
+}
+
 // Picks (and the first time, creates) the guild of an upload's most recently played guild character.
 // It only replaces the current guild when that character was played more recently than any character
 // in the current guild, so uploads from another game folder don't flip it back and forth.
@@ -251,7 +266,7 @@ function bnetSummary(db, userId) {
 
 module.exports = {
   ME_KEY,
-  ensureMe, meId, applyIdentity, refreshMyName, currentGuild, guildFromPayload, selectGuild,
+  ensureMe, meId, applyIdentity, refreshMyName, currentGuild, guildFromPayload, rosterGuildFromPayload, selectGuild,
   roleFromRank, syncRanks, myMembership, bnetSummary, getSetting, setSetting, realmKey, notElsewhere, looseLast,
   guildKey, GUILDLESS_AFTER,
 };
