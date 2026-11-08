@@ -279,7 +279,19 @@ test('session: the local guild data plus the Battle.net sign-in', () => {
 
 test('settings helpers', async () => {
   const st = await load('pages/settings.js');
-  assert.deepEqual(st.SECTIONS.map((x) => x.id), ['battlenet', 'notifications', 'discord', 'coach', 'calendar', 'app', 'about']);
+  assert.deepEqual(st.SECTIONS.map((x) => x.id), ['guild', 'battlenet', 'notifications', 'discord', 'coach', 'calendar', 'app', 'about']);
+  // Your guild: set-up guilds first, then guilds only in the saved data, with the characters seen in each.
+  const options = st.guildOptions(
+    { guilds: [{ id: 1, name: 'Aunt bessys', realm: 'Silvermoon', myCharacters: 1 }, { id: 2, name: 'Cheesy Dreamboys', realm: null, myCharacters: 0 }] },
+    { characters: [
+      { name: 'Gorm', guild: 'cheesy dreamboys', realm: 'CAMWOW' },
+      { name: 'Actual', guild: 'Cheesy Dreamboys', realm: 'CAMWOW' },
+      { name: 'Pit', guild: 'Other Lot', realm: 'CAMWOW', faction: 'Horde', updated: 5 },
+      { name: 'Loner', guild: null },
+    ] });
+  assert.deepEqual(options.map((o) => [o.id, o.name, o.characters, o.known]),
+    [[1, 'Aunt bessys', [], true], [2, 'Cheesy Dreamboys', ['Gorm', 'Actual'], true], [null, 'Other Lot', ['Pit'], false]]);
+  assert.deepEqual(st.guildOptions(null, null), []);
   assert.equal(st.sectionFor('account'), 'battlenet', 'older links still work');
   assert.equal(st.sectionFor('discord'), 'discord');
   assert.equal(st.sectionFor('devices'), null);

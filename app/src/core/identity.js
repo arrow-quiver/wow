@@ -29,6 +29,8 @@ const { guildKey } = require('./db');
 
 const ME_KEY = 'local:me';
 const GUILD_KEY = 'guild_id';
+// The guild the player chose in Settings (a guild id). While set, uploads never switch to another guild.
+const PIN_KEY = 'guild_pinned';
 const DEFAULT_NAME = 'You';
 
 const s = (v, max) => (typeof v === 'string' || typeof v === 'number' ? String(v).trim().slice(0, max) || null : null);
@@ -175,7 +177,9 @@ function rosterGuildFromPayload(payload) {
 // Picks (and the first time, creates) the guild of an upload's most recently played guild character.
 // It only replaces the current guild when that character was played more recently than any character
 // in the current guild, so uploads from another game folder don't flip it back and forth.
-function selectGuild(db, { name, realm = null, faction: fac = null, updated = 0 } = {}) {
+// While the player has chosen a guild in Settings (pinnedGuild), it stays current and nothing new is created;
+// `force` (the player choosing, or accepting an offer) skips both rules.
+function selectGuild(db, { name, realm = null, faction: fac = null, updated = 0, force = false } = {}) {
   const gameName = s(name, 60);
   const before = currentGuild(db);
   if (!gameName) return { guild: before, created: false, switched: false };
@@ -185,7 +189,13 @@ function selectGuild(db, { name, realm = null, faction: fac = null, updated = 0 
   const guild = db.transaction(() => {
     const candidates = db.prepare('SELECT * FROM guilds WHERE guild_key(COALESCE(game_guild, name)) = ? ORDER BY id').all(guildKey(gameName));
     let g = candidates.find((x) => !realm || !x.realm || realmKey(x.realm) === realmKey(realm)) || null;
-    if (before && (!g || g.id !== before.id) && !(played > (before.last_played_at || 0))) {
+    const pinned = force ? null : pinnedGuild(db);
+    if (pinned && (!g || g.id !== pinned.id)) {
+      // The player chose another guild: keep it.
+      if (!before || before.id !== pinned.id) setSetting(db, GUILD_KEY, pinned.id);
+      return pinned;
+    }
+    if (!force && before && (!g || g.id !== before.id) && !(played > (before.last_played_at || 0))) {
       // Played less recently than the current guild: keep it (and don't create anything).
       return before;
     }
@@ -213,6 +223,51 @@ function selectGuild(db, { name, realm = null, faction: fac = null, updated = 0 
     return g;
   })();
   return { guild, created, switched: Boolean(before && before.id !== guild.id) };
+}
+
+/** The guild the player chose in Settings, or null (automatic). */
+function pinnedGuild(db) {
+  const id = Number(getSetting(db, PIN_KEY));
+  if (!Number.isInteger(id) || id <= 0) return null;
+  return db.prepare('SELECT * FROM guilds WHERE id = ?').get(id) || null;
+}
+
+// The player's choice in Settings: { auto: true } goes back to automatic; { id } or { name, realm, faction }
+// makes that guild current and keeps it (a guild seen only in the saved game data is set up first).
+function chooseGuild(db, choice = {}) {
+  if (choice.auto) {
+    setSetting(db, PIN_KEY, null);
+    return { guild: currentGuild(db), pinned: null, created: false };
+  }
+  let pick;
+  const id = Number(choice.id);
+  if (Number.isInteger(id) && id > 0) {
+    const g = db.prepare('SELECT * FROM guilds WHERE id = ?').get(id);
+    if (!g) return null;
+    pick = selectGuild(db, { name: g.game_guild || g.name, realm: g.realm, updated: Math.floor(Date.now() / 1000), force: true });
+  } else {
+    if (!s(choice.name, 60)) return null;
+    pick = selectGuild(db, { name: choice.name, realm: choice.realm, faction: choice.faction, updated: Math.floor(Date.now() / 1000), force: true });
+  }
+  setSetting(db, PIN_KEY, pick.guild.id);
+  return { guild: pick.guild, pinned: pick.guild.id, created: pick.created };
+}
+
+// Every guild Guild Camp has set up on this computer, last played first, with the current and chosen ones.
+function guildChoices(db) {
+  const current = currentGuild(db);
+  const pinned = pinnedGuild(db);
+  const guilds = db.prepare(`SELECT g.id, g.name, g.game_guild, g.realm, g.faction, g.last_played_at,
+      (SELECT COUNT(*) FROM characters c WHERE c.guild_id = g.id AND c.user_id = ?) AS my_characters
+    FROM guilds g ORDER BY COALESCE(g.last_played_at, 0) DESC, g.id`).all(ensureMe(db).id);
+  return {
+    currentId: current ? current.id : null,
+    pinnedId: pinned ? pinned.id : null,
+    guilds: guilds.map((g) => ({
+      id: g.id, name: g.game_guild || g.name, realm: g.realm || null, faction: g.faction || null,
+      lastPlayedAt: g.last_played_at || null, myCharacters: g.my_characters,
+    })),
+  };
 }
 
 function roleFromRank(best, max) {
@@ -266,7 +321,7 @@ function bnetSummary(db, userId) {
 
 module.exports = {
   ME_KEY,
-  ensureMe, meId, applyIdentity, refreshMyName, currentGuild, guildFromPayload, rosterGuildFromPayload, selectGuild,
+  ensureMe, meId, applyIdentity, refreshMyName, currentGuild, guildFromPayload, rosterGuildFromPayload, selectGuild, pinnedGuild, chooseGuild, guildChoices,
   roleFromRank, syncRanks, myMembership, bnetSummary, getSetting, setSetting, realmKey, notElsewhere, looseLast,
   guildKey, GUILDLESS_AFTER,
 };

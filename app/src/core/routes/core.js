@@ -84,6 +84,33 @@ function register(app, ctx) {
     res.json({ notifyPrefs: prefs });
   });
 
+  // ---- Which guild: Settings → Your guild ----
+  //   GET /api/guilds          { currentId, pinnedId, guilds: [{ id, name, realm, faction, lastPlayedAt, myCharacters }] }
+  //   PUT /api/guilds/choice   { auto: true } | { id } | { name, realm, faction } → the same, after choosing
+  // Works before any guild exists (the player may pick one seen only in the saved game data).
+  app.get('/api/guilds', (req, res) => {
+    res.json(identity.guildChoices(db));
+  });
+
+  app.put('/api/guilds/choice', (req, res) => {
+    const b = req.body && typeof req.body === 'object' ? req.body : {};
+    let choice;
+    if (b.auto === true) choice = { auto: true };
+    else if (b.id != null) {
+      const id = num(b.id, 1);
+      if (!Number.isInteger(id)) throw new HttpError(400, 'Pick a guild from the list.');
+      choice = { id };
+    } else {
+      const name = str(b.name, 60);
+      if (!name) throw new HttpError(400, 'Pick a guild from the list.');
+      choice = { name, realm: str(b.realm, 60), faction: str(b.faction, 10) };
+    }
+    const r = identity.chooseGuild(db, choice);
+    if (!r) throw new HttpError(404, "That guild isn't on this computer any more.");
+    if (r.created) ctx.log.info(`Guild Camp set up ${r.guild.name}, chosen in Settings.`);
+    res.json(identity.guildChoices(db));
+  });
+
   // ---- Guild info and settings ----
   app.get('/api/guild', needGuild, (req, res) => {
     res.json({

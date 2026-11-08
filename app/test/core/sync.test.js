@@ -270,6 +270,44 @@ test('a guildless upload whose roster names another guild is not stored in the c
   assert.strictEqual(r.body.noGuild, undefined);
 });
 
+test('the guild chosen in Settings stays current: uploads from another guild never switch it', async (t) => {
+  const { db, owner } = await setup(t, { guild: false });
+  const put = (body) => owner.raw('PUT', '/api/guilds/choice', { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const retail = { characters: { Velanne: { name: 'Velanne', guild: 'Aunt bessys', realm: 'Silvermoon', faction: 'Alliance', updated: 1794000000 } } };
+  const forever = (updated) => ({ characters: { Gorm: { name: 'Gorm', guild: 'Cheesy Dreamboys', realm: 'CAMWOW', faction: 'Horde', updated } } });
+  await upload(owner, retail);
+  let r = (await owner.get('/api/guilds')).body;
+  assert.deepStrictEqual([r.pinnedId, r.guilds.map((g) => g.name)], [null, ['Aunt bessys']]);
+
+  // Chosen before it was ever synced: set up from the saved data's name, realm and faction.
+  r = await put({ name: 'Cheesy Dreamboys', realm: 'CAMWOW', faction: 'Horde' });
+  assert.strictEqual(r.status, 200);
+  const cheesy = r.body.guilds.find((g) => g.name === 'Cheesy Dreamboys');
+  assert.deepStrictEqual([r.body.pinnedId, r.body.currentId, cheesy.faction], [cheesy.id, cheesy.id, 'Horde']);
+
+  // A Retail character played later (and a roster naming it) changes nothing while the choice stands.
+  r = await upload(owner, { ...retail, characters: { Velanne: { ...retail.characters.Velanne, updated: 1899999999 } } });
+  assert.strictEqual(r.body.guild.name, 'Cheesy Dreamboys');
+  r = await upload(owner, { characters: { Gorm: { name: 'Gorm', realm: 'CAMWOW', updated: 1794050747 } }, roster: { scannedAt: 1, guild: 'Aunt bessys', members: [] } });
+  assert.match(r.body.message, /Skipped a save from Aunt bessys: you chose Cheesy Dreamboys in Settings/);
+  assert.strictEqual(r.body.rosterGuild, undefined, 'nothing offered');
+  r = await upload(owner, forever(1794050747));
+  assert.strictEqual(r.body.guild.name, 'Cheesy Dreamboys');
+  assert.strictEqual(db.prepare('SELECT COUNT(*) AS n FROM guilds').get().n, 2, 'nothing new set up');
+
+  // Choosing by id, and back to automatic: the last played character decides again.
+  const aunt = (await owner.get('/api/guilds')).body.guilds.find((g) => g.name === 'Aunt bessys');
+  r = await put({ id: aunt.id });
+  assert.strictEqual(r.body.currentId, aunt.id);
+  r = await put({ auto: true });
+  assert.strictEqual(r.body.pinnedId, null);
+  r = await upload(owner, forever(1999999999));
+  assert.strictEqual(r.body.guild.name, 'Cheesy Dreamboys');
+
+  assert.strictEqual((await put({ id: 999 })).status, 404);
+  assert.strictEqual((await put({})).status, 400);
+});
+
 test('uploads before any guild, and the upload itself are checked', async (t) => {
   const fresh = await setup(t, { guild: false });
   // No character in a guild yet: accepted, nothing stored, and the reply says why in plain words.

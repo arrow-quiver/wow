@@ -101,6 +101,11 @@ is set up yet: Addon & sync asks "Is <guild> your guild?", and the player's yes 
 character) and the app syncs again. Any upload that has a guild drops the offer. The same happens when a guild
 is already current but the roster names a different one: that upload is not stored in the current guild.
 
+**Settings → Your guild** lets the player choose the guild (`GET /api/guilds`, `PUT /api/guilds/choice` with
+`{ "id" }`, `{ "name", "realm", "faction" }` for a guild seen only in the saved data, or `{ "auto": true }`).
+While a guild is chosen it stays current: an upload from another guild never switches it or sets anything up,
+and a guildless upload whose roster names another guild is skipped with a message (no offer).
+
 The app only uploads game folders in use: WoW Forever (or a folder with no flavor), plus any other game the player
 turned on under Addon & sync (`settings.otherGameFolders`). Other games are listed there as "Not used".
 

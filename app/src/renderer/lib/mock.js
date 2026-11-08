@@ -352,6 +352,15 @@ function maybeFindGuild() {
 
 function installsView() { return state.installs.map(({ addon, ...rest }) => rest); }
 
+function mockGuildChoices() {
+  const g = state.guild;
+  return {
+    currentId: g ? g.id : null,
+    pinnedId: state.guildPinned || null,
+    guilds: g ? [{ id: g.id, name: g.name, realm: g.realm || null, faction: g.faction || null, lastPlayedAt: null, myCharacters: 2 }] : [],
+  };
+}
+
 // What wow.detectGuild reads from the addon's SavedVariables (WowGuildDB.characters) on this PC.
 function addonCharacters() {
   const forever = state.installs.find((i) => i.flavor === '_forever_') || state.installs[0];
@@ -400,6 +409,15 @@ addMockRoutes({
     const patch = body && typeof body.notifyPrefs === 'object' ? body.notifyPrefs : body || {};
     for (const [k, v] of Object.entries(patch)) if (k in state.notifyPrefs) state.notifyPrefs[k] = !!v;
     return { notifyPrefs: state.notifyPrefs };
+  },
+  // Settings → Your guild (routes/core.js).
+  'GET /api/guilds': () => mockGuildChoices(),
+  'PUT /api/guilds/choice': ({ body }) => {
+    const b = body && typeof body === 'object' ? body : {};
+    if (b.auto === true) state.guildPinned = null;
+    else if (state.guild && (Number(b.id) === state.guild.id || b.name === state.guild.name)) state.guildPinned = state.guild.id;
+    else throw Object.assign(new Error("The demo only has one guild."), { status: 404 });
+    return mockGuildChoices();
   },
   'GET /api/guild': () => {
     needGuild();

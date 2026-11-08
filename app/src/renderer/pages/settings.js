@@ -8,7 +8,7 @@
 import { html, cx, useState, useEffect, useRef, useCallback } from '../lib/html.js';
 import { gc, useGcEvent } from '../lib/gc.js';
 import { api, useApi } from '../lib/api.js';
-import { useSession, setSession, splitBattleTag } from '../lib/session.js';
+import { useSession, setSession, splitBattleTag, refreshSession } from '../lib/session.js';
 import { Link } from '../lib/router.js';
 import { applyTheme, THEMES } from '../lib/theme.js';
 import { plural } from '../lib/format.js';
@@ -22,6 +22,7 @@ import { ShareHint } from '../components/ShareHint.js';
 // ---------- helpers (exported for tests) ----------
 
 export const SECTIONS = [
+  { id: 'guild', label: 'Your guild', icon: 'camp' },
   { id: 'battlenet', label: 'Battle.net', icon: 'battlenet' },
   { id: 'notifications', label: 'Notifications', icon: 'bell' },
   { id: 'discord', label: 'Discord', icon: 'link' },
@@ -38,6 +39,36 @@ const sectionDomId = (id) => `settings-${id}`;
 export function sectionFor(value) {
   const id = SECTION_ALIASES[value] || value;
   return SECTIONS.some((s) => s.id === id) ? id : null;
+}
+
+const guildKeyOf = (name, realm) => `${String(name || '').trim().toLowerCase()}|${String(realm || '').trim().toLowerCase()}`;
+
+/**
+ * The guilds to choose from: the ones Guild Camp has set up (GET /api/guilds), then guilds only seen in the
+ * game's saved data (wow.detectGuild characters), each with the characters seen in it, newest first.
+ */
+export function guildOptions(choices, detected) {
+  const out = [];
+  const byKey = new Map();
+  const realmLess = new Map(); // a set-up guild with no realm yet matches any realm of the same name
+  for (const g of (choices && choices.guilds) || []) {
+    const row = { ...g, characters: [], known: true };
+    out.push(row);
+    byKey.set(guildKeyOf(g.name, g.realm), row);
+    if (!g.realm) realmLess.set(guildKeyOf(g.name, ''), row);
+  }
+  for (const c of (detected && detected.characters) || []) {
+    if (!c || !c.guild) continue;
+    const key = guildKeyOf(c.guild, c.realm);
+    let row = byKey.get(key) || realmLess.get(guildKeyOf(c.guild, ''));
+    if (!row) {
+      row = { id: null, name: c.guild, realm: c.realm || null, faction: c.faction || null, lastPlayedAt: c.updated || null, myCharacters: 0, characters: [], known: false };
+      out.push(row);
+      byKey.set(key, row);
+    }
+    if (!row.characters.includes(c.name)) row.characters.push(c.name);
+  }
+  return out;
 }
 
 // The notifyPrefs switches, in the order shown. `officer` ones only matter to officers.
@@ -242,6 +273,7 @@ export default function SettingsPage({ query = {} }) {
         </button>`)}
       </nav>
       <div class="settings-main">
+        <${GuildCard} />
         <${BattleNetCard} bnet=${session.bnet} settings=${settings} change=${change} />
         <${NotificationsCard} settings=${settings} change=${change} isOfficer=${session.isOfficer} />
         <${DiscordCard} settings=${settings} change=${change} isOfficer=${session.isOfficer} />
@@ -250,6 +282,69 @@ export default function SettingsPage({ query = {} }) {
         <${AppCard} settings=${settings} change=${change} info=${info} />
         <${AboutCard} info=${info} />
       </div>
+    </div>
+  <//>`;
+}
+
+// ---------- your guild ----------
+
+function GuildCard() {
+  const [choices, setChoices] = useState(null);
+  const [detected, setDetected] = useState(null);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(null); // the option key being chosen
+
+  const load = useCallback(async () => {
+    try { setChoices(await api.get('/api/guilds')); setError(''); } catch (err) { setError(err?.message || "Couldn't read your guilds."); }
+    try { setDetected(await gc.wow.detectGuild()); } catch { setDetected(null); }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const choose = async (key, body, label) => {
+    setBusy(key);
+    try {
+      setChoices(await api.put('/api/guilds/choice', body));
+      await refreshSession();
+      toast(body.auto ? 'Guild Camp picks your guild by itself again.' : `Guild Camp uses ${label} now.`, 'ok');
+      try { await gc.sync.now(); } catch { /* the next /reload syncs it */ }
+    } catch (err) {
+      toast(err?.message || "Couldn't change your guild.", 'alarm');
+    } finally { setBusy(null); }
+  };
+
+  const options = guildOptions(choices, detected);
+  const pinned = choices?.pinnedId ?? null;
+  const auto = choices && !pinned;
+  const where = (g) => [g.realm, g.faction].filter(Boolean).join(' · ');
+  const who = (g) => (g.characters.length ? g.characters.join(', ')
+    : g.myCharacters ? plural(g.myCharacters, 'character') : 'No characters of yours seen yet');
+
+  return html`<${Card} id=${sectionDomId('guild')} title="Your guild" class="settings-card"
+      actions=${choices ? html`<${Pill} kind=${auto ? 'muted' : 'ok'} dot>${auto ? 'Automatic' : 'Chosen by you'}<//>` : null}>
+    <div class="stack">
+      <p class="mb-0">Guild Camp works with one guild at a time. By itself it follows the character you played last, which
+        can pick the wrong guild when you play in more than one. Choose yours to keep it.</p>
+      ${error ? html`<${Notice} kind="alarm">${error}<//>` : null}
+      ${!choices && !error ? html`<${Loading} label="Looking for your guilds…" />` : null}
+      ${choices ? html`<div>
+        <${Row} title="Automatic" hint="The guild of the character you played last.">
+          ${auto ? html`<${Pill} kind="ok">In use<//>`
+            : html`<${Button} size="sm" busy=${busy === 'auto'} disabled=${!!busy} onClick=${() => choose('auto', { auto: true })}>Use automatic<//>`}
+        <//>
+        ${options.map((g) => {
+          const key = g.id ? `id:${g.id}` : guildKeyOf(g.name, g.realm);
+          const chosen = pinned != null && g.id === pinned;
+          const current = g.id != null && g.id === choices.currentId;
+          return html`<${Row} key=${key} title=${html`${g.name}${where(g) ? html` <span class="muted">${where(g)}</span>` : null}`}
+              hint=${`${who(g)}${current && !chosen ? ' · in use now' : ''}`}>
+            ${chosen ? html`<${Pill} kind="ok">Chosen<//>`
+              : html`<${Button} size="sm" variant=${current ? 'secondary' : 'primary'} busy=${busy === key} disabled=${!!busy}
+                  onClick=${() => choose(key, g.id ? { id: g.id } : { name: g.name, realm: g.realm, faction: g.faction }, g.name)}>Use this guild<//>`}
+          <//>`;
+        })}
+        ${!options.length ? html`<p class="hint mb-0">No guild found yet. Log in to a character in your guild with the addon, then log out or type /reload.</p>` : null}
+      </div>` : null}
+      <p class="hint mb-0">Only game folders in use are searched: WoW Forever, and any other game you turned on under <${Link} href="/addon">Addon & sync<//>.</p>
     </div>
   <//>`;
 }
