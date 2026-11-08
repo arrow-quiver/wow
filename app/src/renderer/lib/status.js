@@ -325,7 +325,7 @@ export function describeUpdates(updater, addon) {
     if (updater.state === 'available') return { route: '/updates', label: `App update ${updater.available?.version || ''}`.trim(), kind: 'accent' };
   }
   if (addon && Array.isArray(addon.installs)) {
-    const outdated = addon.installs.filter((i) => i.state === 'outdated').length;
+    const outdated = addon.installs.filter((i) => i.state === 'outdated' && i.inUse !== false).length;
     if (outdated) return { route: '/addon', label: outdated === 1 ? 'Addon update' : `${outdated} addon updates`, kind: 'accent' };
   }
   return null;

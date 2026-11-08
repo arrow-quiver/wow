@@ -46,10 +46,13 @@ function register(app, ctx) {
 
     const addonVersion = ver(body.addonVersion);
     const wanted = identity.guildFromPayload(body);
-    if (!wanted && !req.guild) {
+    // No character says which guild. The roster scan may still name one: when it isn't the current guild (or
+    // there is none yet), nothing is stored in the wrong guild; the offer is kept and the app asks the player.
+    const offer = wanted ? null : identity.rosterGuildFromPayload(body);
+    const otherGuild = Boolean(offer && req.guild
+      && identity.guildKey(req.guild.game_guild || req.guild.name) !== identity.guildKey(offer.name));
+    if (!wanted && (!req.guild || otherGuild)) {
       q.user.run(addonVersion, req.user.id);
-      // The roster scan may still name the guild: remember it, and let the app ask the player.
-      const offer = identity.rosterGuildFromPayload(body);
       identity.setSetting(db, OFFER_KEY, offer ? JSON.stringify(offer) : null);
       return res.json({
         ok: true, noGuild: true, message: offer ? rosterGuildMessage(offer) : NO_GUILD_UPLOAD,

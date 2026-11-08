@@ -376,7 +376,7 @@ function createAddonManager({
     if (!wow || typeof wow.findInstalls !== 'function') return setScan([]);
     let found;
     try {
-      found = wow.findInstalls({ extraRoots: settings().extraWowFolders || [], scanDefaults });
+      found = wow.findInstalls({ extraRoots: settings().extraWowFolders || [], scanDefaults, otherFolders: settings().otherGameFolders || [] });
     } catch (err) {
       log.warn(`Couldn't look for game folders: ${err.message}`);
       return setScan([]);
@@ -392,7 +392,7 @@ function createAddonManager({
   async function freshInstalls() {
     if (!wow || typeof wow.findInstalls !== 'function') return setScan([]);
     try {
-      return setScan(await wow.findInstalls({ extraRoots: settings().extraWowFolders || [], scanDefaults }));
+      return setScan(await wow.findInstalls({ extraRoots: settings().extraWowFolders || [], scanDefaults, otherFolders: settings().otherGameFolders || [] }));
     } catch (err) {
       log.warn(`Couldn't look for game folders: ${err.message}`);
       return scan.list;
@@ -447,6 +447,9 @@ function createAddonManager({
           damaged: Boolean(have && !have.version),
           supported: isSupported(inst, flavors),
           optedOut: optOut.has(key),
+          // WoW Forever, or another game the person turned on: synced and looked after automatically.
+          mainGame: inst.mainGame !== false,
+          inUse: inst.inUse !== false,
           busy: busy.has(key),
           action: busy.get(key) || null,
           error: errors.get(key) || null,
@@ -909,7 +912,7 @@ function createAddonManager({
     if (!autoInstallOn() || !latest()) return [];
     const flavors = supportedFlavors();
     if (!flavors.length) return [];
-    const targets = status().installs.filter((i) => i.state === 'missing' && !i.busy && i.supported && !i.optedOut);
+    const targets = status().installs.filter((i) => i.state === 'missing' && !i.busy && i.supported && !i.optedOut && i.inUse);
     if (!targets.length || await waitsForGame(targets, 'install')) return [];
     const done = [];
     for (const inst of targets) {
@@ -952,7 +955,8 @@ function createAddonManager({
   // "Update all" goes ahead and says restartNeeded when any folder needs a game restart.
   async function updateAll({ auto = false } = {}) {
     await freshInstalls();
-    const outdated = status().installs.filter((i) => i.state === 'outdated' && !i.busy);
+    // Folders not in use (another game, not turned on) are left alone.
+    const outdated = status().installs.filter((i) => i.state === 'outdated' && !i.busy && i.inUse);
     if (auto && outdated.length && await waitsForGame(outdated, 'update')) return status();
     const failed = [];
     let restartNeeded = false;

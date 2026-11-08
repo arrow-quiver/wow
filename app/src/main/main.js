@@ -674,7 +674,7 @@ function bootstrap() {
     timers.push(setInterval(() => background(() => updater.check(), 'Update check failed'), UPDATE_CHECK_MS));
     timers.push(setInterval(() => background(() => addon.check(), 'Addon check failed'), ADDON_CHECK_MS));
     store.on('change', (s, keys) => {
-      if (keys.includes('extraWowFolders')) background(() => addon.check(), 'Addon check failed');
+      if (keys.includes('extraWowFolders') || keys.includes('otherGameFolders')) background(() => addon.check(), 'Addon check failed');
     });
 
     // The first launch of an installed app turns "start with Windows" on once, so the guild stays in

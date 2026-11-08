@@ -13,6 +13,7 @@ const {
   createAddonManager, pickLatest, computeState, normalizeRemote, pickRemote, cleanTitle, looksLikeOurs, flavorsForInterface,
 } = require('../src/main/addon');
 const { createStore } = require('../src/main/store');
+const realWow = require('../src/main/wow');
 const { createZip } = require('../src/shared/zip');
 const { sha256 } = require('../src/shared/hash');
 const { setTocField, tocVersion } = require('../src/shared/toc');
@@ -157,15 +158,25 @@ function memLog() {
 }
 
 // Builds a manager over temp folders. `server` is a githubServer() or null (GitHub can't be reached).
-function setup(t, { bundled = '0.11.0', server = null, games = [['_forever_', 'WoW Forever']], settings = {}, fsOps, noBundled = false, gameWaitMs } = {}) {
+// Every game folder is turned on (settings.otherGameFolders) unless `otherGamesOn: false`.
+function setup(t, { bundled = '0.11.0', server = null, games = [['_forever_', 'WoW Forever']], settings = {}, fsOps, noBundled = false, gameWaitMs, otherGamesOn = true } = {}) {
   const base = tmpDir(t);
   const root = path.join(base, 'World of Warcraft');
   const installs = games.map(([flavor, label]) => makeGame(root, flavor, label));
   const userData = path.join(base, 'userData');
   const store = createStore(userData);
   // Automatic updates and installs are off unless a test turns them on.
-  store.set({ addonAutoUpdate: false, addonAutoInstall: false, ...settings });
-  const wow = { calls: 0, findInstalls: () => { wow.calls += 1; return installs.map((i) => ({ ...i })); } };
+  const otherGameFolders = otherGamesOn ? installs.filter((i) => !realWow.isMainGame(i)).map((i) => i.dir) : [];
+  store.set({ addonAutoUpdate: false, addonAutoInstall: false, otherGameFolders, ...settings });
+  // Marks folders in use the way wow.js does: WoW Forever always, other games once turned on (otherFolders).
+  const wow = {
+    calls: 0,
+    findInstalls: ({ otherFolders = [] } = {}) => {
+      wow.calls += 1;
+      const on = new Set(otherFolders.map((d) => realWow.pathKey(d)));
+      return installs.map((i) => ({ ...i, mainGame: realWow.isMainGame(i), inUse: realWow.isMainGame(i) || on.has(realWow.pathKey(i.dir)) }));
+    },
+  };
   const log = memLog();
   const resourcesDir = noBundled ? tmpDir(t, 'gc-nores-') : makeResources(t, bundled);
   const addon = createAddonManager({
@@ -823,6 +834,23 @@ test('check installs the addon into game folders without it, only for supported 
   assert.deepStrictEqual(leftovers(installs[1].addonsDir), []);
 });
 
+test('another game is left alone until the person turns it on: no automatic installs or updates there', async (t) => {
+  const { addon, installs, store, log } = setup(t, { settings: { addonAutoInstall: true, addonAutoUpdate: true }, games: [['_forever_', 'WoW Forever'], ['_retail_', 'Retail']], otherGamesOn: false });
+  putAddon(installs[1].addonsDir, '0.10.0'); // an older copy already in Retail
+  let s = await addon.check();
+  assert.deepStrictEqual(s.installs.map((i) => [i.mainGame, i.inUse]), [[true, true], [false, false]]);
+  assert.strictEqual(installedVersion(installs[0].addonsDir), '0.11.0', 'WoW Forever gets it automatically');
+  assert.strictEqual(installedVersion(installs[1].addonsDir), '0.10.0', 'Retail is not updated');
+  assert.ok(!/in Retail automatically/.test(log.text()));
+  await addon.updateAll();
+  assert.strictEqual(installedVersion(installs[1].addonsDir), '0.10.0', '"Update all" skips it too');
+
+  store.set({ otherGameFolders: [installs[1].dir] });
+  s = await addon.check();
+  assert.strictEqual(stateOf(s, installs[1].dir).inUse, true);
+  assert.strictEqual(installedVersion(installs[1].addonsDir), '0.11.0', 'turned on: looked after like Forever');
+});
+
 test('a Classic Era addon goes into Classic Era folders only', async (t) => {
   const { addon, installs, resourcesDir } = setup(t, { settings: { addonAutoInstall: true }, games: ALL_FLAVORS });
   const tocFile = path.join(resourcesDir, 'addon', 'WowGuild', 'WowGuild.toc');
@@ -1055,6 +1083,13 @@ test('addon page helpers', async () => {
   assert.deepStrictEqual(page.installActions({ state: 'newer' }, { version: '0.11.0' }), ['repair', 'uninstall']);
   assert.deepStrictEqual(page.installActions({ state: 'outdated', damaged: true }, { version: '0.11.0' }), ['repair', 'uninstall']);
   assert.deepStrictEqual(page.installActions({ state: 'missing' }, null), [], 'nothing to install');
+  // Another game, not turned on: no install or update, only removing a copy that is there.
+  assert.deepStrictEqual(page.installActions({ state: 'missing', inUse: false }, { version: '0.11.0' }), []);
+  assert.deepStrictEqual(page.installActions({ state: 'outdated', inUse: false }, { version: '0.11.0' }), ['uninstall']);
+  // Turning another game on or off in settings.otherGameFolders.
+  assert.deepStrictEqual(page.withOtherFolder(['D:\\WoW\\_retail_'], 'd:\\wow\\_retail_\\', false), []);
+  assert.deepStrictEqual(page.withOtherFolder(null, 'D:\\WoW\\_retail_', true), ['D:\\WoW\\_retail_']);
+  assert.deepStrictEqual(page.withOtherFolder(['D:\\WoW\\_retail_'], 'D:\\WoW\\_retail_', true), ['D:\\WoW\\_retail_'], 'no duplicates');
   // Log lines that belong on this page.
   assert.strictEqual(page.isSyncOrAddonLine({ scope: 'sync' }), true);
   assert.strictEqual(page.isSyncOrAddonLine({ scope: 'addon' }), true);

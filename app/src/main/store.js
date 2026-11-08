@@ -21,6 +21,9 @@ const { EventEmitter } = require('events');
 
 const DEFAULTS = Object.freeze({
   extraWowFolders: [],
+  // Game folders other than WoW Forever (Retail, Classic...) the person turned on: synced and looked after
+  // like the Forever one. Guild Camp is for WoW Forever, so every other folder starts off.
+  otherGameFolders: [],
   syncEnabled: true,
   closeToTray: true,
   startWithWindows: false,
@@ -297,6 +300,8 @@ function sanitizeSettingsPatch(patch) {
       out.bnetRegion = region;
     } else if (key === 'extraWowFolders') {
       out.extraWowFolders = cleanFolderList(value);
+    } else if (key === 'otherGameFolders') {
+      out.otherGameFolders = cleanFolderList(value);
     } else if (key === 'theme') {
       if (!['system', 'light', 'dark'].includes(value)) throw new Error('Theme must be system, light or dark.');
       out.theme = value;

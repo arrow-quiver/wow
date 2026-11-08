@@ -169,9 +169,22 @@ describe('detectGuild', () => {
     return { root, forever, retail, files };
   }
 
-  test('reads every saved character from every install, newest first, and picks the newest guild', () => {
+  test('only WoW Forever by default: another game is read once the person turns it on', () => {
     const { root, forever, retail } = tree();
+    const list = wow.findInstalls({ extraRoots: [root], scanDefaults: false });
+    const byFlavor = Object.fromEntries(list.map((i) => [i.flavor, i]));
+    assert.deepEqual([byFlavor._forever_.mainGame, byFlavor._forever_.inUse], [true, true]);
+    assert.deepEqual([byFlavor._retail_.mainGame, byFlavor._retail_.inUse], [false, false], 'listed, but not in use');
+    const on = wow.findInstalls({ extraRoots: [root], scanDefaults: false, otherFolders: [retail.toUpperCase()] });
+    assert.equal(on.find((i) => i.flavor === '_retail_').inUse, process.platform === 'win32', 'paths compare like the system does');
     const found = wow.detectGuild({ extraRoots: [root], scanDefaults: false });
+    assert.ok(found.characters.every((c) => c.install === forever), 'Retail characters stay out');
+    assert.deepEqual(found.guild, { name: 'Just Now WoW', realm: 'Forever', faction: 'Horde' }, 'the Forever guild, never the Retail one');
+  });
+
+  test('reads every saved character from every install in use, newest first, and picks the newest guild', () => {
+    const { root, forever, retail } = tree();
+    const found = wow.detectGuild({ extraRoots: [root], scanDefaults: false, otherFolders: [retail] });
     assert.deepEqual(found.characters.map((c) => c.name), ['Altie', 'Velanne', 'Thrallia', 'Grommash']);
     assert.deepEqual(found.guild, { name: 'Retail Raiders', realm: 'Silvermoon', faction: 'Alliance' },
       'the most recently updated character that has a guild');
@@ -201,8 +214,9 @@ describe('detectGuild', () => {
   });
 
   test('a newer save is read again; the same character in two places counts once (newest wins)', () => {
-    const { root, files, forever } = tree();
-    assert.equal(wow.detectGuild({ extraRoots: [root], scanDefaults: false }).guild.name, 'Retail Raiders');
+    const { root, files, forever, retail } = tree();
+    const opts = { extraRoots: [root], scanDefaults: false, otherFolders: [retail] };
+    assert.equal(wow.detectGuild(opts).guild.name, 'Retail Raiders');
     // Thrallia logs in again: now she is the newest character with a guild.
     write(files.foreverAlice, sv({ Thrallia: char('Thrallia', { guild: 'Just Now WoW', level: 32, updated: 1794200000 }) }));
     const t = new Date(Date.UTC(2031, 0, 1));
@@ -210,7 +224,7 @@ describe('detectGuild', () => {
     // A copy of the same character with an older record in another account.
     write(path.join(forever, 'WTF', 'Account', 'COPY', 'SavedVariables', 'WowGuild.lua'),
       sv({ Thrallia: char('Thrallia', { guild: 'Old Guild', level: 10, updated: 1700000000 }) }));
-    const found = wow.detectGuild({ extraRoots: [root], scanDefaults: false });
+    const found = wow.detectGuild(opts);
     assert.deepEqual(found.guild, { name: 'Just Now WoW', realm: 'Forever', faction: 'Horde' });
     const thrallias = found.characters.filter((c) => c.name === 'Thrallia');
     assert.equal(thrallias.length, 1);

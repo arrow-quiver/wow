@@ -98,7 +98,11 @@ the game knew its guild), the message says so and the reply adds `"rosterGuild":
 is set up yet: Addon & sync asks "Is <guild> your guild?", and the player's yes calls
 `POST /api/sync/roster-guild` with `{ "name" }`. The name must match the offer the core stored from that upload
 (else 409); the guild is then set up like a first sync would (realm and faction from the most recently played
-character) and the app syncs again. Any upload that has a guild drops the offer.
+character) and the app syncs again. Any upload that has a guild drops the offer. The same happens when a guild
+is already current but the roster names a different one: that upload is not stored in the current guild.
+
+The app only uploads game folders in use: WoW Forever (or a folder with no flavor), plus any other game the player
+turned on under Addon & sync (`settings.otherGameFolders`). Other games are listed there as "Not used".
 
 ### What the core does with it
 

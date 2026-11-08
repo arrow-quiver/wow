@@ -247,6 +247,29 @@ test('no character has a guild but the roster scan names one: offered, and set u
   assert.ok(r.body.characters >= 2);
 });
 
+test('a guildless upload whose roster names another guild is not stored in the current one', async (t) => {
+  const { db, owner } = await setup(t, { guild: false });
+  // Retail set up its guild first.
+  let r = await upload(owner, { characters: { Velanne: { name: 'Velanne', guild: 'Aunt bessys', realm: 'Silvermoon', faction: 'Alliance', updated: 1794000000 } } });
+  assert.strictEqual(r.body.guild.name, 'Aunt bessys');
+  const forever = {
+    characters: { Gorm: { name: 'Gorm', level: 9, faction: 'Horde', realm: 'CAMWOW EU5 Realm 6 PvP', updated: 1794050747 } },
+    roster: { scannedAt: 1794050709, guild: 'Cheesy Dreamboys', members: [{ name: 'Gorm', rankIndex: 3, level: 9, class: 'HUNTER' }] },
+  };
+  r = await upload(owner, forever);
+  assert.strictEqual(r.body.noGuild, true);
+  assert.strictEqual(r.body.rosterGuild.name, 'Cheesy Dreamboys');
+  assert.strictEqual(db.prepare("SELECT COUNT(*) AS n FROM characters WHERE name = 'Gorm'").get().n, 0, 'Gorm stays out of Aunt bessys');
+
+  r = await owner.raw('POST', '/api/sync/roster-guild', { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Cheesy Dreamboys' }) });
+  assert.strictEqual(r.status, 200);
+  r = await upload(owner, forever);
+  assert.strictEqual(r.body.guild.name, 'Cheesy Dreamboys', 'the player said yes: now the current guild');
+  // A roster that names the current guild goes up as usual.
+  r = await upload(owner, forever);
+  assert.strictEqual(r.body.noGuild, undefined);
+});
+
 test('uploads before any guild, and the upload itself are checked', async (t) => {
   const fresh = await setup(t, { guild: false });
   // No character in a guild yet: accepted, nothing stored, and the reply says why in plain words.

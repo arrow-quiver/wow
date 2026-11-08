@@ -41,6 +41,7 @@
 //  - None of the player's characters is in a guild yet: the core stores nothing and says so; that is
 //    logged once and is not a failure. The next save from the game goes up as usual.
 //  - Game folders are looked for again every 60 s and whenever settings.extraWowFolders changes.
+//    Only folders in use are synced: WoW Forever, plus other games turned on in settings.otherGameFolders.
 //  - Uploads never overlap.
 //
 // Plain Node (no Electron). Tests can override timing with createSync({ ..., now, sleep, setTimeout,
@@ -337,8 +338,10 @@ function createSync({ api, store, log, wow, appVersion, coreEvents, ...opts } = 
     let found = [];
     try {
       const extraRoots = store ? store.get().extraWowFolders || [] : [];
-      const result = wow && typeof wow.findInstalls === 'function' ? wow.findInstalls({ extraRoots, scanDefaults }) : [];
-      found = Array.isArray(result) ? result.filter((i) => i && typeof i.dir === 'string' && i.dir) : [];
+      const otherFolders = store ? store.get().otherGameFolders || [] : [];
+      const result = wow && typeof wow.findInstalls === 'function' ? wow.findInstalls({ extraRoots, scanDefaults, otherFolders }) : [];
+      // Only folders in use: WoW Forever, and any other game the person turned on (wow.js inUse).
+      found = Array.isArray(result) ? result.filter((i) => i && typeof i.dir === 'string' && i.dir && i.inUse !== false) : [];
     } catch (err) {
       say('warn', `Couldn't look for game folders: ${plain(err)}`);
     }
@@ -939,7 +942,7 @@ function createSync({ api, store, log, wow, appVersion, coreEvents, ...opts } = 
     store.on('change', (settings, keys) => {
       if (!Array.isArray(keys)) return;
       if (keys.includes('syncEnabled')) setEnabled(settings.syncEnabled !== false);
-      if (keys.includes('extraWowFolders')) {
+      if (keys.includes('extraWowFolders') || keys.includes('otherGameFolders')) {
         dirty = true;
         changed();
       }

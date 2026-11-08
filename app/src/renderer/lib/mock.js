@@ -90,7 +90,7 @@ const LATEST = { app: '0.11.1', addon: '0.11.1' };
 function initialState() {
   const s = {
     settings: {
-      extraWowFolders: [], syncEnabled: true, closeToTray: true, startWithWindows: false, addonAutoUpdate: true, addonAutoInstall: true,
+      extraWowFolders: [], otherGameFolders: [], syncEnabled: true, closeToTray: true, startWithWindows: false, addonAutoUpdate: true, addonAutoInstall: true,
       appAutoUpdate: true, notifications: true, theme: 'system', repoDir: null, windowBounds: null, onboarded: true, startupDefaulted: false,
       addonOptOut: [], discordWebhook: null, bnetRegion: 'eu', inboxRestart: {},
     },

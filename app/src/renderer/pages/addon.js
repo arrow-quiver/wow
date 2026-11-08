@@ -31,10 +31,18 @@ const LOG_LINES = 200;
  */
 export function installActions(inst, latest) {
   if (!inst) return [];
+  // Another game, not turned on: Guild Camp leaves it alone (only removing a copy already there is offered).
+  if (inst.inUse === false) return inst.state === 'missing' ? [] : ['uninstall'];
   if (inst.state === 'missing') return latest ? ['install'] : [];
   if (inst.damaged) return latest ? ['repair', 'uninstall'] : ['uninstall'];
   if (inst.state === 'outdated') return latest ? ['update', 'uninstall'] : ['uninstall'];
   return latest ? ['repair', 'uninstall'] : ['uninstall'];
+}
+
+/** settings.otherGameFolders with `dir` turned on or off (paths compare like Windows does). */
+export function withOtherFolder(list, dir, on) {
+  const rest = (Array.isArray(list) ? list : []).filter((d) => normPath(d) !== normPath(dir));
+  return on ? [...rest, dir] : rest;
 }
 
 /** Log lines shown on this page: the sync engine, the addon manager and game folder detection. */
@@ -186,7 +194,7 @@ export default function AddonPage({ query = {} }) {
   const installs = addon?.installs || [];
   const latest = addon?.latest || null;
   const folders = settings?.extraWowFolders || [];
-  const outdated = installs.filter((i) => i.state === 'outdated');
+  const outdated = installs.filter((i) => i.state === 'outdated' && i.inUse !== false);
   const anyBusy = installs.some((i) => i.busy) || Object.keys(pending).length > 0;
 
   // ---- actions --------------------------------------------------------------------------------
@@ -228,6 +236,16 @@ export default function AddonPage({ query = {} }) {
     }
   };
 
+  const setFolderInUse = async (inst, on) => {
+    try {
+      setSettings(await gc.settings.set({ otherGameFolders: withOtherFolder(settings?.otherGameFolders, inst.dir, on) }));
+      toast(on ? `Guild Camp now syncs ${inst.label} too.` : `Guild Camp leaves ${inst.label} alone now.`, 'ok');
+      try { await addonLive.refresh(); } catch { /* the next status event brings it */ }
+    } catch (err) {
+      toast(err?.message || 'Could not change that setting.', 'alarm');
+    }
+  };
+
   const setAutoUpdate = async (on) => {
     try {
       setSettings(await gc.settings.set({ addonAutoUpdate: on }));
@@ -242,7 +260,7 @@ export default function AddonPage({ query = {} }) {
       const s = await gc.addon.check();
       if (s?.error) toast(s.error, 'warn');
       else {
-        const behind = (s?.installs || []).filter((i) => i.state === 'outdated').length;
+        const behind = (s?.installs || []).filter((i) => i.state === 'outdated' && i.inUse !== false).length;
         toast(behind ? `Addon ${s.latest?.version} is ready for ${plural(behind, 'game folder')}.` : `The addon is up to date${s?.latest ? ` (${s.latest.version})` : ''}.`, 'ok');
       }
     } catch (err) {
@@ -329,7 +347,7 @@ export default function AddonPage({ query = {} }) {
       ${installs.length ? html`<div class="addon-installs">
         ${installs.map((inst) => html`<${InstallCard} key=${inst.dir} inst=${inst} latest=${latest}
           pending=${pending[inst.dir]} custom=${customFolderFor(inst, folders)}
-          onAction=${runInstallAction} onOpen=${openFolder} onRemoveFolder=${removeFolder} />`)}
+          onAction=${runInstallAction} onOpen=${openFolder} onRemoveFolder=${removeFolder} onUse=${setFolderInUse} />`)}
       </div>` : null}
       ${unusedFolders(installs, folders).map((f) => html`<${Notice} key=${f} kind="warn" title="No game found in a folder you added.">
         <div class="addon-folder-line"><code>${f}</code></div>
@@ -529,10 +547,12 @@ function NoGame({ onAdd, adding }) {
   <//>`;
 }
 
-function InstallCard({ inst, latest, pending, custom, onAction, onOpen, onRemoveFolder }) {
+function InstallCard({ inst, latest, pending, custom, onAction, onOpen, onRemoveFolder, onUse }) {
+  const other = inst.mainGame === false;
+  const unused = inst.inUse === false;
   const action = inst.action || pending || null;
   const busy = Boolean(inst.busy || pending);
-  const pill = inst.damaged ? { kind: 'alarm', label: 'Needs repair' } : STATE_PILL[inst.state] || STATE_PILL.missing;
+  const pill = unused ? { kind: 'muted', label: 'Not used' } : inst.damaged ? { kind: 'alarm', label: 'Needs repair' } : STATE_PILL[inst.state] || STATE_PILL.missing;
   const list = installActions(inst, latest);
   const have = inst.installed?.version;
 
@@ -565,12 +585,15 @@ function InstallCard({ inst, latest, pending, custom, onAction, onOpen, onRemove
     return null;
   };
 
-  return html`<${Card} class=${`addon-install ${inst.state === 'outdated' || inst.damaged ? 'card--accent' : ''}`}
+  return html`<${Card} class=${`addon-install ${(inst.state === 'outdated' && inst.inUse !== false) || inst.damaged ? 'card--accent' : ''}`}
       title=${html`<span class="addon-install-title"><${Icon} name="game" />${inst.label}</span>`}
       actions=${html`<${Pill} kind=${pill.kind} dot>${pill.label}<//>`}
       footer=${html`<div class="actions-row">
         ${list.map(button)}
+        ${unused ? html`<${Button} size="sm" variant="primary" icon="plus" disabled=${busy} onClick=${() => onUse(inst, true)}>Use with Guild Camp<//>` : null}
         <span class="spacer"></span>
+        ${other && !unused ? html`<${ConfirmButton} size="sm" variant="ghost" icon="minus" disabled=${busy} confirmVariant="primary"
+          question=${`Stop using ${inst.label} with Guild Camp?`} yes="Stop using" onConfirm=${() => onUse(inst, false)}>Stop using<//>` : null}
         <${Button} size="sm" variant="ghost" icon="folder" onClick=${() => onOpen(inst)}>Open folder<//>
         ${custom ? html`<${ConfirmButton} size="sm" variant="ghost" icon="minus" disabled=${busy} confirmVariant="primary"
           title=${`Stop looking in ${custom}. Nothing is deleted.`}
@@ -587,6 +610,7 @@ function InstallCard({ inst, latest, pending, custom, onAction, onOpen, onRemove
           <div><dt>Newest</dt><dd>${latest?.version || html`<span class="muted">none yet</span>`}</dd></div>
         </dl>
       </div>
+      ${unused ? html`<p class="hint mb-0">Guild Camp is for WoW Forever, so it leaves this game alone: no sync and no automatic addon installs or updates. Turn it on only if your guild plays here too.</p>` : null}
       ${inst.damaged && !busy ? html`<${Notice} kind="warn">The addon folder is missing its WowGuild.toc file, so the game won't load it. Repair puts it back.<//>` : null}
       ${waitingText(inst) && !busy ? html`<${Notice} kind="info" title="Waiting for World of Warcraft to close.">${waitingText(inst)}<//>` : null}
       ${inst.error && !busy ? html`<${Notice} kind="alarm" title="The last change didn't work.">${inst.error}<//>` : null}

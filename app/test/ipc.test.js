@@ -377,7 +377,7 @@ describe('buildMethods', () => {
     const m = buildMethods(deps);
     const found = await m['wow.detectGuild']();
     assert.equal(found.guild.name, 'Just Now WoW');
-    assert.deepEqual(calls.find((c) => c[0] === 'wow.detectGuild'), ['wow.detectGuild', { extraRoots: [path.resolve(tmp)], scanDefaults: true }]);
+    assert.deepEqual(calls.find((c) => c[0] === 'wow.detectGuild'), ['wow.detectGuild', { extraRoots: [path.resolve(tmp)], scanDefaults: true, otherFolders: [] }]);
     for (const gone of REMOVED_METHODS) assert.equal(m[gone], undefined, gone);
   });
 

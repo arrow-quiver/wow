@@ -485,6 +485,7 @@ describe('inbox', () => {
   test('game folders without the addon get no inbox, but their data still uploads', async () => {
     const h = setup();
     const retail = makeGame(h.root, '_retail_', { addon: false, auctionator: false });
+    h.store.set({ otherGameFolders: [retail.dir] });
     await h.sync.start();
     assert.equal(h.api.posts().length, 2);
     assert.ok(fs.existsSync(path.join(h.forever.inboxDir, 'Inbox.lua')));
@@ -979,12 +980,16 @@ describe('lifecycle', () => {
   test('game folders are looked for again every minute', async () => {
     const h = setup();
     await h.sync.start();
-    makeGame(h.root, '_classic_era_', { auctionator: false });
+    const era = makeGame(h.root, '_classic_era_', { auctionator: false });
     await h.sync.poll();
     assert.equal(h.api.posts().length, 1, 'not seen yet');
     h.advance(60 * 1000);
     await h.sync.poll();
-    assert.equal(h.api.posts().length, 2, 'found and uploaded');
+    assert.equal(h.api.posts().length, 1, 'found, but another game stays out until the person turns it on');
+    assert.equal(h.sync.status().installCount, 1);
+    h.store.set({ otherGameFolders: [era.dir] });
+    await h.sync.poll();
+    assert.equal(h.api.posts().length, 2, 'turned on: looked for again at once and uploaded');
     assert.equal(h.sync.status().installCount, 2);
     h.sync.stop();
   });

@@ -31,7 +31,7 @@ export function Sidebar({ routes, sections }) {
   const groups = sections.map((s) => [s, items.filter((r) => r.nav === s)]).filter(([, list]) => list.length);
   const syncInfo = describeSync(sync);
   const updates = describeUpdates(updater, addon);
-  const outdated = addon && Array.isArray(addon.installs) ? addon.installs.filter((i) => i.state === 'outdated').length : 0;
+  const outdated = addon && Array.isArray(addon.installs) ? addon.installs.filter((i) => i.state === 'outdated' && i.inUse !== false).length : 0;
   const badges = {
     '/updates': updater && ['available', 'downloaded'].includes(updater.state) ? '1' : null,
     '/addon': sync && sync.state === 'error' ? '!' : outdated ? String(outdated) : null,

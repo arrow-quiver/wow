@@ -1,8 +1,13 @@
 'use strict';
 // Finds World of Warcraft game folders ("installs") on this computer.
 //
-//   findInstalls({ extraRoots, scanDefaults }) →
-//     [{ dir, root, flavor, label, addonsDir, wtfDir, accounts: [svFile...], addonInstalled }]
+//   findInstalls({ extraRoots, scanDefaults, otherFolders }) →
+//     [{ dir, root, flavor, label, addonsDir, wtfDir, accounts: [svFile...], addonInstalled, mainGame, inUse }]
+//
+// Guild Camp is for WoW Forever. A _forever_ folder, or a game folder with no flavor folder (a private-server
+// layout, or one the person picked directly), is the main game and always in use. Every other flavor
+// (_retail_, _classic_era_, ...) is listed but left alone (inUse: false: no sync, no automatic addon care)
+// until the person turns it on (settings.otherGameFolders, passed as otherFolders).
 //
 // A root is a "World of Warcraft" folder: one of the usual install places, or a folder the person
 // added under Addon & sync (settings.extraWowFolders). Inside a root, every flavor folder
@@ -34,6 +39,7 @@ const { parseSavedVariables } = require('../shared/lua');
 const ADDON = 'WowGuild';
 const INBOX_ADDON = 'WowGuild_Inbox';
 const FLAVOR_RE = /^_.+_$/;
+const MAIN_FLAVOR = '_forever_';
 
 const FLAVOR_LABELS = {
   _forever_: 'WoW Forever',
@@ -69,6 +75,12 @@ function pathKey(p, platform = process.platform) {
 
 // ---------------------------------------------------------------------------------------------
 // Labels
+
+/** The game Guild Camp is for: WoW Forever, or a folder with no flavor (a private-server layout). */
+function isMainGame(install) {
+  const flavor = install && install.flavor;
+  return !flavor || String(flavor).toLowerCase() === MAIN_FLAVOR;
+}
 
 /** "_forever_" → "WoW Forever"; unknown flavors are spelled out ("_classic_ptr_" → "Classic PTR"). */
 function flavorLabel(flavor) {
@@ -243,7 +255,11 @@ function installsInRoot(root) {
  * @param {boolean} [opts.scanDefaults=true] also look in the usual install places
  *                                          (GUILDCAMP_NO_SCAN=1 turns this off)
  */
-function findInstalls({ extraRoots = [], scanDefaults = true } = {}) {
+function findInstalls({ extraRoots = [], scanDefaults = true, otherFolders = [] } = {}) {
+  const others = new Set();
+  for (const d of Array.isArray(otherFolders) ? otherFolders : []) {
+    if (typeof d === 'string' && d.trim()) { try { others.add(pathKey(d.trim())); } catch { /* not a path */ } }
+  }
   const roots = [];
   for (const r of Array.isArray(extraRoots) ? extraRoots : []) {
     // Only full paths: a relative one would depend on where the app happened to start.
@@ -269,7 +285,8 @@ function findInstalls({ extraRoots = [], scanDefaults = true } = {}) {
       const k = pathKey(install.dir);
       if (seenInstalls.has(k)) continue; // the same game folder reached from two roots
       seenInstalls.add(k);
-      out.push(install);
+      const mainGame = isMainGame(install);
+      out.push({ ...install, mainGame, inUse: mainGame || others.has(k) });
     }
   }
   return out;
@@ -345,11 +362,12 @@ function charactersInFile(svFile) {
  * @param {object[]} [opts.installs]         use these installs instead of looking (findInstalls() shape)
  * @returns {{ characters: object[], guild: { name, realm, faction } | null }}
  */
-function detectGuild({ extraRoots = [], scanDefaults = true, installs } = {}) {
+function detectGuild({ extraRoots = [], scanDefaults = true, otherFolders = [], installs } = {}) {
   let list = installs;
   if (!Array.isArray(list)) {
-    try { list = findInstalls({ extraRoots, scanDefaults }); } catch { list = []; }
+    try { list = findInstalls({ extraRoots, scanDefaults, otherFolders }); } catch { list = []; }
   }
+  list = list.filter((i) => i && i.inUse !== false);
   const byKey = new Map();
   for (const install of list) {
     if (!install || typeof install.dir !== 'string') continue;
@@ -451,12 +469,14 @@ module.exports = {
   savedVariablesFiles,
   accountName,
   flavorLabel,
+  isMainGame,
   defaultRoots,
   normaliseRoot,
   isWowRunning,
   gameProcessIds,
   pathKey,
   FLAVOR_LABELS,
+  MAIN_FLAVOR,
   ADDON,
   INBOX_ADDON,
 };

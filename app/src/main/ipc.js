@@ -269,12 +269,12 @@ function buildMethods(d) {
 
     if (changed.includes('syncEnabled')) sync.setEnabled(patch.syncEnabled);
     if (changed.includes('discordWebhook')) log.info(patch.discordWebhook ? 'Discord webhook saved.' : 'Discord webhook removed.');
-    if (changed.includes('extraWowFolders')) background(() => addon.check(), 'Addon check failed');
+    if (changed.includes('extraWowFolders') || changed.includes('otherGameFolders')) background(() => addon.check(), 'Addon check failed');
     return store.get();
   }
 
   function installs() {
-    return wow.findInstalls({ extraRoots: store.get().extraWowFolders, scanDefaults: true });
+    return wow.findInstalls({ extraRoots: store.get().extraWowFolders, scanDefaults: true, otherFolders: store.get().otherGameFolders });
   }
 
   return {
@@ -411,7 +411,7 @@ function buildMethods(d) {
       if (next.length !== list.length) await setSettings({ extraWowFolders: next });
       return installs();
     },
-    'wow.detectGuild': () => wow.detectGuild({ extraRoots: store.get().extraWowFolders, scanDefaults: true }),
+    'wow.detectGuild': () => wow.detectGuild({ extraRoots: store.get().extraWowFolders, scanDefaults: true, otherFolders: store.get().otherGameFolders }),
 
     // --- sync -----------------------------------------------------------------------------
     'sync.status': () => sync.status(),
