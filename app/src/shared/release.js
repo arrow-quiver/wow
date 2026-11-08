@@ -1034,7 +1034,10 @@ async function ghStatus({ gh, env, repo = GITHUB_REPO, timeout = 30000, checkRep
   if (res.code === 0) {
     try {
       const info = JSON.parse(res.stdout);
-      if (info && info.permissions && typeof info.permissions.push === 'boolean') out.push = info.permissions.push;
+      // An Actions GITHUB_TOKEN (github-actions[bot]) reports push: false even with "contents: write",
+      // so in CI push access stays unknown and the publish itself is the check.
+      const ci = mergeEnv(process.env, env).GITHUB_ACTIONS === 'true' || /^github-actions(\[bot\])?$/i.test(out.account || '');
+      if (!ci && info && info.permissions && typeof info.permissions.push === 'boolean') out.push = info.permissions.push;
       if (info && typeof info.private === 'boolean') out.private = info.private;
     } catch { out.note = `Couldn't read GitHub's answer about ${repo}.`; }
   } else if (/HTTP 404|Not Found/i.test(`${res.stderr}${res.stdout}`)) {
