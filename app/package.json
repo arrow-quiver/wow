@@ -15,14 +15,17 @@
     "test": "node --test \"test/**/*.test.{js,mjs}\""
   },
   "dependencies": {
-    "electron-updater": "^6.8.11"
+    "electron-updater": "^6.8.11",
+    "express": "^5.3.0"
   },
   "devDependencies": {
     "@fontsource/alegreya": "^5.2.5",
     "@fontsource/alegreya-sans": "^5.2.5",
     "electron": "45.2.1",
     "electron-builder": "^26.18.0",
+    "fengari": "^0.1.5",
     "htm": "3.1.1",
+    "luaparse": "^0.3.1",
     "preact": "10.29.8"
   },
   "allowScripts": {

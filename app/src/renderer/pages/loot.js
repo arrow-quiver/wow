@@ -9,6 +9,7 @@ import { plural } from '../lib/format.js';
 import {
   Page, Card, Table, Button, ConfirmButton, Input, Textarea, Pill, Tabs, Empty, Async, ItemLink, TimeAgo, tabPanelId, tabId,
 } from '../components/index.js';
+import { ShareHint } from '../components/ShareHint.js';
 import { groupByBoss, AwardHow } from './raid.js';
 
 // ?instance=<name> picks that list; &add=1 also opens the officers' "Add items" form for it.
@@ -101,6 +102,7 @@ function AddItemsCard({ lists, focus, onAdded, onClose }) {
       <div class="form-actions">
         <${Button} type="submit" variant="primary" busy=${add.busy} disabled=${!instance.trim() || !text.trim()}>Add items<//>
       </div>
+      <${ShareHint} officer />
     </form>
   <//>`;
 }

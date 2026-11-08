@@ -1,20 +1,23 @@
 # Coach API
 
 The Coach learns each character's play style from the addon, keeps a Claude-written build plan, works out next
-steps, and answers questions. Implemented in `server/src/routes/coach.js`, `services/coach.js` (play style, plans,
-answers, limits) and `services/ai.js` (Claude Messages API, cost metering). Conventions are in `docs/api/core.md`.
+steps, and answers questions. Implemented in `app/src/core/routes/coach.js`, `services/coach.js` (play style, plans,
+answers, limits) and `services/ai.js` (Claude Messages API, cost metering). Conventions are in [core.md](core.md).
+The Coach is personal: nothing here is shared with guildmates.
 
 ## How it works
 
 - **From the game.** The addon records play style, the quiz, talents and gear in `WowGuildDB.coach`. The app's sync
   uploads it (`POST /api/sync` → `services/coach.applyCoach`); questions asked in game ride along and are stored with
   `source: "game"`. Plans and answers go back to the game in the inbox (`coach` part, see `services/coach.inboxPart`).
-- **Claude.** Plans use `COACH_MODEL` (default `claude-sonnet-5-5`, up to 4 web searches), answers use
-  `COACH_FAST_MODEL` (default `claude-haiku-5-5`, up to 2 searches). Web search is limited to wowhead.com,
-  warcraft.wiki.gg, worldofwarcraft.blizzard.com, icy-veins.com and reddit.com. Every call is metered in `ai_usage`.
-- **Limits.** Each member gets **30 questions and 5 plans a day** (UTC). Officers set a **monthly budget** (USD, default
-  15) and can switch the AI off with `PUT /api/guild/settings { coach_enabled, coach_budget_usd }` (see core.md).
-- **Without `ANTHROPIC_API_KEY`** play-style tracking and next steps still work; asking and plans are refused with a
+- **Claude.** The player's own Anthropic API key, entered in Settings → Coach and stored encrypted on this computer
+  (secret `anthropicKey`; the page can set it but never read it back). Plans use `cfg.coachModel` (`claude-sonnet-5-5`,
+  up to 4 web searches), answers use `cfg.coachFastModel` (`claude-haiku-5-5`, up to 2 searches). Web search is
+  limited to wowhead.com, warcraft.wiki.gg, worldofwarcraft.blizzard.com, icy-veins.com and reddit.com. Every call is metered in `ai_usage`.
+- **Limits.** **30 questions and 5 plans a day** (UTC). A **monthly budget** (USD, default 15) and an on/off switch
+  for the AI live in Guild settings (`PUT /api/guild/settings { coach_enabled, coach_budget_usd }`, see core.md).
+  Anyone can change them: the key and the bill are the player's own.
+- **Without a key** play-style tracking and next steps still work; asking and plans are refused with a
   clear reason, and questions from the game are marked failed with that reason so the game shows it.
 - **Background pass** (`services/coach.processPending`, every minute when timers run, and soon after `kick()`): answers
   waiting questions (6 per pass) and writes plans for characters that want one: no plan yet, a fresh plan asked for in
@@ -36,18 +39,18 @@ got in the app doesn't pop up again. `route` is `/coach`.
 | A plan was written in the background (first plan, level-up, in-game request, or a slow app request) | `Your build plan for <name> is ready` | the plan's headline |
 | A slow app plan request failed | `Your build plan for <name> couldn't be made` | the reason |
 
-### Server hook
+### Core hook
 ```js
 ctx.services.coach.kick()   // schedule a background pass soon (no-op while cfg.timers is off, e.g. in tests)
 await ctx.services.coach.run()  // run a pass now → { answered, plans, failed } (busy: true if one was already running)
 ```
-The sync route should call `kick()` after an upload that brought in-game questions (`stats.coach.questions > 0`) or
-when the inbox says something is pending (`coachPending > 0`), like the old server did. Without a key a pass only marks
-waiting questions as failed (no outside calls).
+The sync route calls `kick()` after an upload that brought in-game questions (`stats.coach.questions > 0`), or when
+something is pending (`coachPending > 0`) and a key is set. Without a key a pass only marks waiting questions as
+failed (no outside calls).
 
 ---
 
-## `GET /api/coach?char=<name>` (guild member)
+## `GET /api/coach?char=<name>` (guild)
 Everything the Coach page shows, for one of **my** coach characters. `char` picks the character (exact name first, then
 ignoring case); without it, or when it doesn't match, the most recently synced character is used.
 
@@ -123,12 +126,12 @@ ignoring case); without it, or when it doesn't match, the most recently synced c
   then each `plan` step.
 - `questions`: my latest 15 across all my characters, newest first. `source` is `app` or `game`. `status` is
   `pending` (Claude is on it), `answered` or `failed` (`error` says why).
-- `ai.available` = server has a Claude key **and** the guild has the Coach switched on **and** this month's spend is under
+- `ai.available` = an Anthropic key is set **and** the Coach's AI is switched on **and** this month's spend is under
   the budget. `reason` is a sentence for people when it isn't. Daily limits are separate (`limits`).
-- `usage` (owner and officers only, else `null`): this calendar month (UTC): spend in USD, the budget, and how many
-  questions and plans were made.
+- `usage`: this calendar month (UTC): spend in USD, the budget, and how many questions and plans were made. Everyone
+  sees it, because the key and the budget are the player's own.
 
-## `POST /api/coach/ask` (guild member)
+## `POST /api/coach/ask` (guild)
 ```json
 { "char": "Grom", "question": "Should I take Improved Charge or Deflection for world PvP?" }
 ```
@@ -151,12 +154,12 @@ If Claude fails, the question is stored as `failed` and the answer is `200` with
 
 Refused before anything is stored or sent:
 - Empty question → `400 "Type a question first."`
-- No Claude key → `503 "The Coach AI isn't set up yet: the server has no Claude API key."`
-- `403` with one of: `"The Coach is switched off for this guild."`,
-  `"The guild's Coach budget for this month is used up. An officer can raise it in Guild settings."`,
+- No key → `503 "The Coach's AI answers are off. Add your Anthropic API key in Settings to turn them on."`
+- `403` with one of: `"The Coach's AI answers are switched off in Guild settings."`,
+  `"Your Coach budget for this month is used up. You can raise it in Guild settings."`,
   `"You've reached today's limit of 30 questions. It resets at midnight (UTC)."`
 
-## `POST /api/coach/plan` (guild member)
+## `POST /api/coach/plan` (guild)
 ```json
 { "char": "Grom" }
 ```
@@ -168,11 +171,14 @@ Ready in time → `200`:
 { "status": "ready", "char": "Grom", "plan": { "headline": "…", "talents": [ { "name": "…", "taken": true, "rank": 3, "...": "…" } ], "...": "same shape as GET" },
   "message": "Your new build plan is ready. It reaches the game after your next sync and /reload." }
 ```
+While the game's news folder waits for a game restart (sync status `restartNeeded`), the app shows this reply as
+"Your new build plan is ready. It reaches the game after you restart World of Warcraft. A /reload isn't enough the
+first time." (SHARING.md §2).
 Still being written after 12 s → `202` (a `coach` event follows, ready or failed):
 ```json
 { "status": "pending", "char": "Grom", "message": "The Coach is writing your plan. It can take a minute; it shows here when it's ready." }
 ```
 Errors:
 - No coach data for me → `400 "No character data yet. Log in with the addon and sync once."`
-- No Claude key → `503` (as above). Switched off, budget, or `"You've reached today's limit of 5 build plans. It resets at midnight (UTC)."` → `403`
+- No key → `503` (as above). Switched off, budget, or `"You've reached today's limit of 5 build plans. It resets at midnight (UTC)."` → `403`
 - Claude failed or returned something that isn't a plan → `502` (`"Claude API 500: …"`, `"Could not reach the Claude API. Try again in a minute."`, `"The Coach didn't return a plan. Try again."`)

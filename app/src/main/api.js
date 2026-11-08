@@ -1,16 +1,15 @@
 'use strict';
-// HTTP client for the guild server. Every server call the app makes goes through here, so the
-// device token is added in one place and errors always come back as ApiError {status, message}.
-// When the server's error reply is JSON, the error also carries it: err.body (the whole object),
-// err.code (body.code, e.g. 'NO_GUILD_MATCH') and err.autoJoin (body.autoJoin, the guild match result
-// a 409 from POST /api/sync includes).
+// HTTP client for the local core (src/core, running in this main process on 127.0.0.1). Every call the
+// app makes to its guild data goes through here, so the launch token is added in one place and errors
+// always come back as ApiError {status, message}. When the core's error reply is JSON, the error also
+// carries it: err.body (the whole object) and err.code (body.code, e.g. 'NO_GUILD').
 //
-//   const api = createApi({ getServer, getToken, appVersion, fetch, log });
+//   const api = createApi({ getBase: () => core.url, getToken: () => core.token, appVersion, log });
 //   await api.request('GET', '/api/me');
 //   await api.request('POST', '/api/sync', payload, { timeout: 120000 });
-//   await api.request('GET', '/api/releases', null, { auth: false });
-//   const buf = await api.download('/updates/addon/WowGuild-0.11.1.zip');
-//   api.on('unauthorized', ({ path, token }) => ...)   // a 401 for a request that carried a token
+//   const text = await api.request('GET', '/api/calendar.ics', null, { raw: true });
+//   const buf = await api.download('/api/...');
+//   api.on('unauthorized', ({ path }) => ...)   // a 401: the token didn't match (should never happen)
 //
 // Plain Node (no Electron). Uses the injected fetch (defaults to global fetch).
 
@@ -47,31 +46,27 @@ const NETWORK_REASONS = {
 };
 
 const STATUS_MESSAGES = {
-  400: "The server didn't accept that request.",
-  401: 'You are not signed in, or your sign-in has expired. Sign in again.',
+  400: "Guild Camp couldn't do that. Check what you entered and try again.",
+  401: "Guild Camp's data service didn't accept the request. Restart Guild Camp.",
   403: "You don't have permission to do that.",
-  404: "The server couldn't find that.",
+  404: "Guild Camp couldn't find that.",
   409: 'That clashes with something that already exists.',
-  413: 'That is too large for the server to accept.',
+  413: 'That is too large for Guild Camp to accept.',
   429: 'Too many requests. Wait a moment and try again.',
-  500: 'The guild server had a problem. Try again in a moment.',
-  502: 'The guild server is not responding properly right now. Try again in a moment.',
-  503: 'The guild server is busy or restarting. Try again in a moment.',
-  504: 'The guild server took too long to answer. Try again in a moment.',
+  500: 'Guild Camp had a problem. Try again, and look in the log if it keeps happening.',
+  502: "Guild Camp couldn't reach an outside service. Try again in a moment.",
+  503: 'That is not available right now. Try again in a moment.',
+  504: 'That took too long. Try again in a moment.',
 };
 
-function hostOf(server) {
-  try { return new URL(server).host; } catch { return String(server || 'unknown'); }
-}
-
-function networkError(err, server) {
+function networkError(err) {
   if (err && (err.name === 'TimeoutError' || err.name === 'AbortError')) {
-    return new ApiError(0, `The guild server took too long to answer (${hostOf(server)}). Try again in a moment.`);
+    return new ApiError(0, 'Guild Camp took too long to answer. Try again in a moment.');
   }
   const cause = (err && err.cause) || {};
   const code = cause.code || (err && err.code) || '';
   const reason = NETWORK_REASONS[code] || (code ? code : (cause.message || (err && err.message) || 'unknown error'));
-  return new ApiError(0, `Can't reach the guild server (${hostOf(server)}: ${reason}). Check your internet connection and the server address in Settings.`);
+  return new ApiError(0, `Guild Camp couldn't reach its own data service (${reason}). Restart Guild Camp.`);
 }
 
 const isPlainObject = (v) => Boolean(v) && typeof v === 'object' && !Array.isArray(v);
@@ -89,12 +84,11 @@ function errorFromBody(status, text) {
       // Not JSON (a proxy error page, say). Don't show raw HTML to people.
     }
   }
-  if (!message) message = STATUS_MESSAGES[status] || `The guild server answered with an error (${status}).`;
+  if (!message) message = STATUS_MESSAGES[status] || `Guild Camp answered with an error (${status}).`;
   const err = new ApiError(status, message.slice(0, 500));
   if (body) {
     err.body = body;
     if (typeof body.code === 'string' && /^[A-Za-z][\w-]{0,63}$/.test(body.code)) err.code = body.code;
-    if (isPlainObject(body.autoJoin)) err.autoJoin = body.autoJoin;
   }
   return err;
 }
@@ -105,26 +99,27 @@ function isBinary(body) {
 
 /**
  * @param {object} deps
- * @param {() => string} deps.getServer   base URL, e.g. https://guild.example.com
- * @param {() => string|null} deps.getToken device token (gcd_…) or null when signed out
- * @param {string} deps.appVersion         sent as X-App-Version
+ * @param {() => string} deps.getBase       the core's address, e.g. http://127.0.0.1:51234 (getServer: the old name)
+ * @param {() => string|null} deps.getToken the core's launch token
+ * @param {string} deps.appVersion          sent as X-App-Version
  * @param {typeof fetch} [deps.fetch]
  * @param {object} [deps.log]
  * @param {number} [deps.timeout=20000]
  */
-function createApi({ getServer, getToken, appVersion, fetch: fetchImpl, log, timeout = DEFAULT_TIMEOUT } = {}) {
+function createApi({ getBase, getServer, getToken, appVersion, fetch: fetchImpl, log, timeout = DEFAULT_TIMEOUT } = {}) {
   const emitter = new EventEmitter();
   const doFetch = fetchImpl || globalThis.fetch;
+  const base = getBase || getServer;
 
   function baseUrl() {
-    const server = String((getServer && getServer()) || '').trim().replace(/\/+$/, '');
-    if (!server) throw new ApiError(0, 'No guild server is set. Add the server address in Settings.');
-    return server;
+    const url = String((base && base()) || '').trim().replace(/\/+$/, '');
+    if (!url) throw new ApiError(0, "Guild Camp's data service hasn't started. Restart Guild Camp.");
+    return url;
   }
 
   function checkPath(p) {
     if (typeof p !== 'string' || !p.startsWith('/') || p.startsWith('//') || p.length > 4096) {
-      throw new ApiError(0, `Bad server path: ${String(p).slice(0, 80)}`);
+      throw new ApiError(0, `Bad request path: ${String(p).slice(0, 80)}`);
     }
   }
 
@@ -159,7 +154,7 @@ function createApi({ getServer, getToken, appVersion, fetch: fetchImpl, log, tim
     try {
       res = await doFetch(server + p, init);
     } catch (err) {
-      const e = networkError(err, server);
+      const e = networkError(err);
       if (log) log.warn(`${verb} ${p} failed: ${e.message}`);
       throw e;
     }
@@ -177,7 +172,7 @@ function createApi({ getServer, getToken, appVersion, fetch: fetchImpl, log, tim
 
   /**
    * @param {string} method GET|POST|PUT|PATCH|DELETE
-   * @param {string} path   server path starting with "/" (e.g. /api/me)
+   * @param {string} path   path starting with "/" (e.g. /api/me)
    * @param {*} [body]      object → JSON; Buffer/string/stream → sent as-is (opts.contentType)
    * @param {object} [opts] { timeout, auth: false, raw: true (resolve with the response text), headers, contentType, signal }
    */
@@ -187,7 +182,7 @@ function createApi({ getServer, getToken, appVersion, fetch: fetchImpl, log, tim
     try {
       text = await res.text();
     } catch (err) {
-      throw networkError(err, baseUrl());
+      throw networkError(err);
     }
     if (opts.raw) return text;
     if (!text) return null;
@@ -195,7 +190,7 @@ function createApi({ getServer, getToken, appVersion, fetch: fetchImpl, log, tim
       return JSON.parse(text);
     } catch {
       const type = res.headers && typeof res.headers.get === 'function' ? res.headers.get('content-type') || '' : '';
-      if (/json/i.test(type)) throw new ApiError(res.status, 'The guild server sent a reply Guild Camp could not read.');
+      if (/json/i.test(type)) throw new ApiError(res.status, 'Guild Camp got a reply it could not read.');
       return text;
     }
   }
@@ -206,7 +201,7 @@ function createApi({ getServer, getToken, appVersion, fetch: fetchImpl, log, tim
     try {
       return Buffer.from(await res.arrayBuffer());
     } catch (err) {
-      throw networkError(err, baseUrl());
+      throw networkError(err);
     }
   }
 

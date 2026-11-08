@@ -1,13 +1,24 @@
-// "Addon & sync": the sync engine's state, the Guild Camp addon in every game folder (install, update, repair,
-// remove), game folder management, what's new in the addon, recent uploads and the sync/addon log.
-// Everything here is live: statuses arrive on the 'sync', 'addon', 'settings' and 'log' channels.
-import { html, useState, useEffect, useMemo, useRef, useCallback } from '../lib/html.js';
+// "Addon & sync": the sync engine's state, sharing in game (what waits to go out, what the game didn't send,
+// changes in my name this PC didn't make), the Guild Camp addon in every game folder (install, update, repair,
+// remove), game folder management, what's new in the addon, recent syncs and the sync/addon log.
+// Sync means: Guild Camp reads what the addon saved (WowGuildDB, written when you log out or type /reload) into
+// its own data on this PC, and writes my changes back for the addon (WowGuild_Inbox, read at login or /reload),
+// which shares them with guildmates in game (docs/SHARING.md).
+// Everything here is live: statuses arrive on the 'sync', 'addon', 'settings' and 'log' channels; sharing comes
+// from GET /api/share/status (lib/status.js shareStatus).
+import { html, cx, useState, useEffect, useMemo, useRef, useCallback } from '../lib/html.js';
 import { gc, useGcEvent } from '../lib/gc.js';
-import { useSyncStatus, useAddonStatus, describeSync, addonStatus as addonLive } from '../lib/status.js';
-import { plural } from '../lib/format.js';
+import { api } from '../lib/api.js';
 import {
-  Page, Card, Table, Button, ConfirmButton, Checkbox, Notice, Pill, Empty, Loading, TimeAgo, LocalTime, Icon, toast,
+  useSyncStatus, useAddonStatus, describeSync, addonStatus as addonLive,
+  useShareStatus, shareStatus as shareLive, shareGroups, shareStateLabel, readyLine, needsGameRestart, SHARE_LINES,
+} from '../lib/status.js';
+import { plural, number } from '../lib/format.js';
+import {
+  Page, Card, Table, Button, ConfirmButton, Checkbox, Notice, Pill, Empty, Loading, TimeAgo, LocalTime, Icon, Stat, toast,
 } from '../components/index.js';
+import { AuthorChecks } from '../components/AuthorChecks.js';
+import { NoGuild } from '../components/NoGuild.js';
 
 const LOG_LINES = 200;
 
@@ -72,12 +83,53 @@ const STATE_PILL = {
   newer: { kind: 'info', label: 'Newer than ours' },
 };
 
+// The game reads new addon folders and each addon's file list only when it starts, so some changes need a restart
+// (the main process says restartNeeded).
+export const RESTART_LINE = "Restart World of Warcraft to load it. A /reload isn't enough this time.";
+
 const ACTION_TEXT = {
-  install: { busy: 'Installing…', done: (v, label) => `Addon ${v} installed in ${label}. Start the game or type /reload to load it.` },
+  install: { busy: 'Installing…', done: (v, label) => `Addon ${v} installed in ${label}. Start the game to load it.` },
   update: { busy: 'Updating…', done: (v, label) => `Addon updated to ${v} in ${label}. Type /reload in the game to load it.` },
   repair: { busy: 'Repairing…', done: (v, label) => `Addon ${v} reinstalled in ${label}.` },
   uninstall: { busy: 'Removing…', done: (_v, label) => `Addon removed from ${label}.` },
 };
+
+/** The toast after an addon change in one game folder; restartNeeded comes from the main process. */
+export function actionDoneText(action, version, label, restartNeeded = false) {
+  const words = ACTION_TEXT[action];
+  if (!words) return 'Done.';
+  if (restartNeeded && action !== 'uninstall') {
+    return action === 'update'
+      ? `Addon updated to ${version} in ${label}. ${RESTART_LINE}`
+      : `Addon ${version} ${action === 'install' ? 'installed' : 'reinstalled'} in ${label}. ${RESTART_LINE}`;
+  }
+  return words.done(version, label);
+}
+
+/** The toast after "Update all" (Addon & sync and Updates pages). */
+export function updateAllText(version, restartNeeded = false) {
+  return `Addon updated to ${version || 'the newest version'}. ${restartNeeded ? RESTART_LINE : 'Type /reload in the game to load it.'}`;
+}
+
+/**
+ * The Sync card's notice while a news folder made during the running game session waits for a game restart
+ * (sync status restartNeeded and restartFolders); '' otherwise.
+ */
+export function restartNoticeText(sync) {
+  if (!needsGameRestart(sync)) return '';
+  const folders = Array.isArray(sync.restartFolders) ? sync.restartFolders : [];
+  const labels = [...new Set(folders.map((f) => f && f.label).filter((l) => typeof l === 'string' && l))];
+  const where = labels.length ? ` in ${labels.join(' and ')}` : '';
+  return `Guild Camp added its news folder${where} while the game was running. Restart World of Warcraft to load it. A /reload isn't enough the first time. Your changes for the guild wait until then.`;
+}
+
+/** A game folder whose automatic install or update waits for World of Warcraft to close, as one line; '' otherwise. */
+export function waitingText(inst) {
+  if (!inst || !inst.waitingForGame) return '';
+  return inst.state === 'missing'
+    ? 'Guild Camp installs the addon here once World of Warcraft is closed. You can also install it now.'
+    : 'Guild Camp updates the addon here once World of Warcraft is closed. You can also update it now.';
+}
 
 const SCOPE_LABEL = (scope) => String(scope || '').replace(/:/g, ' · ');
 
@@ -88,12 +140,14 @@ function logTime(t) {
 
 // ---------- page ----------
 
-// Sections other pages can link to: /addon?section=games|activity|notes|log
-const SECTIONS = ['summary', 'games', 'activity', 'notes', 'log'];
+// Sections other pages can link to: /addon?section=sharing|games|activity|notes|log
+const SECTIONS = ['summary', 'sharing', 'games', 'activity', 'notes', 'log'];
 
 export default function AddonPage({ query = {} }) {
   const sync = useSyncStatus();
   const addon = useAddonStatus();
+  const share = useShareStatus();
+  const groups = shareGroups(share?.data);
   const [settings, setSettings] = useState(null);
   const [info, setInfo] = useState(null);
   const [lines, setLines] = useState(null);
@@ -109,7 +163,7 @@ export default function AddonPage({ query = {} }) {
     gc.app.info().then((i) => live && setInfo(i), () => {});
     gc.log.recent().then((all) => live && setLines((all || []).filter(isSyncOrAddonLine).slice(-LOG_LINES)), () => live && setLines([]));
     // The app checks for addon updates when it starts; if that hasn't happened yet, do it now so the page shows
-    // what the server has.
+    // the newest version on GitHub.
     addonLive.refresh().then((s) => {
       if (live && s && !s.lastCheckAt && !s.checking) gc.addon.check().catch(() => {});
     });
@@ -142,7 +196,7 @@ export default function AddonPage({ query = {} }) {
       const s = await gc.addon[action](inst.dir);
       const after = s?.installs?.find((i) => i.dir === inst.dir);
       const v = after?.installed?.version || latest?.version || '';
-      toast(ACTION_TEXT[action].done(v, inst.label), 'ok');
+      toast(actionDoneText(action, v, inst.label, Boolean(s?.restartNeeded)), 'ok');
     } catch (err) {
       toast(err?.message || 'That did not work. Please try again.', 'alarm');
     } finally {
@@ -167,7 +221,7 @@ export default function AddonPage({ query = {} }) {
     try {
       await gc.sync.setEnabled(on);
       setSettings((s) => (s ? { ...s, syncEnabled: on } : s));
-      toast(on ? 'Sync is on. Guild Camp uploads after you log out or type /reload.' : 'Sync is off. Nothing is uploaded until you turn it back on.', 'ok');
+      toast(on ? 'Sync is on. Guild Camp reads the game data after you log out or type /reload.' : 'Sync is off. Guild Camp stops reading the game data and sending guild news until you turn it back on.', 'ok');
     } catch (err) {
       toast(err?.message || 'Could not change that setting.', 'alarm');
     }
@@ -200,8 +254,8 @@ export default function AddonPage({ query = {} }) {
   const updateAll = async () => {
     setUpdatingAll(true);
     try {
-      await gc.addon.updateAll();
-      toast(`Addon updated to ${latest?.version || 'the newest version'}. Type /reload in the game to load it.`, 'ok');
+      const s = await gc.addon.updateAll();
+      toast(updateAllText(latest?.version, Boolean(s?.restartNeeded)), 'ok');
     } catch (err) {
       toast(err?.message || 'Could not update the addon.', 'alarm');
     } finally {
@@ -251,15 +305,18 @@ export default function AddonPage({ query = {} }) {
   const actions = html`
     <${Button} icon="refresh" busy=${checking || addon?.checking} onClick=${checkAddon}>Check for addon updates<//>
     <${Button} variant="primary" icon="sync" busy=${syncing || sync?.state === 'syncing'}
-      disabled=${!sync || sync.state === 'signed-out' || sync.state === 'off'} onClick=${syncNow}>Sync now<//>`;
+      disabled=${!sync || sync.state === 'off' || sync.state === 'no-game'} onClick=${syncNow}>Sync now<//>`;
 
   return html`<${Page} title="Addon & sync" actions=${actions}
-      lede="Guild Camp keeps the Guild Camp addon up to date in each game folder, and uploads what it saves when you log out or type /reload.">
+      lede="Guild Camp keeps the addon up to date in each game folder. It reads what the addon saves when you log out or type /reload, and hands your changes back to the game, which shares them with your guild.">
+    <${AuthorChecks} checks=${groups.checks} />
     <div class="grid-2 addon-summary" id="addon-summary">
       <${SyncCard} sync=${sync} settings=${settings} onToggle=${setSyncEnabled} />
       <${AddonCard} addon=${addon} settings=${settings} outdated=${outdated} busy=${updatingAll || anyBusy}
         updatingAll=${updatingAll} onUpdateAll=${updateAll} onToggle=${setAutoUpdate} />
     </div>
+
+    <${SharingCard} share=${share} groups=${groups} />
 
     <section class="stack" id="addon-games" aria-labelledby="addon-games-title">
       <div class="row row--between">
@@ -290,28 +347,29 @@ export default function AddonPage({ query = {} }) {
   <//>`;
 }
 
-// ---------- summary cards ----------
+// ---------- summary cards (SyncCard and ShareSection are exported for tests) ----------
 
-function SyncCard({ sync, settings, onToggle }) {
+export function SyncCard({ sync, settings, onToggle }) {
   const d = describeSync(sync);
   const enabled = settings ? settings.syncEnabled !== false : sync?.enabled !== false;
   const result = describeResult(sync?.lastResult);
+  const guild = sync?.lastResult?.guild?.name || null;
   return html`<${Card} title="Sync" class="addon-card">
     <div class="stack">
       <div class="addon-big">
         <${Pill} kind=${d.kind} dot>${d.label}<//>
-        ${sync?.lastSyncAt ? html`<span class="muted">Last upload <${TimeAgo} t=${sync.lastSyncAt} /></span>` : null}
+        ${sync?.lastSyncAt ? html`<span class="muted">Last sync <${TimeAgo} t=${sync.lastSyncAt} /></span>` : null}
       </div>
-      ${result ? html`<p class="hint mb-0">Last upload had ${result}.</p>` : null}
-      ${sync?.state === 'error' && sync.lastError ? html`<${Notice} kind="alarm" title="The last upload failed.">
+      ${result ? html`<p class="hint mb-0">Last sync had ${result}${guild ? ` for ${guild}` : ''}.</p>` : null}
+      ${sync?.state === 'error' && sync.lastError ? html`<${Notice} kind="alarm" title="The last sync failed.">
         ${sync.lastError}${sync.nextRetryAt ? html` Trying again <${TimeAgo} t=${sync.nextRetryAt} />.` : null}<//>` : null}
-      ${sync?.state === 'signed-out' ? html`<${Notice} kind="info">Sign in to sync your characters with the guild.
-        <${Button} size="sm" variant="ghost" href="/welcome">Sign in<//><//>` : null}
+      ${sync?.guildNote && sync.state !== 'error' ? html`<${Notice} kind="info" title="Waiting for your guild.">${sync.guildNote}<//>` : null}
       ${sync?.state === 'no-game' ? html`<${Notice} kind="warn">Guild Camp can't find World of Warcraft. Add your game folder below.<//>` : null}
-      ${sync && !['error', 'signed-out', 'no-game', 'off'].includes(sync.state) && !sync.lastSyncAt
-        ? html`<p class="hint mb-0">Log out of a character or type <code>/reload</code> in the game, and Guild Camp uploads within a few seconds.</p>` : null}
+      ${restartNoticeText(sync) && sync.state !== 'off' ? html`<${Notice} kind="info">${restartNoticeText(sync)}<//>` : null}
+      ${sync && !['error', 'no-game', 'off'].includes(sync.state) && !sync.lastSyncAt && !sync.guildNote
+        ? html`<p class="hint mb-0">Log out of a character or type <code>/reload</code> in the game, and Guild Camp syncs within a few seconds.</p>` : null}
       <${Checkbox} label="Sync while Guild Camp is running" checked=${enabled} disabled=${!sync} onValue=${onToggle}
-        hint="Uploads your characters, professions and the guild roster after each /reload, and brings guild news back into the game." />
+        hint="Reads your characters, professions and guild data after each /reload, and hands your changes back to the addon to share with your guild." />
     </div>
   <//>`;
 }
@@ -321,7 +379,7 @@ function AddonCard({ addon, settings, outdated, busy, updatingAll, onUpdateAll, 
   const { latest, installs = [] } = addon;
   const withAddon = installs.filter((i) => i.state !== 'missing').length;
   const auto = settings ? settings.addonAutoUpdate !== false : addon.autoUpdate;
-  const source = latest?.source === 'remote' ? 'from the guild server' : 'built into Guild Camp';
+  const source = latest?.source === 'remote' ? 'on GitHub' : 'built into Guild Camp';
   return html`<${Card} title="Addon" class="addon-card"
       actions=${outdated.length ? html`<${Button} size="sm" variant="primary" icon="download" busy=${updatingAll} disabled=${busy && !updatingAll}
         onClick=${onUpdateAll}>${outdated.length === 1 ? 'Update' : `Update all (${outdated.length})`}<//>` : null}>
@@ -335,12 +393,106 @@ function AddonCard({ addon, settings, outdated, busy, updatingAll, onUpdateAll, 
         ${withAddon ? `Installed in ${withAddon} of ${plural(installs.length, 'game folder')}. ` : "Not installed in any game folder yet. "}
         ${outdated.length ? html`<strong>${plural(outdated.length, 'copy', 'copies')} can be updated.</strong>` : withAddon ? 'All up to date.' : null}
         ${addon.lastCheckAt ? html` Checked <${TimeAgo} t=${addon.lastCheckAt} />.` : null}</p>` : null}
-      ${addon.error ? html`<${Notice} kind="warn" title="Couldn't check the server for addon updates.">
+      ${addon.error ? html`<${Notice} kind="warn" title="Couldn't check GitHub for addon updates.">
         ${addon.error}${addon.bundled ? ` Guild Camp can still install the addon it came with (${addon.bundled.version}).` : ''}<//>` : null}
       <${Checkbox} label="Update the addon automatically" checked=${auto} onValue=${onToggle}
-        hint="Guild Camp checks every hour and updates game folders that already have the addon. It never installs it anywhere new." />
+        hint="Guild Camp checks every hour and updates game folders that already have the addon, while World of Warcraft is closed. It never installs it anywhere new." />
     </div>
   <//>`;
+}
+
+// ---------- sharing in game ----------
+
+// How many entries a list shows before "Show all".
+const SHARE_LIST_MAX = 8;
+
+function SharingCard({ share, groups }) {
+  const data = share && share.data;
+  const on = Boolean(data && data.enabled);
+  const pill = !data ? null : on ? html`<${Pill} kind="ok" dot>On<//>` : html`<${Pill} kind="muted" dot>Not started yet<//>`;
+  let body;
+  if (!share) body = html`<${Loading} label="Reading what is shared…" />`;
+  else if (share.noGuild) body = html`<${NoGuild} compact here error=${share.error} />`;
+  else if (!data) {
+    body = html`<${Notice} kind="warn" title="Guild Camp couldn't read what is shared.">
+      ${share.error?.message || 'Please try again.'}
+      <div class="share-retry"><${Button} size="sm" icon="refresh" onClick=${() => shareLive.refresh()}>Try again<//></div>
+    <//>`;
+  } else {
+    body = html`<div class="stack">
+      <div class="share-stats">
+        <${Stat} label="Guildmates heard" value=${number(data.peers || 0)} />
+        <${Stat} label="Records" value=${number(data.records || 0)} />
+        <${Stat} label="Last exchange" value=${html`<${TimeAgo} t=${data.lastExchange} never="Not yet" />`} />
+      </div>
+      <p class="hint mb-0">${on
+        ? SHARE_LINES.newData
+        : 'Nothing shared yet. Log in to the game with the Guild Camp addon, then log out or type /reload. The numbers show here after that.'}</p>
+      <${ShareSection} title="Waiting to go out" entries=${groups.waiting} cancel
+        empty="Nothing is waiting. Changes you make in Guild Camp show here until the game sends them." />
+      ${groups.refused.length ? html`<${ShareSection} title="Not sent" entries=${groups.refused} kind="refused" />` : null}
+      ${groups.sent.length ? html`<${ShareSection} title="Sent in the last day" entries=${groups.sent} kind="sent" folded />` : null}
+    </div>`;
+  }
+  return html`<${Card} id="addon-sharing" title="Sharing in game" class="share-card" actions=${pill}>${body}<//>`;
+}
+
+export function ShareSection({ title, entries, empty, cancel = false, kind = 'waiting', folded = false }) {
+  const [all, setAll] = useState(false);
+  const [open, setOpen] = useState(!folded);
+  const shown = all ? entries : entries.slice(0, SHARE_LIST_MAX);
+  const head = html`<span>${title}</span>${entries.length ? html` <span class="share-count">${entries.length}</span>` : null}`;
+  // "Saved. It goes to your guild …" is every ready change's note: say it once above the list instead (with the
+  // restart wording while the game needs a restart to load the news folder).
+  const sync = useSyncStatus();
+  const ready = kind === 'waiting' && entries.some((e) => e.state === 'queued');
+  const list = entries.length
+    ? html`${ready ? html`<p class="hint mb-0">${readyLine(sync)}</p>` : null}
+      <ul class="share-list">
+        ${shown.map((e) => html`<${ShareEntry} key=${e.op} entry=${e} cancel=${cancel && (e.state === 'queued' || e.state === 'waiting')} />`)}
+      </ul>
+      ${entries.length > shown.length ? html`<button type="button" class="link-btn small" onClick=${() => setAll(true)}>
+        Show all ${entries.length}</button>` : null}`
+    : html`<p class="muted mb-0 share-empty">${empty}</p>`;
+  if (folded) {
+    return html`<section class=${cx('share-section', `share-section--${kind}`)}>
+      <button type="button" class="share-section-title share-fold" aria-expanded=${open ? 'true' : 'false'} onClick=${() => setOpen(!open)}>
+        <${Icon} name=${open ? 'back' : 'forward'} class=${cx('share-fold-icon', open && 'is-open')} />${head}
+      </button>
+      ${open ? list : null}
+    </section>`;
+  }
+  return html`<section class=${cx('share-section', `share-section--${kind}`)}>
+    <h3 class="share-section-title">${head}</h3>
+    ${list}
+  </section>`;
+}
+
+function ShareEntry({ entry, cancel }) {
+  const st = shareStateLabel(entry);
+  const dropIt = async () => {
+    try {
+      const r = await api.post(`/api/share/outbox/${encodeURIComponent(entry.op)}/cancel`);
+      toast((r && r.message) || 'Change dropped. It will not be sent.', 'ok');
+    } catch (err) {
+      toast(err?.message || 'That did not work. Please try again.', 'alarm');
+    } finally {
+      shareLive.refresh();
+    }
+  };
+  return html`<li class=${cx('share-entry', `share-entry--${entry.state}`)}>
+    <div class="share-entry-main">
+      <span class="share-entry-summary">${entry.summary || 'A guild change'}</span>
+      ${entry.note && !(entry.state === 'queued' && entry.note === SHARE_LINES.saved) ? html`<span class="share-entry-note">${entry.note}</span>` : null}
+    </div>
+    <div class="share-entry-side">
+      <${Pill} kind=${st.kind} dot>${st.label}<//>
+      <span class="hint nowrap"><${TimeAgo} t=${entry.sentAt || entry.createdAt} /></span>
+      ${cancel ? html`<${ConfirmButton} size="sm" variant="ghost" icon="close" question="Cancel this change?" yes="Yes, cancel" no="Keep it"
+          title="Don't send this change. Guild Camp shows things as they were before it."
+          onConfirm=${dropIt}>Cancel<//>` : null}
+    </div>
+  </li>`;
 }
 
 // ---------- game folders ----------
@@ -413,6 +565,7 @@ function InstallCard({ inst, latest, pending, custom, onAction, onOpen, onRemove
         </dl>
       </div>
       ${inst.damaged && !busy ? html`<${Notice} kind="warn">The addon folder is missing its WowGuild.toc file, so the game won't load it. Repair puts it back.<//>` : null}
+      ${waitingText(inst) && !busy ? html`<${Notice} kind="info" title="Waiting for World of Warcraft to close.">${waitingText(inst)}<//>` : null}
       ${inst.error && !busy ? html`<${Notice} kind="alarm" title="The last change didn't work.">${inst.error}<//>` : null}
     </div>
   <//>`;
@@ -435,11 +588,11 @@ export function shortFile(file, install) {
 function fileStatus(f) {
   const err = fileError(f);
   if (err) return html`<${Pill} kind="alarm" title=${err}>Problem<//>`;
-  if (f.lastUploadAt) return html`<${Pill} kind="ok">Uploaded<//>`;
+  if (f.lastUploadAt) return html`<${Pill} kind="ok">Synced<//>`;
   return html`<${Pill} kind="muted">Waiting<//>`;
 }
 
-const RECENT_KIND = { upload: 'Upload', inbox: 'Guild news', coach: 'Coach answer' };
+const RECENT_KIND = { upload: 'Sync', inbox: 'Guild news', coach: 'Coach answer', guild: 'Guild' };
 
 function ActivityCard({ sync }) {
   const files = sync?.files || [];
@@ -451,7 +604,7 @@ function ActivityCard({ sync }) {
         <span class="addon-file-path" title=${f.file}>${shortFile(f.file, f.install)}</span>
       </div>` },
     { key: 'label', label: 'Game', sortable: true, value: (f) => f.label || f.install, render: (f) => html`<span class="nowrap">${f.label || f.install || '—'}</span>` },
-    { key: 'lastUploadAt', label: 'Last upload', sortable: true, render: (f) => html`<${TimeAgo} t=${f.lastUploadAt} never="Not yet" />` },
+    { key: 'lastUploadAt', label: 'Last sync', sortable: true, render: (f) => html`<${TimeAgo} t=${f.lastUploadAt} never="Not yet" />` },
     { key: 'status', label: 'Status', render: (f) => html`<div class="stack stack--tight">${fileStatus(f)}
         ${fileError(f) ? html`<span class="hint addon-file-error">${fileError(f)}${f.nextRetryAt ? html` Trying again <${TimeAgo} t=${f.nextRetryAt} />.` : null}</span>` : null}</div>` },
   ];
@@ -486,8 +639,8 @@ function WhatsNewCard({ addon }) {
     ${addon && notes.length ? html`<ul class="addon-notes">${notes.map((n, i) => html`<li key=${i}>${n}</li>`)}</ul>` : null}
     ${addon && remote && !notes.length ? html`<p class="muted mb-0">No notes came with this version.</p>` : null}
     ${addon && !remote ? html`<p class="muted mb-0">${addon.bundled
-      ? `You have the addon that came with Guild Camp (${addon.bundled.version}). Notes show here when the guild publishes an update.`
-      : 'Notes show here when the guild publishes an addon update.'}</p>` : null}
+      ? `You have the addon that came with Guild Camp (${addon.bundled.version}). Notes show here when a newer version comes out.`
+      : 'Notes show here when a new version of the addon comes out.'}</p>` : null}
   <//>`;
 }
 

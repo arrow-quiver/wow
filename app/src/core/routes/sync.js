@@ -1,0 +1,123 @@
+'use strict';
+// Sync: the app's sync engine (src/main/sync.js) uploads the addon's saved data, and fetches the guild
+// news the addon shows in game. Shapes are documented in docs/api/sync.md.
+//
+//   POST /api/sync    WowGuildDB as JSON (+ Auctionator prices) → counts + latest versions
+//   GET  /api/inbox   the news for WowGuild_Inbox/Inbox.lua, as JSON
+//
+// The guild comes from the upload itself: the most recently played character that has a guild decides
+// which guild is current (identity.selectGuild creates it locally the first time). An upload with no
+// character in a guild is accepted and stores nothing; the reply says so in plain words (`noGuild`).
+// Roles follow the in-game ranks of the roster rows the upload brought (identity.syncRanks).
+const { HttpError, ver } = require('../http');
+const { applyPayload, buildInbox, emptyInbox } = require('../services/sync');
+const coach = require('../services/coach');
+const identity = require('../identity');
+
+const NO_GUILD_UPLOAD = 'None of your characters is in a guild yet. Guild Camp starts working as soon as you log in to a character in your guild.';
+
+function register(app, ctx) {
+  const { db, cfg } = ctx;
+  coach.setKeyPresent(() => Boolean(cfg.anthropicKey));
+
+  const q = {
+    log: db.prepare('INSERT INTO sync_log (guild_id, user_id, bytes) VALUES (?,?,?)'),
+    user: db.prepare(`UPDATE users SET addon_version = COALESCE(?, addon_version), last_sync_at = datetime('now') WHERE id = ?`),
+  };
+
+  // What the addon gets back: the guild news, plus the newest addon version (so it can tell the
+  // player to update from the app).
+  function inboxFor(req) {
+    const latest = ctx.latest() || {};
+    const news = req.guild ? buildInbox(db, req.guild.id, req.user.id, { ctx }) : emptyInbox();
+    return { ...news, latestAddon: (latest.addon && latest.addon.version) || null };
+  }
+
+  app.post('/api/sync', async (req, res) => {
+    const body = req.body;
+    if (!body || typeof body !== 'object' || Array.isArray(body)) throw new HttpError(400, 'The upload must be a JSON object with the addon\'s data.');
+
+    const addonVersion = ver(body.addonVersion);
+    const wanted = identity.guildFromPayload(body);
+    if (!wanted && !req.guild) {
+      q.user.run(addonVersion, req.user.id);
+      return res.json({
+        ok: true, noGuild: true, message: NO_GUILD_UPLOAD,
+        characters: 0, roster: 0, recipes: 0, ctas: 0, inventory: 0, bank: 0, prices: 0, coachPending: 0,
+        latest: ctx.latest(),
+      });
+    }
+
+    let switched = null;
+    if (wanted) {
+      const pick = identity.selectGuild(db, wanted);
+      if (pick.created) ctx.log.info(`Guild Camp set up ${pick.guild.name}${pick.guild.realm ? ` on ${pick.guild.realm}` : ''}.`);
+      if (pick.created || pick.switched) switched = { id: pick.guild.id, name: pick.guild.name, faction: pick.guild.faction, created: pick.created };
+    }
+    req.guild = identity.myMembership(db);
+    const guildId = req.guild.id;
+    const userId = req.user.id;
+
+    // Throws 400 when the body isn't an object. Everything is written in one transaction.
+    const stats = applyPayload(db, guildId, userId, body, { trustedRanks: true, ctx });
+    // The roster scan carries in-game ranks: roles follow them. My name follows my main character
+    // until Battle.net tells Guild Camp my BattleTag.
+    identity.syncRanks(db, guildId, { audit: (action, detail) => ctx.audit({ guild: req.guild, user: req.user }, action, detail) });
+    identity.refreshMyName(db);
+    req.guild = identity.myMembership(db);
+
+    q.log.run(guildId, userId, Number(req.get('Content-Length')) || 0);
+    q.user.run(addonVersion, userId);
+
+    // Calls to arms sent from the game with /wow cta. A re-upload of the same queue adds nothing,
+    // so these only fire once per call. A call without a message just skips that line.
+    for (const c of stats.ctas) {
+      const message = String(c.message || '').trim();
+      await ctx.discord(req.guild, [
+        `⚔️ **Call to arms: ${c.zone}**${c.needed ? ` (need ${c.needed})` : ''}`,
+        message,
+        `— ${c.character || 'someone'} (from in game)`,
+      ].filter(Boolean).join('\n'));
+      ctx.emit(guildId, 'cta', {
+        title: `⚔️ Call to arms: ${c.zone}`,
+        body: [c.needed ? `Need ${c.needed}.` : '', message, `(${c.character || 'from in game'})`].filter(Boolean).join(' '),
+        route: '/',
+        exceptUserId: userId,
+      });
+    }
+
+    // Questions asked in game, or a build plan wanted: start the Coach now. The app then keeps
+    // checking GET /api/inbox until coachPending is 0. Without a key the Coach still runs for new
+    // questions, so the player gets a clear "add your key" answer instead of silence.
+    const coachPending = coach.inboxPart(db, guildId, userId).pending;
+    const asked = Boolean(stats.coach && stats.coach.questions);
+    if ((coachPending && cfg.anthropicKey) || asked) {
+      const svc = ctx.services.coach;
+      if (svc && typeof svc.kick === 'function') {
+        try { svc.kick(); } catch (e) { ctx.log.warn('Coach kick failed:', e.message); }
+      }
+    }
+
+    res.json({
+      ok: true,
+      guild: { id: guildId, name: req.guild.name, faction: req.guild.faction, role: req.guild.role },
+      characters: stats.characters,
+      roster: stats.roster,
+      recipes: stats.recipes,
+      ctas: stats.ctas.length,
+      inventory: stats.inventory,
+      bank: stats.bank,
+      prices: stats.prices,
+      coachPending,
+      latest: ctx.latest(),
+      ...(switched ? { switched } : {}),
+    });
+  });
+
+  app.get('/api/inbox', (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(inboxFor(req));
+  });
+}
+
+module.exports = { register, NO_GUILD_UPLOAD };

@@ -1,25 +1,33 @@
 # Economy API
 
 The guild bank (tabs, gold, log), bank requests, bank characters, a search across your own alts, the guild price
-index and supply drives. Implemented in `server/src/routes/economy.js`; the data itself arrives with app uploads
-(`POST /api/sync` → `services/economy.js` `applyEconomy`). General conventions (errors, auth, times) are in
-[core.md](core.md).
+index and supply drives. Implemented in `app/src/core/routes/economy.js`; the data itself arrives with uploads
+(`POST /api/sync` → `services/economy.js` `applyEconomy`) and with guildmates' shared records. Conventions
+(roles, errors, times) are in [core.md](core.md).
 
 Where the data comes from:
-- **Guild bank**: whoever opens the guild bank in game with the addon. Only a newer scan replaces the stored one.
-  The game's log only says "x hours ago", so log times (`at`) are approximate.
-- **Bags and banks**: each member's own characters. A character's bank refreshes when its player opens the bank.
-- **Prices**: members' Auctionator scans, read by the app. One price per item per scan day (the lowest seen that
-  day). "Recent" means the last 30 days.
+- **Guild bank**: whoever opens the guild bank in game with the addon. My own scan arrives with my upload;
+  guildmates' scans arrive as shared `gb` records (one per tab). Only a newer scan replaces the stored one. The
+  game's log only says "x hours ago", so log times (`at`) are approximate.
+- **Bags and banks**: my own characters from my uploads. A bank character's bags and bank reach the guild as a
+  shared `bk` record from its own player's addon, only while it is on the bank character list (`BC`).
+- **Prices**: my Auctionator scans, read by the app, and guildmates' `pr` records (up to 60 reagents and bank items
+  each, once a day). One price per item per scan day (the lowest seen that day). "Recent" means the last 30 days.
 
-Item `name` is `null` when the server has never seen the item's name (show `Item <id>`). Money is integer copper.
+**Shared through the addon** ([SHARING.md](../SHARING.md), [share.md](share.md)): bank requests (`bq`), officers'
+answers (`BH`), the bank character list (`BC`), supply drives (`DR`) and hand-ins (`dc`). A change here queues the
+record and the rows change at once; it reaches the guild at the next login or `/reload`. Guildmates are told by
+their own apps, and the Discord post goes out when the game confirms the change. Rows made before sharing can be
+read but not changed (`409 "This was made with an older Guild Camp and can’t be changed. Make it again."`).
+
+Item `name` is `null` when Guild Camp has never seen the item's name (show `Item <id>`). Money is integer copper.
 `unit` is the item's most recent guild auction price (last 30 days) or `null`; `value` is `unit × count` or `null`.
 
 ---
 
 ## Guild bank
 
-### `GET /api/bank` (guild member)
+### `GET /api/bank` (guild)
 ```json
 {
   "money": 1234567,
@@ -46,19 +54,19 @@ Item `name` is `null` when the server has never seen the item's name (show `Item
 ```
 - `money` / `scanned_at` are `null` until someone opens the guild bank. `scanned_at` is ISO 8601 (UTC).
 - `tabs` are in the order the game lists them; items in a tab are sorted by name.
-- `bankCharacters` lists every character marked as a bank character (bags and bank added together per item), sorted
-  by name. A new bank character has `items: []` until its owner syncs it; `updated_at` is when it was last synced. `owner` is the owner's BattleTag name or
-  `null` when nobody owns the character any more.
+- `bankCharacters` lists every character marked as a bank character (bags and bank added together per item),
+  sorted by name. A new bank character has `items: []` until its stock arrives; `updated_at` is when it last did.
+  `owner` is the owning player's name or `null`.
 - `value` adds up every priced stack. Unpriced items count as nothing.
 - `requests`: open requests first, then the ones handled in the last 7 days, newest first. Cancelled requests are
   left out.
 - `log`: the newest 40 entries. `kind` is the game's word: `deposit`, `withdraw`, `move` (items), `repair`,
-  `withdrawForTab`, `buyTab`, `depositSummary` (gold). Item entries have `item_id`/`name`/`count`; gold entries have
-  `amount`.
+  `withdrawForTab`, `buyTab`, `depositSummary` (gold). Item entries have `item_id`/`name`/`count`; gold entries
+  have `amount`.
 
-### `GET /api/bank/search?q=<text>` (guild member)
-"Which alt has my Runecloth?" Items on **your own** synced characters whose name contains `q` (up to 60
-characters, wildcards are literal). Up to 100 rows, by item name then character.
+### `GET /api/bank/search?q=<text>` (guild)
+"Which alt has my Runecloth?" Items on **my own** characters whose name contains `q` (up to 60 characters,
+wildcards are literal). Up to 100 rows, by item name then character.
 ```json
 { "q": "rune",
   "results": [ { "character": "Stashy", "class": "MAGE", "location": "bank", "item_id": 14047, "name": "Runecloth", "count": 100 } ] }
@@ -75,10 +83,12 @@ characters, wildcards are literal). Up to 100 rows, by item name then character.
   "requester_id": 9, "requester": "Mokra", "handled_by": null, "handler": null,
   "created_at": "2026-11-07 18:00:00", "updated_at": "2026-11-07 18:00:00", "mine": true }
 ```
-`status` is `open`, `sent`, `declined` or `cancelled`. `requester` / `handler` are BattleTag names. `mine` is true
-for the caller's own requests.
+`status` is `open`, `sent`, `declined` or `cancelled`: the earlier (by time) of the requester's cancel and an
+officer's answer wins, the same on every computer. `requester` / `handler` are player names (`handled_by` is
+`null` for a cancel). `mine` is true for my own requests.
 
-### `POST /api/bank/requests` (guild member)
+### `POST /api/bank/requests` (guild)
+Queues a `bq` record for my player.
 ```json
 { "item": "Runecloth", "count": 20, "note": "For bandages" }
 ```
@@ -87,43 +97,50 @@ for the caller's own requests.
 
 `201`
 ```json
-{ "ok": true, "request": { "…": "Bank request" }, "message": "Request sent to the officers." }
+{ "ok": true, "request": { "…": "Bank request" }, "message": "Request posted." }
 ```
-- No item → `400 { "error": "Name the item you need." }`
+- No item → `400 "Name the item you need."`
 - Activity: `"<name> asked the bank for 20 × Runecloth"` (kind `bank`).
-- Discord: `🏦 **Bank request:** 20 × Runecloth, for <name>`
-- Event `bank` to the owner and officers (not the asker): title `🏦 Bank request from <name>`, body `20 × Runecloth`,
-  route `/bank?tab=requests`.
+- When the game confirms it, Discord: `🏦 **Bank request:** 20 × Runecloth, for <character>`.
+- Officers' apps notify (`bank`, `🏦 Bank request from <character>`, body `20 × Runecloth`, route
+  `/bank?tab=requests`).
+- A new request cancelled under Addon & sync, or refused by the game, before the guild had it disappears from the
+  list (there is nothing left to cancel).
 
-### `POST /api/bank/requests/:id/sent` · `/declined` (owner or officer) · `/cancel` (the person who asked)
+### `POST /api/bank/requests/:id/sent` · `/declined` (officer) · `/cancel` (the person who asked)
+`sent` and `declined` queue an officer's `BH` record; `cancel` queues the request again as cancelled (`bq` `x`,
+final).
 ```json
 { "ok": true, "request": { "…": "Bank request, with status and handler" }, "message": "Marked as sent." }
 ```
 Messages: `"Marked as sent."`, `"Request declined."`, `"Request cancelled."`
-- Unknown request → `404 "Request not found."`. Not open any more → `409 "That request has already been handled."`
-- `sent`/`declined` by a member → `403 "Officers only."`. `cancel` by anyone but the asker →
-  `403 "Only the person who asked can cancel a request."`
-- `sent`: activity `"20 × Runecloth sent from the bank"`.
-- `sent`/`declined`: audit `bank request sent` / `bank request declined` with `"20 × Runecloth"`, and an event `bank`
-  to the asker (unless they handled it themselves): `🏦 Your bank request is on its way` /
-  `🏦 Your bank request was declined`, body `"20 × Runecloth. Sent by <officer>."`, route `/bank?tab=requests`.
+- Unknown verb → `404 "Not found."`; unknown request → `404 "Request not found."`. Not open any more →
+  `409 "That request has already been handled."`
+- `sent`/`declined` by a member → `403 "Only officers can mark bank requests sent or declined."`. `cancel` by
+  anyone but the asker → `403 "Only the person who asked can cancel a request."`
+- `sent`: activity `"20 × Runecloth sent from the bank"`. `sent`/`declined`: audit `bank request sent` /
+  `bank request declined` with `"20 × Runecloth"`.
+- The requester's app notifies them when the answer arrives: `🏦 Your bank request is on its way` /
+  `🏦 Your bank request was declined`, body `"20 × Runecloth. Sent by <character>."`, route `/bank?tab=requests`.
 
 ---
 
 ## Bank characters (for guilds without a guild bank)
 
-Characters that hold guild stock. Their bags and bank show on the Bank page and count toward the bank's value and the
-addon's guild bank stock.
+Characters that hold guild stock. Their bags and bank show on the Bank page and count toward the bank's value and
+the addon's guild bank stock. The list is one shared record (`BC:1`) that officers edit.
 
-### `GET /api/bank/alts` (owner or officer)
+### `GET /api/bank/alts` (officer)
 Every linked character plus any already marked, marked ones first, then by name.
 ```json
 { "characters": [ { "name": "Stashy", "class": "MAGE", "level": 12, "owner": "Mokra", "is_bank": 1, "items": 2 } ] }
 ```
-`items` is how many item rows (bags + bank) the server holds for the character.
+`items` is how many item rows (bags + bank) Guild Camp holds for the character.
 
-### `PUT /api/bank/alts` (owner or officer)
-The complete list of bank characters. Names match case-insensitively; characters left out stop being bank characters.
+### `PUT /api/bank/alts` (officer)
+The complete list of bank characters (at most 50). Names match in any capitalisation; characters left out stop
+being bank characters. The whole list is queued as `BC` on top of the version this computer holds (a newer list
+from another officer refuses it as stale). Nothing is queued when the list doesn't change.
 ```json
 { "names": ["Stashy", "Grunta"] }
 ```
@@ -132,18 +149,20 @@ The complete list of bank characters. Names match case-insensitively; characters
   "message": "Grunta is now a bank character. Its bags and bank show here after its next sync." }
 ```
 Messages: one added → `"<name> is now a bank character. Its bags and bank show here after its next sync."`; one
-removed → `"<name> is no longer a bank character."`; several → `"Bank characters saved. New ones show their bags and
-bank after their next sync."`; nothing changed → `"No changes."`
+removed → `"<name> is no longer a bank character."`; several → `"Bank characters saved. New ones show their bags
+and bank after their next sync."`; nothing changed → `"No changes."`
 - `names` not a list → `400 "Send the bank characters as a list of names."`; more than 50 →
   `400 "Mark at most 50 bank characters."`; unknown name → `400 "There is no character called <name> in the guild."`
   (nothing is saved).
 - Audit per character: `bank character added` / `bank character removed` with the name.
+- When the guild's first list is cancelled under Addon & sync, or refused by the game, nobody is a bank character
+  again (as before any list).
 
 ---
 
 ## Prices
 
-### `GET /api/prices?q=<text>` (guild member)
+### `GET /api/prices?q=<text>` (guild)
 ```json
 {
   "q": "",
@@ -163,13 +182,13 @@ bank after their next sync."`; nothing changed → `"No changes."`
 - `stats.items`: how many items have a price; `stats.newest`: the newest scan day (`null` without prices).
 - With `q` (up to 60 characters): `results` are up to 50 priced items whose name contains `q`, by name, or the item
   with that id when `q` is a number (it may have `name: null`). `held` is then `[]`.
-- Without `q`: `held` is up to 30 priced items that members carry most (count of characters' bags, banks and guild
-  bank tabs holding it), then by name. `results` is `[]`.
+- Without `q`: `held` is up to 30 priced items that characters carry most (bags, banks and guild bank tabs holding
+  it), then by name. `results` is `[]`.
 - `history` is the item's newest 14 scan days, oldest first; `latest` is the newest of them.
 - `change` is the percent change from the first to the last point of `history`, one decimal place, or `null` with
   fewer than two points.
-- `bank` values the guild bank and bank characters as in `GET /api/bank`; `priced`/`unpriced` count stacks,
-  `top` is the five most valuable stacks, each with the guild bank `tab` or bank `character` holding it (the other is `null`).
+- `bank` values the guild bank and bank characters as in `GET /api/bank`; `priced`/`unpriced` count stacks, `top`
+  is the five most valuable stacks, each with the guild bank `tab` or bank `character` holding it.
 
 ---
 
@@ -182,17 +201,18 @@ bank after their next sync."`; nothing changed → `"No changes."`
   "total": 70, "pct": 35, "contributors": 4, "mine": 12,
   "leaderboard": [ { "who": "Grunta", "amount": 30 }, { "who": "Mokra", "amount": 12 } ] }
 ```
-`status` is `open`, `done` (goal reached) or `closed` (an officer ended it). `pct` is capped at 100. `mine` is the
-caller's own total. `leaderboard` is the top 10, grouped by the character named when giving (or the giver's BattleTag
-name when none was given).
+`status` is `open`, `done` (goal reached) or `closed` (an officer ended it). The total is the sum of every hand-in
+the guild shared, so the goal is reached once, the same everywhere. `pct` is capped at 100. `mine` is my own total.
+`leaderboard` is the top 10, grouped by the character named when giving (or the giver's name when none was given).
 
-### `GET /api/drives` (guild member)
+### `GET /api/drives` (guild)
 ```json
 { "open": [ { "…": "Drive" } ], "past": [ { "…": "Drive" } ], "myCharacters": ["Grunta", "Stashy"] }
 ```
 Newest first, up to 20 of each. `myCharacters` (main first, then by level) fills the "character" choice when giving.
 
-### `POST /api/drives` (owner or officer)
+### `POST /api/drives` (officer)
+Queues a `DR` record.
 ```json
 { "title": "Durotar crates", "unit": "crates", "goal": 200, "notes": "Hand in at Razor Hill" }
 ```
@@ -205,13 +225,13 @@ Newest first, up to 20 of each. `myCharacters` (main first, then by level) fills
 ```
 - Missing title, unit or goal → `400 "Give the drive a name, what you’re collecting, and a goal."`
 - Activity `"New supply drive: <title>"` (kind `drive`), audit `drive started` with the title.
-- Discord: `📦 **Supply drive: <title>**. Goal: 200 crates.` and the server's `/drives` address on the next line.
-  `GET <BASE_URL>/drives` (public, no sign-in) serves a small HTML page with an "Open Drives in Guild Camp" link
-  (`guildcamp://drives`) and a link to `/get`, like the raid links (`GET /raids/:id`).
-- Event `drive` to everyone but the officer: `📦 Supply drive: <title>`, body
-  `"Goal: 200 crates. Log what you hand in under Drives."`, route `/drives`.
+- When the game confirms it, Discord: `📦 **Supply drive: <title>**. Goal: 200 crates. Log what you hand in under
+  Drives in Guild Camp.`
+- Guildmates' apps notify (`drive`, `📦 Supply drive: <title>`, body `"Goal: 200 crates. Log what you hand in under
+  Drives."`, route `/drives`).
 
-### `POST /api/drives/:id/give` (guild member)
+### `POST /api/drives/:id/give` (guild)
+Queues a hand-in (`dc`) for my player.
 ```json
 { "amount": 10, "character": "Grunta", "note": "From the Razor Hill run" }
 ```
@@ -221,12 +241,17 @@ Newest first, up to 20 of each. `myCharacters` (main first, then by level) fills
 ```
 - Unknown drive → `404 "Drive not found."`. Drive done or closed → `409 "That drive has finished."`.
   No amount → `400 "How many did you hand in?"`
-- When the total reaches the goal the drive becomes `done` (exactly once, even with hand-ins at the same moment):
-  `reached: true`, message `"Goal reached. Thank you!"`, activity `"<title> reached its goal!"`, Discord
-  `🎉 **<title>** reached its goal of 200 crates. Thanks everyone!`, event `drive` to everyone but the giver:
-  `🎉 <title> reached its goal`, body `"200 crates. Thanks everyone!"`.
+- When my hand-in brings the total to the goal: `reached: true`, message `"Goal reached. Thank you!"`, activity
+  `"<title> reached its goal!"`. Guildmates' apps notify when a hand-in from someone else reaches the goal
+  (`🎉 <title> reached its goal`, body `"200 crates. Thanks everyone!"`).
+- Discord (when a webhook is set): `🎉 **<title>** reached its goal of 200 crates. Thanks everyone!`, posted once,
+  by the app of the player whose hand-in first brought the total to the goal (hand-ins counted in the order they
+  were made). That app checks when the game's `ok` for the hand-in arrives, after the whole upload is in, so a
+  guildmate's earlier hand-in that comes in the same upload counts first (and then this app stays quiet). A
+  closed drive gets no post.
 
-### `POST /api/drives/:id/close` (owner or officer)
+### `POST /api/drives/:id/close` (officer)
+Queues the drive again as closed (`DR` `c`, final), on top of the version this computer holds.
 ```json
 { "ok": true, "drive": { "…": "Drive, status closed" }, "message": "Drive closed." }
 ```

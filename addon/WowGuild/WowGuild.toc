@@ -9,6 +9,9 @@
 ## AddonCompartmentFunc: WowGuild_OnAddonCompartmentClick
 
 Core.lua
+ShareCodec.lua
+Share.lua
+ShareSync.lua
 Items.lua
 Collect.lua
 UI.lua

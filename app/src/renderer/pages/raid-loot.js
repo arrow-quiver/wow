@@ -1,7 +1,7 @@
 // The raid leader's loot screen (officers): pick the item that dropped, see who reserved it and their bonus,
-// roll (1–100 plus bonus, done on the server so everyone can trust it), give it to the winner. Anything else that
-// drops is recorded as main spec, off spec or a free roll. Big buttons, so it works on a laptop mid-raid.
-// Shapes: docs/api/raids.md (GET /api/raids/:id/loot).
+// roll (1–100 plus bonus, made here on the raid leader's PC), give it to the winner. Anything else that drops is
+// recorded as main spec, off spec or a free roll. Big buttons, so it works on a laptop mid-raid. Awards go to
+// guildmates through the addon. Shapes: docs/api/raids.md (GET /api/raids/:id/loot).
 import { html, useState, useEffect, useMemo } from '../lib/html.js';
 import { api, useApi, useAction } from '../lib/api.js';
 import { useSession } from '../lib/session.js';
@@ -9,6 +9,7 @@ import { plural } from '../lib/format.js';
 import {
   Page, Card, Table, Button, Input, Select, Pill, Notice, Empty, ErrorBox, Loading, ItemLink, TimeAgo,
 } from '../components/index.js';
+import { ShareHint } from '../components/ShareHint.js';
 import { KindPill, StatePill } from './raids.js';
 import { AwardHow } from './raid.js';
 
@@ -62,7 +63,7 @@ export default function RaidLootPage({ params, query = {} }) {
       actions=${html`<${Button} icon="raids" href=${`/raids/${raid.id}`}>Raid page<//>`}>
     <div class="row raid-loot-intro">
       <${KindPill} kind=${raid.kind} /><${StatePill} raid=${raid} />
-      <span class="muted">Pick the item that dropped. Rolls are 1–100 plus each player’s bonus, made here so everyone can see them.</span>
+      <span class="muted">Pick the item that dropped. Rolls are 1–100 plus each player’s bonus. Announce the winner in raid chat.</span>
     </div>
     ${cancelled ? html`<${Notice} kind="alarm">This raid was cancelled, so loot can’t be given out here.<//>` : null}
     <div class="raid-loot-layout">
@@ -96,6 +97,7 @@ export default function RaidLootPage({ params, query = {} }) {
       </div>
     </div>
     <${GivenOut} awarded=${d.awarded} />
+    <${ShareHint} officer discord class="raid-loot-share" />
   <//>`;
 }
 

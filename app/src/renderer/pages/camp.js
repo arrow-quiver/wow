@@ -1,15 +1,19 @@
 // Camp: the guild's dashboard. Who is online around the fire, calls to arms, upcoming raids and events with your
-// sign-up, guild notices (officers post and remove them), a setup checklist for new members, and recent activity.
-// Data: GET /api/camp (docs/api/community.md).
+// sign-up, guild notices (officers post and remove them), a setup checklist, and recent activity.
+// Data: GET /api/camp (docs/api/community.md). Calls to arms and notices go to guildmates through the addon;
+// GET /api/share/status adds changes in my name this PC didn't make (author checks) and what waits to go out.
 import { html, useState, useEffect } from '../lib/html.js';
 import { api, useApi, useAction, qs } from '../lib/api.js';
 import { Link } from '../lib/router.js';
-import { useSyncStatus, describeSync } from '../lib/status.js';
+import { useSyncStatus, describeSync, useShareStatus, shareGroups, isNoGuild, changesLine } from '../lib/status.js';
 import { classColor, className, parseTime, plural } from '../lib/format.js';
 import {
   Page, Card, Button, ConfirmButton, Input, Textarea, Pill, Progress, Empty, Async, ClassName, TimeAgo, LocalTime,
   Icon, Campfire,
 } from '../components/index.js';
+import { ShareHint } from '../components/ShareHint.js';
+import { AuthorChecks } from '../components/AuthorChecks.js';
+import { NoGuild } from '../components/NoGuild.js';
 
 // The roster counts as stale after 30 minutes without a scan (old campRing rule).
 const STALE_MS = 30 * 60 * 1000;
@@ -18,17 +22,22 @@ const shortTag = (bt) => String(bt || '').split('#')[0];
 
 export default function CampPage() {
   const camp = useApi('/api/camp', { refreshOn: ['cta', 'notice', 'raid', 'request'], interval: 60000 });
+  const share = useShareStatus();
+  const groups = shareGroups(share?.data);
   return html`<${Page} title="Camp" width="wide"
       actions=${html`<${Button} variant="ghost" size="sm" icon="refresh" busy=${camp.refreshing} onClick=${camp.reload}>Refresh<//>`}>
-    <${Async} q=${camp} loadingLabel="Gathering round the fire…">
-      ${(d) => html`<${CampBody} d=${d} reload=${camp.reload} setData=${camp.setData} />`}
-    <//>
+    ${camp.error && isNoGuild(camp.error)
+      ? html`<${NoGuild} error=${camp.error} />`
+      : html`<${Async} q=${camp} loadingLabel="Gathering round the fire…">
+          ${(d) => html`<${CampBody} d=${d} groups=${groups} reload=${camp.reload} setData=${camp.setData} />`}
+        <//>`}
   <//>`;
 }
 
-function CampBody({ d, reload, setData }) {
+function CampBody({ d, groups, reload, setData }) {
   const ob = d.onboarding;
   return html`
+    <${AuthorChecks} checks=${groups.checks} onChanged=${reload} />
     ${ob && ob.total && ob.done < ob.total ? html`<${Onboarding} ob=${ob} />` : null}
     <${FireCard} online=${d.online} scannedAt=${d.rosterScannedAt} realm=${d.realm} guild=${d.guild} />
     <div class="cols camp-cols">
@@ -39,7 +48,7 @@ function CampBody({ d, reload, setData }) {
       <div class="stack stack--loose">
         <${RaidsCard} raids=${d.raids} />
         <${NoticesCard} notices=${d.announcements} isOfficer=${d.isOfficer} reload=${reload} setData=${setData} />
-        <${SyncCard} mySync=${d.mySync} />
+        <${SyncCard} mySync=${d.mySync} groups=${groups} />
       </div>
     </div>`;
 }
@@ -97,8 +106,8 @@ function FireCard({ online, scannedAt, realm }) {
       <div class="camp-online">
         <p class="muted camp-scanned">
           ${scanned
-            ? html`Guild roster as of <${TimeAgo} t=${scannedAt} />.${stale ? ' Anyone with Guild Camp running updates it when they log out or /reload.' : ''}`
-            : 'Nobody has synced yet. Install the addon from Addon & sync, then log in to the game.'}
+            ? html`Guild roster as of <${TimeAgo} t=${scannedAt} />.${stale ? ' It updates when you log out or type /reload in game.' : ''}`
+            : 'No roster yet. Install the addon from Addon & sync, then log in to the game.'}
         </p>
         ${online.length
           ? html`<ul class="list-lines camp-online-list">
@@ -153,7 +162,8 @@ function CtaCard({ ctas, me, onPosted }) {
       <div class="form-actions">
         <${Button} type="submit" variant="danger" icon="bell" busy=${post.busy}>Sound the horn<//>
       </div>
-      <p class="hint mb-0">Posts to Discord and notifies everyone in Guild Camp. In game, type <code>/wow cta Crossroads 5 need help</code>. It sends on your next reload or logout.</p>
+      <${ShareHint} discord />
+      <p class="hint mb-0">In a hurry? Type <code>/wow cta Crossroads 5 need help</code> in game. Guildmates who are online see it at once.</p>
     </form>
     <div class="camp-cta-list">
       ${ctas.length
@@ -162,7 +172,7 @@ function CtaCard({ ctas, me, onPosted }) {
               <div class="row">
                 <strong>${c.zone}</strong>
                 ${c.needed ? html`<${Pill} kind="alarm">need ${c.needed}<//>` : null}
-                ${c.source === 'addon' ? html`<${Pill} kind="muted">from in game<//>` : c.source === 'discord' ? html`<${Pill} kind="muted">from Discord<//>` : null}
+                ${c.source === 'addon' ? html`<${Pill} kind="muted">from in game<//>` : null}
                 <span class="spacer"></span>
                 <span class="muted small"><${TimeAgo} t=${c.created_at} /></span>
               </div>
@@ -264,8 +274,9 @@ function NoticesCard({ notices, isOfficer, reload, setData }) {
   return html`<${Card} title="Notices" class="camp-notices">
     ${isOfficer ? html`<form class="stack stack--tight camp-notice-form" onSubmit=${submit}>
       <${Textarea} label="New notice" value=${body} onValue=${setBody} rows="3" maxLength="500"
-        placeholder="Raid sign-ups open Sunday" hint="Posted to Discord too, and everyone gets a notification." />
+        placeholder="Raid sign-ups open Sunday" />
       <div class="form-actions"><${Button} type="submit" busy=${post.busy} disabled=${!body.trim()}>Post notice<//></div>
+      <${ShareHint} discord officer />
     </form>` : null}
     ${notices.length
       ? html`<ul class="list-lines camp-notice-list">
@@ -283,14 +294,24 @@ function NoticesCard({ notices, isOfficer, reload, setData }) {
   <//>`;
 }
 
-// ---------- your sync ----------
+// ---------- your sync (SyncCard is exported for tests) ----------
 
-function SyncCard({ mySync }) {
+export function SyncCard({ mySync, groups }) {
   const sync = useSyncStatus();
   const s = describeSync(sync);
+  const waiting = groups ? groups.waiting.length : 0;
+  const refused = groups ? groups.refused.length : 0;
   return html`<${Card} title="Your sync" class="camp-sync" actions=${html`<${Pill} kind=${s.kind} dot>${s.label}<//>`}>
     <p class="mb-0">${mySync
-      ? html`The server last heard from you <${TimeAgo} t=${mySync} />.`
+      ? html`Guild Camp last read your game data <${TimeAgo} t=${mySync} />. ${changesLine(sync)}`
       : html`Not synced yet. <${Link} href="/addon">Set up the addon<//>, then log in to the game.`}</p>
+    ${sync?.guildNote ? html`<p class="hint mb-0 camp-sync-note">${sync.guildNote}</p>` : null}
+    ${waiting || refused ? html`<ul class="list-plain camp-share-lines">
+      ${waiting ? html`<li class="row nowrap"><${Icon} name="sync" class="camp-share-icon" />
+        <span>${waiting === 1 ? '1 change is' : `${waiting} changes are`} waiting to go out.</span></li>` : null}
+      ${refused ? html`<li class="row nowrap"><${Icon} name="alert" class="camp-share-icon camp-share-icon--bad" />
+        <span>${refused === 1 ? '1 change was' : `${refused} changes were`} not sent.</span></li>` : null}
+      <li><${Link} href="/addon?section=sharing">See what is shared<//></li>
+    </ul>` : null}
   <//>`;
 }

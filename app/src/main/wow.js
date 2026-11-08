@@ -413,6 +413,37 @@ async function isWowRunning({ platform = process.platform, exec = runCommand } =
   }
 }
 
+/**
+ * The process ids of the running game clients: [] when none runs, null when it can't tell. sync.js uses them to see
+ * that the game session it wrote a new news folder in has ended, also after a quick restart it never saw closed.
+ * @param {object} [o] injectable for tests (as isWowRunning)
+ * @returns {Promise<number[]|null>}
+ */
+async function gameProcessIds({ platform = process.platform, exec = runCommand } = {}) {
+  try {
+    const ids = [];
+    if (platform === 'win32') {
+      // "Wow.exe","12345","Console","1","2,000,000 K"
+      const out = await exec('tasklist', ['/FO', 'CSV', '/NH']);
+      for (const line of out.split(/\r?\n/)) {
+        const m = /^"([^"]+)","(\d+)"/.exec(line.trim());
+        if (m && WIN_GAME_EXE.test(m[1])) ids.push(Number(m[2]));
+      }
+      return ids;
+    }
+    // "  4321 /Applications/World of Warcraft/_retail_/World of Warcraft.app/Contents/MacOS/World of Warcraft"
+    const out = await exec('ps', ['-A', '-o', 'pid=,comm=']);
+    for (const line of out.split(/\r?\n/)) {
+      const m = /^\s*(\d+)\s+(.+)$/.exec(line);
+      const name = m && m[2].trim().split('/').pop();
+      if (name && UNIX_GAME_PROC.test(name)) ids.push(Number(m[1]));
+    }
+    return ids;
+  } catch {
+    return null;
+  }
+}
+
 module.exports = {
   findInstalls,
   detectGuild,
@@ -423,6 +454,7 @@ module.exports = {
   defaultRoots,
   normaliseRoot,
   isWowRunning,
+  gameProcessIds,
   pathKey,
   FLAVOR_LABELS,
   ADDON,

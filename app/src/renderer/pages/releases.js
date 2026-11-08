@@ -1,13 +1,14 @@
-// Releases (guild owner only): publish an addon update from a WowGuild folder, or build and publish the app from
-// a source checkout, with the build output live on screen. Everything here reaches every guild member.
+// Releases: publish an addon update from a WowGuild folder, or build and publish the app from a source checkout, as
+// GitHub releases on arrow-quiver/wow, with the output live on screen. The work runs GitHub CLI (gh) on this computer
+// (src/main/publisher.js). Anyone whose computer is set up can publish (status().canPublish: a source checkout, gh
+// installed and signed in, push access); everyone else sees what to set up. Releases reach every Guild Camp player.
 import { html, useState, useEffect, useRef, useCallback } from '../lib/html.js';
 import { gc, useGcEvent, isMock } from '../lib/gc.js';
-import { useSession } from '../lib/session.js';
 import {
-  Page, Card, Button, ConfirmButton, CopyButton, Checkbox, Textarea, Input, Notice, Pill, Loading, ErrorBox, Empty,
+  Page, Card, Button, ConfirmButton, CopyButton, Textarea, Input, Notice, Pill, Loading, ErrorBox,
   TimeAgo, LocalTime, Spinner, toast,
 } from '../components/index.js';
-import { ReleaseNotes } from './updates.js';
+import { ReleaseNotes, RELEASES_URL } from './updates.js';
 
 const MAX_NOTES = 4000; // same limit as src/main/publisher.js
 const LOG_KEEP = 600;
@@ -37,7 +38,7 @@ export function bumpVersion(v, kind) {
   return `${n.major}.${n.minor}.${n.patch}${n.pre ? `-${n.pre}` : ''}`;
 }
 
-// -1 | 0 | 1, pre-releases below their release (enough for "is this newer than the server's?").
+// -1 | 0 | 1, pre-releases below their release (enough for "is this newer than GitHub's?").
 export function compareVersions(a, b) {
   const pa = parseVersion(a); const pb = parseVersion(b);
   if (!pa || !pb) return pa ? 1 : pb ? -1 : 0;
@@ -82,6 +83,7 @@ function usePublisher() {
   const seq = useRef(0);
   const load = useCallback(async () => {
     const id = ++seq.current;
+    setState((s) => (s.loading ? s : { ...s, loading: true }));
     try {
       const data = await gc.publisher.status();
       if (id === seq.current) setState({ data, error: null, loading: false });
@@ -92,29 +94,22 @@ function usePublisher() {
     }
   }, []);
   useEffect(() => { load(); }, [load]);
-  // A release published elsewhere (CI, the script) shows up straight away.
-  useGcEvent('server-event', (ev) => { if (ev && ev.kind === 'release') load(); });
   return { ...state, reload: load };
+}
+
+/**
+ * The setup checklist from publisher.status().setup.steps, with the first unfinished step marked as the one to do
+ * next. → [{ id, done, title, detail, command, next }]
+ */
+export function setupList(st) {
+  const steps = Array.isArray(st?.setup?.steps) ? st.setup.steps : [];
+  const firstOpen = steps.findIndex((s) => !s.done);
+  return steps.map((s, i) => ({ ...s, next: i === firstOpen }));
 }
 
 // ---------- page ----------
 
 export default function ReleasesPage() {
-  const session = useSession();
-  if (session.loaded && !session.isOwner) {
-    return html`<${Page} title="Releases" width="narrow">
-      <${Card}>
-        <${Empty} icon="releases" title="Only the guild owner publishes releases."
-          action=${html`<${Button} href="/updates" icon="updates">See updates<//>`}>
-          New versions of the app and the addon reach you by themselves. The Updates page shows what you have.
-        <//>
-      <//>
-    <//>`;
-  }
-  return html`<${OwnerReleases} />`;
-}
-
-function OwnerReleases() {
   const pub = usePublisher();
   const st = pub.data;
   const [lines, setLines] = useState([]);
@@ -153,8 +148,8 @@ function OwnerReleases() {
       const out = await fn();
       if (out && out.version) {
         toast(kind === 'app'
-          ? `Guild Camp ${out.version} is live. Members get it at their next update check.`
-          : `Addon ${out.version} is live. Members' apps install it by themselves.`, 'ok');
+          ? `Guild Camp ${out.version} is live on GitHub. Players get it at their next update check.`
+          : `Addon ${out.version} is live on GitHub. Players' apps install it by themselves.`, 'ok');
       }
       return { ok: true, value: out };
     } catch (err) {
@@ -180,17 +175,32 @@ function OwnerReleases() {
 
   if (!st) {
     return html`<${Page} title="Releases">
-      ${pub.error ? html`<${ErrorBox} error=${pub.error} title="Couldn't load the release tools." onRetry=${pub.reload} />` : html`<${Loading} label="Looking for your source folders…" />`}
+      ${pub.error ? html`<${ErrorBox} error=${pub.error} title="Couldn't load the release tools." onRetry=${pub.reload} />` : html`<${Loading} label="Checking GitHub CLI and your source folder…" />`}
+    <//>`;
+  }
+
+  const refresh = html`<${Button} icon="refresh" onClick=${pub.reload} busy=${pub.loading}>Refresh<//>`;
+
+  if (!st.canPublish && !busyKind) {
+    return html`<${Page} title="Releases" width="normal"
+        lede="New versions of the app and the addon are published as releases on GitHub."
+        actions=${refresh}>
+      <div class="releases">
+        <${SetupCard} st=${st} onRepoChanged=${pub.reload} onCheck=${pub.reload} checking=${pub.loading} />
+        <${PublishedCard} st=${st} />
+        <${CommandLineCard} st=${st} />
+      </div>
     <//>`;
   }
 
   return html`<${Page} title="Releases" width="wide"
-      lede="Publish new versions of the addon and the app to your guild's server."
-      actions=${html`<${Button} icon="refresh" onClick=${pub.reload} busy=${pub.loading}>Refresh<//>`}>
+      lede=${`Publish new versions of the addon and the app as releases on GitHub (${st.repo || 'arrow-quiver/wow'}).`}
+      actions=${refresh}>
     <div class="releases">
-      <${Notice} kind="warn" title="Publishing reaches every guild member.">
+      <${Notice} kind="warn" title="Publishing reaches every Guild Camp player.">
         Their apps download the new version by themselves, usually within the hour. Test a build in game before you publish it.
       <//>
+      ${st.repoPrivate ? html`<${PrivateRepoNotice} st=${st} />` : null}
       ${!st.canPublish && st.reason ? html`<${Notice} kind="alarm">${st.reason}<//>` : null}
 
       <${PublishedCard} st=${st} />
@@ -210,27 +220,91 @@ function OwnerReleases() {
 
 // ---------- what is live ----------
 
+export const PUBLISHED_ERROR_TITLE = "Couldn't read the releases on GitHub.";
+
+/**
+ * A notice's text without the sentence its title already says: the publisher's message starts with
+ * "Couldn't read the releases on GitHub." itself, so it would show twice. '' when nothing else is left.
+ */
+export function withoutTitle(message, title) {
+  let text = String(message || '').trim();
+  const lead = String(title || '').trim();
+  while (lead && text.startsWith(lead)) text = text.slice(lead.length).trim();
+  return text;
+}
+
 function PublishedCard({ st }) {
   const pub = st.published;
+  const page = st.releasesUrl || RELEASES_URL;
   const item = (label, rel, local, localLabel) => html`<div class="releases-live">
     <span class="releases-live-label">${label}</span>
     ${rel
       ? html`<span class="releases-live-version">${rel.version}</span>
-        ${rel.source === 'bundled'
-          ? html`<span class="muted small">Bundled with the server. Nothing published yet.</span>`
-          : html`<span class="muted small">published <${TimeAgo} t=${rel.publishedAt} never="some time ago" />${rel.publishedAt ? html` · <${LocalTime} t=${rel.publishedAt} style="day" />` : null}</span>`}`
+        <span class="muted small">published <${TimeAgo} t=${rel.publishedAt} never="some time ago" />${rel.publishedAt ? html` · <${LocalTime} t=${rel.publishedAt} style="day" />` : null}${rel.url ? html` · <a href=${rel.url} target="_blank" rel="noopener noreferrer">${rel.tag || 'release page'}</a>` : null}</span>`
       : html`<span class="releases-live-version muted">none</span><span class="muted small">Nothing published yet.</span>`}
     ${local ? html`<span class="small">
         ${localLabel} <strong>${local}</strong>
-        ${rel && compareVersions(local, rel.version) > 0 ? html` <${Pill} kind="accent">not published yet<//>` : null}
-        ${rel && compareVersions(local, rel.version) < 0 ? html` <${Pill} kind="warn">older than the server<//>` : null}
+        ${!rel || compareVersions(local, rel.version) > 0 ? html` <${Pill} kind="accent">not published yet<//>` : null}
+        ${rel && compareVersions(local, rel.version) < 0 ? html` <${Pill} kind="warn">older than GitHub<//>` : null}
       </span>` : null}
   </div>`;
-  return html`<${Card} title="Live on the server" sub=${st.server || ''}>
-    ${st.publishedError ? html`<${Notice} kind="alarm" title="Couldn't read what the server has.">${st.publishedError}<//>` : null}
+  return html`<${Card} title="Latest on GitHub" sub=${st.repo || 'arrow-quiver/wow'}
+      actions=${html`<${Button} size="sm" variant="ghost" icon="external" href=${page}>Releases page<//>`}>
+    ${st.publishedError ? html`<${Notice} kind="alarm" title=${PUBLISHED_ERROR_TITLE}>${withoutTitle(st.publishedError, PUBLISHED_ERROR_TITLE) || null}<//>` : null}
     <div class="grid-2">
       ${item('App', pub?.app, st.appSource?.version || (st.repoDir ? st.appVersion : null), 'Your checkout:')}
       ${item('Addon', pub?.addon, st.addonSource?.version, 'Your addon folder:')}
+    </div>
+  <//>`;
+}
+
+function PrivateRepoNotice({ st }) {
+  const cmd = `gh repo edit ${st.repo || 'arrow-quiver/wow'} --visibility public --accept-visibility-change-consequences`;
+  return html`<${Notice} kind="alarm" title="The repository is private.">
+    Players can't download updates until it is public. The repository owner makes it public with this command:
+    <${Command} cmd=${cmd} />
+  <//>`;
+}
+
+// ---------- setup (shown until this computer can publish) ----------
+
+function SetupCard({ st, onRepoChanged, onCheck, checking }) {
+  const [picking, setPicking] = useState(false);
+  const steps = setupList(st);
+  const pick = async () => {
+    setPicking(true);
+    try {
+      const dir = await gc.app.pickFolder({ title: 'Choose your Guild Camp source folder (the one with app and addon)', defaultPath: st.repoDir || undefined });
+      if (!dir) return;
+      await gc.publisher.setRepoDir(dir);
+      await onRepoChanged();
+      toast('Source folder saved.', 'ok');
+    } catch (err) {
+      toast(err?.message || "That folder can't be used.", 'alarm');
+    } finally {
+      setPicking(false);
+    }
+  };
+  return html`<${Card} title="Set up publishing on this computer" sub="a few one-time steps"
+      actions=${html`<${Button} size="sm" icon="refresh" busy=${checking} onClick=${onCheck}>Check again<//>`}>
+    <div class="stack">
+      <p class="muted">Releases go on GitHub, and Guild Camp publishes them with GitHub CLI. Players don't need any of this:
+        their apps update by themselves.</p>
+      ${st.reason ? html`<${Notice} kind="info">${st.reason}<//>` : null}
+      <ul class="updates-installs">
+        ${steps.map((s) => html`<li key=${s.id}>
+          <span class="updates-install-name">${s.title}</span>
+          <span class="muted small">${s.detail}</span>
+          <span class="spacer"></span>
+          <${Pill} kind=${s.done ? 'ok' : s.next ? 'accent' : 'muted'}>${s.done ? 'Done' : s.next ? 'Next' : 'To do'}<//>
+        </li>`)}
+      </ul>
+      ${steps.filter((s) => !s.done && s.command).map((s) => html`<${Command} key=${s.id} label=${s.title} cmd=${s.command} />`)}
+      <div class="form-actions">
+        <${Button} icon="folder" busy=${picking} onClick=${pick}>${st.repoDir ? 'Change the source folder…' : 'Choose the source folder…'}<//>
+        <${Button} variant="ghost" icon="external" href="https://cli.github.com">Get GitHub CLI<//>
+      </div>
+      ${st.setup?.gh?.note ? html`<p class="hint">${st.setup.gh.note}</p>` : null}
     </div>
   <//>`;
 }
@@ -305,22 +379,17 @@ function AddonForm({ st, busyKind, onStart }) {
   const [exact, setExact] = useState('');
   const [notes, setNotes] = useState('');
   const [touched, setTouched] = useState(false);
-  const [force, setForce] = useState(false);
   const [picking, setPicking] = useState(false);
 
   const source = custom || st.addonSource;
   const current = source?.version || null;
-  // The server's bundled addon (source 'bundled') isn't published: any first upload replaces it,
-  // so it must not ask for "Roll back".
-  const pa = st.published?.addon;
-  const live = pa && pa.source !== 'bundled' ? pa.version || null : null;
+  const live = st.published?.addon?.version || null;
   const target = targetVersion(current, choice, exact);
   const notNewer = Boolean(live && target && compareVersions(target, live) <= 0);
   const suggestion = st.changelog?.addon || '';
 
-  // Prefill the notes from git until the owner types their own.
+  // Prefill the notes from git until the person types their own.
   useEffect(() => { if (!touched && suggestion) setNotes(suggestion); }, [suggestion]);
-  useEffect(() => { if (!notNewer) setForce(false); }, [notNewer]);
 
   const pick = async () => {
     setPicking(true);
@@ -344,14 +413,14 @@ function AddonForm({ st, busyKind, onStart }) {
     : !current ? 'WowGuild.toc has no "## Version:" line.'
       : !target ? (choice === 'exact' ? 'Type the exact version to publish.' : "That version can't be worked out.")
         : notes.length > MAX_NOTES ? 'The release notes are too long.'
-          : notNewer && !force ? `The server already has ${live}. Choose a bump, or tick "Roll back".` : null;
+          : notNewer ? `GitHub already has addon ${live}. Choose a newer version.` : null;
 
   const publish = () => onStart('addon', () => gc.publisher.publishAddon({
-    sourceDir: source.dir, bump: bumpArg(choice, exact), notes, force: notNewer && force,
+    sourceDir: source.dir, bump: bumpArg(choice, exact), notes,
   })).then((r) => {
     if (r.ok) {
       if (custom && r.value?.version) setCustom({ ...custom, version: r.value.version });
-      setChoice('patch'); setExact(''); setForce(false); setTouched(false); setNotes('');
+      setChoice('patch'); setExact(''); setTouched(false); setNotes('');
     }
   });
 
@@ -365,20 +434,17 @@ function AddonForm({ st, busyKind, onStart }) {
           ${custom ? html`<${Button} size="sm" variant="ghost" disabled=${blocked} onClick=${() => setCustom(null)}>Use the checkout's<//>` : null}
         <//>
         <p class="field-hint">${source
-          ? html`WowGuild.toc says <strong>${current || 'no version'}</strong>${live ? html`. The server has ${live}.` : '. Nothing is published yet.'}`
+          ? html`WowGuild.toc says <strong>${current || 'no version'}</strong>${live ? html`. GitHub has ${live}.` : '. Nothing is published yet.'}`
           : 'Pick the WowGuild folder: addon\\WowGuild in your checkout, or any copy of it.'}</p>
       </div>
 
       <${BumpPicker} name="addon-bump" current=${current} value=${choice} onChange=${setChoice} exact=${exact} onExact=${setExact} disabled=${blocked} />
 
-      ${notNewer ? html`<${Checkbox} label=${`Roll back: publish ${target} even though the server has ${live}`} checked=${force} onValue=${setForce} disabled=${blocked}
-        hint="New installs get this version. Members who already have a newer one can use Repair on the Addon & sync page." />` : null}
-
       <${NotesField} value=${notes} onValue=${(v) => { setNotes(v); setTouched(true); }} suggestion=${suggestion} disabled=${blocked} />
 
       <div class="form-actions">
         <${ConfirmButton} variant="primary" confirmVariant="primary" size="md" icon="upload" busy=${busy}
-          disabled=${blocked || Boolean(problem)} question=${`Publish addon ${target} to every member?`} yes="Publish" no="Not yet"
+          disabled=${blocked || Boolean(problem)} question=${`Publish addon ${target} to every player?`} yes="Publish" no="Not yet"
           onConfirm=${() => { publish(); }}>
           ${target ? `Publish addon ${target}` : 'Publish addon'}
         <//>
@@ -429,7 +495,7 @@ function AppForm({ st, busyKind, onStart, onRepoChanged }) {
     : !current ? "app/package.json has no version."
       : !target ? (choice === 'exact' ? 'Type the exact version to publish.' : "That version can't be worked out.")
         : notes.length > MAX_NOTES ? 'The release notes are too long.'
-          : notNewer ? `The server already has ${live}. Choose a newer version.` : null;
+          : notNewer ? `GitHub already has app ${live}. Choose a newer version.` : null;
 
   const publish = () => onStart('app', () => gc.publisher.publishApp({ bump: bumpArg(choice, exact), notes })).then((r) => {
     if (r.ok) { setChoice('patch'); setExact(''); setTouched(false); setNotes(''); }
@@ -455,12 +521,17 @@ function AppForm({ st, busyKind, onStart, onRepoChanged }) {
 
       <${NotesField} value=${notes} onValue=${(v) => { setNotes(v); setTouched(true); }} suggestion=${suggestion} disabled=${blocked || !st.repoDir} />
 
-      <p class="hint">The build runs <code>npm run dist</code> and takes a few minutes. Keep Guild Camp open until it says the release is live.
+      ${st.bnet && !st.bnet.ready ? html`<${Notice} kind=${st.bnet.problem ? 'alarm' : 'warn'} title=${st.bnet.problem ? 'The Battle.net settings are half done.' : 'This build will have no Battle.net sign-in.'}>
+          ${st.bnet.problem || html`Set <code>GUILDCAMP_BNET_CLIENT_ID</code> and <code>GUILDCAMP_BNET_CLIENT_SECRET</code>, or put <code>bnetClientId</code> and <code>bnetClientSecret</code> in <code>.release.json</code> in the source folder. People can still use the app without signing in.`}
+        <//>` : null}
+      ${st.bnet && st.bnet.ready ? html`<p class="hint">Battle.net sign-in will be built in (from ${st.bnet.from}).</p>` : null}
+
+      <p class="hint">The build runs <code>npm run dist</code> and takes a few minutes, then the upload to GitHub takes a few more. Keep Guild Camp open until it says the release is live.
         The app never moves people to an older version, so ship fixes as a new version.</p>
 
       <div class="form-actions">
         <${ConfirmButton} variant="primary" confirmVariant="primary" size="md" icon="build" busy=${busy}
-          disabled=${blocked || Boolean(problem)} question=${`Build ${target} and publish it to every member?`} yes="Build and publish" no="Not yet"
+          disabled=${blocked || Boolean(problem)} question=${`Build ${target} and publish it to every player?`} yes="Build and publish" no="Not yet"
           onConfirm=${() => { publish(); }}>
           ${target ? `Build and publish ${target}` : 'Build and publish'}
         <//>
@@ -551,9 +622,8 @@ function CommandLineCard({ st }) {
   return html`<${Card} title="From the command line" sub="the same releases, from a terminal or CI"
       actions=${docs ? html`<${Button} size="sm" variant="ghost" icon="external" onClick=${openDocs}>Open RELEASING.md<//>` : null}>
     <div class="stack">
-      <p class="muted">Run these at the root of the source checkout. They need the publish token: set <code>PUBLISH_TOKEN</code> on the server
-        and the same value as <code>GUILDCAMP_PUBLISH_TOKEN</code> on your computer (or in <code>.release.json</code>).
-        ${st.server ? html` Point them at this server with <code>GUILDCAMP_SERVER=${st.server}</code>.` : null}</p>
+      <p class="muted">Run these at the root of the source checkout. Like this page, they publish with GitHub CLI, so they need
+        <code>gh auth login</code> done once with an account that can push to ${st.repo || 'arrow-quiver/wow'}.</p>
       <div class="stack releases-cmds">
         <${Command} label="Check what's published" cmd="node scripts/release.js status" />
         <${Command} label="Publish the addon" cmd='node scripts/release.js addon --bump patch --notes "What changed"' />
@@ -561,12 +631,12 @@ function CommandLineCard({ st }) {
         <${Command} label="Both at once" cmd='node scripts/release.js all --bump patch --notes "What changed"' />
       </div>
       <h4 class="releases-subhead">Let GitHub Actions do it</h4>
-      <p class="muted">These bump the version, commit, tag (<code>addon-v…</code> or <code>app-v…</code>) and push. The release workflow then builds and publishes on GitHub's Windows machines.</p>
+      <p class="muted">These bump the version, commit, tag (<code>addon-v…</code> or <code>v…</code>) and push. The release workflow then builds and publishes on GitHub's machines.</p>
       <div class="stack releases-cmds">
         <${Command} label="Addon through CI" cmd="node scripts/release.js addon --bump patch --tag-only --push" />
         <${Command} label="App through CI" cmd="node scripts/release.js app --bump minor --tag-only --push" />
       </div>
-      <p class="hint">${docs ? 'docs/RELEASING.md' : 'docs/RELEASING.md in the source checkout'} explains first-time setup, rolling back, and what each error means.</p>
+      <p class="hint">${docs ? 'docs/RELEASING.md' : 'docs/RELEASING.md in the source checkout'} explains first-time setup (Battle.net, making the repository public, CI secrets), rolling back, and what each error means.</p>
     </div>
   <//>`;
 }

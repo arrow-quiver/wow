@@ -1,5 +1,6 @@
 'use strict';
-// The background sync engine (src/main/sync.js), run against fake game folders in temp dirs.
+// The background sync engine (src/main/sync.js), run against fake game folders in temp dirs. It talks
+// to the local core through api.js; no sign-in is needed for any of it.
 // Default scanning is off (scanDefaults: false), so a real game install is never touched.
 // Time is injected: `now` is a fake clock, `sleep` resolves at once (and records how long it was
 // asked to wait), and the 4 s check timer is a fake the tests fire by hand.
@@ -10,11 +11,12 @@ const os = require('os');
 const path = require('path');
 const http = require('http');
 
-const { createSync, inboxToc, writeInboxFiles, uploadSummary, retryDelay, describeWait, noGuildReply } = require('../src/main/sync');
-const wow = require('../src/main/wow');
-const { createStore } = require('../src/main/store');
+const { createSync, inboxToc, writeInboxFiles, uploadSummary, retryDelay, describeWait } = require('../src/main/sync');
+// The real wow.js, except that the game counts as closed: tests never ask the real task list.
+const wow = { ...require('../src/main/wow'), isWowRunning: async () => false };
+const { createStore, sanitizeSettingsPatch } = require('../src/main/store');
 const { createLog } = require('../src/main/log');
-const { createApi, ApiError, errorFromBody } = require('../src/main/api');
+const { createApi, ApiError } = require('../src/main/api');
 const { parseSavedVariables, toLua } = require('../src/shared/lua');
 
 const CLOCK_START = Date.UTC(2026, 10, 7, 12, 0, 0);
@@ -85,10 +87,9 @@ const INBOX = {
   buddies: [{ character: 'Mokra', level: 22, zone: 'The Barrens', whenText: 'evenings', note: 'questing' }],
   coach: { pending: 0 },
   latestAddon: '0.11.1',
-  site: 'https://guild.example.com',
 };
 
-const SYNC_OK = { ok: true, characters: 1, roster: 3, recipes: 2, ctas: 1, inventory: 0, bank: 0, prices: 2, coachPending: 0, latest: { app: { version: '0.11.0' }, addon: { version: '0.11.1' } } };
+const SYNC_OK = { ok: true, guild: { id: 1, name: 'Camp Fire', faction: 'Horde', role: 'officer' }, characters: 1, roster: 3, recipes: 2, ctas: 1, inventory: 0, bank: 0, prices: 2, coachPending: 0, latest: { app: { version: '0.11.0' }, addon: { version: '0.11.1' } } };
 
 let tmp;
 beforeEach(() => { tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'gc-sync-')); });
@@ -138,7 +139,7 @@ function fakeApi(routes) {
     async request(method, p, body, opts) {
       calls.push({ method, path: p, body: body === undefined || body === null ? body : structuredClone(body), opts });
       const handler = routes[`${method} ${p}`];
-      if (!handler) throw new ApiError(404, "The server couldn't find that.");
+      if (!handler) throw new ApiError(404, "Guild Camp couldn't find that.");
       active += 1;
       api.maxActive = Math.max(api.maxActive, active);
       try {
@@ -154,26 +155,28 @@ function fakeApi(routes) {
 /**
  * A sync engine wired to a fake game folder, a fake API, a real store and log in temp dirs.
  * @param {object} [o]
- * @param {boolean} [o.token=true] signed in
  * @param {boolean} [o.folders=true] settings.extraWowFolders points at the fake "World of Warcraft" folder
  */
-function setup({ token = true, folders = true, routes = {}, game = {} } = {}) {
+function setup({ folders = true, routes = {}, game = {}, pids = false } = {}) {
   const root = path.join(tmp, 'World of Warcraft');
   const forever = makeGame(root, '_forever_', game);
   const store = createStore(path.join(tmp, 'user-data'));
-  if (token) store.setSecret('deviceToken', 'gcd_test_token');
   if (folders) store.set({ extraWowFolders: [root] });
   const log = createLog(path.join(tmp, 'logs'));
   const api = fakeApi({ 'POST /api/sync': () => SYNC_OK, 'GET /api/inbox': () => INBOX, ...routes });
 
-  const h = { root, forever, store, log, api, clock: CLOCK_START, sleeps: [], timers: [], lines: [], statuses: [], uploaded: [], onSleep: null };
-  h.sync = createSync({
+  // gameRunning: what isWowRunning says. With pids, the game is asked for its process ids (gameIds) instead.
+  const h = { root, forever, store, log, api, clock: CLOCK_START, sleeps: [], timers: [], lines: [], statuses: [], uploaded: [], onSleep: null, gameRunning: false, gameIds: [], gameChecks: 0 };
+  h.createSync = () => createSync({
     api,
     store,
     log: log.scope('sync'),
     wow,
     appVersion: '0.11.0',
     scanDefaults: false,
+    ...(pids
+      ? { gameProcessIds: async () => { h.gameChecks += 1; return h.gameIds; } }
+      : { isWowRunning: async () => { h.gameChecks += 1; return h.gameRunning; } }),
     now: () => h.clock,
     sleep: async (ms) => {
       h.sleeps.push(ms);
@@ -189,6 +192,16 @@ function setup({ token = true, folders = true, routes = {}, game = {} } = {}) {
       if (i !== -1) h.timers.splice(i, 1);
     },
   });
+  /** A new sync engine on the same settings and folders, as after Guild Camp restarts. */
+  h.restartApp = () => {
+    h.sync.stop();
+    h.timers.length = 0;
+    h.sync = h.createSync();
+    h.sync.on('log', (msg) => h.lines.push(msg));
+    h.sync.on('status', (s) => h.statuses.push(s));
+    return h.sync;
+  };
+  h.sync = h.createSync();
   h.sync.on('log', (msg) => h.lines.push(msg));
   h.sync.on('status', (s) => h.statuses.push(s));
   h.sync.on('uploaded', (result, where) => h.uploaded.push({ result, where }));
@@ -206,13 +219,11 @@ function setup({ token = true, folders = true, routes = {}, game = {} } = {}) {
 const readInbox = (g) => parseSavedVariables(fs.readFileSync(path.join(g.inboxDir, 'Inbox.lua'))).WowGuildInbox;
 
 describe('states', () => {
-  test('signed out, off and no game folder are reported before anything else', async () => {
-    const h = setup({ token: false, folders: false });
-    assert.equal(h.sync.status().state, 'signed-out');
-    await assert.rejects(h.sync.syncNow(), /Sign in to sync/);
-
-    h.store.setSecret('deviceToken', 'gcd_x');
+  test('off and no game folder are reported before anything else; no sign-in is needed', async () => {
+    const h = setup({ folders: false });
     assert.equal(h.sync.status().state, 'no-game');
+    assert.equal('noGuild' in h.sync.status(), false, 'there is no "waiting for the server to find your guild" state any more');
+    assert.equal(h.sync.status().guildNote, null);
     await assert.rejects(h.sync.syncNow(), /can't find your World of Warcraft folder/);
 
     h.sync.setEnabled(false);
@@ -243,14 +254,14 @@ describe('uploads', () => {
 
     const [post] = h.api.posts();
     assert.equal(h.api.posts().length, 1);
-    assert.deepEqual(post.body, { ...DB, prices: PRICES });
+    assert.deepEqual(post.body, { ...DB, prices: PRICES, _source: { account: 'ACCOUNT1', install: h.forever.dir } });
     assert.equal(post.opts.timeout, 120000);
     assert.equal(h.api.inboxGets().length, 1);
 
     assert.equal(status.state, 'idle');
     assert.equal(status.running, true);
     assert.equal(status.lastSyncAt, new Date(CLOCK_START).toISOString());
-    assert.deepEqual(status.lastResult, { characters: 1, roster: 3, recipes: 2, ctas: 1, inventory: 0, bank: 0, prices: 2, coachPending: 0, account: 'ACCOUNT1', label: 'WoW Forever' });
+    assert.deepEqual(status.lastResult, { characters: 1, roster: 3, recipes: 2, ctas: 1, inventory: 0, bank: 0, prices: 2, coachPending: 0, account: 'ACCOUNT1', label: 'WoW Forever', guild: { name: 'Camp Fire', role: 'officer' } });
     assert.equal(status.lastError, null);
     assert.equal(status.files[0].lastUploadAt, status.lastSyncAt);
     assert.equal(status.recent.length, 1);
@@ -336,18 +347,18 @@ describe('uploads', () => {
 
   test('failed uploads are retried with backoff from 5 s up to 5 min', async () => {
     const h = setup();
-    const down = () => { throw new ApiError(0, "Can't reach the guild server (guild.example.com: connection refused). Check your internet connection and the server address in Settings."); };
+    const down = () => { throw new ApiError(0, "Guild Camp couldn't reach its own data service (connection refused). Restart Guild Camp."); };
     h.api.routes['POST /api/sync'] = down;
     await h.sync.start();
     assert.equal(h.api.posts().length, 1);
     let s = h.sync.status();
     assert.equal(s.state, 'error');
-    assert.match(s.lastError, /Can't reach the guild server/);
+    assert.match(s.lastError, /couldn't reach its own data service/);
     assert.equal(s.nextRetryAt, new Date(h.clock + 5000).toISOString());
     assert.equal(s.files[0].nextRetryAt, s.nextRetryAt);
     assert.match(s.files[0].lastError, /connection refused/);
     assert.equal(s.recent[0].ok, false);
-    assert.match(h.lines.at(-2), /^Couldn't upload the saved data for ACCOUNT1: Can't reach the guild server .* Trying again in 5 seconds\.$/);
+    assert.match(h.lines.at(-2), /^Couldn't upload the saved data for ACCOUNT1: Guild Camp couldn't reach its own data service .* Trying again in 5 seconds\.$/);
     assert.ok(fs.existsSync(path.join(h.forever.inboxDir, 'Inbox.lua')), 'the news is still saved on a full sync');
 
     const waits = [5, 10, 20, 40, 80, 160, 300, 300];
@@ -439,8 +450,8 @@ describe('uploads', () => {
     await h.sync.syncNow();
     assert.equal(h.api.posts().length, 2, 'forced: uploads even though nothing changed');
     assert.deepEqual(h.sleeps, [], 'no settle wait for a forced sync');
-    h.api.routes['POST /api/sync'] = () => { throw new ApiError(500, 'The guild server had a problem. Try again in a moment.'); };
-    await assert.rejects(h.sync.syncNow(), { message: 'The guild server had a problem. Try again in a moment.' });
+    h.api.routes['POST /api/sync'] = () => { throw new ApiError(500, 'Guild Camp had a problem. Try again, and look in the log if it keeps happening.'); };
+    await assert.rejects(h.sync.syncNow(), { message: 'Guild Camp had a problem. Try again, and look in the log if it keeps happening.' });
     assert.equal(h.sync.status().state, 'error');
   });
 });
@@ -500,13 +511,13 @@ describe('inbox', () => {
     assert.equal(readInbox(h.forever).guild, 'Camp Fire Reborn');
 
     // A failed refresh is not retried on every 4 s check.
-    h.api.routes['GET /api/inbox'] = () => { throw new ApiError(503, 'The guild server is busy or restarting. Try again in a moment.'); };
+    h.api.routes['GET /api/inbox'] = () => { throw new ApiError(500, 'Guild Camp had a problem. Try again, and look in the log if it keeps happening.'); };
     h.advance(5 * 60 * 1000);
     await h.sync.poll();
     await h.sync.poll();
     assert.equal(h.api.inboxGets().length, 3);
     assert.equal(h.sync.status().state, 'error');
-    assert.match(h.text(), /Couldn't get the guild news from the server: The guild server is busy/);
+    assert.match(h.text(), /Couldn't put together the guild news for the addon: Guild Camp had a problem./);
     h.api.routes['GET /api/inbox'] = () => INBOX;
     h.advance(5 * 60 * 1000);
     await h.sync.poll();
@@ -519,10 +530,346 @@ describe('inbox', () => {
     fs.mkdirSync(addonsDir, { recursive: true });
     assert.match(inboxToc(addonsDir, '1.2.3'), /^## Interface: 16001, 120105\r\n.*## Version: 1\.2\.3\r\n\r\nInbox\.lua\r\n$/s, 'default Interface without the addon toc');
     const first = writeInboxFiles(addonsDir, { guild: 'Ünïcode' }, '1.2.3');
-    assert.deepEqual([first.toc, first.lua], [true, true]);
+    assert.deepEqual([first.toc, first.lua, first.created], [true, true, true]);
     const again = writeInboxFiles(addonsDir, { guild: 'Ünïcode' }, '1.2.3');
-    assert.deepEqual([again.toc, again.lua], [false, false]);
+    assert.deepEqual([again.toc, again.lua, again.created], [false, false, false]);
     assert.equal(parseSavedVariables(fs.readFileSync(path.join(first.dir, 'Inbox.lua'))).WowGuildInbox.guild, 'Ünïcode');
+    // A folder without its .toc was never an addon the game knew: still a first creation.
+    fs.rmSync(path.join(first.dir, 'WowGuild_Inbox.toc'));
+    assert.equal(writeInboxFiles(addonsDir, { guild: 'x' }, '1.2.3').created, true);
+  });
+
+  test('the first WowGuild_Inbox made while the game runs says the news shows after a game restart, since a /reload does not load a new addon folder', async () => {
+    const h = setup();
+    h.gameRunning = true;
+    await h.sync.start();
+    assert.ok(fs.existsSync(path.join(h.forever.inboxDir, 'WowGuild_Inbox.toc')));
+    assert.match(h.text(), /Guild news saved for the addon\. It shows after you restart World of Warcraft\. A \/reload isn't enough the first time\./);
+    assert.doesNotMatch(h.text(), /It shows after your next \/reload/);
+    // The folder is there now: once the game has closed (so its next start finds the folder), a save needs only a /reload.
+    h.gameRunning = false;
+    h.lines.length = 0;
+    touch(h.forever.sv.ACCOUNT1);
+    await h.sync.poll();
+    assert.match(h.text(), /Guild news saved for the addon\. It shows after your next \/reload\./);
+    assert.doesNotMatch(h.text(), /restart World of Warcraft/);
+    h.sync.stop();
+
+    // When Guild Camp can't tell whether the game runs, it says restart too.
+    fs.rmSync(h.forever.inboxDir, { recursive: true });
+    h.gameRunning = null;
+    h.lines.length = 0;
+    await h.sync.syncNow();
+    assert.match(h.text(), /It shows after you restart World of Warcraft/);
+  });
+
+  test('a /reload later in the same game session, after the first WowGuild_Inbox was made while the game ran, still says restart (the running game never loads that folder) until Guild Camp sees the game closed', async () => {
+    const h = setup();
+    h.gameRunning = true;
+    await h.sync.start();
+    assert.match(h.text(), /It shows after you restart World of Warcraft/);
+    // The player types /reload: the game saves, and its session still doesn't have the news folder.
+    h.lines.length = 0;
+    touch(h.forever.sv.ACCOUNT1);
+    await h.sync.poll();
+    assert.match(h.text(), /Guild news saved for the addon\. It shows after you restart World of Warcraft\. A \/reload isn't enough the first time\./);
+    assert.doesNotMatch(h.text(), /It shows after your next \/reload/);
+    // The 5-minute refresh while the game still runs adds no line.
+    h.lines.length = 0;
+    h.advance(5 * 60 * 1000);
+    await h.sync.poll();
+    assert.doesNotMatch(h.text(), /Guild news saved/);
+    // The game closes (the next refresh sees it); after the next game start a /reload is enough again.
+    h.gameRunning = false;
+    h.advance(5 * 60 * 1000);
+    await h.sync.poll();
+    h.gameRunning = true;
+    h.lines.length = 0;
+    touch(h.forever.sv.ACCOUNT1);
+    await h.sync.poll();
+    assert.match(h.text(), /Guild news saved for the addon\. It shows after your next \/reload\./);
+    assert.doesNotMatch(h.text(), /restart World of Warcraft/);
+    h.sync.stop();
+  });
+
+  test('a WowGuild_Inbox made while the game runs: sync status says restartNeeded for that game folder, kept in settings across a Guild Camp restart, until Guild Camp sees the game closed', async () => {
+    const h = setup();
+    h.gameRunning = true;
+    await h.sync.start();
+    let s = h.sync.status();
+    assert.equal(s.restartNeeded, true);
+    assert.equal(s.restartFolders.length, 1);
+    assert.equal(wow.pathKey(s.restartFolders[0].install), wow.pathKey(h.forever.dir));
+    assert.equal(s.restartFolders[0].label, 'WoW Forever');
+    assert.equal(s.restartFolders[0].since, new Date(CLOCK_START).toISOString());
+    assert.equal(h.statuses.at(-1).restartNeeded, true, 'the status event carries it to the screens');
+    // Saved in settings, as an internal key the screens can't change.
+    assert.deepEqual(Object.keys(h.store.get().inboxRestart), [wow.pathKey(h.forever.dir)]);
+    assert.deepEqual(sanitizeSettingsPatch({ inboxRestart: {}, theme: 'dark' }), { theme: 'dark' });
+
+    // Guild Camp restarts (an app update, say) while the same game session runs: it still says restart, before any write.
+    h.clock += 60 * 1000;
+    h.restartApp();
+    assert.equal(h.sync.status().restartNeeded, true);
+    await h.sync.start();
+    assert.equal(h.sync.status().restartNeeded, true);
+    h.lines.length = 0;
+    touch(h.forever.sv.ACCOUNT1); // a /reload in that session
+    await h.sync.poll();
+    assert.match(h.text(), /It shows after you restart World of Warcraft/);
+
+    // The game closes: the next check sees it, and the folder no longer waits.
+    h.gameRunning = false;
+    h.clock += 31 * 1000;
+    await h.sync.poll();
+    s = h.sync.status();
+    assert.equal(s.restartNeeded, false);
+    assert.deepEqual(s.restartFolders, []);
+    assert.deepEqual(h.store.get().inboxRestart, {});
+    assert.equal(h.statuses.at(-1).restartNeeded, false);
+    h.sync.stop();
+  });
+
+  test('a quick game restart Guild Camp never sees closed (other game process ids) ends the wait for a restart; the running game is looked at at most every 30 s', async () => {
+    const h = setup({ pids: true });
+    h.gameIds = [4242];
+    await h.sync.start();
+    assert.equal(h.sync.status().restartNeeded, true);
+    assert.deepEqual(Object.values(h.store.get().inboxRestart)[0].pids, [4242]);
+    const checks = h.gameChecks;
+    // The same game keeps running: no new look within 30 s, and it still waits after one.
+    h.clock += 10 * 1000;
+    await h.sync.poll();
+    assert.equal(h.gameChecks, checks, 'no check within 30 s');
+    h.clock += 21 * 1000;
+    await h.sync.poll();
+    assert.equal(h.gameChecks, checks + 1);
+    assert.equal(h.sync.status().restartNeeded, true);
+    // Guild Camp can't tell for a moment: it keeps waiting.
+    h.gameIds = null;
+    h.clock += 31 * 1000;
+    await h.sync.poll();
+    assert.equal(h.sync.status().restartNeeded, true);
+    // The player closed the game and started it again between two checks: the session that lacked the folder is gone.
+    h.gameIds = [5150];
+    h.clock += 31 * 1000;
+    await h.sync.poll();
+    assert.equal(h.sync.status().restartNeeded, false);
+    assert.deepEqual(h.store.get().inboxRestart, {});
+    h.lines.length = 0;
+    touch(h.forever.sv.ACCOUNT1);
+    await h.sync.poll();
+    assert.match(h.text(), /Guild news saved for the addon\. It shows after your next \/reload\./);
+    assert.doesNotMatch(h.text(), /restart World of Warcraft/);
+    // A second game client started after the folder was made doesn't keep an old wait alive either.
+    fs.rmSync(h.forever.inboxDir, { recursive: true });
+    h.gameIds = [6000];
+    await h.sync.syncNow();
+    assert.equal(h.sync.status().restartNeeded, true);
+    h.gameIds = [6000, 7000];
+    h.clock += 31 * 1000;
+    await h.sync.poll();
+    assert.equal(h.sync.status().restartNeeded, true, 'the session from then still runs');
+    h.gameIds = [7000];
+    h.clock += 31 * 1000;
+    await h.sync.poll();
+    assert.equal(h.sync.status().restartNeeded, false, 'only a client that started with the folder is left');
+    h.sync.stop();
+  });
+
+  test('Y8: uninstalling the addon from a game folder whose news folder waits for a game restart takes that folder off the Sync card notice at once, and out of the saved waits at the next check, while the game still runs', async () => {
+    const h = setup();
+    h.gameRunning = true;
+    await h.sync.start();
+    assert.equal(h.sync.status().restartNeeded, true);
+    // Uninstall: WowGuild and WowGuild_Inbox go (main/addon.js uninstall).
+    fs.rmSync(path.join(h.forever.addonsDir, 'WowGuild'), { recursive: true });
+    fs.rmSync(h.forever.inboxDir, { recursive: true });
+    const s = h.sync.status();
+    assert.equal(s.restartNeeded, false);
+    assert.deepEqual(s.restartFolders, []);
+    h.clock += 31 * 1000;
+    await h.sync.poll();
+    assert.deepEqual(h.store.get().inboxRestart, {}, 'the wait is forgotten');
+    assert.equal(h.sync.status().restartNeeded, false);
+    h.sync.stop();
+  });
+
+  test('Y8: a wait for a game restart that Guild Camp can\'t follow (the game runs, but only whether it runs can be read) ends after 24 hours', async () => {
+    // isWowRunning only (no process ids): it can't tell this session from a later one.
+    const h = setup();
+    h.gameRunning = true;
+    await h.sync.start();
+    assert.equal(Object.values(h.store.get().inboxRestart)[0].pids, null);
+    h.clock += 23 * 3600 * 1000;
+    await h.sync.poll();
+    assert.equal(h.sync.status().restartNeeded, true, 'still within 24 hours');
+    h.clock += 3600 * 1000;
+    await h.sync.poll();
+    assert.equal(h.sync.status().restartNeeded, false, 'after 24 hours');
+    assert.deepEqual(h.store.get().inboxRestart, {});
+    h.sync.stop();
+  });
+
+  test('Y8: a wait for a game restart made while the game\'s process ids can\'t be read at all ends after 24 hours', async () => {
+    const k = setup({ pids: true });
+    k.gameIds = null;
+    await k.sync.start();
+    assert.equal(k.sync.status().restartNeeded, true);
+    k.clock += 24 * 3600 * 1000;
+    await k.sync.poll();
+    assert.equal(k.sync.status().restartNeeded, false);
+    k.sync.stop();
+  });
+
+  test('Y8: a wait for a game restart Guild Camp follows by process ids stays past 24 hours while that game session still runs', async () => {
+    const h = setup({ pids: true });
+    h.gameIds = [4242];
+    await h.sync.start();
+    h.clock += 30 * 3600 * 1000;
+    await h.sync.poll();
+    assert.equal(h.sync.status().restartNeeded, true, 'the same game session still runs');
+    h.gameIds = [5150];
+    h.clock += 31 * 1000;
+    await h.sync.poll();
+    assert.equal(h.sync.status().restartNeeded, false);
+    h.sync.stop();
+  });
+
+  test('the game is asked for its process ids through wow.gameProcessIds, but a wow whose isWowRunning was replaced (tests, tools) is asked through that only', async () => {
+    const root = path.join(tmp, 'World of Warcraft');
+    const game = makeGame(root, '_forever_');
+    const store = createStore(path.join(tmp, 'user-data'));
+    store.set({ extraWowFolders: [root] });
+    const api = fakeApi({ 'POST /api/sync': () => SYNC_OK, 'GET /api/inbox': () => INBOX });
+    const real = require('../src/main/wow');
+    let idCalls = 0;
+    const timerless = { setTimeout: () => ({}), clearTimeout: () => {} };
+    // The app's own wow module: process ids.
+    let sync = createSync({ api, store, wow: { ...real, gameProcessIds: async () => { idCalls += 1; return [31337]; } }, appVersion: '0.11.0', scanDefaults: false, ...timerless });
+    await sync.start();
+    assert.equal(idCalls, 1);
+    assert.deepEqual(Object.values(store.get().inboxRestart)[0].pids, [31337]);
+    sync.stop();
+    // A replaced isWowRunning: the real process list is never asked.
+    fs.rmSync(game.inboxDir, { recursive: true });
+    store.set({ inboxRestart: {} });
+    idCalls = 0;
+    sync = createSync({ api, store, wow: { ...real, isWowRunning: async () => true, gameProcessIds: async () => { idCalls += 1; return []; } }, appVersion: '0.11.0', scanDefaults: false, ...timerless });
+    await sync.start();
+    assert.equal(idCalls, 0);
+    assert.equal(sync.status().restartNeeded, true);
+    assert.equal(Object.values(store.get().inboxRestart)[0].pids, null, 'no process ids known');
+    sync.stop();
+  });
+
+  test('a Coach answer saved while the news folder waits for a game restart says to restart the game, not to /reload', async () => {
+    const h = setup();
+    h.gameRunning = true;
+    h.api.routes['POST /api/sync'] = () => ({ ...SYNC_OK, coachPending: 1 });
+    let gets = 0;
+    h.api.routes['GET /api/inbox'] = () => {
+      gets += 1;
+      return gets <= 1 ? { ...INBOX, coach: { pending: 1 } } : { ...INBOX, coach: { pending: 0, answers: [{ q: 'Which talents first?', a: 'Take Improved Rend.' }] } };
+    };
+    await h.sync.start();
+    await h.sync.whenIdle();
+    assert.match(h.text(), /The Coach has answered\. Restart World of Warcraft to see it\. A \/reload isn't enough the first time\./);
+    assert.doesNotMatch(h.text(), /The Coach has answered\. Type \/reload/);
+    h.sync.stop();
+  });
+
+  test('a Coach answer still on its way after two minutes, while the news folder waits for a game restart, says it shows after a restart; with no wait, after a later /reload', async () => {
+    const h = setup();
+    h.gameRunning = true;
+    h.api.routes['POST /api/sync'] = () => ({ ...SYNC_OK, coachPending: 1 });
+    h.api.routes['GET /api/inbox'] = () => ({ ...INBOX, coach: { pending: 1 } });
+    await h.sync.start();
+    await h.sync.whenIdle();
+    assert.match(h.text(), /The Coach is taking a while\. The answer will show after you restart World of Warcraft\. A \/reload isn't enough the first time\./);
+    assert.doesNotMatch(h.text(), /after a later \/reload/);
+    // The game closes; the next question's slow answer needs only a /reload.
+    h.gameRunning = false;
+    h.clock += 31 * 1000;
+    await h.sync.poll();
+    assert.equal(h.sync.status().restartNeeded, false);
+    h.lines.length = 0;
+    touch(h.forever.sv.ACCOUNT1);
+    await h.sync.poll();
+    await h.sync.whenIdle();
+    assert.match(h.text(), /The Coach is taking a while\. The answer will show after a later \/reload\./);
+    h.sync.stop();
+  });
+
+  test('a WowGuild_Inbox made while the game runs, with a settings file that cannot be written: the wait for a game restart is kept for this run, so sync status and the log still say restart, not /reload', async () => {
+    const h = setup();
+    h.gameRunning = true;
+    const realSet = h.store.set;
+    h.store.set = (patch) => {
+      if (patch && 'inboxRestart' in patch) throw new Error('EPERM: operation not permitted, rename settings.json');
+      return realSet(patch);
+    };
+    await h.sync.start();
+    assert.deepEqual(h.store.get().inboxRestart, {}, 'nothing could be saved');
+    assert.equal(h.sync.status().restartNeeded, true);
+    assert.equal(h.statuses.at(-1).restartNeeded, true);
+    assert.match(h.text(), /Guild news saved for the addon\. It shows after you restart World of Warcraft\./);
+    assert.doesNotMatch(h.text(), /It shows after your next \/reload/);
+    // The settings can be written again: the game is seen closed, the wait ends and is saved as ended.
+    h.store.set = realSet;
+    h.gameRunning = false;
+    h.clock += 31 * 1000;
+    await h.sync.poll();
+    assert.equal(h.sync.status().restartNeeded, false);
+    assert.deepEqual(h.store.get().inboxRestart, {});
+    h.sync.stop();
+  });
+});
+
+describe('sharing outbox', () => {
+  test('a change queued in the app rewrites the inbox within 2 s, once for a burst, also with the game closed', async () => {
+    const { EventEmitter } = require('events');
+    const coreEvents = new EventEmitter();
+    let outbox = [];
+    const root = path.join(tmp, 'World of Warcraft');
+    const game = makeGame(root, '_forever_');
+    const store = createStore(path.join(tmp, 'user-data'));
+    store.set({ extraWowFolders: [root] });
+    const api = fakeApi({ 'POST /api/sync': () => SYNC_OK, 'GET /api/inbox': () => ({ ...INBOX, outbox }) });
+    const timers = [];
+    const sync = createSync({
+      api, store, wow, appVersion: '0.11.0', scanDefaults: false, coreEvents,
+      setTimeout: (fn, ms) => { const t = { fn, ms }; timers.push(t); return t; },
+      clearTimeout: (t) => { const i = timers.indexOf(t); if (i !== -1) timers.splice(i, 1); },
+    });
+    // Never started (as when the game is closed and nothing was saved yet): the change still goes out.
+    outbox = [{ op: 'o1ab', g: 'Forever/Camp Fire', id: 'AN:q2w8zz', t: 1794069000, need: 'o', base: '', body: 'Bring fire resist' }];
+    coreEvents.emit('outbox');
+    coreEvents.emit('outbox');
+    coreEvents.emit('outbox');
+    assert.equal(timers.length, 1, 'one rewrite for a burst of changes');
+    assert.ok(timers[0].ms <= 2000, 'within 2 s');
+    const t = timers.shift();
+    await t.fn();
+    assert.equal(api.inboxGets().length, 1);
+    assert.deepEqual(readInbox(game).outbox, outbox);
+
+    // A later change: another rewrite. Through the method too.
+    outbox = [];
+    sync.outboxChanged();
+    await timers.shift().fn();
+    assert.deepEqual(Object.values(readInbox(game).outbox || {}), [], 'nothing waiting any more');
+
+    // Sync turned off: nothing is written; stop() drops a pending rewrite.
+    sync.setEnabled(false);
+    coreEvents.emit('outbox');
+    await timers.shift().fn();
+    assert.equal(api.inboxGets().length, 2);
+    sync.setEnabled(true);
+    coreEvents.emit('outbox');
+    assert.equal(timers.length, 1);
+    sync.stop();
+    assert.equal(timers.length, 0);
   });
 });
 
@@ -642,227 +989,59 @@ describe('lifecycle', () => {
     h.sync.stop();
   });
 
-  test('signing out stops checks from uploading', async () => {
+  test('signing out of Battle.net changes nothing: checks keep uploading', async () => {
     const h = setup();
     await h.sync.start();
-    h.store.setSecret('deviceToken', null);
+    h.store.setSecret('bnetToken', null);
     touch(h.forever.sv.ACCOUNT1);
     await h.sync.poll();
-    assert.equal(h.api.posts().length, 1);
-    assert.equal(h.sync.status().state, 'signed-out');
+    assert.equal(h.api.posts().length, 2);
+    assert.equal(h.sync.status().state, 'idle');
     h.sync.stop();
   });
 });
 
 describe('not in a guild yet', () => {
-  const REASON = "None of your characters are in Just Now WoW's roster yet. Ask someone in the guild to open the guild roster in game, or use an invite link.";
-  const AUTO_JOIN = { status: 'no-match', guild: { id: 1, name: 'Just Now WoW', faction: 'Horde' }, role: null, via: null, character: null, reason: REASON, detected: { guild: 'Just Now WoW', realm: 'Forever', faction: 'Horde' } };
-  const JOINED = { guild: { id: 1, name: 'Just Now WoW', faction: 'Horde' }, role: 'member', via: 'roster', character: 'Thrallia' };
-  // What api.js throws for 409 { error, code: 'NO_GUILD_MATCH', autoJoin }: status + sentence (code and
-  // autoJoin only when the client passes them on, so both shapes are tested).
-  const noMatch = (full = false) => () => {
-    throw Object.assign(new ApiError(409, REASON), full ? { code: 'NO_GUILD_MATCH', autoJoin: AUTO_JOIN } : {});
-  };
-  // GET /api/inbox for someone without a guild, as the real server answers it.
-  const refused = () => { throw new ApiError(403, 'Join a guild first.'); };
+  const NOTE = 'None of your characters is in a guild yet. Guild Camp starts working as soon as you log in to a character in your guild.';
+  const NO_GUILD = { ok: true, noGuild: true, message: NOTE, characters: 0, roster: 0, recipes: 0, ctas: 0, inventory: 0, bank: 0, prices: 0, coachPending: 0, latest: { app: null, addon: null } };
+  const EMPTY_INBOX = { guild: '', generatedAt: 1730000000, coach: { pending: 0 }, latestAddon: '0.11.1' };
 
-  function watch(h) {
-    h.noGuild = [];
-    h.joined = [];
-    h.sync.on('no-guild', (info) => h.noGuild.push(info));
-    h.sync.on('joined', (joined, where) => h.joined.push({ joined, where }));
-    return h;
-  }
-
-  test('a 409 is waiting, not failing: state no-guild, the reason as lastError, no backoff, no news', async () => {
-    const h = watch(setup({ routes: { 'POST /api/sync': noMatch(true), 'GET /api/inbox': refused } }));
-    const s = await h.sync.start();
+  test('the core stores nothing and says why: logged once, not a failure, and the next save goes up as usual', async () => {
+    const h = setup({ routes: { 'POST /api/sync': () => NO_GUILD, 'GET /api/inbox': () => EMPTY_INBOX } });
+    let s = await h.sync.start();
     assert.equal(h.api.posts().length, 1);
-    assert.equal(s.state, 'no-guild');
-    assert.equal(s.lastError, REASON);
-    assert.deepEqual(s.noGuild, { reason: REASON, since: new Date(CLOCK_START).toISOString() });
-    assert.equal(s.nextRetryAt, new Date(CLOCK_START + 60000).toISOString(), 'tried again in a minute');
-    assert.equal(s.files[0].lastError, REASON);
-    assert.equal(s.lastSyncAt, null, 'nothing was stored');
-    assert.equal(h.api.inboxGets().length, 0, 'no guild, no news to fetch');
-    assert.ok(!fs.existsSync(h.forever.inboxDir));
-    assert.equal(h.noGuild.length, 1);
-    assert.deepEqual(h.noGuild[0].autoJoin, AUTO_JOIN, 'the server\'s match result is passed on when the client has it');
-    assert.equal(h.noGuild[0].reason, REASON);
-    assert.equal(h.noGuild[0].account, 'ACCOUNT1');
-    assert.ok(!/Couldn't upload/.test(h.text()), 'not reported as a failed upload');
-    assert.equal(h.lines.filter((l) => l.startsWith('Waiting to match you to a guild')).length, 1);
-    assert.equal(s.recent[0].kind, 'guild');
-    h.sync.stop();
-  });
-
-  test('the same file is tried again after 60 s without spam; a new save goes up at once', async () => {
-    const h = watch(setup({ routes: { 'POST /api/sync': noMatch(), 'GET /api/inbox': refused } }));
-    await h.sync.start();
-    h.sleeps.length = 0;
-    // Checks every 4 s for just under a minute: nothing is sent, nothing waits.
-    for (let t = 4000; t < 60000; t += 4000) {
-      h.advance(4000);
-      await h.sync.poll();
-    }
-    assert.equal(h.api.posts().length, 1, 'no retry before a minute has passed');
-    assert.deepEqual(h.sleeps, []);
-    h.advance(60000 - 56000);
-    await h.sync.poll();
-    assert.equal(h.api.posts().length, 2, 'retried after 60 s');
-    assert.deepEqual(h.sleeps, [], 'an unchanged file needs no settle wait');
-    assert.equal(h.sync.status().state, 'no-guild');
-    assert.equal(h.noGuild.length, 2, 'every answer is passed on');
-    assert.equal(h.noGuild[1].autoJoin, null, 'a bare 409 carries no match result');
-    assert.equal(h.lines.filter((l) => l.startsWith('Waiting to match you to a guild')).length, 1, 'logged once per reason');
-    assert.equal(h.sync.status().nextRetryAt, new Date(h.clock + 60000).toISOString(), 'and the next try is a minute later (no backoff)');
-
-    // The game saves again (the player logged in to another character): uploaded at the next check.
-    touch(h.forever.sv.ACCOUNT1);
-    h.advance(4000);
-    await h.sync.poll();
-    assert.equal(h.api.posts().length, 3);
-    assert.deepEqual(h.sleeps, [1500], 'a changed file settles first, as usual');
-    h.sync.stop();
-  });
-
-  test('a reply with joined emits joined, counts as a normal upload and ends the wait', async () => {
-    const h = watch(setup({ routes: { 'POST /api/sync': noMatch(), 'GET /api/inbox': refused } }));
-    const statuses = [];
-    h.sync.on('status', (s) => statuses.push(s.state));
-    await h.sync.start();
-    assert.equal(h.sync.status().state, 'no-guild');
-
-    h.api.routes['POST /api/sync'] = () => ({ ...SYNC_OK, joined: JOINED });
-    h.api.routes['GET /api/inbox'] = () => INBOX;
-    touch(h.forever.sv.ACCOUNT1);
-    await h.sync.poll();
-    assert.equal(h.joined.length, 1);
-    assert.deepEqual(h.joined[0].joined, JOINED);
-    assert.equal(h.joined[0].where.account, 'ACCOUNT1');
-    assert.equal(h.uploaded.length, 1, 'uploaded as usual');
-    const s = h.sync.status();
-    assert.equal(s.state, 'idle');
+    assert.equal(s.state, 'idle', 'waiting for a guild is not a problem');
     assert.equal(s.lastError, null);
-    assert.equal(s.noGuild, null);
-    assert.equal(s.nextRetryAt, null);
+    assert.equal(s.guildNote, NOTE);
+    assert.equal(s.lastResult.guild, null);
     assert.equal(s.files[0].lastError, null);
-    assert.ok(s.lastSyncAt);
-    assert.equal(h.api.inboxGets().length, 1, 'the guild news is saved right after');
-    assert.ok(fs.existsSync(path.join(h.forever.inboxDir, 'Inbox.lua')));
-    assert.match(h.text(), /You're in Just Now WoW \(matched Thrallia\)\. Guild Camp joined you automatically\./);
-    assert.ok(statuses.includes('no-guild') && statuses.at(-1) === 'idle');
-    h.sync.stop();
-  });
+    assert.equal(s.nextRetryAt, null, 'no retry: the game saving again is what counts');
+    assert.ok(!/Uploaded:/.test(h.text()), 'no "Uploaded" line for an upload that stored nothing');
+    assert.equal(h.lines.filter((l) => l === NOTE).length, 1);
+    assert.equal(s.recent[0].kind, 'guild');
+    assert.equal(readInbox(h.forever).guild, '', 'the (empty) news still reaches the addon, with the latest version');
 
-  test('joined on the very first upload: the upload is processed and the event fires once', async () => {
-    const h = watch(setup({ routes: { 'POST /api/sync': () => ({ ...SYNC_OK, joined: JOINED }) } }));
-    const s = await h.sync.start();
-    assert.equal(s.state, 'idle');
-    assert.equal(h.joined.length, 1);
-    assert.equal(h.noGuild.length, 0);
-    assert.equal(s.lastResult.characters, 1);
+    // The same answer again is not logged again.
+    touch(h.forever.sv.ACCOUNT1);
     await h.sync.poll();
-    assert.equal(h.joined.length, 1, 'not repeated');
-    h.sync.stop();
-  });
+    assert.equal(h.api.posts().length, 2);
+    assert.equal(h.lines.filter((l) => l === NOTE).length, 1);
 
-  test('once in a guild another way, clearNoGuild lets waiting files go up at the next check', async () => {
-    const h = watch(setup({ routes: { 'POST /api/sync': noMatch(), 'GET /api/inbox': refused } }));
-    await h.sync.start();
-    h.api.routes['POST /api/sync'] = () => SYNC_OK;
-    h.api.routes['GET /api/inbox'] = () => INBOX;
+    // Joining a guild in game: the next save is a normal upload.
+    h.api.routes['POST /api/sync'] = () => ({ ...SYNC_OK, switched: { id: 1, name: 'Camp Fire', faction: 'Horde', created: true } });
+    touch(h.forever.sv.ACCOUNT1);
     await h.sync.poll();
-    assert.equal(h.api.posts().length, 1, 'still waiting');
-    assert.equal(h.api.inboxGets().length, 0, 'and the news is not asked for on every check');
-    const s = h.sync.clearNoGuild();
-    assert.equal(s.state, 'idle');
-    assert.equal(s.lastError, null);
-    await h.sync.poll();
-    assert.equal(h.api.posts().length, 2, 'uploaded straight away');
-    assert.equal(h.sync.status().lastSyncAt, new Date(h.clock).toISOString());
-    assert.equal(h.api.inboxGets().length, 1);
-    assert.match(h.text(), /You're in a guild now\. Uploading your saved data\./);
-    assert.equal(h.sync.clearNoGuild().state, 'idle', 'twice is fine');
+    s = h.sync.status();
+    assert.equal(s.guildNote, null);
+    assert.deepEqual(s.lastResult.guild, { name: 'Camp Fire', role: 'officer' });
+    assert.match(h.text(), /Guild Camp set up Camp Fire./);
+    assert.match(h.text(), /Uploaded: 1 character\(s\), 3 roster entries, 2 recipes/);
     h.sync.stop();
-  });
-
-  test('an older server\'s 403 "Join a guild first." waits the same way', async () => {
-    const h = watch(setup({ routes: { 'POST /api/sync': () => { throw new ApiError(403, 'Join a guild first.'); } } }));
-    const s = await h.sync.start();
-    assert.equal(s.state, 'no-guild');
-    assert.equal(s.lastError, 'Join a guild first.');
-    assert.equal(h.noGuild[0].autoJoin, null);
-    h.sync.stop();
-  });
-
-  test('without saved data yet, the news being refused (403) is not a sync problem', async () => {
-    const h = watch(setup({ game: { db: {} }, routes: { 'GET /api/inbox': () => { throw new ApiError(403, 'Join a guild first.'); } } }));
-    const s = await h.sync.start();
-    assert.equal(h.api.posts().length, 0);
-    assert.equal(h.api.inboxGets().length, 1);
-    assert.equal(s.state, 'no-guild');
-    assert.equal(s.lastError, 'Join a guild first.');
-    assert.equal(h.noGuild.length, 1);
-    // The news is asked for again every 5 minutes; once it comes, the wait is over.
-    h.api.routes['GET /api/inbox'] = () => INBOX;
-    h.advance(5 * 60 * 1000);
-    await h.sync.poll();
-    assert.equal(h.sync.status().state, 'idle');
-    assert.equal(h.sync.status().lastError, null);
-    assert.ok(fs.existsSync(path.join(h.forever.inboxDir, 'Inbox.lua')));
-    h.sync.stop();
-  });
-
-  test('the server\'s reason is kept when the news is refused in the same pass', async () => {
-    const h = watch(setup({ routes: { 'POST /api/sync': noMatch(), 'GET /api/inbox': () => { throw new ApiError(403, 'Join a guild first.'); } } }));
-    await h.sync.start();
-    h.advance(5 * 60 * 1000);
-    await h.sync.poll(); // retries the upload (409) and refreshes the news (403)
-    assert.equal(h.sync.status().lastError, REASON);
-    assert.equal(h.sync.status().state, 'no-guild');
-    h.sync.stop();
-  });
-
-  test('syncNow says plainly why nothing went up', async () => {
-    const h = watch(setup({ routes: { 'POST /api/sync': noMatch(), 'GET /api/inbox': refused } }));
-    await assert.rejects(h.sync.syncNow(), (err) => err.message === REASON && err.status === 409 && err.code === 'no-guild');
-    assert.equal(h.sync.status().state, 'no-guild');
-  });
-
-  test('stop() and turning sync off forget the wait', async () => {
-    const h = watch(setup({ routes: { 'POST /api/sync': noMatch(), 'GET /api/inbox': refused } }));
-    await h.sync.start();
-    let s = h.sync.stop();
-    assert.equal(s.noGuild, null);
-    assert.equal(s.lastError, null);
-    assert.notEqual(s.state, 'no-guild');
-    await h.sync.start();
-    assert.equal(h.sync.status().state, 'no-guild');
-    s = h.sync.setEnabled(false);
-    assert.equal(s.state, 'off');
-    assert.equal(s.noGuild, null);
-    h.sync.stop();
-  });
-
-  test('noGuildReply recognises the answers that mean "not in a guild"', () => {
-    assert.deepEqual(noGuildReply(new ApiError(409, 'No match')), { reason: 'No match.', autoJoin: null });
-    assert.deepEqual(noGuildReply(Object.assign(new ApiError(409, 'No match.'), { body: { code: 'NO_GUILD_MATCH', autoJoin: AUTO_JOIN } })), { reason: 'No match.', autoJoin: AUTO_JOIN });
-    assert.deepEqual(noGuildReply(Object.assign(new Error('x'), { code: 'NO_GUILD_MATCH' })), { reason: 'x.', autoJoin: null });
-    // What api.js really throws for the server's 409: the match result comes along, so main.js records it
-    // instead of asking POST /api/guild/auto-join again.
-    const fromServer = errorFromBody(409, JSON.stringify({ error: 'No match.', code: 'NO_GUILD_MATCH', autoJoin: AUTO_JOIN }));
-    assert.deepEqual(noGuildReply(fromServer), { reason: 'No match.', autoJoin: AUTO_JOIN });
-    assert.deepEqual(noGuildReply(errorFromBody(403, JSON.stringify({ error: 'Join a guild first.' }))), { reason: 'Join a guild first.', autoJoin: null });
-    assert.equal(noGuildReply(new ApiError(403, 'Join a guild first.')).reason, 'Join a guild first.');
-    assert.equal(noGuildReply(new ApiError(500, 'Boom.')), null);
-    assert.equal(noGuildReply(new ApiError(0, 'Offline.')), null);
-    assert.equal(noGuildReply(null), null);
   });
 });
 
 describe('with the real API client', () => {
-  test('uploads JSON with the device token and app version, and writes the inbox from the reply', async () => {
+  test('uploads JSON with the launch token and app version to the local core, and writes the inbox from the reply', async () => {
     const seen = [];
     const server = http.createServer((req, res) => {
       let body = '';
@@ -880,9 +1059,9 @@ describe('with the real API client', () => {
       const root = path.join(tmp, 'WoW');
       const game = makeGame(root, '_forever_');
       const store = createStore(path.join(tmp, 'ud'));
-      store.setSecret('deviceToken', 'gcd_real_token');
-      store.set({ extraWowFolders: [root], serverUrl: `http://127.0.0.1:${server.address().port}` });
-      const api = createApi({ getServer: () => store.get().serverUrl, getToken: () => store.getSecret('deviceToken'), appVersion: '0.11.0' });
+      store.set({ extraWowFolders: [root] });
+      const base = `http://127.0.0.1:${server.address().port}`;
+      const api = createApi({ getBase: () => base, getToken: () => 'gcd_real_token', appVersion: '0.11.0' });
       const sync = createSync({ api, store, wow, appVersion: '0.11.0', scanDefaults: false });
       const s = await sync.syncNow();
       assert.equal(s.state, 'idle');
@@ -891,7 +1070,7 @@ describe('with the real API client', () => {
       assert.equal(post.auth, 'Bearer gcd_real_token');
       assert.equal(post.version, '0.11.0');
       assert.equal(post.type, 'application/json');
-      assert.deepEqual(JSON.parse(post.body), { ...DB, prices: extractPricesNow() });
+      assert.deepEqual(JSON.parse(post.body), { ...DB, prices: extractPricesNow(), _source: { account: 'ACCOUNT1', install: game.dir } });
       assert.ok(seen.some((r) => r.url === '/api/inbox' && r.method === 'GET'));
       assert.deepEqual(parseSavedVariables(fs.readFileSync(path.join(game.inboxDir, 'Inbox.lua'))).WowGuildInbox, INBOX);
     } finally {
@@ -905,7 +1084,6 @@ describe('with real timers', () => {
     const root = path.join(tmp, 'WoW');
     const game = makeGame(root, '_forever_', { auctionator: false });
     const store = createStore(path.join(tmp, 'ud'));
-    store.setSecret('deviceToken', 'gcd_x');
     store.set({ extraWowFolders: [root] });
     const api = fakeApi({ 'POST /api/sync': () => ({ ...SYNC_OK, coachPending: 1 }), 'GET /api/inbox': () => ({ ...INBOX, coach: { pending: 1 } }) });
     const sync = createSync({ api, store, wow, appVersion: '0.11.0', scanDefaults: false, pollMs: 20, settleMs: 10, coachEveryMs: 60 * 1000 });

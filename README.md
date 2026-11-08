@@ -1,100 +1,91 @@
 # Guild Camp
 
-A guild platform for **World of Warcraft: Forever** (PvP ruleset; Retail later), in three parts:
+Guild Camp is a desktop app and an in-game addon for a **World of Warcraft: Forever** guild. There is no
+website and no server: every player runs the app on their own PC, and the addon shares guild data with
+guildmates inside the game.
 
-```
-app/      Guild Camp, the Windows desktop app (Electron). Everything a member sees and does,
-          plus background sync with the game, and it installs and updates the addon.
-server/   The guild server (Node + SQLite JSON API). Shared guild data, Battle.net sign-in,
-          Discord, calendar feeds, and hosting for app and addon updates.
-addon/    WowGuild, the in-game addon (listed as "Guild Camp"; Forever 16001, Retail 120105).
-scripts/  release.js: publish app and addon updates.
-docs/     ARCHITECTURE.md (how it fits together), RELEASING.md, api/*.md (every endpoint).
-```
+## For players
 
-Version 0.11.0 replaces the old companion exe and browser site. The old version is on the
-`versions/0.10.0` branch.
+What you get:
 
-## How it works
+- **Camp**: who's online, calls to arms, notices, upcoming raids and what the guild has been up to.
+- **Raids**: sign-ups, soft reserves with an SR+ loyalty bonus, a loot screen for officers, and loot lists.
+- **Crafters, Requests and Partners**: who can make what, crafting requests, and leveling partners.
+- **Bank, Prices and Drives**: the guild bank, bank requests, guild prices from Auctionator, and supply drives.
+- **Coach**: learns how you play and suggests next steps. Its AI answers need your own Anthropic API key.
+- **In game**: guild news, item tooltips (crafters, your alts, the guild bank), a skill-up guide and a shopping
+  list.
 
-1. A member installs Guild Camp (from `<server>/get`) and signs in with Battle.net. That is the whole first
-   run: Guild Camp finds every WoW folder (`_forever_`, `_retail_`, …), installs the addon where the game
-   version is supported, and joins the member to the guild automatically when one of their characters is in
-   the guild roster (verified by Battle.net, or from the characters the addon saved). The first person on a
-   new server sets the guild up with one click and becomes the owner; officers can follow in-game ranks.
-   Invite links still work for anyone the automatic match can't place.
-2. The addon saves data out of combat into `WowGuildDB`. WoW writes it on logout or `/reload`.
-3. The app sees the file change and uploads it to the server. Then it writes the guild's news into
-   `Interface\AddOns\WowGuild_Inbox` so the addon shows it after the next `/reload`.
-4. Everything else happens in the app: Camp, Coach, Raids (sign-ups, soft reserves with SR+ loyalty,
-   loot screen), Crafters, Requests, Partners, Roster, Bank, Prices, Drives, Loot, Officer tools and
-   Guild settings. Desktop notifications cover calls to arms, raids, notices, requests and Coach answers.
-5. The app updates itself and the addon from the guild server. The owner publishes updates with
-   `scripts/release.js`, a tag push (GitHub Actions), or the app's **Releases** page.
+How it works:
 
-## Run it locally
+1. The addon saves what the game shows. WoW writes it to disk when you log out or type `/reload`.
+2. The app reads that file and shows it. Changes you make in the app (a sign-up, a request) go to the addon,
+   which sends them to your guild the next time you log in or type `/reload`.
+3. Guildmates who are online pass guild data on to each other, so it reaches you even when the person who made
+   it has logged off. New guild data shows in the app after you log out or type `/reload` in game.
+4. Your role comes from your in-game rank. The Guild Master decides which ranks count as officers.
 
-```bash
-npm install
-```
+### Install
 
-That installs `app/` and `server/` too. Then, in two terminals:
+1. Download `Guild-Camp-Setup-<version>.exe` from the
+   [latest release](https://github.com/arrow-quiver/wow/releases/latest) and run it. The installer isn't
+   code-signed yet, so Windows SmartScreen asks once: **More info → Run anyway**.
+2. Open Guild Camp. Sign in with Battle.net, or continue without it. Guild Camp finds your game folders and
+   installs the addon.
+3. Log in to the game on a character in your guild, then log out or type `/reload`. Guild Camp picks up your
+   guild from there.
 
-```bash
-cd server && DEV_LOGIN=1 PORT=3000 BASE_URL=http://127.0.0.1:3000 node src/index.js
-```
+The app updates itself and the addon from GitHub. It starts with Windows and stays in the tray, so your guild
+stays in sync. You can turn that off in Settings.
 
-```bash
-cd app && GUILDCAMP_SERVER=http://127.0.0.1:3000 npx electron . --user-data ./dist/dev-profile
-```
+## For developers
 
-`DEV_LOGIN=1` lets you sign in by typing any BattleTag. `--user-data` keeps the dev app's settings and
-sign-in apart from a real install. Add `GUILDCAMP_NO_SCAN=1` to stop the dev app looking in the real
-game folders (it would otherwise install and update the addon there, like the real app does).
-
-Tests (shared modules, app main process, every server domain, the real addon Lua in a simulated WoW
-client, and an end-to-end run from game to server and back):
+You need Node.js 24 (the tests use its built-in `node:sqlite`, as the app does inside Electron) and Git.
+Windows is the main target.
 
 ```bash
-npm test
+npm install                    # at the repo root; also installs app/
+GUILDCAMP_NO_SCAN=1 npm test   # every test: node --test "app/test/**/*.test.{js,mjs}"
 ```
 
-Screenshots of every page from the real app (needs a `DEV_LOGIN=1` server; never touches game folders):
+Run the app from `app/`, always with a scratch profile and without scanning your real game folders:
 
 ```bash
-cd app && MSYS_NO_PATHCONV=1 GUILDCAMP_SERVER=http://127.0.0.1:3000 npx electron . --smoke --smoke-login=Dev#1234
+cd app
+GUILDCAMP_NO_SCAN=1 npx electron . --user-data ./dist/dev-profile
 ```
 
-## Deploy the server (Coolify)
+Without those two settings a dev app finds your real World of Warcraft folders and installs, updates or syncs
+the addon there, exactly like the installed app does. To try it with game data, add a fake game folder under
+Addon & sync in the scratch profile.
 
-1. New resource → this repo → Build pack **Dockerfile**, base directory `/`, Dockerfile `server/Dockerfile`, port `3000`.
-2. Persistent storage mounted at `/data` (database, backups and published updates live there).
-3. Environment (see `server/.env.example`): `BASE_URL`, `SESSION_SECRET`, `BNET_CLIENT_ID` / `BNET_CLIENT_SECRET`
-   (redirect URL `<BASE_URL>/auth/bnet/callback`), `PUBLISH_TOKEN`, and optionally `DISCORD_*`,
-   `ANTHROPIC_API_KEY`, `COACH_MODEL`, `COACH_FAST_MODEL`, `BNET_REGION`.
-   The Battle.net client (develop.battle.net) needs the `wow.profile` scope enabled: sign-in asks for
-   `openid wow.profile` so the server can read members' characters and match them to the guild.
-4. Deploy. The first person to set up the guild in the app becomes the owner.
+Screenshots of every page with a demo guild (safe by default; nothing touches your game or settings):
 
-The new server opens the old site's database as it is: the old migrations are kept and new tables are
-added on top. Old companion sync keys keep uploading until members switch to the app.
+```bash
+cd app
+npx electron . --smoke --smoke-seed      # pictures and a report in app/dist/smoke
+```
 
-## Release updates
+Heavy simulations of many players run only with `GUILDCAMP_SIM_HEAVY=1`. Tests never touch the network, a real
+game folder or the real GitHub CLI.
 
-Short version (full guide: [docs/RELEASING.md](docs/RELEASING.md)):
+Read these next:
+
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): how the app, its local core, the addon and GitHub fit together,
+  the safety rules for development, and the test layout.
+- [docs/SHARING.md](docs/SHARING.md): how the addon shares guild data in game.
+- [docs/api/](docs/api/): every endpoint of the app's local core.
+
+## Releasing
+
+App and addon releases are GitHub releases on this repository, published with the GitHub CLI (`gh`):
 
 ```bash
 node scripts/release.js addon --bump patch --notes "What changed"
-```
-
-```bash
 node scripts/release.js app --bump minor --notes-from-git
 ```
 
-Set `GUILDCAMP_SERVER` and `GUILDCAMP_PUBLISH_TOKEN` (the server's `PUBLISH_TOKEN`) first, or put them in
-`.release.json`. Add `--push` to commit, tag (`app-v…` / `addon-v…`) and push; with the GitHub secrets set,
-`.github/workflows/release.yml` publishes tagged versions too. Members get app updates in the background
-(restart to install) and addon updates automatically in every game folder that has the addon (and new
-installs in supported game folders, unless the member removed the addon there).
-
-The app's installer isn't code-signed yet, so Windows SmartScreen asks once: **More info → Run anyway**.
+Add `--dry-run` to build and zip without publishing. Pushing a `v<version>` or `addon-v<version>` tag publishes
+from GitHub Actions instead, and the app's **Releases** page can publish from a PC that has the source code and
+`gh` signed in. First-time setup (making the repository public, `gh auth login`, the Battle.net client id and
+secret that are built into the installer) and every step are in [docs/RELEASING.md](docs/RELEASING.md).

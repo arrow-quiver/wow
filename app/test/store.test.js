@@ -5,7 +5,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const { createStore, sanitizeSettingsPatch, normaliseServerUrl, writeFileAtomic, DEFAULTS } = require('../src/main/store');
+const { createStore, sanitizeSettingsPatch, cleanWebhook, writeFileAtomic, DEFAULTS } = require('../src/main/store');
 
 // Stand-in for safeStorage: reversible, but clearly not plain text on disk.
 const fakeCrypto = {
@@ -25,16 +25,19 @@ describe('settings', () => {
   test('starts from the documented defaults', () => {
     const store = createStore(dir);
     assert.deepEqual(store.get(), { ...DEFAULTS, extraWowFolders: [] });
-    assert.equal(store.get().serverUrl, 'https://wow.cjplumbing.co.za');
+    assert.equal('serverUrl' in store.get(), false, 'there is no server');
+    assert.equal('lastEventId' in store.get(), false);
+    assert.equal(store.get().discordWebhook, null);
+    assert.equal(store.get().bnetRegion, 'eu');
     assert.equal(store.get().syncEnabled, true);
     assert.equal(store.get().repoDir, null);
     assert.equal(fs.existsSync(path.join(dir, 'settings.json')), false, 'nothing written until something changes');
   });
 
-  test('automatic setup defaults: addon installs on, start with Windows off until the first sign-in', () => {
+  test('automatic setup defaults: addon installs on, start with Windows off until the first launch of an installed app', () => {
     const store = createStore(dir);
     assert.equal(store.get().addonAutoInstall, true);
-    assert.equal(store.get().startWithWindows, false, 'main.js turns it on once, on the first sign-in of an installed app');
+    assert.equal(store.get().startWithWindows, false, 'main.js turns it on once, at the first launch of an installed app');
     assert.equal(store.get().startupDefaulted, false);
     assert.deepEqual(store.get().addonOptOut, []);
     // Settings files from before these keys existed get the defaults.
@@ -81,10 +84,10 @@ describe('settings', () => {
 
   test('writes atomically: no temp files are left behind and the file is valid JSON', () => {
     const store = createStore(dir);
-    for (let i = 0; i < 20; i++) store.set({ lastEventId: i + 1 });
+    for (let i = 0; i < 20; i++) store.set({ windowBounds: { x: i + 1 } });
     const files = fs.readdirSync(dir);
     assert.deepEqual(files, ['settings.json']);
-    assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'settings.json'), 'utf8')).lastEventId, 20);
+    assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'settings.json'), 'utf8')).windowBounds.x, 20);
   });
 
   test('writeFileAtomic replaces an existing file in one step', () => {
@@ -127,87 +130,120 @@ describe('settings', () => {
     fs.writeFileSync(path.join(dir, 'settings.json'), `\uFEFF${JSON.stringify({ theme: 'light' })}`);
     assert.equal(createStore(dir).get().theme, 'light');
   });
+
+  test("a smoke run's switches (no sync, updates or notifications) are overrides for that run, never saved: the next normal run of the profile keeps them on", () => {
+    const { SMOKE_SETTINGS } = require('../src/main/main');
+    createStore(dir).set({ theme: 'dark' }); // the profile as the person left it
+    const before = fs.readFileSync(path.join(dir, 'settings.json'), 'utf8');
+
+    const smoke = createStore(dir, { overrides: SMOKE_SETTINGS });
+    for (const [key, value] of Object.entries(SMOKE_SETTINGS)) assert.equal(smoke.get()[key], value, key);
+    assert.equal(smoke.get().theme, 'dark', 'everything else comes from the file');
+    assert.equal(fs.readFileSync(path.join(dir, 'settings.json'), 'utf8'), before, 'reading does not write');
+
+    // A change to an overridden setting holds for this run only; other changes are saved as usual.
+    const seen = [];
+    smoke.on('change', (s, keys) => seen.push(keys));
+    assert.equal(smoke.set({ syncEnabled: true }).syncEnabled, true);
+    assert.deepEqual(seen, [['syncEnabled']]);
+    assert.equal(fs.readFileSync(path.join(dir, 'settings.json'), 'utf8'), before, 'the overridden setting is not written');
+    smoke.set({ theme: 'light', notifications: true });
+    const saved = JSON.parse(fs.readFileSync(path.join(dir, 'settings.json'), 'utf8'));
+    assert.equal(saved.theme, 'light');
+
+    // The next normal run of this profile.
+    const next = createStore(dir).get();
+    assert.equal(next.theme, 'light');
+    for (const key of Object.keys(SMOKE_SETTINGS)) assert.equal(next[key], true, `${key} is still on`);
+  });
 });
 
 describe('secrets', () => {
   test('are encrypted on disk with the injected functions and read back', () => {
     const store = createStore(dir, fakeCrypto);
-    assert.equal(store.getSecret('deviceToken'), null);
-    store.setSecret('deviceToken', 'gcd_abcdefghijklmnop');
-    assert.equal(store.getSecret('deviceToken'), 'gcd_abcdefghijklmnop');
+    assert.equal(store.getSecret('bnetToken'), null);
+    store.setSecret('bnetToken', 'gcd_abcdefghijklmnop');
+    assert.equal(store.getSecret('bnetToken'), 'gcd_abcdefghijklmnop');
     const raw = fs.readFileSync(path.join(dir, 'secrets.json'), 'utf8');
     assert.ok(!raw.includes('gcd_abcdefghijklmnop'), 'token must not be stored in plain text');
     const parsed = JSON.parse(raw);
-    assert.equal(parsed.deviceToken.e, 1);
-    assert.equal(Buffer.from(parsed.deviceToken.v, 'base64').toString().slice(0, 4), 'ENC:');
+    assert.equal(parsed.bnetToken.e, 1);
+    assert.equal(Buffer.from(parsed.bnetToken.v, 'base64').toString().slice(0, 4), 'ENC:');
     assert.equal(store.secretsEncrypted(), true);
     assert.equal(store.secretWarning, null);
 
     const again = createStore(dir, fakeCrypto);
-    assert.equal(again.getSecret('deviceToken'), 'gcd_abcdefghijklmnop');
+    assert.equal(again.getSecret('bnetToken'), 'gcd_abcdefghijklmnop');
   });
 
   test('setSecret(name, null) removes it', () => {
     const store = createStore(dir, fakeCrypto);
-    store.setSecret('deviceToken', 'gcd_abcdefghijklmnop');
-    store.setSecret('deviceToken', null);
-    assert.equal(store.getSecret('deviceToken'), null);
-    assert.equal(createStore(dir, fakeCrypto).getSecret('deviceToken'), null);
+    store.setSecret('bnetToken', 'gcd_abcdefghijklmnop');
+    store.setSecret('bnetToken', null);
+    assert.equal(store.getSecret('bnetToken'), null);
+    assert.equal(createStore(dir, fakeCrypto).getSecret('bnetToken'), null);
     assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir, 'secrets.json'), 'utf8')), {});
   });
 
   test('falls back to plain text with a warning when encryption is unavailable', () => {
     const store = createStore(dir, { ...fakeCrypto, isEncryptionAvailable: () => false });
-    store.setSecret('deviceToken', 'gcd_plainplainplain');
-    assert.equal(store.getSecret('deviceToken'), 'gcd_plainplainplain');
+    store.setSecret('bnetToken', 'gcd_plainplainplain');
+    assert.equal(store.getSecret('bnetToken'), 'gcd_plainplainplain');
     assert.match(store.secretWarning, /without encryption/);
     assert.equal(store.secretsEncrypted(), false);
     const parsed = JSON.parse(fs.readFileSync(path.join(dir, 'secrets.json'), 'utf8'));
-    assert.deepEqual(parsed.deviceToken, { e: 0, v: 'gcd_plainplainplain' });
-    assert.equal(createStore(dir).getSecret('deviceToken'), 'gcd_plainplainplain');
+    assert.deepEqual(parsed.bnetToken, { e: 0, v: 'gcd_plainplainplain' });
+    assert.equal(createStore(dir).getSecret('bnetToken'), 'gcd_plainplainplain');
   });
 
   test('falls back to plain text when encrypt() throws', () => {
     const store = createStore(dir, { encrypt: () => { throw new Error('no keyring'); }, decrypt: fakeCrypto.decrypt });
-    store.setSecret('deviceToken', 'gcd_throwsthrows');
-    assert.equal(store.getSecret('deviceToken'), 'gcd_throwsthrows');
+    store.setSecret('bnetToken', 'gcd_throwsthrows');
+    assert.equal(store.getSecret('bnetToken'), 'gcd_throwsthrows');
     assert.ok(store.secretWarning);
   });
 
   test('a secret that cannot be decrypted reads as missing and is reported', () => {
-    createStore(dir, fakeCrypto).setSecret('deviceToken', 'gcd_abcdefghijklmnop');
+    createStore(dir, fakeCrypto).setSecret('bnetToken', 'gcd_abcdefghijklmnop');
     const other = createStore(dir, { encrypt: fakeCrypto.encrypt, decrypt: () => { throw new Error('wrong user'); } });
-    assert.equal(other.getSecret('deviceToken'), null);
+    assert.equal(other.getSecret('bnetToken'), null);
     assert.ok(other.problems.some((p) => /could not be decrypted/.test(p)));
   });
 
   test('a corrupted secrets file means signed out, not a crash', () => {
     fs.writeFileSync(path.join(dir, 'secrets.json'), 'garbage');
     const store = createStore(dir, fakeCrypto);
-    assert.equal(store.getSecret('deviceToken'), null);
+    assert.equal(store.getSecret('bnetToken'), null);
     assert.ok(fs.readdirSync(dir).some((f) => f.startsWith('secrets.json.corrupt-')));
-    store.setSecret('deviceToken', 'gcd_abcdefghijklmnop');
-    assert.equal(createStore(dir, fakeCrypto).getSecret('deviceToken'), 'gcd_abcdefghijklmnop');
+    store.setSecret('bnetToken', 'gcd_abcdefghijklmnop');
+    assert.equal(createStore(dir, fakeCrypto).getSecret('bnetToken'), 'gcd_abcdefghijklmnop');
   });
 
   test('several secrets live side by side', () => {
     const store = createStore(dir, fakeCrypto);
-    store.setSecret('deviceToken', 'gcd_abcdefghijklmnop');
+    store.setSecret('bnetToken', 'gcd_abcdefghijklmnop');
     store.setSecret('me', JSON.stringify({ user: { battletag: 'A#1' } }));
     const again = createStore(dir, fakeCrypto);
-    assert.equal(again.getSecret('deviceToken'), 'gcd_abcdefghijklmnop');
+    assert.equal(again.getSecret('bnetToken'), 'gcd_abcdefghijklmnop');
     assert.equal(JSON.parse(again.getSecret('me')).user.battletag, 'A#1');
   });
 });
 
 describe('sanitizeSettingsPatch (settings from the renderer)', () => {
-  test('accepts valid values and normalises the server address', () => {
-    const out = sanitizeSettingsPatch({ serverUrl: ' https://Guild.Example.com/ ', theme: 'dark', syncEnabled: false, repoDir: null });
-    assert.deepEqual(out, { serverUrl: 'https://guild.example.com', theme: 'dark', syncEnabled: false, repoDir: null });
+  test('accepts valid values: theme, sync, the Discord webhook and the Battle.net region', () => {
+    const out = sanitizeSettingsPatch({ theme: 'dark', syncEnabled: false, repoDir: null, discordWebhook: ' https://discord.com/api/webhooks/1/abc ', bnetRegion: 'US' });
+    assert.deepEqual(out, { theme: 'dark', syncEnabled: false, repoDir: null, discordWebhook: 'https://discord.com/api/webhooks/1/abc', bnetRegion: 'us' });
+    assert.deepEqual(sanitizeSettingsPatch({ discordWebhook: '' }), { discordWebhook: null }, 'empty removes it');
+    assert.deepEqual(sanitizeSettingsPatch({ discordWebhook: null }), { discordWebhook: null });
+  });
+
+  test('the server address is gone: an old page sending it gets a plain error', () => {
+    assert.throws(() => sanitizeSettingsPatch({ serverUrl: 'https://guild.example.com' }), /"serverUrl" is not a setting Guild Camp knows about/);
+    assert.throws(() => sanitizeSettingsPatch({ lastEventId: 3 }), /not a setting/);
   });
 
   test('drops internal keys silently', () => {
-    assert.deepEqual(sanitizeSettingsPatch({ lastEventId: 99, windowBounds: { x: 1 }, onboarded: true }), { onboarded: true });
+    assert.deepEqual(sanitizeSettingsPatch({ windowBounds: { x: 1 }, onboarded: true }), { onboarded: true });
     assert.deepEqual(sanitizeSettingsPatch({ startupDefaulted: true, addonOptOut: ['C:\\WoW'], addonAutoInstall: false }), { addonAutoInstall: false });
     assert.throws(() => sanitizeSettingsPatch({ addonAutoInstall: 1 }), /on or off/);
   });
@@ -221,15 +257,14 @@ describe('sanitizeSettingsPatch (settings from the renderer)', () => {
     assert.throws(() => sanitizeSettingsPatch([1]), /object/);
   });
 
-  test('server address rules', () => {
-    assert.equal(normaliseServerUrl('guild.example.com'), 'https://guild.example.com');
-    assert.equal(normaliseServerUrl('http://localhost:3000/'), 'http://localhost:3000');
-    assert.equal(normaliseServerUrl('http://192.168.1.20:3000'), 'http://192.168.1.20:3000');
-    assert.equal(normaliseServerUrl('https://example.com/guild/'), 'https://example.com/guild');
-    assert.throws(() => normaliseServerUrl('http://guild.example.com'), /https/);
-    assert.throws(() => normaliseServerUrl('ftp://x.com'), /https/);
-    assert.throws(() => normaliseServerUrl('https://user:pw@x.com'), /user name/);
-    assert.throws(() => normaliseServerUrl(''), /Enter the guild server/);
+  test('Discord webhook and region rules', () => {
+    assert.equal(cleanWebhook('https://discordapp.com/api/webhooks/123/x-y_z'), 'https://discordapp.com/api/webhooks/123/x-y_z');
+    for (const bad of ['http://discord.com/api/webhooks/1/a', 'https://example.com/api/webhooks/1/a', 'https://discord.com/channels/1', 'https://discord.com/api/webhooks/' + 'a'.repeat(300)]) {
+      assert.throws(() => cleanWebhook(bad), /isn't a Discord webhook address/, bad);
+    }
+    assert.throws(() => cleanWebhook(42), /web address/);
+    assert.throws(() => sanitizeSettingsPatch({ bnetRegion: 'cn' }), /Battle\.net region/);
+    assert.throws(() => sanitizeSettingsPatch({ bnetRegion: 1 }), /Battle\.net region/);
   });
 
   test('cleans the extra game folder list', () => {

@@ -1,14 +1,16 @@
-// Raids: what's coming up (one card per raid, PvP premade or guild event), past raids, and the officers'
-// "Schedule" form. Shapes: docs/api/raids.md. The labels and small helpers here are shared with raid.js,
-// raid-loot.js and loot.js.
+// Raids: what's coming up (one card per raid, PvP premade or guild event), past raids, the officers'
+// "Schedule" form, and "Export to calendar" (an .ics file). Raids go to guildmates through the addon.
+// Shapes: docs/api/raids.md. The labels and small helpers here are shared with raid.js, raid-loot.js and loot.js.
 import { html, useState, useEffect } from '../lib/html.js';
 import { api, useApi, useAction } from '../lib/api.js';
+import { gc } from '../lib/gc.js';
 import { useSession } from '../lib/session.js';
 import { navigate, setQuery, Link } from '../lib/router.js';
 import { fromLocalInput, parseTime, plural } from '../lib/format.js';
 import {
-  Page, Card, Table, Button, Modal, Input, Select, Pill, Progress, LocalTime, Empty, Async, useNow,
+  Page, Card, Table, Button, Modal, Input, Select, Pill, Progress, LocalTime, Empty, Async, useNow, toast,
 } from '../components/index.js';
+import { ShareHint } from '../components/ShareHint.js';
 
 // ---------- shared labels and helpers ----------
 
@@ -20,6 +22,8 @@ export const ROLE_LABEL = { tank: 'Tank', healer: 'Healer', dps: 'Damage' };
 export const ROLE_PLURAL = { tank: 'Tanks', healer: 'Healers', dps: 'Damage' };
 export const ROLES = ['tank', 'healer', 'dps'];
 export const AWARD_LABEL = { sr: 'Reserve', ms: 'Main spec', os: 'Off spec', free: 'Free roll' };
+// Discord posts go out when the game confirms the raid reached the guild, not when it is saved here.
+export const SCHEDULE_DISCORD_HINT = 'Your Discord channel gets a post once it goes out, and a reminder an hour before.';
 
 // [pill kind, label] for a raid's state. Only raids have reserves; other kinds just open and close.
 export function raidState(raid) {
@@ -103,9 +107,17 @@ export default function RaidsPage({ query = {} }) {
   const [scheduling, setScheduling] = useState(query.schedule === '1');
   useEffect(() => { if (query.schedule === '1') setScheduling(true); }, [query.schedule]);
   const stopScheduling = () => { setScheduling(false); if (query.schedule) setQuery({ schedule: undefined }); };
-  const schedule = isOfficer ? html`<${Button} variant="primary" icon="plus" onClick=${() => setScheduling(true)}>Schedule<//>` : null;
+  const exporter = useAction(() => gc.calendar.export());
+  const exportIcs = async () => {
+    const r = await exporter.run();
+    if (r.ok && r.value) toast('Calendar file saved. Open it to add the raids to your calendar.', 'ok');
+  };
+  const actions = html`
+    <${Button} variant="ghost" icon="download" busy=${exporter.busy} onClick=${exportIcs}
+      title="Save the raids as a calendar file for Outlook, Google or Apple Calendar">Export to calendar<//>
+    ${isOfficer ? html`<${Button} variant="primary" icon="plus" onClick=${() => setScheduling(true)}>Schedule<//>` : null}`;
 
-  return html`<${Page} title="Raids" actions=${schedule}
+  return html`<${Page} title="Raids" actions=${actions}
       lede="Raids, PvP premades and guild events. Times are shown in your own time zone.">
     <${Async} q=${q} loadingLabel="Loading raids…">${(data) => html`
       <section class="stack" aria-labelledby="raids-upcoming">
@@ -114,7 +126,7 @@ export default function RaidsPage({ query = {} }) {
           ? html`<div class="raids-grid">${data.upcoming.map((r) => html`<${RaidCard} key=${r.id} raid=${r} />`)}</div>`
           : html`<${Empty} icon="raids" title="Nothing scheduled yet."
               action=${isOfficer ? html`<${Button} variant="primary" icon="plus" onClick=${() => setScheduling(true)}>Schedule a raid<//>` : null}>
-              ${isOfficer ? 'Schedule a raid, PvP premade or guild event. Discord gets a post straight away.' : 'Officers schedule raids here. You will get a notification when one is posted.'}
+              ${isOfficer ? 'Schedule a raid, PvP premade or guild event.' : 'Officers schedule raids. New ones show up here after you log in to WoW or type /reload.'}
             <//>`}
       </section>
       <${PastRaids} rows=${data.past} />
@@ -212,7 +224,7 @@ function ScheduleModal({ open, instances = [], onClose }) {
     const errs = {};
     if (!f.title.trim()) errs.title = 'Give it a name.';
     if (!f.instance.trim()) errs.instance = 'Say where it is.';
-    // The date and time are in this computer's time zone; the server stores UTC.
+    // The date and time are in this computer's time zone; Guild Camp stores UTC.
     const startsAt = f.date && f.time ? fromLocalInput(`${f.date}T${f.time}`) : null;
     if (!startsAt) errs.when = 'Pick a date and a start time.';
     setErrors(errs);
@@ -251,7 +263,8 @@ function ScheduleModal({ open, instances = [], onClose }) {
           : null}
         <${Input} fieldClass="wide" label="Notes" value=${f.notes} onValue=${set('notes')} maxLength="300" placeholder="Bring fire resistance" />
       </div>
-      <p class="hint">Everyone sees the time in their own time zone. Discord gets a post straight away and a reminder an hour before.</p>
+      <p class="hint mb-0">Everyone sees the time in their own time zone.</p>
+      <${ShareHint} officer discord=${SCHEDULE_DISCORD_HINT} />
       <button type="submit" hidden></button>
     </form>
   <//>`;

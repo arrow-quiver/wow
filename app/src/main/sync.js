@@ -1,26 +1,20 @@
 'use strict';
-// Background sync engine: the old companion's watch → upload → inbox loop, inside the app.
+// Background sync engine: the old companion's watch → upload → inbox loop, inside the app. It talks to
+// the local core (src/core) through api.js; Battle.net sign-in is not needed for any of it.
 //
-//   const sync = createSync({ api, store, log, wow, appVersion });
+//   const sync = createSync({ api, store, log, wow, appVersion, coreEvents });
 //   sync.start()          start watching; resolves (never rejects) after the first full sync.
-//                         main.js calls it on sign-in and stop() on sign-out / quit.
+//                         main.js calls it at startup and stop() on quit.
 //   sync.stop()
 //   await sync.syncNow()  upload every SavedVariables file now and rewrite the inbox → status.
-//                         Rejects with a plain sentence when signed out, no game folder was found,
-//                         or an upload failed.
+//                         Rejects with a plain sentence when no game folder was found or an upload failed.
 //   sync.setEnabled(bool) background sync on/off (saved as settings.syncEnabled) → status
-//   sync.clearNoGuild()   forget "the server has no guild for you yet" (main.js calls it once the
-//                         member is in a guild) so waiting files upload at the next check → status
+//   sync.outboxChanged()  a change was queued for the addon to share: the inbox is rewritten within 2 s
+//                         (debounced). Called on the core's 'outbox' event when coreEvents (core.emitter) is given.
 //   sync.status()         → see status() below (ARCHITECTURE.md "sync.status")
 //   events: 'status' (status; only when something changed)
 //           'log' (message, level)              every line this engine logs
-//           'uploaded' (serverResult, { file, account, install, label })
-//           'joined' (joined, where)            an upload put this member into a guild:
-//                                               joined = { guild: { id, name, faction }, role, via, character }
-//           'no-guild' ({ reason, autoJoin, file?, account?, install?, label? })
-//                                               the server had no guild for this member (409 NO_GUILD_MATCH,
-//                                               or "Join a guild first." from an older server). autoJoin is the
-//                                               server's match result when the reply carried it, else null.
+//           'uploaded' (coreResult, { file, account, install, label })
 //
 // How it works
 //  - Every 4 s it checks the modification time of WTF/Account/*/SavedVariables/WowGuild.lua in every
@@ -31,14 +25,21 @@
 //  - After an upload it saves the guild news (GET /api/inbox) for the addon in
 //    Interface/AddOns/WowGuild_Inbox: a tiny addon the WowGuild addon loads first, so the addon's own
 //    folder stays exactly as released. The news is refreshed every 5 minutes as well.
-//  - When the server says a Coach answer is on its way (coachPending), it checks the inbox every
+//  - When the app queues a change for the guild (core 'outbox' event), the inbox is rewritten within 2 s,
+//    whether or not the game is running, so the addon sends it at the next login or /reload.
+//  - The game finds new addon folders only when it starts. When WowGuild_Inbox is made while the game may be running,
+//    that game session never loads it, also not after a /reload: status().restartNeeded says so (per game folder in
+//    restartFolders) until Guild Camp sees that game session end: the game closed, or every game process from then
+//    gone (a quick restart between two checks). It is kept in settings.inboxRestart, so an app restart keeps it. A wait
+//    Guild Camp can't follow (no process ids) ends after restartWaitMaxMs (24 h), and one whose news folder was
+//    removed (the addon uninstalled from that game folder) ends at once.
+//  - Each upload says which file it came from (WowGuildDB._source = { account, install }), so the core can
+//    tell when one account's shared store is far behind and needs a seed (docs/SHARING.md §9).
+//  - When the core says a Coach answer is on its way (coachPending), it checks the inbox every
 //    6 s for up to 2 minutes and saves the answer as soon as it is there.
 //  - A failed upload is retried per file with exponential backoff: 5 s, 10 s, 20 s ... up to 5 min.
-//  - Signed in but not in a guild yet: the server tries to match the uploaded characters to its guild.
-//    When it joins the member, the reply says so ('joined' event) and the upload counts as normal.
-//    When it can't (409 NO_GUILD_MATCH), nothing is stored: the state is 'no-guild', lastError is the
-//    server's plain reason, and the file is tried again when the game saves it again or after 60 s.
-//    That is waiting, not failing: no backoff and no "Couldn't upload" lines on every try.
+//  - None of the player's characters is in a guild yet: the core stores nothing and says so; that is
+//    logged once and is not a failure. The next save from the game goes up as usual.
 //  - Game folders are looked for again every 60 s and whenever settings.extraWowFolders changes.
 //  - Uploads never overlap.
 //
@@ -66,8 +67,12 @@ const DEFAULTS = Object.freeze({
   coachTimeoutMs: 2 * 60 * 1000, // ... for this long
   retryBaseMs: 5000, // first retry after a failed upload
   retryMaxMs: 5 * 60 * 1000, // longest wait between retries
-  noGuildRetryMs: 60 * 1000, // try again this long after the server had no guild for this member
   uploadTimeoutMs: 120 * 1000, // big guilds send a lot
+  outboxDelayMs: 1000, // rewrite the inbox this long after a change was queued (well within 2 s)
+  gameCheckMs: 30 * 1000, // while sharing waits for a game restart: how often to look whether that game session ended
+  // A wait for a game restart that Guild Camp can't follow (it can't read the game's process ids, or had none when the
+  // folder was made) ends after this long: the game was surely restarted by then, and the wording would stay for good.
+  restartWaitMaxMs: 24 * 60 * 60 * 1000,
 });
 
 const HISTORY_SIZE = 20;
@@ -135,14 +140,18 @@ function writeIfChanged(file, data) {
 
 /**
  * Writes Interface/AddOns/WowGuild_Inbox/{WowGuild_Inbox.toc, Inbox.lua}. Each file is only
- * rewritten when its content changed. → { dir, toc: changed?, lua: changed? }
+ * rewritten when its content changed. → { dir, toc: changed?, lua: changed?, created }
+ * created: the news addon wasn't there before (no folder, or no .toc in it). The game finds new addon folders
+ * only when it starts, so a running game loads it after a restart, not after a /reload.
  */
 function writeInboxFiles(addonsDir, inbox, appVersion) {
   const dir = path.join(addonsDir, INBOX_ADDON);
+  const tocFile = path.join(dir, `${INBOX_ADDON}.toc`);
+  const created = !fs.existsSync(tocFile);
   fs.mkdirSync(dir, { recursive: true });
-  const toc = writeIfChanged(path.join(dir, `${INBOX_ADDON}.toc`), Buffer.from(inboxToc(addonsDir, appVersion), 'utf8'));
+  const toc = writeIfChanged(tocFile, Buffer.from(inboxToc(addonsDir, appVersion), 'utf8'));
   const lua = writeIfChanged(path.join(dir, 'Inbox.lua'), Buffer.from(luaAssignment('WowGuildInbox', inbox), 'utf8'));
-  return { dir, toc, lua };
+  return { dir, toc, lua, created };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -153,22 +162,6 @@ const plain = (err) => {
 };
 
 const userError = (message) => Object.assign(new Error(message), { status: 400 });
-
-/**
- * Is this failed upload the server saying "you're not in a guild (yet)"? → { reason, autoJoin } | null.
- * New servers answer 409 { error, code: 'NO_GUILD_MATCH', autoJoin }; older ones 403 "Join a guild first.".
- * api.js puts code and autoJoin on the ApiError (and the whole reply on err.body), so the 'no-guild' event
- * carries the server's match result and main.js records it instead of asking POST /api/guild/auto-join
- * again. Without one (an older server, or the inbox's 403) autoJoin is null and main.js asks.
- */
-function noGuildReply(err) {
-  if (!err || typeof err !== 'object') return null;
-  const body = [err.body, err.data].find((b) => b && typeof b === 'object') || {};
-  const code = err.code || body.code || null;
-  if (code !== 'NO_GUILD_MATCH' && err.status !== 409 && err.status !== 403) return null;
-  const autoJoin = [err.autoJoin, body.autoJoin].find((r) => r && typeof r === 'object' && !Array.isArray(r)) || null;
-  return { reason: plain(err), autoJoin };
-}
 
 function mtimeOf(file) {
   try { return fs.statSync(file).mtimeMs; } catch { return null; }
@@ -183,14 +176,15 @@ const noopLog = { info() {}, warn() {}, error() {} };
 /**
  * @param {object} deps
  * @param {object} deps.api        createApi() result: request(method, path, body, opts)
- * @param {object} [deps.store]    createStore() result (settings + device token)
+ * @param {object} [deps.store]    createStore() result (settings)
  * @param {object} [deps.log]      logger with info/warn/error
  * @param {object} deps.wow        { findInstalls } (the wow.js module)
  * @param {string} deps.appVersion written into the inbox .toc
  * Test overrides (all optional): now() → ms, sleep(ms) → Promise, setTimeout/clearTimeout (the 4 s
- * check timer), scanDefaults (false: only settings.extraWowFolders), and any key of DEFAULTS.
+ * check timer), scanDefaults (false: only settings.extraWowFolders), isWowRunning() → true|false|null,
+ * gameProcessIds() → number[]|null (the game's process ids), and any key of DEFAULTS.
  */
-function createSync({ api, store, log, wow, appVersion, ...opts } = {}) {
+function createSync({ api, store, log, wow, appVersion, coreEvents, ...opts } = {}) {
   const o = { ...DEFAULTS };
   for (const key of Object.keys(DEFAULTS)) {
     if (Number.isFinite(opts[key]) && opts[key] >= 0) o[key] = opts[key];
@@ -211,6 +205,26 @@ function createSync({ api, store, log, wow, appVersion, ...opts } = {}) {
   const setTimer = typeof opts.setTimeout === 'function' ? opts.setTimeout : setTimeout;
   const clearTimer = typeof opts.clearTimeout === 'function' ? opts.clearTimeout : clearTimeout;
   const scanDefaults = opts.scanDefaults !== false;
+  // The game right now: { running: true|false|null (unknown), ids: its process ids, or null when not known }. Only for
+  // telling when a news folder needs a game restart. Asked in this order: the test overrides gameProcessIds and
+  // isWowRunning, then wow.gameProcessIds, then wow.isWowRunning; without any, the game counts as closed. A wow object
+  // whose isWowRunning was replaced (tests, tools) is asked through that, never the real process list.
+  const fromIds = (ids) => (Array.isArray(ids)
+    ? { running: ids.length > 0, ids: ids.filter((id) => Number.isInteger(id)) }
+    : { running: null, ids: null });
+  const fromBool = (v) => ({ running: v === true || v === false ? v : null, ids: null });
+  const gameNow = async () => {
+    try {
+      if (typeof opts.gameProcessIds === 'function') return fromIds(await opts.gameProcessIds());
+      if (typeof opts.isWowRunning === 'function') return fromBool(await opts.isWowRunning());
+      const realCheck = !wow || typeof wow.isWowRunning !== 'function' || wow.isWowRunning === wowHelpers.isWowRunning;
+      if (wow && typeof wow.gameProcessIds === 'function' && realCheck) return fromIds(await wow.gameProcessIds());
+      if (wow && typeof wow.isWowRunning === 'function') return fromBool(await wow.isWowRunning());
+      return { running: false, ids: [] };
+    } catch {
+      return { running: null, ids: null };
+    }
+  };
   const logger = log || noopLog;
   const emitter = new EventEmitter();
   const keyOf = (p) => wowHelpers.pathKey(p);
@@ -238,7 +252,6 @@ function createSync({ api, store, log, wow, appVersion, ...opts } = {}) {
   const records = new Map(); // file key → { lastUploadAt, lastError }
   const auctionatorSent = new Map(); // Auctionator.lua key → mtimeMs included in a successful upload
   const inboxErrors = new Map(); // install key → message
-  const guildWaits = new Map(); // file key → { mtime, retryAt } after the server had no guild for this member
   const recent = []; // newest first, HISTORY_SIZE entries
 
   let lastSyncAt = null;
@@ -246,7 +259,9 @@ function createSync({ api, store, log, wow, appVersion, ...opts } = {}) {
   let lastError = null;
   let lastEmitted = null;
   let appNagged = false;
-  let noGuild = null; // { reason, autoJoin, since } while the server has no guild for this member
+  let guildNote = null; // the core's last "none of your characters is in a guild yet" message (logged once)
+  let restartMemo = null; // settings.inboxRestart kept here when there is no store, or its last save failed
+  let lastGameCheckAt = -Infinity;
 
   function safeEmit(event, ...args) {
     try { emitter.emit(event, ...args); } catch (err) { logger.warn(`A "${event}" listener failed: ${err.message}`); }
@@ -257,43 +272,13 @@ function createSync({ api, store, log, wow, appVersion, ...opts } = {}) {
     safeEmit('log', message, level);
   }
 
-  const hasToken = () => (store ? Boolean(store.getSecret('deviceToken')) : true);
-
   function remember(entry) {
     recent.unshift(entry);
     if (recent.length > HISTORY_SIZE) recent.length = HISTORY_SIZE;
   }
 
   function clearProblemIfSolved() {
-    if (!failures.size && !inboxErrors.size) lastError = noGuild ? noGuild.reason : null;
-  }
-
-  // ---- not in a guild yet --------------------------------------------------------------------
-
-  /** The server has no guild for this member yet. Logged once per reason; the event fires every time. */
-  function enterNoGuild(info, where = {}) {
-    const fresh = !noGuild || noGuild.reason !== info.reason;
-    noGuild = { reason: info.reason, autoJoin: info.autoJoin || null, since: fresh ? iso(now()) : noGuild.since };
-    clearProblemIfSolved();
-    if (fresh) {
-      const message = `Waiting to match you to a guild: ${info.reason} Guild Camp tries again when the game saves, and every minute.`;
-      say('info', message);
-      remember({ at: iso(now()), kind: 'guild', ok: false, message, ...where });
-    }
-    safeEmit('no-guild', { reason: info.reason, autoJoin: info.autoJoin || null, ...where });
-  }
-
-  /** In a guild now: files that were waiting go up at the next check. */
-  function leaveNoGuild() {
-    if (!noGuild && !guildWaits.size) return false;
-    noGuild = null;
-    for (const key of guildWaits.keys()) {
-      const rec = records.get(key);
-      if (rec && rec.lastError) records.set(key, { ...rec, lastError: null });
-    }
-    guildWaits.clear();
-    clearProblemIfSolved();
-    return true;
+    if (!failures.size && !inboxErrors.size) lastError = null;
   }
 
   // ---- installs ------------------------------------------------------------------------------
@@ -330,7 +315,6 @@ function createSync({ api, store, log, wow, appVersion, ...opts } = {}) {
     fileList = out;
     // Retry state for files that are gone is meaningless now.
     for (const key of [...failures.keys()]) if (!keys.has(key)) failures.delete(key);
-    for (const key of [...guildWaits.keys()]) if (!keys.has(key)) guildWaits.delete(key);
     clearProblemIfSolved();
   }
 
@@ -373,24 +357,24 @@ function createSync({ api, store, log, wow, appVersion, ...opts } = {}) {
   // ---- status --------------------------------------------------------------------------------
 
   function state() {
-    if (!hasToken()) return 'signed-out';
     if (working > 0) return 'syncing';
     if (!enabled) return 'off';
     if (!currentInstalls().length) return 'no-game';
-    if (noGuild) return 'no-guild';
     if (failures.size || inboxErrors.size) return 'error';
     return 'idle';
   }
 
   /**
    * {
-   *   enabled, running, state: 'off'|'idle'|'syncing'|'error'|'signed-out'|'no-game'|'no-guild',
+   *   enabled, running, state: 'off'|'idle'|'syncing'|'error'|'no-game',
    *   lastSyncAt, lastResult: { characters, roster, recipes, ctas, inventory, bank, prices,
-   *     coachPending, account, label }|null, lastError,
-   *   noGuild: { reason, since }|null   (state 'no-guild': the server has no guild for this member yet;
-   *                                      lastError is the same reason)
+   *     coachPending, account, label, guild: { name, role }|null }|null, lastError,
+   *   guildNote: string|null   (the core stored nothing because no character is in a guild yet)
    *   files: [{ file, account, install (game folder), label, flavor, lastUploadAt, lastError, nextRetryAt }],
    *   nextRetryAt, installCount, coachWaiting,
+   *   restartNeeded: boolean   (a game folder's news folder was made during the game session still running: what the
+   *                             app hands the addon, changes for the guild included, loads after a game restart only)
+   *   restartFolders: [{ install (game folder), label, since }]   (the folders that wait for it)
    *   recent: [{ at, kind: 'upload'|'inbox'|'coach'|'guild', ok, message, file?, account?, install?, label?, result? }]
    * }   (times are ISO strings)
    */
@@ -399,7 +383,12 @@ function createSync({ api, store, log, wow, appVersion, ...opts } = {}) {
     const s = state();
     let next = null;
     for (const f of failures.values()) if (next === null || f.retryAt < next) next = f.retryAt;
-    for (const w of guildWaits.values()) if (next === null || w.retryAt < next) next = w.retryAt;
+    const waits = restartWaits();
+    const restartFolders = list.filter((i) => waits[keyOf(i.dir)] && hasNewsFolder(i)).map((i) => ({
+      install: i.dir,
+      label: i.label || wowHelpers.flavorLabel(i.flavor),
+      since: typeof waits[keyOf(i.dir)].at === 'string' ? waits[keyOf(i.dir)].at : null,
+    }));
     return {
       enabled,
       running,
@@ -407,14 +396,11 @@ function createSync({ api, store, log, wow, appVersion, ...opts } = {}) {
       lastSyncAt,
       lastResult: lastResult ? { ...lastResult } : null,
       lastError,
-      noGuild: noGuild ? { reason: noGuild.reason, since: noGuild.since } : null,
+      guildNote,
       files: fileList.map((f) => {
         const rec = records.get(f.key);
         const fail = failures.get(f.key);
-        const wait = guildWaits.get(f.key);
-        let retryAt = null;
-        if (fail) retryAt = fail.retryAt;
-        else if (wait) retryAt = wait.retryAt;
+        const retryAt = fail ? fail.retryAt : null;
         return {
           file: f.file,
           account: f.account,
@@ -422,13 +408,15 @@ function createSync({ api, store, log, wow, appVersion, ...opts } = {}) {
           label: f.label,
           flavor: f.flavor,
           lastUploadAt: rec ? rec.lastUploadAt : null,
-          lastError: fail ? fail.error : (wait && noGuild ? noGuild.reason : null),
+          lastError: fail ? fail.error : null,
           nextRetryAt: retryAt === null ? null : iso(retryAt),
         };
       }),
       nextRetryAt: next === null ? null : iso(next),
       installCount: list.length,
       coachWaiting: Boolean(coach),
+      restartNeeded: restartFolders.length > 0,
+      restartFolders,
       recent: recent.map((r) => ({ ...r, result: r.result ? { ...r.result } : undefined })),
     };
   }
@@ -515,28 +503,31 @@ function createSync({ api, store, log, wow, appVersion, ...opts } = {}) {
         say('info', `No Guild Camp data for ${entry.account} yet. Log in to a character, then log out or type /reload once.`);
         seen.set(entry.key, mtime);
         failures.delete(entry.key);
-        guildWaits.delete(entry.key);
         clearProblemIfSolved();
         return { uploaded: false };
       }
       const auc = auctionatorPrices(entry.file);
       if (auc) db.prices = auc.prices;
+      db._source = { account: entry.account, install: entry.install };
       const result = (await api.request('POST', '/api/sync', db, { timeout: o.uploadTimeoutMs })) || {};
       if (auc) auctionatorSent.set(auc.key, auc.mtime);
 
       const at = iso(now());
       seen.set(entry.key, mtime);
       failures.delete(entry.key);
-      guildWaits.delete(entry.key);
       records.set(entry.key, { lastUploadAt: at, lastError: null });
-      // An upload went through, so this member is in a guild now. When this very upload put them
-      // there, say so; files that were waiting for a guild go up straight after.
-      const joined = result.joined && typeof result.joined === 'object' && result.joined.guild ? result.joined : null;
-      leaveNoGuild();
-      if (joined) {
-        const who = joined.character ? ` (matched ${joined.character})` : '';
-        say('info', `You're in ${joined.guild.name || 'the guild'}${who}. Guild Camp joined you automatically.`);
-        remember({ at, kind: 'guild', ok: true, message: `Joined ${joined.guild.name || 'the guild'}${who}.`, ...where });
+      // No character in a guild yet: nothing was stored. Say why once; it is not a failure.
+      const note = result.noGuild && typeof result.message === 'string' ? result.message : null;
+      if (note && note !== guildNote) {
+        say('info', note);
+        remember({ at, kind: 'guild', ok: false, message: note, ...where });
+      }
+      guildNote = note;
+      const guild = result.guild && typeof result.guild === 'object' ? result.guild : null;
+      if (guild && result.switched && result.switched.created) {
+        const message = `Guild Camp set up ${guild.name || 'your guild'}.`;
+        say('info', message);
+        remember({ at, kind: 'guild', ok: true, message, ...where });
       }
       lastSyncAt = at;
       lastResult = {
@@ -550,24 +541,18 @@ function createSync({ api, store, log, wow, appVersion, ...opts } = {}) {
         coachPending: Number(result.coachPending) || 0,
         account: entry.account,
         label: entry.label,
+        guild: guild ? { name: guild.name || null, role: guild.role || null } : null,
       };
       clearProblemIfSolved();
-      const message = `${uploadSummary(result)}${multi ? ` (${entry.account}, ${entry.label})` : ''}.`;
-      say('info', message);
-      remember({ at, kind: 'upload', ok: true, message, ...where, result: { ...lastResult } });
+      if (!note) {
+        const message = `${uploadSummary(result)}${multi ? ` (${entry.account}, ${entry.label})` : ''}.`;
+        say('info', message);
+        remember({ at, kind: 'upload', ok: true, message, ...where, result: { ...lastResult } });
+      }
       nagAboutApp(result.latest);
-      if (joined) safeEmit('joined', { guild: { ...joined.guild }, role: joined.role || null, via: joined.via || null, character: joined.character || null }, where);
       safeEmit('uploaded', result, where);
       return { uploaded: true, result };
     } catch (err) {
-      const waiting = noGuildReply(err);
-      if (waiting) {
-        // Not stored on the server, but not a failure either: wait for the next save or a minute.
-        guildWaits.set(entry.key, { mtime, retryAt: now() + o.noGuildRetryMs });
-        failures.delete(entry.key);
-        enterNoGuild(waiting, where);
-        return { uploaded: false, noGuild: true };
-      }
       const prev = failures.get(entry.key);
       const count = (prev ? prev.count : 0) + 1;
       const wait = retryDelay(count, o.retryBaseMs, o.retryMaxMs);
@@ -586,6 +571,66 @@ function createSync({ api, store, log, wow, appVersion, ...opts } = {}) {
 
   // ---- inbox ---------------------------------------------------------------------------------
 
+  // News folders made while the game may have been running: settings.inboxRestart, { [install key]: { dir, at, pids } }
+  // (pids: the game's process ids then, or null when unknown). That game session never loads them, also not after a
+  // /reload, so sharing waits for a game restart. Kept in settings, so an app restart in between keeps it.
+  function restartWaits() {
+    const v = restartMemo !== null || !store ? restartMemo : store.get().inboxRestart;
+    return v && typeof v === 'object' && !Array.isArray(v) ? v : {};
+  }
+
+  function saveRestartWaits(next) {
+    if (store) {
+      try {
+        store.set({ inboxRestart: next });
+        restartMemo = null;
+        return;
+      } catch (err) {
+        // A settings file that can't be written never stops the news itself from being saved, and the wait is kept
+        // in memory for this run, so the screens still say to restart the game.
+        logger.warn(`Couldn't save the settings: ${plain(err)}`);
+      }
+    }
+    restartMemo = next;
+  }
+
+  // A game folder whose news folder is there (an uninstall removes it: then nothing waits to be loaded).
+  function hasNewsFolder(install) {
+    return isDir(path.join(addonsDirOf(install), INBOX_ADDON));
+  }
+
+  // Drops the folders whose game session has ended: the game is closed, or none of the game processes running when the
+  // folder was made is left (the game was restarted between two checks). Unknown stays as it is, for up to
+  // restartWaitMaxMs. A folder whose news folder is gone (the addon was uninstalled there) no longer waits.
+  function forgetEndedSessions(game) {
+    const waits = restartWaits();
+    const known = new Map(currentInstalls().map((i) => [keyOf(i.dir), i]));
+    let next = null;
+    for (const [key, w] of Object.entries(waits)) {
+      const pids = w && Array.isArray(w.pids) ? w.pids : null;
+      const followed = game.running === true && Array.isArray(game.ids) && pids && pids.length > 0;
+      const made = Date.parse(w && w.at);
+      const age = Number.isFinite(made) ? now() - made : Infinity;
+      const ended = game.running === false
+        || (followed && !pids.some((id) => game.ids.includes(id)))
+        || (!followed && age >= o.restartWaitMaxMs)
+        || (known.has(key) && !hasNewsFolder(known.get(key)));
+      if (ended) {
+        next = next || { ...waits };
+        delete next[key];
+      }
+    }
+    if (next) saveRestartWaits(next);
+  }
+
+  /** While a folder waits for a game restart: looks at the game at most every gameCheckMs (force: now). */
+  async function checkGameSession({ force = false } = {}) {
+    if (!Object.keys(restartWaits()).length) return;
+    if (!force && now() - lastGameCheckAt < o.gameCheckMs) return;
+    lastGameCheckAt = now();
+    forgetEndedSessions(await gameNow());
+  }
+
   /**
    * Saves the guild news into every given install that has the addon. Fetches GET /api/inbox once
    * unless `inbox` is given. → number of installs written.
@@ -602,25 +647,17 @@ function createSync({ api, store, log, wow, appVersion, ...opts } = {}) {
         try {
           data = await api.request('GET', '/api/inbox');
         } catch (err) {
-          // Not in a guild yet: there is no news, and that is not a sync problem.
-          if (err && err.status === 403) {
-            for (const t of targets) inboxErrors.delete(keyOf(t.dir));
-            if (!noGuild) enterNoGuild({ reason: plain(err), autoJoin: null }); // keep the server's better reason
-            return 0;
-          }
           const error = plain(err);
           for (const t of targets) inboxErrors.set(keyOf(t.dir), error);
           lastError = error;
-          const message = `Couldn't get the guild news from the server: ${error}`;
+          const message = `Couldn't put together the guild news for the addon: ${error}`;
           say('warn', message);
           remember({ at: iso(now()), kind: 'inbox', ok: false, message });
           return 0;
         }
       }
-      // News only comes for guild members, so the "no guild yet" wait is over.
-      if (!inbox) leaveNoGuild();
       if (!data || typeof data !== 'object' || Array.isArray(data)) {
-        const message = 'The guild server sent news Guild Camp could not read.';
+        const message = 'Guild Camp could not read the guild news it put together.';
         lastError = message;
         for (const t of targets) inboxErrors.set(keyOf(t.dir), message);
         say('warn', message);
@@ -628,12 +665,16 @@ function createSync({ api, store, log, wow, appVersion, ...opts } = {}) {
         return 0;
       }
       let written = 0;
+      const wrote = []; // install keys written now
+      const made = []; // { key, dir } of news folders made now
       for (const t of targets) {
         const label = t.label || wowHelpers.flavorLabel(t.flavor);
         try {
-          writeInboxFiles(addonsDirOf(t), data, appVersion);
-          inboxErrors.delete(keyOf(t.dir));
+          const key = keyOf(t.dir);
+          if (writeInboxFiles(addonsDirOf(t), data, appVersion).created) made.push({ key, dir: t.dir });
+          inboxErrors.delete(key);
           written += 1;
+          wrote.push(key);
         } catch (err) {
           const error = plain(err);
           inboxErrors.set(keyOf(t.dir), error);
@@ -644,16 +685,52 @@ function createSync({ api, store, log, wow, appVersion, ...opts } = {}) {
         }
       }
       clearProblemIfSolved();
-      if (written && announce) say('info', 'Guild news saved for the addon. It shows after your next /reload.');
+      // A news folder made while the game may be running: only a game restart loads it, also after a /reload later in
+      // that game session. It waits for a restart until Guild Camp sees that game session end.
+      const before = restartWaits();
+      if (made.length || wrote.some((k) => before[k])) {
+        const game = await gameNow();
+        lastGameCheckAt = now();
+        forgetEndedSessions(game);
+        if (made.length && game.running !== false) {
+          const next = { ...restartWaits() };
+          const pids = Array.isArray(game.ids) && game.ids.length ? game.ids : null;
+          for (const m of made) next[m.key] = { dir: m.dir, at: iso(now()), pids };
+          saveRestartWaits(next);
+        }
+      }
+      const waits = restartWaits();
+      const restart = wrote.some((k) => waits[k]) && (made.length > 0 || announce);
+      if (restart) say('info', "Guild news saved for the addon. It shows after you restart World of Warcraft. A /reload isn't enough the first time.");
+      else if (written && announce) say('info', 'Guild news saved for the addon. It shows after your next /reload.');
       return written;
     } finally {
       working -= 1;
     }
   }
 
+  // ---- outbox --------------------------------------------------------------------------------
+
+  // A change queued for the guild: rewrite every inbox soon (several changes in a row: one rewrite).
+  let outboxTimer = null;
+  function outboxChanged() {
+    if (outboxTimer) return;
+    outboxTimer = setTimer(async () => {
+      outboxTimer = null;
+      if (!enabled) return; // sync is off: the next start writes the inbox anyway
+      try {
+        await exclusive(() => writeInboxes(currentInstalls()));
+      } catch (err) {
+        say('warn', `Couldn't save your guild changes for the addon: ${plain(err)}`);
+      }
+      changed();
+    }, o.outboxDelayMs);
+  }
+  if (coreEvents && typeof coreEvents.on === 'function') coreEvents.on('outbox', outboxChanged);
+
   // ---- Coach ---------------------------------------------------------------------------------
 
-  // The Coach answers questions asked in game on the server, which takes a little while. Keep
+  // The Coach answers questions asked in game in the background, which takes a little while. Keep
   // checking for up to two minutes and save the answer for the addon as soon as it is there.
   function followCoach() {
     if (coach) return coach.promise;
@@ -667,15 +744,19 @@ function createSync({ api, store, log, wow, appVersion, ...opts } = {}) {
         if (job.cancelled) return false;
         const inbox = await api.request('GET', '/api/inbox');
         if (job.cancelled) return false;
-        if (!inbox || typeof inbox !== 'object') throw new Error('The guild server sent news Guild Camp could not read.');
+        if (!inbox || typeof inbox !== 'object') throw new Error('Guild Camp could not read the guild news it put together.');
         if (!inbox.coach || !inbox.coach.pending) {
           await exclusive(() => writeInboxes(currentInstalls(), { inbox }));
-          say('info', 'The Coach has answered. Type /reload in game (or press "Check for answers" in the Coach) to see it.');
+          say('info', status().restartNeeded
+            ? "The Coach has answered. Restart World of Warcraft to see it. A /reload isn't enough the first time."
+            : 'The Coach has answered. Type /reload in game (or press "Check for answers" in the Coach) to see it.');
           remember({ at: iso(now()), kind: 'coach', ok: true, message: 'The Coach has answered.' });
           return true;
         }
       }
-      say('info', 'The Coach is taking a while. The answer will show after a later /reload.');
+      say('info', status().restartNeeded
+        ? "The Coach is taking a while. The answer will show after you restart World of Warcraft. A /reload isn't enough the first time."
+        : 'The Coach is taking a while. The answer will show after a later /reload.');
       return false;
     })()
       .catch((err) => {
@@ -714,20 +795,13 @@ function createSync({ api, store, log, wow, appVersion, ...opts } = {}) {
         if (mtime === null) continue;
         if (!force) {
           if (seen.get(entry.key) === mtime) continue;
-          // The server had no guild for this member: the same file is tried again after a minute
-          // (no need to wait for it to settle, it hasn't changed); a new save goes up as usual.
-          const wait = guildWaits.get(entry.key);
-          const sameAsWaiting = Boolean(wait && wait.mtime === mtime);
-          if (sameAsWaiting && now() < wait.retryAt) continue;
           const fail = failures.get(entry.key);
           if (fail && now() < fail.retryAt) continue;
-          if (!sameAsWaiting) {
-            // Wait until WoW has finished writing the file; if it is still changing, the next check
-            // picks it up.
-            await sleep(o.settleMs);
-            if (mtimeOf(entry.file) !== mtime) continue;
-            if (gen !== stopGen) return { uploads, failed, stopped: true };
-          }
+          // Wait until WoW has finished writing the file; if it is still changing, the next check
+          // picks it up.
+          await sleep(o.settleMs);
+          if (mtimeOf(entry.file) !== mtime) continue;
+          if (gen !== stopGen) return { uploads, failed, stopped: true };
         }
         const r = await uploadFile(entry, mtime);
         if (r.uploaded) {
@@ -741,9 +815,7 @@ function createSync({ api, store, log, wow, appVersion, ...opts } = {}) {
       if (uploadedHere || force) needInbox.push(install);
     }
 
-    // No guild, no news: the 5-minute refresh in poll() checks again later.
-    if (needInbox.length && noGuild) lastInboxTryAt = now();
-    else if (needInbox.length) await writeInboxes(needInbox, { announce: true });
+    if (needInbox.length) await writeInboxes(needInbox, { announce: true });
     if (coachPending > 0 && (force || gen === stopGen)) followCoach();
     return { uploads, failed };
   }
@@ -751,7 +823,8 @@ function createSync({ api, store, log, wow, appVersion, ...opts } = {}) {
   /** One background check (what the 4 s timer runs). Skipped while another check is running. */
   async function poll() {
     if (current) return;
-    if (!enabled || !hasToken()) {
+    if (!enabled) {
+      try { await checkGameSession(); } catch { /* checked again later */ }
       changed();
       return;
     }
@@ -759,6 +832,7 @@ function createSync({ api, store, log, wow, appVersion, ...opts } = {}) {
       await exclusive(async () => {
         await pass({ force: false });
         if (now() - lastInboxTryAt >= o.inboxRefreshMs) await writeInboxes(currentInstalls());
+        await checkGameSession();
       });
     } catch (err) {
       say('warn', `Sync check failed: ${plain(err)}`);
@@ -777,7 +851,6 @@ function createSync({ api, store, log, wow, appVersion, ...opts } = {}) {
   // ---- public API ----------------------------------------------------------------------------
 
   async function syncNow() {
-    if (!hasToken()) throw userError('Sign in to sync with your guild.');
     dirty = true;
     if (!currentInstalls().length) {
       changed();
@@ -790,8 +863,6 @@ function createSync({ api, store, log, wow, appVersion, ...opts } = {}) {
       changed();
     }
     if (result.failed.length) throw Object.assign(new Error(result.failed[0]), { status: 502 });
-    // Nothing went up because the server has no guild for this member yet: say why.
-    if (noGuild && !result.uploads && fileList.length) throw Object.assign(new Error(noGuild.reason), { status: 409, code: 'no-guild' });
     if (!fileList.length) say('info', 'No saved data from the addon yet. Log in to a character, then log out or type /reload once.');
     return status();
   }
@@ -801,7 +872,7 @@ function createSync({ api, store, log, wow, appVersion, ...opts } = {}) {
     running = true;
     dirty = true;
     schedule();
-    const go = enabled && hasToken();
+    const go = enabled;
     if (go) say('info', 'Watching your game folders for logouts and reloads.');
     startPromise = (go ? exclusive(() => pass({ force: true })) : Promise.resolve())
       .catch((err) => say('warn', `Sync failed: ${plain(err)}`))
@@ -815,17 +886,19 @@ function createSync({ api, store, log, wow, appVersion, ...opts } = {}) {
       clearTimer(timer);
       timer = null;
     }
+    if (outboxTimer) {
+      clearTimer(outboxTimer);
+      outboxTimer = null;
+    }
     const wasRunning = running;
     running = false;
     startPromise = null;
     stopGen += 1;
     if (coach) coach.cancelled = true;
     wakeSleepers();
-    // Retry timers belong to the session that is ending (and so does "no guild yet").
+    // Retry timers belong to the run that is ending.
     failures.clear();
     inboxErrors.clear();
-    guildWaits.clear();
-    noGuild = null;
     lastError = null;
     if (wasRunning) say('info', 'Sync stopped.');
     return changed();
@@ -840,18 +913,7 @@ function createSync({ api, store, log, wow, appVersion, ...opts } = {}) {
     if (!next) {
       failures.clear();
       inboxErrors.clear();
-      guildWaits.clear();
-      noGuild = null;
       lastError = null;
-    }
-    return changed();
-  }
-
-  /** The member is in a guild now (main.js saw it): waiting files upload at the next check. */
-  function clearNoGuild() {
-    if (leaveNoGuild()) {
-      lastInboxTryAt = 0; // the guild news is due at the next check too
-      say('info', "You're in a guild now. Uploading your saved data.");
     }
     return changed();
   }
@@ -870,18 +932,7 @@ function createSync({ api, store, log, wow, appVersion, ...opts } = {}) {
     store.on('change', (settings, keys) => {
       if (!Array.isArray(keys)) return;
       if (keys.includes('syncEnabled')) setEnabled(settings.syncEnabled !== false);
-      if (keys.includes('serverUrl')) {
-        // A different server has none of this data yet.
-        seen.clear();
-        auctionatorSent.clear();
-        failures.clear();
-        records.clear();
-        guildWaits.clear();
-        noGuild = null;
-        lastSyncAt = null;
-        lastResult = null;
-      }
-      if (keys.includes('extraWowFolders') || keys.includes('serverUrl')) {
+      if (keys.includes('extraWowFolders')) {
         dirty = true;
         changed();
       }
@@ -894,9 +945,9 @@ function createSync({ api, store, log, wow, appVersion, ...opts } = {}) {
     start,
     stop,
     setEnabled,
-    clearNoGuild,
     poll,
     followCoach,
+    outboxChanged,
     whenIdle,
     rescan: () => { dirty = true; return changed(); },
   });
@@ -904,7 +955,6 @@ function createSync({ api, store, log, wow, appVersion, ...opts } = {}) {
 
 module.exports = {
   createSync,
-  noGuildReply,
   inboxToc,
   writeInboxFiles,
   uploadSummary,

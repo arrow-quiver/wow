@@ -91,12 +91,18 @@ test('route table covers the architecture navigation', () => {
   const nav = pages.routes.filter((r) => r.nav).map((r) => `${r.nav}:${r.path}`);
   assert.deepEqual(nav, [
     'Play:/', 'Play:/coach', 'Play:/raids', 'Play:/crafters', 'Play:/requests', 'Play:/partners',
-    'Guild:/roster', 'Guild:/bank', 'Guild:/prices', 'Guild:/drives', 'Guild:/loot',
-    'Officers:/admin', 'Officers:/guild-settings',
+    'Guild:/roster', 'Guild:/bank', 'Guild:/prices', 'Guild:/drives', 'Guild:/loot', 'Guild:/guild-settings',
+    'Officers:/admin',
     'App:/addon', 'App:/settings', 'App:/updates', 'App:/releases',
   ]);
-  assert.ok(pages.routes.find((r) => r.path === '/releases').owner);
+  // Releases shows on a PC that can publish (publisher.status().canPublish), not by guild role.
+  const releases = pages.routes.find((r) => r.path === '/releases');
+  assert.ok(releases.publisher);
+  assert.ok(!releases.owner && !releases.officer);
   assert.ok(pages.routes.find((r) => r.path === '/admin').officer);
+  // Guild settings is for everyone: the Coach budget and tooltips are each player's own; ranks are the Guild Master's.
+  const gs = pages.routes.find((r) => r.path === '/guild-settings');
+  assert.ok(!gs.officer && !gs.owner);
   assert.ok(pages.staticPaths.includes('/welcome'));
   assert.ok(!pages.staticPaths.some((p) => p.includes(':')));
 });
@@ -118,104 +124,58 @@ test('wowhead links follow the old views/wowhead.js', () => {
   assert.equal(wh.guildGame({ wowhead_game: 'retail' }), 'retail');
 });
 
-test('welcome helpers', () => {
-  const { normalizeServerUrl: n, parseInviteCode: p, validBattleTag: v } = welcome;
-  assert.deepEqual(n('wow.cjplumbing.co.za'), { url: 'https://wow.cjplumbing.co.za' });
-  assert.deepEqual(n('https://wow.example.com/'), { url: 'https://wow.example.com' });
-  assert.deepEqual(n('localhost:3000'), { url: 'http://localhost:3000' });
-  assert.deepEqual(n('http://192.168.1.5:3000'), { url: 'http://192.168.1.5:3000' });
-  assert.ok(n('').error);
-  assert.ok(n('ftp://x.com').error);
-  assert.equal(p('https://wow.example.com/join/AbC_12-x'), 'AbC_12-x');
-  assert.equal(p('guildcamp://join/AbC123'), 'AbC123');
-  assert.equal(p('guildcamp://join/AbC123/'), 'AbC123');
-  assert.equal(p('join/AbC123'), 'AbC123');
-  assert.equal(p('  AbC123  '), 'AbC123');
-  assert.equal(p('https://wow.example.com/raids/12'), '');
-  assert.equal(p('no spaces allowed'), '');
-  assert.equal(v('Name#1234'), true);
-  assert.equal(v('Name'), false);
-  assert.equal(v('#1234'), false);
-  assert.equal(v(`${'x'.repeat(40)}#1`), false);
-});
-
-test('welcome: first screen and labels', () => {
-  const { firstStep, listLabels, hostOf } = welcome;
-  assert.equal(firstStep({ signedIn: false }), 'signin');
-  assert.equal(firstStep({ signedIn: true }), 'setup');
-  assert.equal(firstStep({ signedIn: true, step: 'server' }), 'server');
-  assert.equal(firstStep({ signedIn: false, step: 'nonsense' }), 'signin');
+test('welcome: first screen, the Battle.net line and labels', () => {
+  const { firstStep, listLabels, signInMessage, bnetView, welcomeName } = welcome;
+  // The first screen until the person signed in to Battle.net, chose to go on without it, or finished setup.
+  assert.equal(firstStep({}), 'start');
+  assert.equal(firstStep({ bnetSignedIn: true }), 'setup');
+  assert.equal(firstStep({ withoutBnet: true }), 'setup');
+  assert.equal(firstStep({ onboarded: true }), 'setup');
+  assert.equal(firstStep({ bnetSignedIn: true, step: 'start' }), 'start');
+  assert.equal(firstStep({ step: 'nonsense' }), 'start');
   assert.equal(listLabels([]), '');
   assert.equal(listLabels(['WoW Forever']), 'WoW Forever');
   assert.equal(listLabels(['WoW Forever', 'Retail']), 'WoW Forever and Retail');
   assert.equal(listLabels(['WoW Forever', 'Retail', 'WoW Forever', '', 'Classic Era']), 'WoW Forever, Retail and Classic Era');
-  assert.equal(hostOf('https://wow.example.com/x'), 'wow.example.com');
-  assert.equal(hostOf('not a url'), 'not a url');
+
+  // Sign-in failures are shown as the main process words them; cancelling yourself says nothing.
+  assert.equal(signInMessage({ code: 'cancelled', message: 'Sign-in was cancelled.' }), '');
+  assert.equal(signInMessage({ code: 'timeout', message: 'Battle.net sign-in took too long.' }), 'Battle.net sign-in took too long.');
+  assert.match(signInMessage({ code: 'x' }), /didn't work/);
+  assert.equal(signInMessage(null), '');
+
+  // The Battle.net line: hidden without built-in credentials, optional before sign-in, done after.
+  assert.equal(bnetView({ available: false }), null);
+  assert.equal(bnetView(null), null);
+  const optional = bnetView({ available: true });
+  assert.equal(optional.state, 'pending');
+  assert.equal(optional.title, 'Battle.net (optional)');
+  assert.match(optional.detail, /Everything works without it/);
+  assert.equal(bnetView({ available: true, signingIn: true }).state, 'working');
+  assert.deepEqual(bnetView({ available: true, signedIn: true, battletag: 'Zulgar#1234', characters: [{}, {}] }),
+    { state: 'done', title: 'Signed in as Zulgar#1234', detail: 'Battle.net shows 2 characters on your account.' });
+  assert.match(bnetView({ signedIn: true, battletag: 'Zulgar#1234', characters: [] }).detail, /no World of Warcraft characters/);
+
+  // The heading uses the BattleTag's name, else the name the local data knows ("You" means none).
+  assert.equal(welcomeName({ battletag: 'Zulgar#1234', user: { battletag: 'Zulgar#1234' } }), 'Zulgar');
+  assert.equal(welcomeName({ battletag: null, user: { battletag: 'Mokra' } }), 'Mokra');
+  assert.equal(welcomeName({ battletag: null, user: { battletag: 'You' } }), '');
+  assert.equal(welcomeName(null), '');
 });
 
-test('welcome: guild.autoJoin result → the "Your guild" line', () => {
-  const { guildView: v, mergeMembership: merge, createGuildBody } = welcome;
-  const g = { id: 1, name: 'Just Now WoW', faction: 'Horde' };
-  const base = { guild: g, role: null, via: null, character: null, reason: '', detected: null };
-
-  // Nothing yet, or still asking.
-  assert.equal(v({}).state, 'working');
-  assert.equal(v({ checking: true }).state, 'working');
-
-  // Joined: says who matched; officers from rank are told why.
-  const joined = v({ result: { ...base, status: 'joined', role: 'member', via: 'roster', character: 'Zulgar', reason: 'Matched Zulgar.' } });
-  assert.equal(joined.state, 'done');
-  assert.equal(joined.title, "You're in Just Now WoW (matched Zulgar)");
-  const officer = v({ result: { ...base, status: 'joined', role: 'officer', via: 'battlenet', character: 'Grimtusk' } });
-  assert.match(officer.detail, /officer/);
-  assert.match(officer.detail, /rank in game/);
-  // The signed-in state wins once it has the guild, whatever the last check said.
-  assert.equal(v({ result: { ...base, status: 'no-match', reason: 'x' }, guild: g, role: 'owner' }).state, 'done');
-  assert.match(v({ guild: g, role: 'owner' }).detail, /owner/);
-
-  // No guild on the server: offer the one from the characters, or ask for a name.
-  const setup = v({ result: { ...base, guild: null, status: 'no-guild-on-server', detected: { guild: 'Just Now WoW', realm: 'Forever', faction: 'Horde' }, reason: 'Nobody has set it up.' } });
-  assert.equal(setup.state, 'setup');
-  assert.equal(setup.title, 'Set up Just Now WoW on this server');
-  assert.match(setup.detail, /Forever, Horde/);
-  assert.deepEqual(setup.detected, { guild: 'Just Now WoW', realm: 'Forever', faction: 'Horde' });
-  const create = v({ result: { ...base, guild: null, status: 'no-guild-on-server', reason: 'Nobody has set up a guild on this server yet.' } });
-  assert.equal(create.state, 'create');
-  assert.equal(create.detail, 'Nobody has set up a guild on this server yet.');
-
-  // Not matched yet, or invite only: the server's reason is shown as it is.
-  const reason = "None of your characters are in Just Now WoW's roster yet. Ask someone in the guild to open the guild roster in game, or use an invite link.";
-  const waiting = v({ result: { ...base, status: 'no-match', reason } });
+test('welcome: the "Your guild" line comes from the game', () => {
+  const { guildView } = welcome;
+  const waiting = guildView({});
   assert.equal(waiting.state, 'waiting');
-  assert.equal(waiting.title, "We haven't matched you to Just Now WoW yet");
-  assert.equal(waiting.detail, reason);
-  assert.equal(v({ result: { ...base, guild: null, status: 'no-match', reason }, serverGuild: { name: 'Camp' } }).title, "We haven't matched you to Camp yet");
-  const off = v({ result: { ...base, status: 'disabled', reason: 'Ask an officer for an invite link.' } });
-  assert.equal(off.state, 'waiting');
-  assert.match(off.title, /invite link/);
-
-  // The call failed (older server, offline): say so, keep trying.
-  const err = v({ error: 'The server is not answering.' });
-  assert.equal(err.state, 'error');
-  assert.match(err.detail, /^The server is not answering\. Guild Camp tries again/);
-  assert.equal(v({ error: 'x', checking: true }).state, 'working');
-  // Unknown statuses are ignored.
-  assert.equal(v({ result: { status: 'weird' } }).state, 'working');
-
-  // An 'already' right after a 'joined' keeps the matched character.
-  const first = { ...base, status: 'joined', role: 'member', via: 'roster', character: 'Zulgar' };
-  const merged = merge(first, { ...base, status: 'already', role: 'member', reason: 'Already in.' });
-  assert.equal(merged.status, 'joined');
-  assert.equal(merged.character, 'Zulgar');
-  assert.equal(merge(first, null), first);
-  assert.equal(merge(null, { status: 'nope' }), null);
-  assert.equal(merge(first, { ...base, status: 'no-match' }).status, 'no-match');
-
-  // "Set up <guild> on this server" body.
-  assert.deepEqual(createGuildBody({ guild: ' Just Now WoW ', realm: 'Forever', faction: 'Alliance' }),
-    { name: 'Just Now WoW', faction: 'Alliance', realm: 'Forever', game_guild: 'Just Now WoW' });
-  assert.deepEqual(createGuildBody({ guild: 'x'.repeat(50) }), { name: 'x'.repeat(40), faction: 'Horde', game_guild: 'x'.repeat(50) });
-  assert.deepEqual(createGuildBody(null), { name: '', faction: 'Horde' });
+  assert.equal(waiting.title, 'Waiting for your guild');
+  assert.equal(waiting.detail, 'Log in to World of Warcraft once with the addon. Guild Camp picks up your guild by itself.');
+  const g = { id: 1, name: 'Just Now WoW', realm: 'Mirage Raceway', faction: 'Horde' };
+  assert.deepEqual(guildView({ guild: g, role: 'member' }),
+    { state: 'done', title: "You're in Just Now WoW (Mirage Raceway, Horde)", detail: 'Your characters and guild news stay in sync while you play.' });
+  assert.match(guildView({ guild: g, role: 'owner' }).detail, /Guild Master/);
+  assert.match(guildView({ guild: g, role: 'officer' }).detail, /guild rank makes you an officer/);
+  assert.equal(guildView({ guild: { name: 'Camp' } }).title, "You're in Camp");
+  assert.equal(guildView({ guild: { id: 3 } }).state, 'waiting', 'a guild without a name is not shown yet');
 });
 
 test('welcome: game folders and addon lines', () => {
@@ -256,66 +216,452 @@ test('welcome: game folders and addon lines', () => {
   assert.equal(none.state, 'attention');
   assert.deepEqual(none.missing.map((m) => m.dir), [retail.dir]);
 
-  const { setupLede, guildMark } = welcome;
+  // The automatic install waits while the game runs (main-1): the line says so, and a click still installs it.
+  const waiting = addonView({ installs: [retail], addon: { installs: [st(retail.dir, 'missing', { waitingForGame: true })] } });
+  assert.equal(waiting.state, 'attention');
+  assert.equal(waiting.detail, 'Guild Camp installs it once World of Warcraft is closed. You can also install it now with one click.');
+  assert.deepEqual(waiting.missing.map((m) => m.dir), [retail.dir]);
+
+  const { setupLede } = welcome;
   assert.equal(setupLede(['done', 'done', 'done']), 'Everything is ready.');
   assert.match(setupLede(['done', 'working', 'waiting']), /few seconds/);
   assert.equal(setupLede(['attention', 'pending', 'done']), 'Almost done. One thing needs you.');
   assert.equal(setupLede(['attention', 'pending', 'attention']), 'Almost done. A few things need you.');
-  assert.match(setupLede(['done', 'done', 'waiting']), /waiting to match you/);
-  assert.deepEqual(['done', 'working', 'waiting', 'setup', 'create', 'error'].map(guildMark), ['done', 'working', 'waiting', 'attention', 'attention', 'attention']);
+  assert.equal(setupLede(['done', 'done', 'waiting']), 'Almost done. Guild Camp is waiting for your guild.');
 
   assert.equal(allSet({ inGuild: true, games: { state: 'done' }, addon: { state: 'done' } }), true);
   assert.equal(allSet({ inGuild: false, games: { state: 'done' }, addon: { state: 'done' } }), false);
   assert.equal(allSet({ inGuild: true, games: { state: 'attention' }, addon: { state: 'pending' } }), false);
 });
 
-test('guild settings: joining choices', async () => {
-  const gs = await load('pages/guild-settings.js');
-  assert.deepEqual(gs.AUTO_JOIN_OPTIONS.map((o) => o.value), ['roster', 'verified', 'off']);
-  assert.match(gs.AUTO_JOIN_OPTIONS[0].label, /recommended/);
-  assert.deepEqual(gs.OFFICER_RANK_OPTIONS.map((o) => o.value), ['', '0', '1', '2', '3']);
-  assert.equal(gs.rankToValue(undefined), '1'); // server default
-  assert.equal(gs.rankToValue(null), '');
-  assert.equal(gs.rankToValue(0), '0');
-  assert.equal(gs.rankToValue(12), '');
-  assert.equal(gs.valueToRank(''), null);
-  assert.equal(gs.valueToRank('0'), 0);
-  assert.equal(gs.valueToRank('3'), 3);
-  assert.equal(gs.officerRankOptions(2), gs.OFFICER_RANK_OPTIONS);
-  assert.deepEqual(gs.officerRankOptions(6).at(-1), { value: '6', label: 'Guild Master and 6 ranks below' });
-  const guild = { auto_join: 'roster', officer_rank_max: 1 };
-  assert.deepEqual(gs.joiningChanges(guild, 'roster', '1'), {});
-  assert.deepEqual(gs.joiningChanges(guild, 'off', '1'), { auto_join: 'off' });
-  assert.deepEqual(gs.joiningChanges(guild, 'roster', ''), { officer_rank_max: null });
-  assert.deepEqual(gs.joiningChanges({ auto_join: 'verified', officer_rank_max: null }, 'roster', '0'), { auto_join: 'roster', officer_rank_max: 0 });
+test('session: the local guild data plus the Battle.net sign-in', () => {
+  const { buildSession, normalizeBnet, splitBattleTag, EMPTY_BNET } = session;
+  const me = { user: { id: 1, battletag: 'Mokra' }, guild: { id: 2, name: 'Just Now WoW' }, role: 'officer', notifyPrefs: {} };
+
+  const local = buildSession(me, { available: true, signedIn: false });
+  assert.equal(local.loaded, true);
+  assert.equal(local.ready, true);
+  assert.equal(local.signedIn, true, 'kept for older code: the local data answered');
+  assert.equal(local.guild.name, 'Just Now WoW');
+  assert.equal(local.role, 'officer');
+  assert.equal(local.battletag, null);
+  assert.equal(local.name, 'Mokra');
+  assert.equal(local.bnet.available, true);
+
+  const withBnet = buildSession(me, { available: true, signedIn: true, battletag: 'Zulgar#1234', characters: [{ name: 'Zulgar' }], region: 'us', canRefresh: true });
+  assert.equal(withBnet.battletag, 'Zulgar#1234');
+  assert.equal(withBnet.user.battletag, 'Zulgar#1234', 'the BattleTag shows before the local data catches up');
+  assert.equal(me.user.battletag, 'Mokra', 'the answer itself is not changed');
+  assert.equal(withBnet.name, 'Zulgar#1234');
+  assert.equal(withBnet.bnet.region, 'us');
+  assert.equal(withBnet.bnet.characters.length, 1);
+
+  // Roles only come with a guild, and only known ones.
+  assert.equal(buildSession({ user: { id: 1 }, guild: null, role: 'owner' }, null).role, null);
+  assert.equal(buildSession({ user: {}, guild: { name: 'G' }, role: 'king' }, null).role, null);
+  assert.equal(buildSession({ user: {}, guild: { name: 'G', role: 'owner' } }, null).role, 'owner');
+
+  // Nothing could be read.
+  const none = buildSession(null, null, { error: 'Guild Camp could not read your guild data.' });
+  assert.equal(none.loaded, true);
+  assert.equal(none.ready, false);
+  assert.equal(none.signedIn, false);
+  assert.equal(none.user, null);
+  assert.equal(none.error, 'Guild Camp could not read your guild data.');
+  assert.deepEqual(none.bnet, EMPTY_BNET);
+
+  // A signed-out Battle.net state carries no BattleTag or characters, whatever it was sent with.
+  assert.deepEqual(normalizeBnet({ signedIn: false, battletag: 'X#1', characters: [1], canRefresh: true, error: 'Sign in again.' }), { ...EMPTY_BNET, error: 'Sign in again.' });
+  assert.deepEqual(splitBattleTag('Zulgar#1234'), { name: 'Zulgar', digits: '1234' });
+  assert.deepEqual(splitBattleTag('Mokra'), { name: 'Mokra', digits: '' });
+  assert.deepEqual(splitBattleTag(null), { name: '', digits: '' });
 });
 
-test('dev mock: guild matching, membership and the new settings', async () => {
+test('settings helpers', async () => {
+  const st = await load('pages/settings.js');
+  assert.deepEqual(st.SECTIONS.map((x) => x.id), ['battlenet', 'notifications', 'discord', 'coach', 'calendar', 'app', 'about']);
+  assert.equal(st.sectionFor('account'), 'battlenet', 'older links still work');
+  assert.equal(st.sectionFor('discord'), 'discord');
+  assert.equal(st.sectionFor('devices'), null);
+  assert.equal(st.sectionFor(undefined), null);
+
+  assert.deepEqual(st.REGIONS.map((r) => r.value), ['eu', 'us', 'kr', 'tw']);
+  assert.equal(st.regionLabel('us'), 'Americas and Oceania');
+  assert.equal(st.regionLabel('nope'), 'Europe');
+  assert.equal(st.gameLabel('profile-eu'), 'Retail');
+  assert.equal(st.gameLabel('profile-classic-eu'), 'Classic');
+  assert.equal(st.gameLabel('profile-classic1x-us'), 'Classic Era');
+  assert.equal(st.gameLabel(''), 'World of Warcraft');
+
+  // Discord webhooks: the same rule as the main process; the token part is never shown.
+  assert.equal(st.isWebhookUrl('https://discord.com/api/webhooks/123456789012345678/AbC-dEf_gh'), true);
+  assert.equal(st.isWebhookUrl(' https://discordapp.com/api/webhooks/1/x '), true);
+  assert.equal(st.isWebhookUrl('http://discord.com/api/webhooks/1/x'), false);
+  assert.equal(st.isWebhookUrl('https://evil.example/api/webhooks/1/x'), false);
+  assert.equal(st.isWebhookUrl(null), false);
+  const masked = st.maskWebhook('https://discord.com/api/webhooks/123456789012345678/AbC-dEf_gh');
+  assert.equal(masked, 'discord.com/api/webhooks/123456…/••••');
+  assert.doesNotMatch(masked, /AbC/);
+  assert.equal(st.maskWebhook(''), '');
+  assert.equal(st.maskWebhook('something odd'), 'A webhook is set.');
+
+  // Anthropic keys: checked before they are sent, and never shown.
+  assert.match(st.keyProblem(''), /Paste your key/);
+  assert.match(st.keyProblem('sk-ant api03'), /no spaces/);
+  assert.match(st.keyProblem('sk-ant-short'), /starts with sk-ant-/);
+  assert.equal(st.keyProblem(`  sk-ant-api03-${'x'.repeat(40)}  `), '');
+});
+
+test('guild settings: officer ranks', async () => {
+  const gs = await load('pages/guild-settings.js');
+  // Off (null) and 0 both mean "only the Guild Master"; the core's default is 1.
+  assert.equal(gs.rankToValue(undefined), '1');
+  assert.equal(gs.rankToValue(null), '0');
+  assert.equal(gs.rankToValue(0), '0');
+  assert.equal(gs.rankToValue(3), '3');
+  assert.equal(gs.rankToValue(12), '0');
+  assert.equal(gs.valueToRank('0'), 0);
+  assert.equal(gs.valueToRank('3'), 3);
+  assert.equal(gs.valueToRank(''), 0);
+  assert.deepEqual(gs.rankChange({ officer_rank_max: 1 }, '1'), {});
+  assert.deepEqual(gs.rankChange({ officer_rank_max: null }, '0'), {}, 'off and 0 are the same choice');
+  assert.deepEqual(gs.rankChange({ officer_rank_max: 1 }, '2'), { officer_rank_max: 2 });
+  assert.deepEqual(gs.rankChange({ officer_rank_max: 2 }, '0'), { officer_rank_max: 0 });
+
+  // Without rank names the choices count ranks; with them they read like the game.
+  assert.deepEqual(gs.officerRankOptions(1).map((o) => o.value), ['0', '1', '2', '3']);
+  assert.equal(gs.officerRankOptions(1)[0].label, 'Only the Guild Master');
+  assert.equal(gs.officerRankOptions(1)[2].label, 'Guild Master and 2 ranks below');
+  assert.equal(gs.officerRankOptions(6).at(-1).value, '6', 'the saved value is always offered');
+  const names = new Map([[0, 'Warchief'], [1, 'Officer'], [2, 'Veteran'], [3, 'Member'], [4, 'Initiate']]);
+  const opts = gs.officerRankOptions(1, names);
+  assert.deepEqual(opts.map((o) => o.value), ['0', '1', '2', '3', '4']);
+  assert.equal(opts[1].label, 'Guild Master and Officer');
+  assert.equal(opts[2].label, 'Guild Master, Officer and Veteran');
+  assert.equal(opts[3].label, 'Guild Master and the 3 ranks below (Officer, Veteran, Member)');
+
+  // The ranks table: one row per in-game rank, with the role it gives.
+  const chars = [
+    { name: 'A', rank: 'Warchief', rank_index: 0, online: 1 }, { name: 'B', rank: 'Officer', rank_index: 1 },
+    { name: 'C', rank: 'Veteran', rank_index: 2, online: 1 }, { name: 'D', rank: 'Veteran', rank_index: 2 },
+    { name: 'E', rank: null, rank_index: null }, { name: 'F', rank_index: 5 },
+  ];
+  assert.deepEqual(gs.rankRows(chars, 1), [
+    { index: 0, name: 'Warchief', characters: 1, online: 1, role: 'owner' },
+    { index: 1, name: 'Officer', characters: 1, online: 0, role: 'officer' },
+    { index: 2, name: 'Veteran', characters: 2, online: 1, role: 'member' },
+    { index: 5, name: 'Rank 5', characters: 1, online: 0, role: 'member' },
+  ]);
+  assert.equal(gs.rankRows(chars, 2)[2].role, 'officer');
+  assert.equal(gs.rankRows(chars, null)[1].role, 'member');
+  assert.deepEqual(gs.rankRows(undefined, 1), []);
+});
+
+test('guild settings: who passes on officer changes', async () => {
+  const gs = await load('pages/guild-settings.js');
+  // null means officers only; a value at or above the officer ranks adds nobody, so it reads the same.
+  assert.equal(gs.relayToValue(null, 1), 'none');
+  assert.equal(gs.relayToValue(undefined, 1), 'none');
+  assert.equal(gs.relayToValue(1, 1), 'none');
+  assert.equal(gs.relayToValue(0, 1), 'none');
+  assert.equal(gs.relayToValue(3, 1), '3');
+  assert.equal(gs.relayToValue(12, 1), 'none');
+  assert.equal(gs.valueToRelay('none'), null);
+  assert.equal(gs.valueToRelay('3'), 3);
+  assert.equal(gs.valueToRelay('x'), null);
+  assert.deepEqual(gs.relayChange({ officer_rank_max: 1, relay_rank_max: null }, 'none'), {});
+  assert.deepEqual(gs.relayChange({ officer_rank_max: 1, relay_rank_max: 1 }, 'none'), {}, 'already officers only');
+  assert.deepEqual(gs.relayChange({ officer_rank_max: 1, relay_rank_max: null }, '2'), { relay_rank_max: 2 });
+  assert.deepEqual(gs.relayChange({ officer_rank_max: 1, relay_rank_max: 3 }, 'none'), { relay_rank_max: null });
+  assert.deepEqual(gs.relayChange({ officer_rank_max: 1, relay_rank_max: 3 }, '3'), {});
+
+  // Choices start below the officer ranks and read like the game when the roster knows the rank names.
+  const names = new Map([[0, 'Warchief'], [1, 'Officer'], [2, 'Veteran'], [3, 'Member'], [4, 'Initiate']]);
+  const opts = gs.relayOptions({ officer_rank_max: 1, relay_rank_max: null }, names);
+  assert.deepEqual(opts.map((o) => o.value), ['none', '2', '3', '4']);
+  assert.deepEqual(opts.map((o) => o.label), [
+    'Only officers', 'Officers and Veteran', 'Officers, Veteran and Member', 'Officers and the 3 ranks below them (Veteran, Member, Initiate)',
+  ]);
+  const plain = gs.relayOptions({ officer_rank_max: 2, relay_rank_max: 6 });
+  assert.equal(plain[1].value, '3');
+  assert.equal(plain[1].label, 'Officers and 1 rank below them');
+  assert.equal(plain.at(-1).value, '6', 'the saved value is always offered');
+  assert.equal(gs.relayOptions({ officer_rank_max: 9 }).length, 1, 'no ranks left below the officers');
+});
+
+test('sharing: status groups, plain lines and author checks', async () => {
+  assert.deepEqual(status.SHARE_LINES, {
+    saved: 'Saved. It goes to your guild the next time you log in or type /reload.',
+    newData: 'New guild data shows here after you log out or type /reload in game.',
+    instance: 'Waiting until you leave the dungeon.',
+    officer: 'Log in on an officer character to send this.',
+    stale: 'Someone changed this in the meantime. Check it and try again.',
+  });
+  const now = Date.parse('2026-11-08T12:00:00Z');
+  const groups = status.shareGroups({
+    outbox: [
+      { op: 'o1', state: 'queued', createdAt: '2026-11-08 11:00:00' },
+      { op: 'o2', state: 'waiting', note: status.SHARE_LINES.officer, createdAt: '2026-11-08 10:00:00' },
+      { op: 'o3', state: 'sent', createdAt: '2026-11-08 09:00:00', sentAt: '2026-11-08 09:30:00' },
+      null,
+    ],
+    refused: [
+      { op: 'o4', state: 'refused', note: status.SHARE_LINES.stale, createdAt: '2026-11-07 10:00:00', sentAt: '2026-11-07 12:00:00' },
+      { op: 'o5', state: 'refused', createdAt: '2026-10-01 10:00:00', sentAt: '2026-10-02 10:00:00' },
+      { op: 'o6', state: 'refused' },
+    ],
+    authorChecks: [{ id: 3, summary: 'Sign-up for Molten Core: not coming', via: 'Kazgul' }, { summary: 'no id' }],
+  }, now);
+  assert.deepEqual(groups.waiting.map((e) => e.op), ['o1', 'o2']);
+  assert.deepEqual(groups.sent.map((e) => e.op), ['o3']);
+  assert.deepEqual(groups.refused.map((e) => e.op), ['o4', 'o6'], 'refused changes older than 14 days are left out');
+  assert.deepEqual(groups.checks.map((c) => c.id), [3]);
+  assert.deepEqual(status.shareGroups(null), { waiting: [], sent: [], refused: [], checks: [] });
+
+  assert.deepEqual(status.shareStateLabel({ state: 'waiting' }), { kind: 'warn', label: 'Waiting' });
+  assert.deepEqual(status.shareStateLabel({ state: 'refused' }), { kind: 'alarm', label: 'Not sent' });
+  assert.equal(status.shareStateLabel({ state: 'queued' }).kind, 'info');
+  assert.equal(status.shareStateLabel(null).label, 'Unknown');
+
+  // The dungeon line only when the game said it is waiting for the player to leave one.
+  assert.equal(status.waitingForDungeon({ outbox: [{ state: 'waiting', note: status.SHARE_LINES.officer }] }), false);
+  assert.equal(status.waitingForDungeon({ outbox: [{ state: 'waiting', note: status.SHARE_LINES.instance }] }), true);
+  assert.equal(status.waitingForDungeon({ outbox: [{ state: 'sent', note: status.SHARE_LINES.instance }] }), false);
+
+  // docs/SHARING.md §5, word for word.
+  assert.equal(status.authorCheckText({ summary: 'Sign-up for Molten Core: not coming', via: 'Kazgul' }),
+    "A change in your name arrived that this computer didn't make: Sign-up for Molten Core: not coming. Passed on by Kazgul.");
+  assert.equal(status.authorCheckText({ summary: 'Notice: hi.', via: null }),
+    "A change in your name arrived that this computer didn't make: Notice: hi.");
+
+  // "No guild yet": the core's code, or its sentence when the code was lost on the way.
+  assert.equal(status.isNoGuild({ status: 403, code: 'NO_GUILD', message: 'x' }), true);
+  assert.equal(status.isNoGuild({ status: 403, message: status.NO_GUILD_TEXT }), true);
+  assert.equal(status.isNoGuild({ status: 403, message: 'Only officers can do that.' }), false);
+  assert.equal(status.isNoGuild(null), false);
+  const ng = await load('components/NoGuild.js');
+  assert.equal(ng.noGuildText(null), status.NO_GUILD_TEXT);
+  assert.equal(ng.noGuildText({ status: 403, code: 'NO_GUILD', message: 'Play once first.' }), 'Play once first.');
+  assert.equal(ng.noGuildText(new Error('Something else.')), status.NO_GUILD_TEXT);
+
+  const st = await load('pages/settings.js');
+  assert.equal(st.webhookOfferText({ from: 'Velanne', at: 'x' }), 'Velanne shared a Discord webhook. Use it?');
+  assert.equal(st.webhookOfferText({ from: null }), 'An officer shared a Discord webhook. Use it?');
+  assert.equal(st.webhookOfferText(null), '');
+});
+
+test('app gate: the welcome flow until setup is done, then pages wait for the guild', () => {
+  const { pageGate, isOnboarded, GUILDLESS_PATHS } = session;
+  const camp = pages.routes.find((r) => r.path === '/');
+  const addon = pages.routes.find((r) => r.path === '/addon');
+  const welcomeRoute = pages.routes.find((r) => r.path === '/welcome');
+  const inGuild = { loaded: true, ready: true, guild: { id: 1, name: 'Camp' } };
+  const noGuild = { loaded: true, ready: true, guild: null };
+
+  // The bug this replaces: no guild used to send people back to /welcome, and "Done" bounced.
+  assert.equal(pageGate({ route: camp, session: noGuild, onboarded: true }), 'no-guild');
+  assert.equal(pageGate({ route: camp, session: inGuild, onboarded: true }), 'page');
+  assert.equal(pageGate({ route: camp, session: inGuild, onboarded: false }), 'welcome');
+  assert.equal(pageGate({ route: camp, session: noGuild, onboarded: false, smoke: true }), 'no-guild', 'a smoke run never stops at the welcome flow');
+  assert.equal(pageGate({ route: camp, session: { loaded: false }, onboarded: true }), 'loading');
+  assert.equal(pageGate({ route: camp, session: { loaded: true, ready: false, guild: null }, onboarded: true }), 'unavailable');
+  // App pages work without a guild; the welcome page is always reachable.
+  for (const p of ['/addon', '/settings', '/updates', '/releases']) assert.ok(GUILDLESS_PATHS.includes(p), p);
+  assert.equal(pageGate({ route: addon, session: noGuild, onboarded: true }), 'page');
+  assert.equal(pageGate({ route: addon, session: { loaded: false }, onboarded: true }), 'page');
+  assert.equal(pageGate({ route: addon, session: noGuild, onboarded: false }), 'welcome');
+  assert.equal(pageGate({ route: welcomeRoute, session: noGuild, onboarded: false }), 'page');
+  assert.equal(pageGate({ route: { path: '*' }, session: noGuild }), 'page');
+  // Officer pages also wait for the guild before anything else.
+  assert.equal(pageGate({ route: pages.routes.find((r) => r.path === '/admin'), session: noGuild }), 'no-guild');
+
+  // Settings that can't be read never lock anyone out.
+  assert.equal(isOnboarded({ onboarded: false }), false);
+  assert.equal(isOnboarded({ onboarded: true }), true);
+  assert.equal(isOnboarded({}), true);
+  assert.equal(isOnboarded(null), true);
+});
+
+test('dev mock: sharing in game (status, cancel, author checks, "Close it" on a group of a kind this version doesn\'t know closes it with the core\'s reply and queues nothing, webhook, relay ranks)', async () => {
+  const gc = gcmod.gc;
+  const req = (method, path, body) => gc.api.request(method, path, body);
+  const st = await req('GET', '/api/share/status');
+  for (const k of ['enabled', 'pid', 'peers', 'records', 'lastHello', 'lastExchange', 'outbox', 'refused', 'authorChecks', 'webhookOffer']) assert.ok(k in st, k);
+  for (const e of [...st.outbox, ...st.refused]) {
+    for (const k of ['op', 'id', 'type', 'summary', 'state', 'note', 'createdAt', 'sentAt']) assert.ok(k in e, `${e.op}.${k}`);
+  }
+  // The preview's scenarios: an officer change waiting for an officer character, one ready to go, a stale refusal.
+  const waiting = st.outbox.find((e) => e.state === 'waiting');
+  assert.equal(waiting.note, 'Log in on an officer character to send this.');
+  assert.ok(st.outbox.some((e) => e.state === 'queued' && e.note === status.SHARE_LINES.saved));
+  assert.equal(st.refused[0].note, status.SHARE_LINES.stale);
+  // A plain change in my name, and a group of a kind this version doesn't know (its second button only closes it).
+  assert.deepEqual(st.authorChecks.map((c) => [c.id, c.kind, c.count]), [[7, null, 1], [8, 'unknown', 3]]);
+  assert.deepEqual(Object.keys(st.authorChecks[0]).sort(), ['at', 'count', 'id', 'kind', 'summary', 'via'], 'the core sharing.status shape');
+  assert.ok(st.webhookOffer && st.webhookOffer.from);
+
+  // The shared store reads the same status.
+  await status.shareStatus.refresh();
+  assert.equal(status.shareStatus.get().data.records, st.records);
+  assert.equal(status.shareStatus.get().error, null);
+
+  // Cancel: only changes that haven't gone out.
+  const cancelled = await req('POST', `/api/share/outbox/${waiting.op}/cancel`);
+  assert.match(cancelled.message, /will not be sent/);
+  await assert.rejects(req('POST', `/api/share/outbox/${waiting.op}/cancel`), (err) => err.status === 404);
+  const sent = st.outbox.find((e) => e.state === 'sent');
+  await assert.rejects(req('POST', `/api/share/outbox/${sent.op}/cancel`), (err) => err.status === 409);
+
+  // "Undo it" sends my earlier version again; a second answer finds nothing.
+  const check = st.authorChecks[0];
+  await assert.rejects(req('POST', `/api/share/author-checks/${check.id}`, { action: 'maybe' }), (err) => err.status === 400);
+  const undone = await req('POST', `/api/share/author-checks/${check.id}`, { action: 'undo' });
+  assert.equal(undone.message, status.SHARE_LINES.saved);
+  await assert.rejects(req('POST', `/api/share/author-checks/${check.id}`, { action: 'mine' }), (err) => err.status === 404);
+  // "Close it" on the unknown-kind group: closed with the core's reply, and nothing is queued.
+  const queuedBefore = (await req('GET', '/api/share/status')).outbox.length;
+  const closed = await req('POST', '/api/share/author-checks/8', { action: 'undo' });
+  assert.equal(closed.message, "Closed. This version can't undo those changes. They go away by themselves within 14 days.");
+  const after = await req('GET', '/api/share/status');
+  assert.equal(after.outbox.length, queuedBefore);
+  assert.equal(after.authorChecks.length, 0);
+  assert.ok(!after.outbox.some((e) => e.op === waiting.op));
+
+  // The webhook offer: accept gives the address once; sharing mine queues a WH change for the officers.
+  const { url } = await req('POST', '/api/share/webhook/accept');
+  assert.match(url, /^https:\/\/discord\.com\/api\/webhooks\//);
+  assert.equal((await req('GET', '/api/share/status')).webhookOffer, null);
+  await assert.rejects(req('POST', '/api/share/webhook/accept'), (err) => err.status === 404);
+  const shared = await req('POST', '/api/share/webhook/share');
+  assert.equal(shared.message, status.SHARE_LINES.saved);
+  assert.ok((await req('GET', '/api/share/status')).outbox.some((e) => e.id === 'WH:1' && e.state === 'queued'));
+
+  // Who passes on officer changes: the Guild Master sets it; it travels as the guild settings record.
+  await assert.rejects(req('PUT', '/api/guild/settings', { relay_rank_max: 12 }), (err) => err.status === 400);
+  const saved = await req('PUT', '/api/guild/settings', { relay_rank_max: 3 });
+  assert.equal(saved.guild.relay_rank_max, 3);
+  assert.ok(saved.messages.includes(status.SHARE_LINES.saved));
+  assert.ok((await req('GET', '/api/share/status')).outbox.some((e) => e.id === 'CFG:1'));
+  assert.equal((await req('PUT', '/api/guild/settings', { relay_rank_max: null })).guild.relay_rank_max, null);
+});
+
+test('pages: the shared "goes out to the guild" hint, officer tools and the Coach notice', async () => {
+  const hint = await load('components/ShareHint.js');
+  // The lines of docs/SHARING.md §2.
+  assert.equal(hint.shareHintText(), 'This goes to your guild the next time you log in or type /reload.');
+  assert.equal(hint.SAVED_LINE, 'Saved. It goes to your guild the next time you log in or type /reload.');
+  assert.equal(hint.NEW_DATA_LINE, 'New guild data shows here after you log out or type /reload in game.');
+  assert.equal(hint.OFFICER_HINT, 'Log in on an officer character to send this.');
+  assert.equal(hint.STALE_LINE, 'Someone changed this in the meantime. Check it and try again.');
+  assert.equal(hint.shareHintText({ discord: true }), hint.SHARE_HINT, 'Discord only when a webhook is set');
+  assert.equal(hint.shareHintText({ discord: true, webhook: true }), `${hint.SHARE_HINT} ${hint.DISCORD_HINT}`);
+  assert.equal(hint.shareHintText({ discord: 'Custom line.', webhook: true, officer: true }), `${hint.SHARE_HINT} ${hint.OFFICER_HINT} Custom line.`);
+  assert.equal(hint.shareHintText({ gm: true, officer: true }), `${hint.SHARE_HINT} Log in on your Guild Master character to send this.`);
+  // "Waiting until you leave the dungeon." only when the game said so.
+  assert.ok(!hint.shareHintText({ officer: true }).includes('dungeon'));
+  assert.equal(hint.shareHintText({ dungeon: true }), `${hint.SHARE_HINT} Waiting until you leave the dungeon.`);
+  assert.match(hint.shareHintText({ syncOff: true, discord: true, webhook: true, dungeon: true }), /^Sync is off/);
+
+  const admin = await load('pages/admin.js');
+  const sum = admin.adminSummary({
+    roster: [{ name: 'A', rank_index: 0, online: 1 }, { name: 'B', rank_index: 1, addonOutdated: true }, { name: 'C', rank_index: 3 }],
+    members: [{ id: 1, addonOutdated: false }, { id: 2, appOutdated: true }],
+    backups: [{ file: 'guildcamp-1.db', created: 'x' }],
+  }, 1);
+  assert.deepEqual(sum, { characters: 3, online: 1, officers: 2, people: 2, outdated: 2, backups: 1, newestBackup: { file: 'guildcamp-1.db', created: 'x' } });
+  assert.equal(admin.adminSummary(null, 1).characters, 0);
+
+  const coach = await load('pages/coach.js');
+  assert.equal(coach.aiNoticeText({ available: true }), null);
+  assert.equal(coach.aiNoticeText({ available: false, hasKey: false }, true).link.href, '/settings?section=coach');
+  assert.equal(coach.aiNoticeText({ available: false, hasKey: true, enabled: false }, true).link.href, '/guild-settings?section=coach');
+  assert.match(coach.aiNoticeText({ available: false, hasKey: true, enabled: true, budgetLeft: false }, false).text, /raise your budget/);
+});
+
+test('sidebar: Releases only on a PC that can publish', async () => {
+  const shell = await load('components/Shell.js');
+  const member = { isOfficer: false, isOwner: false };
+  const owner = { isOfficer: true, isOwner: true };
+  const paths = (s, o) => shell.visibleNav(pages.routes, s, o).map((r) => r.path);
+  assert.ok(!paths(owner).includes('/releases'), 'the Guild Master alone is not enough');
+  assert.ok(paths(member, { canPublish: true }).includes('/releases'));
+  assert.ok(paths(member).includes('/guild-settings'));
+  assert.ok(!paths(member).includes('/admin'));
+  assert.ok(paths(owner).includes('/admin'));
+});
+
+test('dev mock: the local core and main process shapes', async () => {
   const gc = gcmod.gc;
   const settings = await gc.invoke('settings.get');
   assert.equal(settings.addonAutoInstall, true);
+  assert.ok(!('serverUrl' in settings) && !('lastEventId' in settings));
+  assert.ok('discordWebhook' in settings && settings.bnetRegion === 'eu');
+  await assert.rejects(gc.invoke('settings.set', { discordWebhook: 'https://evil.example/x' }), (err) => err.status === 400);
   const det = await gc.invoke('wow.detectGuild');
   assert.ok(Array.isArray(det.characters) && det.characters.length > 0);
   for (const k of ['name', 'realm', 'guild', 'faction', 'level', 'class', 'updated', 'install', 'account']) assert.ok(k in det.characters[0], k);
   assert.equal(det.guild.name, det.characters[0].guild);
-  // The default preview member is already in the guild.
-  const events = [];
-  const off = gc.on('membership', (r) => events.push(r));
-  const r = await gc.invoke('guild.autoJoin');
-  off();
-  assert.equal(r.status, 'already');
-  for (const k of ['status', 'guild', 'role', 'via', 'character', 'reason', 'detected']) assert.ok(k in r, k);
-  assert.equal(events.length, 1);
-  assert.deepEqual(await gc.invoke('membership.status'), r);
-  const g = await gc.api.request('GET', '/api/guild');
-  assert.equal(g.guild.auto_join, 'roster');
-  assert.equal(g.guild.officer_rank_max, 1);
-  const saved = await gc.api.request('PUT', '/api/guild/settings', { auto_join: 'verified', officer_rank_max: null });
-  assert.equal(saved.guild.auto_join, 'verified');
-  assert.equal(saved.guild.officer_rank_max, null);
-  await assert.rejects(gc.api.request('PUT', '/api/guild/settings', { officer_rank_max: 12 }), (err) => err.status === 400);
+  // Gone with the server: guild matching, dev sign-in and the membership channel.
+  for (const m of ['guild.autoJoin', 'membership.status', 'auth.devSignIn']) await assert.rejects(gc.invoke(m), (err) => err.status === 501, m);
+  assert.throws(() => gc.on('membership', () => {}), /Unknown event channel/);
+  assert.ok(!gcmod.METHODS.includes('guild.autoJoin') && gcmod.METHODS.includes('calendar.export'));
+
+  // auth.state = the Battle.net state plus who I am in the local core.
+  const auth = await gc.invoke('auth.state');
+  for (const k of ['available', 'signedIn', 'battletag', 'characters', 'user', 'guild', 'role']) assert.ok(k in auth, k);
+  assert.equal(auth.role, 'owner');
   const me = await gc.api.request('GET', '/api/me');
+  assert.deepEqual(Object.keys(me).sort(), ['bnet', 'guild', 'notifyPrefs', 'role', 'user']);
   assert.ok(me.bnet && typeof me.bnet.characters === 'number');
+  assert.equal(me.guild.officer_rank_max, 1);
+  assert.ok(!('invite_code' in me.guild) && !('auto_join' in me.guild));
+  const meta = await gc.api.request('GET', '/api/meta');
+  assert.equal(meta.app, 'guild-camp');
+  assert.equal(typeof meta.blizzard, 'boolean');
+
+  // Guild settings follow the core's rules: the Guild Master sets officer ranks; the webhook lives in Settings.
+  const g = await gc.api.request('GET', '/api/guild');
+  assert.equal(g.guild.officer_rank_max, 1);
+  await assert.rejects(gc.api.request('PUT', '/api/guild/settings', { auto_join: 'off' }), (err) => err.status === 400 && /Nothing to save/.test(err.message));
+  await assert.rejects(gc.api.request('PUT', '/api/guild/settings', { discord_webhook: '' }), (err) => err.status === 400);
+  await assert.rejects(gc.api.request('PUT', '/api/guild/settings', { officer_rank_max: 12 }), (err) => err.status === 400);
+  const before = (await gc.api.request('GET', '/api/members')).members.find((m) => m.battletag.startsWith('Mokra'));
+  assert.equal(before.role, 'member');
+  assert.equal(before.rank_index, 2);
+  const saved = await gc.api.request('PUT', '/api/guild/settings', { officer_rank_max: 2 });
+  assert.equal(saved.guild.officer_rank_max, 2);
+  const after = (await gc.api.request('GET', '/api/members')).members.find((m) => m.battletag.startsWith('Mokra'));
+  assert.equal(after.role, 'officer', 'roles follow the new officer ranks at once');
+  await gc.api.request('PUT', '/api/guild/settings', { officer_rank_max: 1 });
+
+  // The roster carries rank_index; Officer tools has local backups with their full path and no downloads.
+  const roster = await gc.api.request('GET', '/api/roster');
+  assert.ok(roster.characters.every((c) => 'rank_index' in c));
+  const admin = await gc.api.request('GET', '/api/admin');
+  assert.ok(admin.backups.length && admin.backups.every((b) => b.path && b.path.endsWith(b.file)));
+  assert.ok(admin.backupDir && Array.isArray(admin.roster) && admin.knownLocally === true);
+  assert.ok(!('canDownloadBackups' in admin));
+  assert.ok(admin.members.every((m) => !('devices' in m) && !('sync_keys' in m) && !('discord_linked' in m)));
+
+  // Camp onboarding has no Discord or join step; sync has no signed-out or no-guild state.
+  const camp = await gc.api.request('GET', '/api/camp');
+  assert.deepEqual(camp.onboarding.steps.map((x) => x.key), ['synced', 'professions', 'main', 'signup']);
+  const sync = await gc.invoke('sync.status');
+  assert.ok(['off', 'idle', 'syncing', 'error', 'no-game'].includes(sync.state));
+  assert.ok('guildNote' in sync && !('noGuild' in sync));
+  assert.ok(sync.lastResult && 'guild' in sync.lastResult);
+
+  // The Coach key is the player's own; secrets never come back.
+  assert.equal(await gc.invoke('secrets.has', 'anthropicKey'), true);
+  assert.deepEqual(await gc.invoke('secrets.set', 'anthropicKey', ''), { name: 'anthropicKey', set: false, encrypted: true });
+  const coach = await gc.api.request('GET', '/api/coach');
+  assert.equal(coach.ai.hasKey, false);
+  assert.match(coach.ai.reason, /Anthropic API key in Settings/);
+  assert.ok(coach.usage && typeof coach.usage.spentUsd === 'number', 'usage is shown to everyone');
+  await gc.invoke('secrets.set', 'anthropicKey', 'sk-ant-preview');
+  assert.match(await gc.invoke('calendar.export'), /\.ics$/);
+  const pub = await gc.invoke('publisher.status');
+  assert.equal(typeof pub.canPublish, 'boolean');
 });
 
 test('table sorting keeps empties last', () => {
@@ -330,6 +676,21 @@ test('status summaries', () => {
   assert.equal(status.describeSync({ state: 'error' }).kind, 'alarm');
   assert.equal(status.describeSync({ state: 'idle', lastSyncAt: 'x' }).label, 'Synced');
   assert.equal(status.describeSync(null).kind, 'muted');
+  assert.equal(status.describeSync({ state: 'off' }).label, 'Sync is off');
+  assert.equal(status.describeSync({ state: 'no-game' }).kind, 'warn');
+  // No character in a guild yet: the addon's data was read, but there is no guild to keep it for.
+  assert.deepEqual(status.describeSync({ state: 'idle', lastSyncAt: 'x', guildNote: 'None of your characters is in a guild yet.' }),
+    { kind: 'warn', label: 'Waiting for your guild' });
+  assert.equal(status.describeSync({ state: 'idle' }).label, 'Waiting for the game');
+  // Roles from in-game ranks, as the core decides them.
+  assert.equal(status.roleForRank(0, 1), 'owner');
+  assert.equal(status.roleForRank(1, 1), 'officer');
+  assert.equal(status.roleForRank(2, 1), 'member');
+  assert.equal(status.roleForRank(0, null), 'owner');
+  assert.equal(status.roleForRank(1, null), 'member');
+  assert.equal(status.roleForRank(null, 1), null);
+  assert.equal(status.roleForRank('3', '3'), 'officer');
+  assert.equal(status.ROLE_NAMES.owner, 'Guild Master');
   assert.equal(status.describeUpdates({ state: 'downloaded' }, null).label, 'Restart to update');
   assert.equal(status.describeUpdates({ state: 'idle' }, { installs: [{ state: 'outdated' }, { state: 'outdated' }] }).label, '2 addon updates');
   assert.equal(status.describeUpdates({ state: 'idle' }, { installs: [] }), null);
@@ -343,7 +704,7 @@ test('gc wrapper cleans Electron error text and uses the mock outside Electron',
   assert.equal(t.message, 'Raid not found.');
   assert.equal(gcmod.isMock, true);
   const meta = await gcmod.gc.api.request('GET', '/api/meta');
-  assert.equal(meta.server, 'guild-camp');
+  assert.equal(meta.app, 'guild-camp');
   await assert.rejects(gcmod.gc.api.request('GET', '/api/does-not-exist'), (err) => err.status === 404);
   assert.equal(api.qs({ q: 'ore', page: 2, x: '', y: null, z: true }), '?q=ore&page=2&z=1');
 });
@@ -465,14 +826,22 @@ test("a 403 reloads the profile once, so a demoted officer's nav catches up", as
   const realRequest = g.api.request;
   const realState = g.auth.state;
   const asked = [];
-  g.auth.state = async (opts) => { asked.push(opts || null); return { signedIn: true, user: { id: 1 }, guild: { id: 1 }, role: 'member' }; };
-  g.api.request = async () => { throw Object.assign(new Error('Officers only.'), { status: 403 }); };
+  // Roles come from the local guild data (GET /api/me); Battle.net only adds the BattleTag.
+  g.auth.state = async () => ({ available: true, signedIn: false });
+  g.api.request = async (method, path) => {
+    if (method === 'GET' && path === '/api/me') {
+      asked.push(path);
+      return { user: { id: 1, battletag: 'Mokra' }, guild: { id: 1, name: 'Camp' }, role: 'member' };
+    }
+    throw Object.assign(new Error('Officers only.'), { status: 403 });
+  };
   try {
-    session.setSession({ signedIn: true, user: { id: 1 }, guild: { id: 1 }, role: 'officer' });
+    session.setSession({ me: { user: { id: 1 }, guild: { id: 1, name: 'Camp' }, role: 'officer' }, bnet: null });
+    assert.equal(session.getSession().isOfficer, true);
     await assert.rejects(api.api.get('/api/admin/audit'), (err) => err.status === 403 && err.message === 'Officers only.');
     await assert.rejects(api.api.post('/api/raids', {}), (err) => err.status === 403);
     await new Promise((r) => setTimeout(r, 0));
-    assert.deepEqual(asked, [{ refresh: true }], 'one profile reload for a burst of 403s');
+    assert.deepEqual(asked, ['/api/me'], 'one profile reload for a burst of 403s');
     assert.equal(session.getSession().role, 'member');
     assert.equal(session.getSession().isOfficer, false);
     // Other failures don't reload anything; a later 403 (after the gap) does again.
@@ -482,4 +851,139 @@ test("a 403 reloads the profile once, so a demoted officer's nav catches up", as
     g.api.request = realRequest;
     g.auth.state = realState;
   }
+});
+
+test("requests: a crafter who claimed a request can give it back with \"I can't make it\", and it is open again (renderer-1)", async () => {
+  const rq = await load('pages/requests.js');
+  // The buttons follow the core's can* flags, withdraw included.
+  assert.deepEqual(rq.requestActions({ status: 'claimed', canClaim: false, canDone: true, canCancel: false, canWithdraw: true }), ['done', 'withdraw']);
+  assert.deepEqual(rq.requestActions({ status: 'open', canClaim: true }), ['claim']);
+  assert.deepEqual(rq.requestActions({ status: 'claimed', canDone: true, canCancel: true, canWithdraw: false }), ['done', 'cancel']);
+  assert.deepEqual(rq.requestActions(null), []);
+
+  // The dev mock answers like the core: after a claim the crafter may withdraw, which opens the request again.
+  const req = (method, path, body) => gcmod.gc.api.request(method, path, body);
+  const open = (await req('GET', '/api/requests')).requests.find((r) => r.status === 'open' && r.canClaim);
+  assert.ok(open, 'an open request someone else asked for');
+  assert.equal(open.canWithdraw, false);
+  const claimed = await req('POST', `/api/requests/${open.id}/claim`);
+  assert.equal(claimed.message, `You're making ${open.item}.`, 'no promise that the requester sees it already');
+  assert.equal(claimed.request.canWithdraw, true);
+  assert.deepEqual(rq.requestActions(claimed.request), ['done', 'withdraw']);
+  const back = await req('POST', `/api/requests/${open.id}/withdraw`);
+  assert.equal(back.message, `You're no longer making ${open.item}.`);
+  assert.equal(back.request.status, 'open');
+  assert.equal(back.request.crafter_id, null);
+  assert.deepEqual(rq.requestActions(back.request), ['claim']);
+  await assert.rejects(req('POST', `/api/requests/${open.id}/withdraw`), (err) => err.status === 409);
+});
+
+test('raid: before signing up, the reserve picker is read-only and says to sign up first instead of failing with 409 (renderer-4)', async () => {
+  const raid = await load('pages/raid.js');
+  const open = { raid: { status: 'open', kind: 'raid', sr_limit: 2 } };
+  assert.deepEqual(raid.reservesState({ ...open, canReserve: false, needsSignup: true, mySignup: null }),
+    { editable: false, notice: { kind: 'info', text: 'Sign up first, then pick your reserves.' } });
+  assert.deepEqual(raid.reservesState({ ...open, canReserve: true, needsSignup: false, mySignup: { status: 'yes' } }), { editable: true, notice: null });
+  // An older core without needsSignup: reservable but no sign-up means the same thing.
+  assert.equal(raid.reservesState({ ...open, canReserve: true, mySignup: null }).notice.text, raid.SIGN_UP_FIRST);
+  // Locked and closed raids keep their own notices.
+  assert.equal(raid.reservesState({ raid: { status: 'locked' }, canReserve: false, needsSignup: false, mySignup: { status: 'yes' } }).notice.text, 'Reserves are locked. Your picks are shown below.');
+  assert.equal(raid.reservesState({ raid: { status: 'open' }, canReserve: false, needsSignup: false, mySignup: null }).notice.text, 'Reserves are closed for this raid.');
+
+  // The dev mock follows the core: no reserves without a sign-up.
+  const req = (method, path, body) => gcmod.gc.api.request(method, path, body);
+  const made = await req('POST', '/api/raids', { kind: 'raid', title: 'BWL test run', instance: 'Blackwing Lair', starts_at: new Date(Date.now() + 3 * 86400000).toISOString(), sr_limit: 1 });
+  assert.equal(made.message, 'Raid scheduled.', 'no promise of a Discord post before the game sends it');
+  const before = await req('GET', `/api/raids/${made.raid.id}`);
+  assert.equal(before.mySignup, null);
+  assert.equal(before.needsSignup, true);
+  assert.equal(before.canReserve, false);
+  assert.equal(raid.reservesState(before).notice.text, raid.SIGN_UP_FIRST);
+  const itemId = before.items[0].id;
+  await assert.rejects(req('POST', `/api/raids/${made.raid.id}/reserves`, { item_ids: [itemId] }),
+    (err) => err.status === 409 && err.message === 'Sign up for this raid first, then pick your reserves.');
+  await req('POST', `/api/raids/${made.raid.id}/signup`, { character: 'Grimtusk', role: 'tank', status: 'yes' });
+  const after = await req('GET', `/api/raids/${made.raid.id}`);
+  assert.equal(after.needsSignup, false);
+  assert.equal(after.canReserve, true);
+  assert.deepEqual(raid.reservesState(after), { editable: true, notice: null });
+  assert.equal((await req('POST', `/api/raids/${made.raid.id}/reserves`, { item_ids: [itemId] })).message, 'Reserves saved.');
+});
+
+test('guild settings: a save refreshes the app session, so item tooltips and officer roles on other pages follow at once (renderer-2)', async () => {
+  const gs = await load('pages/guild-settings.js');
+  const toasts = await load('lib/toast.js');
+  const g = gcmod.gc;
+  const realRequest = g.api.request;
+  const realState = g.auth.state;
+  const asked = [];
+  g.auth.state = async () => ({ available: true, signedIn: false });
+  g.api.request = async (method, path) => {
+    asked.push(`${method} ${path}`);
+    if (method === 'GET' && path === '/api/me') return { user: { id: 1, battletag: 'Mokra' }, guild: { id: 1, name: 'Camp', wowhead_game: 'classic', officer_rank_max: 3 }, role: 'owner' };
+    throw Object.assign(new Error('unexpected'), { status: 500 });
+  };
+  try {
+    session.setSession({ me: { user: { id: 1 }, guild: { id: 1, name: 'Camp', wowhead_game: 'forever', officer_rank_max: 1 }, role: 'owner' }, bnet: null });
+    let pageGuild = null;
+    const saved = gs.settingsSaved({ guild: { wowhead_game: 'classic' }, messages: ["Item tooltips now use Wowhead's Classic database."] }, (guild) => { pageGuild = guild; });
+    assert.deepEqual(saved, { wowhead_game: 'classic' });
+    assert.deepEqual(pageGuild, { wowhead_game: 'classic' }, 'the page itself shows it at once');
+    for (let i = 0; i < 50 && session.getSession().guild.wowhead_game !== 'classic'; i++) await new Promise((r) => setTimeout(r, 5));
+    assert.deepEqual(asked, ['GET /api/me'], 'the session reads who I am again');
+    assert.equal(session.getSession().guild.wowhead_game, 'classic');
+    assert.equal(session.getSession().guild.officer_rank_max, 3);
+    assert.ok(toasts.toastStore.get().some((t) => t.message === "Item tooltips now use Wowhead's Classic database."));
+  } finally {
+    g.api.request = realRequest;
+    g.auth.state = realState;
+    for (const t of toasts.toastStore.get()) toasts.dismiss(t.id);
+  }
+});
+
+test("releases: the GitHub error shows its first sentence once, not again under the notice's title (K5)", async () => {
+  const rel = await load('pages/releases.js');
+  const msg = "Couldn't read the releases on GitHub. Couldn't reach GitHub (connection refused). Check your internet connection.";
+  assert.equal(rel.withoutTitle(msg, rel.PUBLISHED_ERROR_TITLE), "Couldn't reach GitHub (connection refused). Check your internet connection.");
+  assert.equal(rel.withoutTitle(`${rel.PUBLISHED_ERROR_TITLE} ${msg}`, rel.PUBLISHED_ERROR_TITLE), "Couldn't reach GitHub (connection refused). Check your internet connection.");
+  assert.equal(rel.withoutTitle('GitHub said 502.', rel.PUBLISHED_ERROR_TITLE), 'GitHub said 502.');
+  assert.equal(rel.withoutTitle(rel.PUBLISHED_ERROR_TITLE, rel.PUBLISHED_ERROR_TITLE), '');
+});
+
+test('Discord lines never promise a post before the game sends the change (K6)', async () => {
+  const raids = await load('pages/raids.js');
+  const raid = await load('pages/raid.js');
+  const settings = await load('pages/settings.js');
+  const hint = await load('components/ShareHint.js');
+  for (const line of [raids.SCHEDULE_DISCORD_HINT, raid.CANCEL_DISCORD_HINT, settings.WEBHOOK_SAVED, hint.DISCORD_HINT]) {
+    assert.match(line, /once it goes out/, line);
+    assert.doesNotMatch(line, /\bnow\b|at once|right away/, line);
+  }
+  // No page (or the preview's answers) keeps the old wording.
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  const old = [/Guildies can see it/, /gets a post now/, /Cancelling also posts to your Discord channel\./, /now posts to that Discord channel/, /posted to Discord/, /have been told/, /can see that\./];
+  const files = fs.readdirSync(path.join(R, 'pages')).map((f) => `pages/${f}`).concat(['lib/mocks/community.js', 'lib/mocks/raids.js']);
+  for (const f of files) {
+    const text = fs.readFileSync(path.join(R, f), 'utf8');
+    for (const re of old) assert.doesNotMatch(text, re, `${f}: ${re}`);
+  }
+});
+
+test("admin: after a fresh start the card says unsent changes stay and shared guild data comes back after a log out or /reload, as the core replies (K2)", async () => {
+  const admin = await load('pages/admin.js');
+  assert.match(admin.FRESH_START_HINT, /unsent changes stay/);
+  assert.match(admin.FRESH_START_HINT, /guild data shared in game come back after you log out or type \/reload/);
+  assert.doesNotMatch(admin.FRESH_START_HINT, /next sync/);
+  // The preview answers like the core: the same 403 and the same reply.
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  const core = fs.readFileSync(path.join(R, '..', 'core', 'routes', 'admin.js'), 'utf8');
+  const mock = fs.readFileSync(path.join(R, 'lib', 'mocks', 'admin.js'), 'utf8');
+  const forbidden = core.match(/HttpError\(403, '(Only the Guild Master can wipe[^']*)'\)/)[1];
+  assert.ok(mock.includes(`httpError(403, '${forbidden}')`), forbidden);
+  const tail = 'People, settings and your unsent changes stay. Guild data shared in game comes back after you log out or type /reload.';
+  assert.ok(core.includes(tail) && mock.includes(tail));
+  assert.ok(mock.includes('rows of game data removed from this PC (backup'));
+  assert.doesNotMatch(mock, /People and settings are untouched|wipe the guild’s data/);
 });

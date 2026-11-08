@@ -1,20 +1,26 @@
 'use strict';
-// Backend of the owner-only Releases page: publishes addon and app updates to the guild server
-// with shared/release.js (the same pipeline as scripts/release.js and CI).
+// Backend of the Releases page: publishes addon and app updates as GitHub releases on arrow-quiver/wow
+// with shared/release.js (the same pipeline as scripts/release.js and CI), running the GitHub CLI (gh)
+// on this computer.
 //
-//   const publisher = createPublisher({ store, log, auth, api, getServer, getToken, appVersion, isPackaged, appDir });
+//   const publisher = createPublisher({ store, log, appVersion, isPackaged, appDir });
 //   await publisher.status();
-//   await publisher.publishAddon({ sourceDir, bump, notes, force });   // bump: null | patch | minor | major | beta | "1.2.3"
+//   await publisher.publishAddon({ sourceDir, bump, notes });           // bump: null | patch | minor | major | beta | "1.2.3"
 //   await publisher.publishAddon({ sourceDir, bump, preview: true });  // reads the folder, publishes nothing
-//   await publisher.publishApp({ bump, notes });                       // bump, npm run dist, upload, make it live
+//   await publisher.publishApp({ bump, notes });                       // bump, npm run dist, gh release create
 //   publisher.cancel();                                                // stops a running build or upload
 //   await publisher.setRepoDir(dir | null);
 //   events: 'log' ({ t, kind, level, line }), 'job' ({ kind, startedAt } | null)
 //
-// Uploads use the owner's device token (getToken()); the server's publish endpoints accept it from
-// the guild owner, so no publish token is needed in the app. One job runs at a time. A version
-// bump that doesn't end in a published release is undone, so trying again doesn't skip a number.
-// Plain Node (no Electron), so it is unit tested with temp folders and a local HTTP server.
+// Who can publish: anyone whose computer has a source checkout of Guild Camp, GitHub CLI installed and
+// signed in (gh auth login), with push access to the repo. status().canPublish says so, and
+// status().setup lists what is missing, in order, for the page's setup instructions. There are no
+// guild roles here: publishing is about the code, not the guild.
+//
+// One job runs at a time. A version bump that doesn't end in a published release is undone, so trying
+// again doesn't skip a number. The app build gets the Battle.net credentials from the environment
+// (GUILDCAMP_BNET_CLIENT_ID / _SECRET) or the checkout's .release.json, like scripts/release.js.
+// Plain Node (no Electron), so it is unit tested with temp folders and a fake gh.
 
 const fs = require('fs');
 const path = require('path');
@@ -26,6 +32,8 @@ const version = require('../shared/version');
 const MAX_NOTES = 4000;
 const LOG_KEEP = 400; // lines kept for a page that opens in the middle of a build
 const CHANGELOG_TTL_MS = 60 * 1000;
+const STATUS_TTL_MS = 30 * 1000; // gh checks and the release list are reused this long by status()
+const REPO = sharedRelease.GITHUB_REPO;
 
 const isDir = (p) => { try { return fs.statSync(p).isDirectory(); } catch { return false; } };
 const isFile = (p) => { try { return fs.statSync(p).isFile(); } catch { return false; } };
@@ -61,24 +69,17 @@ function git(cwd, args) {
 
 /**
  * Same result as release.gitChangelog (commit subjects that touched the addon or the app since the
- * previous addon-v* / app-v* tag, release commits left out), but asynchronous.
+ * previous addon-v* / v* tag, release commits left out), but asynchronous.
  */
 async function gitChangelogAsync(repoDir, kind, { max = 60 } = {}) {
   const paths = kind === 'addon' ? ['addon/WowGuild'] : ['app'];
   let prev = '';
-  try { prev = await git(repoDir, ['describe', '--tags', '--abbrev=0', '--match', `${kind}-v*`, 'HEAD^']); } catch { /* first release */ }
+  try { prev = await git(repoDir, ['describe', '--tags', '--abbrev=0', '--match', sharedRelease.TAG_MATCH[kind], 'HEAD^']); } catch { /* first release */ }
   let subjects = [];
   try {
     subjects = (await git(repoDir, ['log', '--no-merges', '--format=%s', prev ? `${prev}..HEAD` : 'HEAD', '--', ...paths])).split(/\r?\n/);
   } catch { /* not a git checkout, or git is missing */ }
-  const seen = new Set();
-  const lines = subjects.map((s) => s.trim())
-    .filter((s) => s && !/^Release (addon|app) v?\d/i.test(s))
-    .filter((s) => (seen.has(s) ? false : seen.add(s)));
-  if (!lines.length) return '- Maintenance release.';
-  const shown = lines.slice(0, max).map((s) => `- ${s}`);
-  if (lines.length > max) shown.push(`- …and ${lines.length - max} more changes.`);
-  return shown.join('\n');
+  return sharedRelease.changelogFrom(subjects, max);
 }
 
 /** null | 'patch' | 'minor' | 'major' | 'beta' | an exact version. Anything else is refused. */
@@ -130,37 +131,94 @@ function plainError(err, { cancelled = false } = {}) {
     const where = err.path ? ` (${err.path})` : '';
     return userError(`Guild Camp couldn't read or change the release files${where}: ${FS_PROBLEMS[err.code]}. Close anything using them and try again.`, undefined, 'files');
   }
-  if (err instanceof Error && ['TypeError', 'ReferenceError', 'SyntaxError', 'RangeError'].includes(err.name)) return err;
   if (err instanceof Error) return err;
   return userError(String(err || 'Publishing failed.'));
+}
+
+/**
+ * The setup checklist for the page, in order. Each step: { id, done, title, detail, command? }.
+ * reason: the first step that isn't done, as one sentence (null when everything is ready).
+ */
+function setupSteps({ repoDir, repoProblem, gh, isPackaged }) {
+  const g = gh || {};
+  const steps = [
+    {
+      id: 'repo',
+      done: Boolean(repoDir),
+      title: 'Get the Guild Camp source code',
+      detail: repoDir ? `Found at ${repoDir}.`
+        : repoProblem || (isPackaged
+          ? 'Clone the repository, run npm install in it, then choose its folder on this page.'
+          : 'Clone the repository and run npm install in it. A development build finds it by itself.'),
+      command: repoDir ? null : `git clone https://github.com/${REPO}.git`,
+    },
+    {
+      id: 'gh',
+      done: Boolean(g.installed),
+      title: 'Install GitHub CLI',
+      detail: g.installed ? `GitHub CLI ${g.version || ''} is installed.`.replace('  ', ' ') : 'Guild Camp publishes with GitHub CLI (gh). Install it from cli.github.com, then restart Guild Camp.',
+      command: g.installed ? null : 'winget install --id GitHub.cli',
+    },
+    {
+      id: 'login',
+      done: Boolean(g.loggedIn),
+      title: 'Sign in to GitHub',
+      detail: g.loggedIn ? `Signed in${g.account ? ` as ${g.account}` : ''}.` : 'Run this in a terminal, choose GitHub.com, and sign in.',
+      command: g.loggedIn ? null : 'gh auth login',
+    },
+    {
+      id: 'push',
+      done: g.push !== false && Boolean(g.loggedIn),
+      title: `Have push access to ${REPO}`,
+      detail: g.push === true ? 'Your account can publish releases.'
+        : g.push === false ? `Your account${g.account ? ` (${g.account})` : ''} can't push to ${REPO}. Ask the owner to add you, or sign in with another account.`
+          : g.loggedIn ? "Couldn't check yet. Publishing tells you if your account isn't allowed." : 'Your GitHub account needs to be able to push to the repository.',
+      command: g.push === false ? 'gh auth login' : null,
+    },
+  ];
+  const first = steps.find((s) => !s.done);
+  let reason = null;
+  if (first) {
+    if (first.id === 'repo') reason = repoProblem || 'Publishing needs a source checkout of Guild Camp on this computer. Choose its folder first.';
+    else if (first.id === 'gh') reason = 'Install GitHub CLI and run gh auth login to publish releases.';
+    else if (first.id === 'login') reason = 'Run gh auth login to sign in to GitHub, then refresh this page.';
+    else reason = g.problem || `Your GitHub account can't push to ${REPO}.`;
+  }
+  return { steps, reason };
 }
 
 /**
  * @param {object} deps
  * @param {object} deps.store   createStore(): get() → settings (repoDir, addonSourceDir), set(patch)
  * @param {object} deps.log     log.scope('publisher')
- * @param {object} deps.auth    auth.state() → { signedIn, role }
- * @param {object} [deps.api]   createApi(): request() for GET /api/releases
- * @param {() => string} deps.getServer
- * @param {() => string|null} deps.getToken   the owner's device token
  * @param {string} deps.appVersion            the running app's version
  * @param {boolean} deps.isPackaged
  * @param {string} deps.appDir                app.getAppPath() (the repo's app/ folder in dev)
+ * @param {string} [deps.gh]                  the gh command or full path (default 'gh' on PATH)
+ * @param {object} [deps.env]                 extra environment for gh and the build (tests point PATH at a fake gh)
+ * @param {typeof fetch} [deps.fetch]         for the public release list when gh can't answer
  * @param {Function} [deps.buildApp]          stand-in for release.buildApp (tests)
- * @param {typeof fetch} [deps.fetch]         stand-in for fetch in uploads (tests)
  * @param {object} [deps.release]             stand-in for shared/release.js (tests)
+ * @param {object|Function} [deps.bnetCredentials]  { clientId, clientSecret } (or a function giving it) to build in,
+ *                                            when neither the environment nor .release.json has them
  */
-function createPublisher({ store, log, auth, api, getServer, getToken, appVersion, isPackaged, appDir, buildApp, fetch: fetchImpl, release: releaseOverride } = {}) {
+function createPublisher({
+  store, log, appVersion, isPackaged, appDir, gh, env, fetch: fetchImpl, buildApp, release: releaseOverride, bnetCredentials,
+} = {}) {
   const rel = releaseOverride || sharedRelease;
   const emitter = new EventEmitter();
   const say = (level, msg) => { try { if (log && typeof log[level] === 'function') log[level](msg); } catch { /* logging never breaks publishing */ } };
   const settings = () => (store && typeof store.get === 'function' ? store.get() : {}) || {};
+  const runEnv = env || undefined;
+  const fullEnv = () => ({ ...process.env, ...(env || {}) });
 
   let job = null; // { kind, startedAt, step, controller }
   let recent = []; // log lines of the current (or last) job
   let lastResult = null;
   let lastError = null;
   let changelogCache = null; // { repo, at, value }
+  let ghCache = null; // { at, value: ghStatus() }
+  let publishedCache = null; // { at, value, error }
 
   // ---- log lines --------------------------------------------------------------------------------
   function line(text, level = 'info') {
@@ -223,56 +281,92 @@ function createPublisher({ store, log, auth, api, getServer, getToken, appVersio
     return value;
   }
 
-  async function fetchPublished() {
-    if (api && typeof api.request === 'function') {
-      try {
-        const data = await api.request('GET', '/api/releases', null, { auth: false, timeout: 20000 });
-        return data && typeof data === 'object' ? data : { app: null, addon: null, history: [] };
-      } catch (err) {
-        if (err && err.status === 404) throw userError("This server doesn't take releases yet (it has no /api/releases). Update the server first.", 404, 'no-releases');
-        throw userError((err && err.message) || "Couldn't read what the server has published.", err && err.status, 'unreachable');
-      }
+  // gh installed, signed in, push access. Cached briefly: it runs gh three times.
+  async function ghInfo({ fresh = false } = {}) {
+    if (!fresh && ghCache && Date.now() - ghCache.at < STATUS_TTL_MS) return ghCache.value;
+    let value;
+    try {
+      value = await rel.ghStatus({ gh, env: runEnv, repo: REPO });
+    } catch (err) {
+      value = { installed: false, version: null, loggedIn: false, account: null, push: null, private: null, problem: err.message };
+    }
+    ghCache = { at: Date.now(), value };
+    return value;
+  }
+
+  // What's on GitHub: through gh when it is signed in (works while the repo is private), else the public list.
+  async function published({ fresh = false, useGh = true } = {}) {
+    if (!fresh && publishedCache && Date.now() - publishedCache.at < STATUS_TTL_MS) {
+      if (publishedCache.error) throw userError(publishedCache.error, undefined, 'unreachable');
+      return publishedCache.value;
     }
     try {
-      return await rel.getReleases(getServer(), { fetch: fetchImpl });
+      const value = await rel.getReleases({ gh, env: runEnv, fetch: fetchImpl, repo: REPO, useGh, userAgent: `GuildCamp/${appVersion || '0.0.0'}` });
+      publishedCache = { at: Date.now(), value, error: null };
+      return value;
     } catch (err) {
-      throw plainError(err);
+      const message = `Couldn't read the releases on GitHub. ${err.message}`;
+      publishedCache = { at: Date.now(), value: null, error: message };
+      throw userError(message, err.status, 'unreachable');
     }
   }
 
-  function who() {
-    const s = auth && typeof auth.state === 'function' ? auth.state() : {};
-    const token = typeof getToken === 'function' ? getToken() : null;
-    let reason = null;
-    if (!s.signedIn || !token) reason = 'Sign in to publish releases.';
-    else if (s.role !== 'owner') reason = 'Only the guild owner can publish releases.';
-    return { signedIn: Boolean(s.signedIn && token), role: s.role || null, canPublish: !reason, reason, token };
+  function bnetInfo(repo) {
+    let config = {};
+    if (repo) {
+      try { config = JSON.parse(fs.readFileSync(path.join(repo, '.release.json'), 'utf8')) || {}; } catch { /* none, or not JSON */ }
+    }
+    try {
+      const found = rel.bnetCredentialsFrom({ env: fullEnv(), config });
+      if (found) return { creds: found, ready: true, from: found.from, problem: null };
+    } catch (err) {
+      return { creds: null, ready: false, from: null, problem: err.message };
+    }
+    const injected = typeof bnetCredentials === 'function' ? bnetCredentials() : bnetCredentials;
+    if (injected && injected.clientId && injected.clientSecret) {
+      return { creds: { clientId: injected.clientId, clientSecret: injected.clientSecret, from: 'this app' }, ready: true, from: 'this app', problem: null };
+    }
+    return { creds: null, ready: false, from: null, problem: null };
   }
 
-  function requirePublisher() {
-    const w = who();
-    if (!w.canPublish) throw userError(w.reason, w.signedIn ? 403 : 401, 'not-owner');
-    return w.token;
+  function who(repo, ghValue) {
+    const { steps, reason } = setupSteps({ repoDir: repo.dir, repoProblem: repo.problem, gh: ghValue, isPackaged });
+    return { canPublish: !reason, reason, steps };
+  }
+
+  async function requirePublisher() {
+    const repo = repoInfo();
+    const g = await ghInfo({ fresh: !ghCache || Date.now() - ghCache.at > 5000 });
+    const w = who(repo, g);
+    if (!w.canPublish) throw userError(w.reason, 403, 'cannot-publish');
+    return { repo, gh: g };
   }
 
   // ---- status -----------------------------------------------------------------------------------
   async function status() {
-    const w = who();
     const repo = repoInfo();
     const addonDir = defaultAddonDir(repo.dir);
     const appSrc = readApp(repo.dir);
-    let published = null;
+    const [g, notes] = await Promise.all([ghInfo(), changelog(repo.dir)]);
+    let pub = null;
     let publishedError = null;
-    const [, notes] = await Promise.all([
-      fetchPublished().then((p) => { published = p; }, (err) => { publishedError = err.message; }),
-      changelog(repo.dir),
-    ]);
+    try {
+      pub = await published({ useGh: Boolean(g.loggedIn) });
+    } catch (err) {
+      publishedError = err.message;
+    }
+    const w = who(repo, g);
+    const bnet = bnetInfo(repo.dir);
     return {
       canPublish: w.canPublish,
       reason: w.reason,
-      signedIn: w.signedIn,
-      role: w.role,
-      server: typeof getServer === 'function' ? getServer() : null,
+      setup: {
+        steps: w.steps,
+        gh: { installed: g.installed, version: g.version, loggedIn: g.loggedIn, account: g.account, push: g.push, problem: g.problem || null, note: g.note || null },
+      },
+      repo: REPO,
+      releasesUrl: rel.releasesPage(REPO),
+      repoPrivate: typeof g.private === 'boolean' ? g.private : null,
       isPackaged: Boolean(isPackaged),
       runningVersion: appVersion || '0.0.0',
       repoDir: repo.dir,
@@ -282,8 +376,9 @@ function createPublisher({ store, log, auth, api, getServer, getToken, appVersio
       addonSource: addonDir ? readAddon(addonDir) : null,
       appSource: appSrc,
       appVersion: (appSrc && appSrc.version) || appVersion || '0.0.0',
-      published: published ? { app: published.app || null, addon: published.addon || null, history: Array.isArray(published.history) ? published.history : [] } : null,
+      published: pub ? { app: pub.app || null, addon: pub.addon || null, history: Array.isArray(pub.history) ? pub.history : [] } : null,
       publishedError,
+      bnet: { ready: bnet.ready, from: bnet.from, problem: bnet.problem },
       building: Boolean(job),
       job: job ? { kind: job.kind, startedAt: job.startedAt, step: job.step } : null,
       canCancel: Boolean(job),
@@ -295,25 +390,27 @@ function createPublisher({ store, log, auth, api, getServer, getToken, appVersio
   }
 
   // ---- jobs -------------------------------------------------------------------------------------
-  // Works out the version to publish and refuses early (before a long build) when the server
-  // already has it or something newer. Same rule as scripts/release.js.
-  function planVersion(kind, current, bump, published, force) {
+  // Works out the version to publish and refuses early (before a long build) when GitHub already has
+  // that release, or a newer version. Same rule as scripts/release.js.
+  async function planVersion(kind, current, bump, pub) {
     const where = kind === 'addon' ? 'WowGuild.toc' : 'app/package.json';
     const next = bump ? rel.nextVersion(current, bump, where) : current;
     if (!version.valid(next)) {
       throw userError(`The ${kind} version in ${where} ("${next || ''}") isn't valid. Choose an exact version like 1.2.3.`, 400, 'bad-version');
     }
-    // The addon bundled in the server image (source 'bundled') only stands in until one is
-    // published: the server accepts any first upload over it, so it doesn't count here.
-    const rec = published && published[kind];
-    const live = rec && rec.source !== 'bundled' ? rec.version : null;
-    if (live && !version.gt(next, live) && !(kind === 'addon' && force)) {
-      const hint = kind === 'addon'
-        ? 'Choose a bump (patch, for example), or tick "Roll back" to publish this version anyway.'
-        : 'Choose a bump (patch, for example) or an exact newer version.';
-      throw userError(`The server already has ${kind} ${live}, and ${next} isn't newer. ${hint}`, 409, 'not-newer');
+    const tag = rel.tagFor(kind, next);
+    const live = pub && pub[kind] ? pub[kind].version : null;
+    const info = await rel.ghReleaseInfo(tag, { gh, env: runEnv, repo: REPO });
+    if (info.exists && !info.draft) {
+      throw userError(`GitHub already has the release ${tag}. Choose a bump (patch, for example) or an exact newer version.`, 409, 'exists');
     }
-    return { next, live: live || null };
+    if (info.exists && info.draft) {
+      line(`GitHub has an unfinished draft release for ${tag} (from a cancelled upload). Delete it on GitHub when you can.`, 'warn');
+    }
+    if (live && !version.gt(next, live)) {
+      throw userError(`GitHub already has ${kind} ${live}, and ${next} isn't newer. Choose a bump (patch, for example) or an exact newer version.`, 409, 'not-newer');
+    }
+    return { next, tag, live };
   }
 
   async function runJob(kind, fn) {
@@ -327,7 +424,7 @@ function createPublisher({ store, log, auth, api, getServer, getToken, appVersio
     emitter.emit('job', { kind, startedAt: job.startedAt });
     try {
       const result = await fn(controller.signal, (step) => { if (job) job.step = step; });
-      lastResult = { kind, version: result.version, at: new Date().toISOString() };
+      lastResult = { kind, version: result.version, url: result.url || null, at: new Date().toISOString() };
       return result;
     } catch (err) {
       const e = plainError(err, { cancelled: controller.signal.aborted });
@@ -337,6 +434,7 @@ function createPublisher({ store, log, auth, api, getServer, getToken, appVersio
     } finally {
       job = null;
       changelogCache = null; // versions (and maybe commits) changed
+      publishedCache = null;
       emitter.emit('job', null);
     }
   }
@@ -372,9 +470,11 @@ function createPublisher({ store, log, auth, api, getServer, getToken, appVersio
     return { preview: true, dir: found.dir, version: found.version, next, problem };
   }
 
+  const ghLine = (l) => line(l);
+
   /**
-   * Bumps (optional), zips and uploads the WowGuild addon.
-   * → { kind: 'addon', version, previous, dir, fileName, size, files, result } (result = the server's reply)
+   * Bumps (optional), zips and publishes the WowGuild addon as release addon-v<version>.
+   * → { kind: 'addon', version, previous, dir, fileName, size, files, tag, url }
    */
   async function publishAddon(opts = {}) {
     const o = opts && typeof opts === 'object' ? opts : {};
@@ -386,17 +486,15 @@ function createPublisher({ store, log, auth, api, getServer, getToken, appVersio
     if (!sourceDir) throw userError('Choose the WowGuild addon folder to publish.', 400, 'no-folder');
     if (o.preview) return previewAddon(sourceDir, bump);
 
-    const token = requirePublisher();
     const notes = cleanNotes(o.notes);
-    const force = Boolean(o.force);
-    const server = getServer();
+    await requirePublisher();
 
     return runJob('addon', async (signal, step) => {
       const dir = rel.resolveAddonDir(sourceDir);
       const current = rel.readAddonVersion(dir);
       line(`Publishing the addon from ${dir}`);
-      const published = await fetchPublished();
-      const plan = planVersion('addon', current, bump, published, force);
+      const pub = await published({ fresh: true });
+      const plan = await planVersion('addon', current, bump, pub);
       checkCancelled(signal);
 
       const tocFile = path.join(dir, 'WowGuild.toc');
@@ -408,17 +506,18 @@ function createPublisher({ store, log, auth, api, getServer, getToken, appVersio
           bumped = true;
           line(`Addon version: ${current} → ${plan.next} (WowGuild.toc)`);
         } else {
-          line(`Addon version: ${plan.next}${force && plan.live ? ` (rolling back from ${plan.live})` : ''}`);
+          line(`Addon version: ${plan.next}`);
         }
         step('pack');
         const pack = rel.packAddon(dir);
         line(`Packed ${pack.files.length} files: ${pack.fileName}, ${rel.formatBytes(pack.size)}`);
         checkCancelled(signal);
         step('upload');
-        const result = await rel.publishAddon({ server, token, pack, notes, force, onLog: (l) => line(l), signal, fetch: fetchImpl });
+        const out = await rel.publishAddon({ pack, notes, gh, env: runEnv, repo: REPO, onLog: ghLine, signal });
+        if (bumped) line('Commit the new version in WowGuild.toc and push it, so the code on GitHub matches the release.');
         return {
           kind: 'addon', version: pack.version, previous: current, dir, fileName: pack.fileName,
-          size: pack.size, files: pack.files.length, result,
+          size: pack.size, files: pack.files.length, tag: out.tag, url: out.url,
         };
       } catch (err) {
         if (bumped) restore(saved, `Put WowGuild.toc back to ${current}, because the addon wasn't published.`);
@@ -428,33 +527,30 @@ function createPublisher({ store, log, auth, api, getServer, getToken, appVersio
   }
 
   /**
-   * Bumps (optional) app/package.json, builds the installer (npm run dist, a few minutes), uploads it
-   * and makes it live. Needs a source checkout with npm install done.
-   * → { kind: 'app', version, previous, files: [{ name, size, sha512 }], result }
+   * Bumps (optional) app/package.json, builds the installer (npm run dist, a few minutes) and publishes
+   * it as release v<version>, marked Latest. Needs a source checkout with npm install done.
+   * → { kind: 'app', version, previous, files: [{ name, size, sha512 }], tag, url }
    */
   async function publishApp(opts = {}) {
     const o = opts && typeof opts === 'object' ? opts : {};
     const bump = cleanBump(o.bump);
     const notes = cleanNotes(o.notes);
-    const token = requirePublisher();
-    const repo = repoInfo();
-    if (!repo.dir) {
-      throw userError(repo.problem || 'Building the app needs a source checkout of Guild Camp (with npm install done). Choose its folder first.', 400, 'no-repo');
-    }
+    const { repo } = await requirePublisher();
     const appSrc = path.join(repo.dir, 'app');
-    const server = getServer();
+    const bnet = bnetInfo(repo.dir);
+    if (bnet.problem) throw userError(bnet.problem, 400, 'bnet-half');
 
     return runJob('app', async (signal, step) => {
       const current = rel.readAppVersion(appSrc);
       line(`Publishing the app from ${repo.dir}`);
-      // Check the server before a build that takes minutes.
-      const published = await fetchPublished();
-      const plan = planVersion('app', current, bump, published, false);
+      // Check GitHub before a build that takes minutes.
+      const pub = await published({ fresh: true });
+      const plan = await planVersion('app', current, bump, pub);
       checkCancelled(signal);
       const builder = ['electron-builder', 'electron-builder.cmd'];
       const hasBuilder = [path.join(appSrc, 'node_modules', '.bin'), path.join(repo.dir, 'node_modules', '.bin')]
         .some((bin) => builder.some((b) => exists(path.join(bin, b))));
-      if (!buildApp && !hasBuilder) line("electron-builder isn't installed in this checkout. If the build fails, run npm install at the repo root first.", 'warn');
+      if (!buildApp && !hasBuilder) line("electron-builder isn't installed in this checkout. If the build fails, run npm install in the app folder first.", 'warn');
 
       const saved = snapshot([path.join(appSrc, 'package.json'), path.join(appSrc, 'package-lock.json')]);
       let bumped = false;
@@ -467,15 +563,18 @@ function createPublisher({ store, log, auth, api, getServer, getToken, appVersio
           line(`App version: ${plan.next}`);
         }
         step('build');
-        const { distDir } = await (buildApp || rel.buildApp)(appSrc, { onLog: (l) => line(l), signal });
+        const { distDir } = await (buildApp || rel.buildApp)(appSrc, {
+          onLog: (l) => line(l), onWarn: (l) => line(l, 'warn'), signal, env: runEnv, bnet: bnet.creds || null,
+        });
         checkCancelled(signal);
         const build = rel.readAppBuild(distDir);
         if (build.version !== plan.next) {
           throw userError(`The build in ${distDir} is version ${build.version}, but app/package.json says ${plan.next}. The build probably failed; check the output above.`, undefined, 'mismatch');
         }
         step('upload');
-        const out = await rel.publishApp({ server, token, distDir, notes, onLog: (l) => line(l), signal, fetch: fetchImpl });
-        return { kind: 'app', version: out.version, previous: current, files: out.files, result: out.result };
+        const out = await rel.publishApp({ distDir, notes, gh, env: runEnv, repo: REPO, onLog: ghLine, signal });
+        if (bumped) line('Commit the new version in app/package.json (and package-lock.json) and push it, so the code on GitHub matches the release.');
+        return { kind: 'app', version: out.version, previous: current, files: out.files, tag: out.tag, url: out.url };
       } catch (err) {
         if (bumped) restore(saved, `Put app/package.json back to ${current}, because the app wasn't published.`);
         throw err;
@@ -503,7 +602,7 @@ function createPublisher({ store, log, auth, api, getServer, getToken, appVersio
     if (typeof dir !== 'string' || !path.isAbsolute(dir.trim())) throw userError('That folder is not a full path.', 400, 'bad-folder');
     const picked = path.resolve(dir.trim());
     // People often pick the app or addon folder (or addon\WowGuild) instead of the checkout itself.
-    const found = [picked, path.dirname(picked), path.dirname(path.dirname(picked))].find(looksLikeRepo);
+    const found = [picked, path.dirname(picked), path.dirname(path.dirname(picked))].find((d) => isDir(d) && looksLikeRepo(d));
     if (!found) {
       throw userError('That folder isn\'t a Guild Camp source checkout. Choose the folder that holds "app" and "addon" (with the addon in addon\\WowGuild).', 400, 'not-repo');
     }
@@ -516,4 +615,4 @@ function createPublisher({ store, log, auth, api, getServer, getToken, appVersio
   return Object.assign(emitter, { status, publishAddon, publishApp, cancel, setRepoDir, isBusy: () => Boolean(job) });
 }
 
-module.exports = { createPublisher, looksLikeRepo, findRepoFrom, cleanBump, cleanNotes, plainError, gitChangelogAsync, MAX_NOTES };
+module.exports = { createPublisher, looksLikeRepo, findRepoFrom, cleanBump, cleanNotes, plainError, gitChangelogAsync, setupSteps, MAX_NOTES };

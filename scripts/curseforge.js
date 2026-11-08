@@ -8,7 +8,7 @@
 //   CF_API_TOKEN=... node scripts/curseforge.js addon-v0.11.1
 //
 // scripts/release.js addon --curseforge calls uploadToCurseForge() with the same zip it
-// publishes to the Guild Camp server.
+// publishes as a GitHub release.
 // The project id comes from "## X-Curse-Project-ID:" in WowGuild.toc (or CF_PROJECT_ID).
 const fs = require('fs');
 const path = require('path');
@@ -69,7 +69,7 @@ function releaseTypeFor(versionOrTag) {
   return /alpha/i.test(s) ? 'alpha' : /beta/i.test(s) ? 'beta' : 'release';
 }
 
-// The zip holds one WowGuild/ folder, like every addon zip (the same zip the server gets).
+// The zip holds one WowGuild/ folder, like every addon zip (the same zip the GitHub release gets).
 function buildZip(dir = ADDON_DIR) {
   const pack = release.packAddon(dir);
   return { zip: pack.zip, files: pack.files, pack };

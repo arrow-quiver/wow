@@ -1,6 +1,6 @@
 -- Guild Camp: the Coach. Learns how you play (outside combat only), keeps your quiz answers,
--- reads talents and gear, and works out your next steps. The Guild Camp app carries it to the
--- guild server, where Claude writes your build plan and answers questions; they come back in the inbox.
+-- reads talents and gear, and works out your next steps. The Guild Camp app reads it from your saved
+-- data on this computer, has Claude write your build plan and answer your questions, and puts them in the inbox.
 local ADDON, ns = ...
 local C = {}
 ns.coach = C
@@ -246,7 +246,7 @@ function C.stats(ch)
   }
 end
 
--- Refresh everything the guild server needs (called on login, every few minutes and at logout).
+-- Refresh everything the Guild Camp app needs (called on login, every few minutes and at logout).
 function C.refresh()
   if not ns.db or not safe() then return end
   local ch = C.char()

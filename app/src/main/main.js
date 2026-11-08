@@ -2,49 +2,55 @@
 // Guild Camp main process entry.
 //
 // Responsibilities: single instance, guildcamp:// links, app lifecycle, building the services in
-// order (log → store → api → auth → wow → sync → addon → membership → updater → publisher → events →
-// ipc → window → tray), start-hidden in the tray, quitting, and the --smoke screenshot run.
+// order (log → store → credentials → auth → wow → addon → updater → local core → api → sync → publisher →
+// notify → session → ipc → window → tray), start-hidden in the tray, quitting, and the --smoke screenshot run.
 //
-// After "Sign in with Battle.net" everything else happens here by itself:
-//   - sync and the event feed start; the addon check runs again (it installs the addon into game
-//     folders that don't have it, where the game version is supported)
-//   - while signed in without a guild, membership.js asks the server to match the member to its guild
-//     right away, every 60 s, and whenever the game saves (the sync upload tries too and reports
-//     'joined' / 'no-guild'); once in a guild, sync uploads at once
-//   - the first sign-in of an installed app turns "start with Windows" on once (startupDefaulted)
+// There is no Guild Camp server. The guild data lives in the local core (src/core): an Express app on
+// 127.0.0.1 with a per-launch token, inside this process, over userData/guildcamp.db. Everything works
+// without Battle.net: sync starts at once, the guild comes from the game's saved data, roles from in-game
+// ranks. Battle.net sign-in (auth.js, optional) only adds the BattleTag and the character list, which go
+// to the core with core.setIdentity().
+//
+// Notifications come from the core's event bus (core.emitter 'event') → native notification + the
+// renderer's 'server-event' channel (same name as before, so pages keep working).
 //
 // Command line:
 //   --hidden                 start in the tray (used by "start with Windows")
 //   --dev                    dev conveniences (reload keys, log echo); unpackaged runs get them anyway
-//   --user-data <dir>        use another user data folder (also env GUILDCAMP_USER_DATA)
-//   --smoke                  open the window, screenshot routes, write smoke-report.json, exit 0/1
-//   --smoke-login=<BattleTag>   dev sign-in first (needs a DEV_LOGIN server via GUILDCAMP_SERVER)
-//   --smoke-routes=/,/raids     routes to capture (default: every route the renderer reports)
-//   --smoke-out=<dir>           where screenshots go (default app/dist/smoke)
-//   --smoke-scan                let a smoke run look in the usual game folders (off by default)
-// Env: GUILDCAMP_SERVER overrides the server address at startup.
+//   --user-data <dir>        use another user data folder (also env GUILDCAMP_USER_DATA); not for smoke runs
+//   --smoke                  open the window, screenshot routes, write smoke-report.json, exit 0/1. Always in its
+//                            own user data folder (<smoke out>/user-data), whatever GUILDCAMP_USER_DATA says
+//   --smoke-user-data <dir>  a smoke run's user data folder instead (a scratch folder with fake game folders)
+//   --smoke-seed             fill the local data with a demo guild first (and pretend to be signed in
+//                            to Battle.net as the demo player), so every page has something to show
+//   --smoke-routes=/,/raids  routes to capture (default: every route the renderer reports)
+//   --smoke-out=<dir>        where screenshots go (default app/dist/smoke)
+//   --smoke-scan             let a smoke run look in the usual game folders (off by default)
 
 const fs = require('fs');
 const path = require('path');
-const { joinedResult } = require('./membership');
+const { EventEmitter } = require('events');
 
 const APP_ID = 'com.arrowquiver.guildcamp';
 const PROTOCOL = 'guildcamp';
-const SMOKE_TIMEOUT_MS = 90000;
+const SMOKE_TIMEOUT_MS = 120000;
 const SMOKE_READY_WAIT_MS = 30000;
 const SMOKE_ROUTE_WAIT_MS = 1500;
 const UPDATE_CHECK_MS = 30 * 60 * 1000;
 const ADDON_CHECK_MS = 60 * 60 * 1000;
-// Roles change on the server (an officer promotes or demotes someone): the profile is read again on
-// this timer while signed in, and when the window is shown or focused (at most every PROFILE_FOCUS_GAP_MS).
-const PROFILE_REFRESH_MS = 5 * 60 * 1000;
-const PROFILE_FOCUS_GAP_MS = 20 * 1000;
+
+// GET endpoints the pages use; a smoke run checks that each answers, so a broken one shows in the report.
+const SMOKE_API_PATHS = [
+  '/api/me', '/api/meta', '/api/camp', '/api/activity', '/api/roster', '/api/crafters', '/api/requests', '/api/partners',
+  '/api/raids', '/api/loot', '/api/bank', '/api/bank/alts', '/api/prices', '/api/drives', '/api/coach', '/api/guild',
+  '/api/members', '/api/admin', '/api/admin/status', '/api/inbox', '/api/calendar.ics',
+];
 
 // ---------------------------------------------------------------------------------------------
 // Pure helpers (exported for tests)
 
 function parseArgs(argv) {
-  const out = { hidden: false, dev: false, smoke: false, smokeScan: false, userData: null, smokeLogin: null, smokeRoutes: null, smokeOut: null };
+  const out = { hidden: false, dev: false, smoke: false, smokeScan: false, smokeSeed: false, userData: null, smokeUserData: null, smokeRoutes: null, smokeOut: null };
   const list = Array.isArray(argv) ? argv : [];
   for (let i = 0; i < list.length; i++) {
     const arg = list[i];
@@ -66,8 +72,9 @@ function parseArgs(argv) {
       case '--dev': out.dev = true; break;
       case '--smoke': out.smoke = true; break;
       case '--user-data': out.userData = value(); break;
-      case '--smoke-login': out.smokeLogin = value(); break;
       case '--smoke-scan': out.smokeScan = true; break;
+      case '--smoke-seed': out.smokeSeed = true; break;
+      case '--smoke-user-data': out.smokeUserData = value(); break;
       case '--smoke-out': out.smokeOut = value(); break;
       case '--smoke-routes': {
         const v = value();
@@ -88,7 +95,6 @@ function findDeepLink(argv) {
 }
 
 /**
- * guildcamp://join/<code> → "/welcome?join=<code>".
  * guildcamp://raids/12, guildcamp://characters/Name, guildcamp://coach … → the same app route.
  * Anything else → null (just focus the app).
  */
@@ -103,15 +109,29 @@ function deepLinkRoute(url) {
   } catch {
     return null;
   }
-  if (parts[0] && parts[0].toLowerCase() === 'join' && parts[1] && /^[A-Za-z0-9_-]{1,64}$/.test(parts[1])) {
-    return `/welcome?join=${encodeURIComponent(parts[1])}`;
-  }
   const first = (parts[0] || '').toLowerCase();
   if (DEEP_LINK_ROOTS.has(first) && parts.length <= 3 && parts.every((p) => /^[\p{L}\p{N} _'-]{1,64}$/u.test(p))) {
     return `/${[first, ...parts.slice(1)].map((p) => encodeURIComponent(p)).join('/')}`;
   }
   return null;
 }
+
+/**
+ * The user data folder to use instead of Electron's default, or null for the default.
+ * A smoke run always gets its own (--smoke-user-data, else <smokeOut>/user-data): GUILDCAMP_USER_DATA and
+ * --user-data are for dev runs and never point a smoke run at a real or dev profile.
+ */
+function pickUserDataDir(args, env, smokeOut) {
+  const a = args || {};
+  const e = env || {};
+  if (a.smoke) return path.resolve(a.smokeUserData || path.join(smokeOut, 'user-data'));
+  const dir = a.userData || e.GUILDCAMP_USER_DATA || null;
+  return dir ? path.resolve(dir) : null;
+}
+
+// A smoke run's settings for that run only (store overrides, never written to settings.json): nothing installs,
+// updates, syncs or notifies in the background.
+const SMOKE_SETTINGS = Object.freeze({ addonAutoUpdate: false, addonAutoInstall: false, appAutoUpdate: false, syncEnabled: false, notifications: false });
 
 /** "/" → "home", "/guild-settings" → "guild-settings", "/raids?x=1" → "raids-x-1". */
 function routeSlug(route) {
@@ -127,96 +147,156 @@ function detectRepoDir(appDir) {
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/**
- * fn, but at most once per gapMs: calls in between are dropped (returns false). mark() counts as a
- * call without running fn (for a refresh that already happened another way).
- */
-function throttle(fn, gapMs, now = Date.now) {
-  let last = -Infinity;
-  const run = (...args) => {
-    const t = now();
-    if (t - last < gapMs) return false;
-    last = t;
-    fn(...args);
-    return true;
+/** What the core needs from a Battle.net state: the BattleTag and characters, or nothing when signed out. */
+function identityOf(authState) {
+  const s = authState && typeof authState === 'object' ? authState : {};
+  if (!s.signedIn) return { battletag: null, characters: [] };
+  return {
+    battletag: typeof s.battletag === 'string' ? s.battletag : null,
+    characters: Array.isArray(s.characters) ? s.characters : [],
+    profileAt: s.profileAt || null,
   };
-  run.mark = () => { last = now(); };
-  return run;
 }
 
 /**
- * Wires the automatic "sign in → join the guild → sync" flow between the services. Plain Node (the
- * services are injected), so it is tested without Electron. Returns the auth 'change' handler; call
- * it once with auth.state() at startup.
+ * The session the renderer sees as auth.*: Battle.net sign-in in the app (auth.js) plus who I am in the
+ * local core (user, guild, role from in-game ranks). Plain Node, tested without Electron.
  *
- * @param {object} d
- * @param {object} d.auth @param {object} d.sync @param {object} d.events @param {object} d.addon
- * @param {object} d.membership @param {object} d.store @param {object} d.startup @param {object} d.log
- * @param {boolean} d.isPackaged  "start with Windows" is only defaulted in an installed app
+ *   const session = createSession({ auth, core, log });
+ *   session.state() → { ...auth.state(), user, guild, role }
+ *   session.signIn() / signOut() / refresh() → state
+ *   session.on('change', (state) => ...)   Battle.net changed, or the core's session did (first sync made the
+ *                                           guild, a new rank made me an officer, ...)
+ * Battle.net changes are passed on to the core (core.setIdentity) as they happen.
  */
-function wireSession({ auth, sync, events, addon, membership, store, startup, log, isPackaged }) {
-  const background = (fn, what) => Promise.resolve().then(fn).catch((err) => log.warn(`${what}: ${err.message}`));
-  let wasSignedIn = null;
-  let hadGuild = null;
-  // "First sign-in": only a sign-in that happens while the app runs counts, so people who were already
-  // signed in before this version keep the choice they made.
-  let sawSignedOut = false;
+function createSession({ auth, core, log }) {
+  const emitter = new EventEmitter();
+  let lastIdentity = null;
+  let lastEmitted = null;
 
-  function defaultStartup(s) {
-    if (!isPackaged || !sawSignedOut || !s.user || store.get().startupDefaulted) return;
-    let on = false;
-    if (startup && startup.supported) {
-      try { on = Boolean(startup.set(true)); } catch (err) { log.warn(`Couldn't turn on "start with Windows": ${err.message}`); }
+  const local = () => {
+    try { return core.session(); } catch (err) {
+      if (log) log.warn(`Couldn't read your guild details: ${err.message}`);
+      return { user: null, guild: null, role: null };
     }
-    store.set({ startWithWindows: on, startupDefaulted: true });
-    if (on) log.info('Guild Camp now starts with Windows, in the tray, so your guild stays in sync. Turn this off in Settings.');
-  }
-
-  const applyAuth = (s) => {
-    const state = s || {};
-    if (state.signedIn !== wasSignedIn) {
-      const first = wasSignedIn === null;
-      wasSignedIn = Boolean(state.signedIn);
-      if (state.signedIn) {
-        sync.start();
-        events.start();
-        // A fresh sign-in: look for game folders and install the addon now, not at the next hourly check.
-        if (!first) background(() => addon.check(), 'Addon check failed');
-      } else {
-        sawSignedOut = true;
-        sync.stop();
-        events.stop();
-        membership.stop({ forget: true });
-      }
-    }
-    if (!state.signedIn) {
-      hadGuild = null;
-      return;
-    }
-    const inGuild = Boolean(state.guild);
-    if (inGuild) {
-      membership.stop();
-      // Just joined (automatically, by invite or by setting up the guild): waiting uploads go now.
-      if (hadGuild === false) sync.clearNoGuild();
-    } else {
-      membership.start();
-    }
-    hadGuild = inGuild;
-    defaultStartup(state);
+  };
+  const state = () => {
+    const a = (auth && auth.state()) || {};
+    const l = local();
+    return { ...a, user: l.user || null, guild: l.guild || null, role: l.role || null };
+  };
+  const pushIdentity = (authState) => {
+    const id = identityOf(authState);
+    const key = JSON.stringify([id.battletag, id.characters]);
+    if (key === lastIdentity) return;
+    lastIdentity = key;
+    core.setIdentity(id);
+  };
+  const changed = () => {
+    const s = state();
+    const json = JSON.stringify(s);
+    if (json === lastEmitted) return s;
+    lastEmitted = json;
+    emitter.emit('change', s);
+    return s;
   };
 
-  // An upload put the member into the guild, or the server still has no guild for them.
-  sync.on('joined', (joined) => {
-    membership.record(joinedResult(joined));
-    background(() => auth.refresh(), "Couldn't load your profile");
-  });
-  sync.on('no-guild', (info) => {
-    if (info && info.autoJoin) membership.record(info.autoJoin);
-    else background(() => membership.kick(), 'Guild check failed');
-  });
+  lastIdentity = JSON.stringify((() => { const id = identityOf(auth && auth.state()); return [id.battletag, id.characters]; })());
+  lastEmitted = JSON.stringify(state());
+  if (auth && typeof auth.on === 'function') {
+    auth.on('change', (s) => {
+      try { pushIdentity(s); } catch (err) { if (log) log.warn(`Couldn't save your Battle.net details: ${err.message}`); }
+      changed();
+    });
+  }
+  if (core && core.emitter) core.emitter.on('session', () => changed());
 
-  auth.on('change', applyAuth);
-  return applyAuth;
+  const after = (fn) => async (...args) => {
+    await fn(...args);
+    pushIdentity(auth.state());
+    return changed();
+  };
+  return Object.assign(emitter, {
+    state,
+    signIn: after(() => auth.signIn()),
+    signOut: after(() => auth.signOut()),
+    refresh: after(() => (typeof auth.refresh === 'function' ? auth.refresh() : null)),
+  });
+}
+
+/**
+ * The background sync engine (sync.js), wired to the local core: a change queued for the guild (the core's
+ * 'outbox' event, after sharing.queue()) rewrites the inbox within 2 s, without waiting for an upload.
+ */
+function createAppSync({ core, ...deps }) {
+  const { createSync } = require('./sync');
+  return createSync({ ...deps, coreEvents: core && core.emitter });
+}
+
+/**
+ * A game folder that just got the addon gets its news folder (WowGuild_Inbox) within a second or two, through the
+ * same writer as every sync. Left to the next upload or the 5-minute refresh, the news folder could appear while the
+ * game runs, and only a game restart loads a new addon folder. → stop()
+ */
+function wireInboxAfterInstall({ addon, sync }) {
+  if (!addon || typeof addon.on !== 'function' || !sync || typeof sync.outboxChanged !== 'function') return () => {};
+  let had = null; // game folders that had the addon at the last status
+  const onStatus = (s) => {
+    if (!s || !Array.isArray(s.installs)) return;
+    const now = new Set(s.installs.filter((i) => i && i.installed && typeof i.dir === 'string').map((i) => i.dir.toLowerCase()));
+    const added = had !== null && [...now].some((dir) => !had.has(dir));
+    had = now;
+    if (added) sync.outboxChanged();
+  };
+  try { onStatus(addon.status()); } catch { /* not ready yet: the first status event sets the baseline */ }
+  addon.on('status', onStatus);
+  return () => { if (typeof addon.off === 'function') addon.off('status', onStatus); };
+}
+
+/**
+ * Smoke runs: the addon manager's and the updater's checks (which ask GitHub, and may install or update the
+ * addon) do nothing and just report the current status, whoever calls them (the pages do, through IPC).
+ */
+function skipChecksForSmoke({ addon, updater }) {
+  if (addon) addon.check = async () => addon.status();
+  if (updater) updater.check = async () => updater.status();
+}
+
+/** The newest app and addon versions the updater and addon manager know about, for the core. */
+function createLatestTracker({ updater, addon }) {
+  const latest = { app: null, addon: null };
+  const fromUpdater = (s) => {
+    if (!s || typeof s !== 'object') return;
+    latest.app = (s.available && s.available.version) || s.current || latest.app;
+  };
+  const fromAddon = (s) => {
+    if (!s || typeof s !== 'object') return;
+    latest.addon = (s.latest && s.latest.version) || latest.addon;
+  };
+  const read = (source, fn) => {
+    if (!source) return;
+    try {
+      const s = typeof source.status === 'function' ? source.status() : null;
+      if (s && typeof s.then === 'function') s.then(fn, () => {});
+      else fn(s);
+    } catch { /* not ready yet */ }
+    if (typeof source.on === 'function') source.on('status', fn);
+  };
+  read(updater, fromUpdater);
+  read(addon, fromAddon);
+  return () => ({ app: latest.app, addon: latest.addon });
+}
+
+/** Core events → the renderer ('server-event') and a native notification when notifications are on. */
+function wireNotifications({ core, notify, broadcast, store, log }) {
+  const onEvent = (ev) => {
+    if (!ev || typeof ev !== 'object') return;
+    broadcast('server-event', ev);
+    if (store.get().notifications === false) return;
+    try { notify.show(ev); } catch (err) { if (log) log.warn(`A notification couldn't be shown: ${err.message}`); }
+  };
+  core.emitter.on('event', onEvent);
+  return () => core.emitter.off('event', onEvent);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -225,21 +305,20 @@ function wireSession({ auth, sync, events, addon, membership, store, startup, lo
 function bootstrap() {
   const { app, dialog, shell, safeStorage, nativeTheme, session, Menu } = require('electron');
   const { createLog } = require('./log');
-  const { createStore, normaliseServerUrl } = require('./store');
+  const { createStore } = require('./store');
   const { createApi } = require('./api');
-  const { createAuth, AUTH_PARTITION } = require('./auth');
+  const { createAuth } = require('./auth');
+  const { loadBnetCredentials } = require('./credentials');
   const wow = require('./wow');
-  const { createSync } = require('./sync');
   const { createAddonManager } = require('./addon');
-  const { createMembership } = require('./membership');
   const { createUpdater } = require('./updater');
   const { createPublisher } = require('./publisher');
-  const { createEvents } = require('./events');
   const { createNotify } = require('./notify');
   const { createStartup } = require('./startup');
   const { createIpc, buildMethods, forwardEvents } = require('./ipc');
   const { registerScheme, registerAppProtocol, createMainWindow, showWindow, findIcon } = require('./window');
   const { createTray } = require('./tray');
+  const { createCore } = require('../core');
 
   const args = parseArgs(process.argv.slice(1));
   const isPackaged = app.isPackaged;
@@ -248,27 +327,27 @@ function bootstrap() {
   const version = app.getVersion();
   const smokeOut = path.resolve(args.smokeOut || path.join(appDir, 'dist', 'smoke'));
 
-  // A separate user data folder keeps dev and smoke runs away from real settings and sign-ins.
-  // Smoke runs get their own folder by default.
-  const userDataOverride = args.userData || process.env.GUILDCAMP_USER_DATA || (args.smoke ? path.join(smokeOut, 'user-data') : null);
-  if (userDataOverride) app.setPath('userData', path.resolve(userDataOverride));
+  // A separate user data folder keeps dev and smoke runs away from real settings and data.
+  // Smoke runs always get their own folder (pickUserDataDir).
+  const userDataOverride = pickUserDataDir(args, process.env, smokeOut);
+  if (userDataOverride) app.setPath('userData', userDataOverride);
 
   app.setAppUserModelId(APP_ID);
   registerScheme();
 
   if (!args.smoke && !app.requestSingleInstanceLock()) {
-    // Another Guild Camp is running; it receives our arguments (and any join link) and shows itself.
+    // Another Guild Camp is running; it receives our arguments (and any link) and shows itself.
     app.quit();
     return;
   }
 
-  // Isolated runs (smoke, or a dev run with its own user data folder) leave join links alone so
+  // Isolated runs (smoke, or a dev run with its own user data folder) leave guildcamp:// links alone so
   // they keep opening the normal install.
   if (!args.smoke && !(userDataOverride && !isPackaged)) {
     try {
       if (isPackaged) app.setAsDefaultProtocolClient(PROTOCOL);
       else app.setAsDefaultProtocolClient(PROTOCOL, process.execPath, [path.resolve(appDir)]);
-    } catch { /* not fatal: join links just won't open the app */ }
+    } catch { /* not fatal: links just won't open the app */ }
   }
 
   // ---- state ---------------------------------------------------------------------------------
@@ -279,7 +358,6 @@ function bootstrap() {
   let rendererIsReady = false;
   let pendingRoute = deepLinkRoute(findDeepLink(process.argv));
   let services = null; // set once ready
-  let onWindowShown = () => {}; // set in start(): re-reads the profile (throttled)
   const timers = [];
   let resolveSmokeReady = null;
   const smokeReady = new Promise((resolve) => { resolveSmokeReady = resolve; });
@@ -295,7 +373,7 @@ function bootstrap() {
   function handleDeepLink(url) {
     const route = deepLinkRoute(url);
     if (services) {
-      services.log.info(route ? `Opened a join link (${route}).` : `Opened a ${PROTOCOL}:// link.`);
+      services.log.info(route ? `Opened a link to ${route}.` : `Opened a ${PROTOCOL}:// link.`);
       showMain();
       navigateTo(route);
     } else if (route) {
@@ -351,9 +429,6 @@ function bootstrap() {
       }
     });
     wc.on('unresponsive', () => log.warn('The window stopped responding.'));
-    // Opened from the tray or switched back to: pick up a role change made while it was away.
-    mainWindow.on('show', () => onWindowShown());
-    mainWindow.on('focus', () => onWindowShown());
     mainWindow.on('closed', () => { mainWindow = null; rendererIsReady = false; });
   }
 
@@ -382,14 +457,24 @@ function bootstrap() {
     handleDeepLink(url);
   });
 
-  app.on('before-quit', () => {
+  // The local data service is closed once, after everything that writes to it has stopped.
+  let coreClosed = false;
+  app.on('before-quit', (event) => {
     quitting = true;
     for (const t of timers) clearInterval(t);
-    if (services) {
-      try { services.sync.stop(); } catch { /* quitting anyway */ }
-      try { services.events.stop(); } catch { /* quitting anyway */ }
-      try { services.membership.stop(); } catch { /* quitting anyway */ }
-    }
+    if (!services || coreClosed) return;
+    try { services.sync.stop(); } catch { /* quitting anyway */ }
+    if (!services.core) return;
+    event.preventDefault();
+    coreClosed = true;
+    const core = services.core;
+    // An upload in progress gets a moment to finish; the database is closed either way.
+    const settle = Promise.race([Promise.resolve().then(() => services.sync.whenIdle()), delay(3000)]);
+    settle
+      .catch(() => {})
+      .then(() => Promise.race([core.close(), delay(3000)]))
+      .catch((err) => services.log.warn(`Closing the local data didn't finish cleanly: ${err.message}`))
+      .finally(() => app.quit());
   });
 
   app.on('will-quit', () => {
@@ -431,45 +516,27 @@ function bootstrap() {
     log.info(`Guild Camp ${version} starting (${isPackaged ? 'installed' : 'dev'}; Electron ${process.versions.electron}; ${process.platform} ${process.arch}).`);
     if (userDataOverride) log.info(`User data folder: ${userData}`);
 
+    // Smoke runs are for screenshots only: they must never read or change a real game install.
+    // Default folder scanning is off (add fake folders with extraWowFolders in a scratch folder given with
+    // --smoke-user-data, or pass --smoke-scan), and nothing installs, updates or syncs in the background. Those
+    // switches hold for this run only: settings.json keeps what was chosen there.
     const store = createStore(userData, {
       encrypt: (text) => safeStorage.encryptString(text),
       decrypt: (buf) => safeStorage.decryptString(buf),
       isEncryptionAvailable: () => safeStorage.isEncryptionAvailable(),
+      overrides: args.smoke ? SMOKE_SETTINGS : null,
     });
     for (const problem of store.problems) log.warn(problem);
-
-    // Smoke runs are for screenshots only: they must never read or change a real game install.
-    // Default folder scanning is off (add fake folders with extraWowFolders in a scratch user data
-    // folder, or pass --smoke-scan), and nothing installs, updates or syncs in the background.
-    if (args.smoke) {
-      if (!args.smokeScan) process.env.GUILDCAMP_NO_SCAN = '1';
-      store.set({ addonAutoUpdate: false, addonAutoInstall: false, appAutoUpdate: false, syncEnabled: false, notifications: false });
-    }
-
-    if (process.env.GUILDCAMP_SERVER) {
-      try {
-        const url = normaliseServerUrl(process.env.GUILDCAMP_SERVER);
-        if (url !== store.get().serverUrl) {
-          // A token for the previous server is useless here.
-          store.setSecret('deviceToken', null);
-          store.setSecret('me', null);
-          store.set({ serverUrl: url, lastEventId: 0 });
-        }
-        log.info(`Using server ${url} (from GUILDCAMP_SERVER).`);
-      } catch (err) {
-        log.warn(`Ignoring GUILDCAMP_SERVER: ${err.message}`);
-      }
-    }
+    if (args.smoke && !args.smokeScan) process.env.GUILDCAMP_NO_SCAN = '1';
 
     // Light/dark: the renderer's prefers-color-scheme follows the Theme setting.
     nativeTheme.themeSource = store.get().theme || 'system';
     store.on('change', (s, keys) => { if (keys.includes('theme')) nativeTheme.themeSource = s.theme || 'system'; });
 
-    // Permissions: notifications and clipboard writes only; the sign-in window gets nothing.
+    // Permissions: notifications and clipboard writes only.
     const allowed = new Set(['notifications', 'clipboard-sanitized-write', 'fullscreen']);
     session.defaultSession.setPermissionRequestHandler((_wc, permission, cb) => cb(allowed.has(permission)));
     session.defaultSession.setPermissionCheckHandler((_wc, permission) => allowed.has(permission));
-    session.fromPartition(AUTH_PARTITION).setPermissionRequestHandler((_wc, _permission, cb) => cb(false));
 
     if (process.platform === 'darwin') {
       Menu.setApplicationMenu(Menu.buildFromTemplate([{ role: 'appMenu' }, { role: 'editMenu' }, { role: 'viewMenu' }, { role: 'windowMenu' }]));
@@ -477,27 +544,66 @@ function bootstrap() {
       Menu.setApplicationMenu(null); // shortcuts are handled in window.js
     }
 
-    const getServer = () => store.get().serverUrl;
-    const getToken = () => store.getSecret('deviceToken');
-    const api = createApi({ getServer, getToken, appVersion: version, log: log.scope('api') });
-    const auth = createAuth({ store, api, log: log.scope('auth'), appVersion: version, getServer, getParentWindow: () => mainWindow });
-    const sync = createSync({ api, store, log: log.scope('sync'), wow, appVersion: version });
+    // Battle.net: the client id and secret built into the installer (or env vars in development).
+    // A smoke run with demo data never talks to Battle.net: it is "signed in" as the demo player.
+    const credentials = loadBnetCredentials({ appDir, log: log.scope('auth') });
+    let demo = null;
+    let auth;
+    if (args.smoke && args.smokeSeed) {
+      demo = require('../core/demo');
+      auth = demo.createDemoAuth();
+    } else {
+      auth = createAuth({ store, log: log.scope('auth'), appVersion: version, credentials, openExternal: (url) => shell.openExternal(url) });
+    }
+    if (!credentials && !demo) log.info('This copy of Guild Camp has no Battle.net app built in. Everything works without signing in.');
+
+    // A smoke run stays off the network and never runs the GitHub CLI: addon and app update checks do
+    // nothing, and the Releases page sees no gh (unless --smoke-scan, which also lets it scan game folders).
+    const offline = args.smoke && !args.smokeScan;
+    const offlineFetch = async () => { throw new Error('Smoke runs stay offline.'); };
     const resourcesDir = isPackaged ? process.resourcesPath : path.resolve(appDir, '..');
-    const addon = createAddonManager({ store, log: log.scope('addon'), wow, api, resourcesDir, fetch: globalThis.fetch });
-    const membership = createMembership({ api, wow, auth, log: log.scope('membership'), store });
-    const updater = createUpdater({ store, log: log.scope('updater'), api, getServer, appVersion: version, isPackaged });
-    const publisher = createPublisher({ store, log: log.scope('publisher'), auth, api, getServer, getToken, appVersion: version, isPackaged, appDir });
+    const addon = createAddonManager({ store, log: log.scope('addon'), wow, resourcesDir, fetch: offline ? offlineFetch : globalThis.fetch });
+    const updater = createUpdater({ store, log: log.scope('updater'), appVersion: version, isPackaged, ...(offline ? { fetch: offlineFetch } : {}) });
+    if (offline) skipChecksForSmoke({ addon, updater });
+    const latest = createLatestTracker({ updater, addon });
+
+    // The local core: guild data, on this computer only.
+    const core = await createCore({
+      dataDir: userData,
+      log: log.scope('core'),
+      getIdentity: () => identityOf(auth.state()),
+      getSecret: (name) => store.getSecret(name),
+      getSettings: () => store.get(),
+      credentials,
+      getLatest: latest,
+    });
+    if (demo) {
+      try {
+        await demo.loadDemo(core);
+        log.info('Demo guild loaded for the smoke run.');
+      } catch (err) {
+        log.error('Loading the demo guild failed:', err);
+      }
+    }
+
+    const api = createApi({ getBase: () => core.url, getToken: () => core.token, appVersion: version, log: log.scope('api') });
+    const sync = createAppSync({ api, store, log: log.scope('sync'), wow, appVersion: version, core });
+    const publisher = createPublisher({
+      store, log: log.scope('publisher'), appVersion: version, isPackaged, appDir,
+      // No GitHub CLI and no network in a smoke run: the Releases page shows its "not set up" state.
+      ...(offline ? { gh: path.join(userData, 'smoke-has-no-gh', 'gh'), fetch: offlineFetch } : {}),
+    });
     const iconPath = findIcon();
     const notify = createNotify({ showWindow: () => showMain(), broadcast, iconPath, log: log.scope('notify') });
-    const events = createEvents({ api, store, notify, broadcast, log: log.scope('events') });
     const startup = createStartup();
+    const userSession = createSession({ auth, core, log: log.scope('auth') });
 
-    services = { log, store, api, auth, wow, sync, addon, membership, updater, publisher, notify, events, startup, iconPath, ipc: null };
+    services = { log, store, api, auth, core, session: userSession, wow, sync, addon, updater, publisher, notify, startup, iconPath, ipc: null };
 
-    if (!store.secretsEncrypted()) log.warn('Secure storage is not available. Your sign-in is saved without encryption.');
+    if (!store.secretsEncrypted()) log.warn('Secure storage is not available. Your Battle.net sign-in and API key are saved without encryption.');
 
     const methods = buildMethods({
-      store, log, auth, api, wow, sync, addon, updater, publisher, notify, startup, membership, shell, dialog,
+      store, log, auth: userSession, api, wow, sync, addon, updater, publisher, notify, startup, shell, dialog,
       getWindow: () => mainWindow,
       downloadsDir: app.getPath('downloads'),
       quit,
@@ -511,8 +617,9 @@ function bootstrap() {
         electron: process.versions.electron,
         logFile: log.file,
         userData,
+        dataFile: path.join(userData, 'guildcamp.db'),
         repoDir: store.get().repoDir || (isPackaged ? null : detectRepoDir(appDir)),
-        server: getServer(),
+        bnetAvailable: Boolean(credentials),
         secretsEncrypted: store.secretsEncrypted(),
         startWithWindowsSupported: startup.supported,
         smoke: args.smoke,
@@ -523,7 +630,10 @@ function bootstrap() {
       getWindows: () => (mainWindow && !mainWindow.isDestroyed() ? [mainWindow] : []),
       log: log.scope('ipc'),
     });
-    forwardEvents({ broadcast, store, log, auth, sync, addon, updater, publisher, membership });
+    forwardEvents({ broadcast, store, log, auth: userSession, sync, addon, updater, publisher });
+    wireNotifications({ core, notify, broadcast, store, log: log.scope('notify') });
+    // A folder that just got the addon gets its news folder at once, so the game finds both when it next starts.
+    wireInboxAfterInstall({ addon, sync });
 
     registerAppProtocol(path.join(__dirname, '..', 'renderer'), log.scope('protocol'));
     createWindow();
@@ -552,47 +662,41 @@ function bootstrap() {
     sync.on('status', (s) => tray.setSyncStatus(s));
     if (args.hidden && !tray.exists()) showMain(); // nowhere to hide: show the window after all
 
-    // Signed in → sync and the event feed run, and (without a guild) the guild is looked for;
-    // signed out → they stop. See wireSession.
-    const applyAuth = wireSession({ auth, sync, events, addon, membership, store, startup, log, isPackaged });
-    applyAuth(auth.state()); // the token on disk says whether we are signed in
-    auth.refresh().catch((err) => log.warn(`Couldn't load your profile: ${err.message}`));
-
     const background = (fn, what) => Promise.resolve().then(fn).catch((err) => log.warn(`${what}: ${err.message}`));
 
-    // Role changes reach a running app: auth.refresh() re-reads GET /api/me and, when the role (or
-    // anything else) changed, emits 'change' → the renderer's session (nav, officer pages) updates.
-    const refreshProfile = () => {
-      if (auth.state().signedIn) background(() => auth.refresh(), "Couldn't load your profile");
-    };
-    const refreshProfileSoon = throttle(refreshProfile, PROFILE_FOCUS_GAP_MS);
-    refreshProfileSoon.mark(); // just refreshed above
-    onWindowShown = refreshProfileSoon;
-    timers.push(setInterval(() => { refreshProfile(); refreshProfileSoon.mark(); }, PROFILE_REFRESH_MS));
+    // Sync needs nothing but the game folders: it starts now.
+    background(() => sync.start(), 'Sync failed to start');
+    // Only while the token is still good: refresh() with an expired token signs the person out.
+    if (auth.state().canRefresh) background(() => auth.refresh(), "Couldn't read your Battle.net characters");
 
     background(() => addon.check(), 'Addon check failed');
     background(() => updater.check(), 'Update check failed');
     timers.push(setInterval(() => background(() => updater.check(), 'Update check failed'), UPDATE_CHECK_MS));
     timers.push(setInterval(() => background(() => addon.check(), 'Addon check failed'), ADDON_CHECK_MS));
-    // A release published on the server shows up at once instead of at the next timer.
-    events.on('event', (ev) => {
-      if (ev && ev.kind === 'release') {
-        background(() => updater.check(), 'Update check failed');
-        background(() => addon.check(), 'Addon check failed');
-      }
+    store.on('change', (s, keys) => {
+      if (keys.includes('extraWowFolders')) background(() => addon.check(), 'Addon check failed');
     });
 
-    // Keep the login item pointing at the current install (the path can change between versions).
-    if (isPackaged && store.get().startWithWindows && startup.supported) {
+    // The first launch of an installed app turns "start with Windows" on once, so the guild stays in
+    // sync in the background. The person's own choice in Settings is never overridden.
+    if (isPackaged && !store.get().startupDefaulted) {
+      let on = false;
+      if (startup.supported) {
+        try { on = Boolean(startup.set(true)); } catch (err) { log.warn(`Couldn't turn on "start with Windows": ${err.message}`); }
+      }
+      store.set({ startWithWindows: on, startupDefaulted: true });
+      if (on) log.info('Guild Camp now starts with Windows, in the tray, so your guild stays in sync. Turn this off in Settings.');
+    } else if (isPackaged && store.get().startWithWindows && startup.supported) {
+      // Keep the login item pointing at the current install (the path can change between versions).
       try { startup.set(true); } catch (err) { log.warn(`Couldn't refresh "start with Windows": ${err.message}`); }
     }
   }
 
   // ---- smoke run -----------------------------------------------------------------------------
   async function runSmoke() {
-    const { log, auth } = services;
+    const { log, api } = services;
     fs.mkdirSync(smokeOut, { recursive: true });
-    const report = { app: version, startedAt: new Date().toISOString(), outDir: smokeOut, routes: [], errors: [], warnings: [] };
+    const report = { app: version, startedAt: new Date().toISOString(), outDir: smokeOut, seeded: args.smokeSeed, routes: [], api: [], errors: [], warnings: [] };
     let sink = report.errors; // errors go to the route being captured, or the run as a whole
     let finished = false;
 
@@ -610,13 +714,13 @@ function bootstrap() {
       }
       log.info(report.ok ? `Smoke run passed (${report.routes.length} route(s)).` : `Smoke run found ${problems} problem(s). See ${path.join(smokeOut, 'smoke-report.json')}.`);
       quitting = true;
-      app.exit(report.ok ? 0 : 1);
+      const done = () => app.exit(report.ok ? 0 : 1);
+      Promise.resolve(services.core && services.core.close()).catch(() => {}).finally(done);
     };
     const hardStop = setTimeout(() => finish(`The smoke run took longer than ${SMOKE_TIMEOUT_MS / 1000} seconds and was stopped.`), SMOKE_TIMEOUT_MS);
 
     const wc = mainWindow.webContents;
     // Electron 45 passes one details object { level: 'info'|'warning'|'error'|'debug', message, lineNumber, sourceId }.
-    // (A listener with more parameters triggers a deprecation warning, so take just the one.)
     wc.on('console-message', (details) => {
       if (details.level !== 'error') return;
       const source = details.sourceId || '';
@@ -636,18 +740,18 @@ function bootstrap() {
     wc.on('preload-error', (_e, file, error) => sink.push(`Preload failed (${file}): ${error.message}`));
     wc.once('did-finish-load', () => showWindow(mainWindow));
 
-    const info = await Promise.race([smokeReady, delay(SMOKE_READY_WAIT_MS).then(() => null)]);
-    if (!info) report.errors.push('The page never reported that it was ready (gc.app.rendererReady was not called).');
-
-    if (args.smokeLogin) {
+    // The local core answers on its own; record what each page's endpoint says.
+    for (const p of SMOKE_API_PATHS) {
       try {
-        const s = await auth.devSignIn(args.smokeLogin);
-        report.signedInAs = s.user ? (s.user.battletag || s.user.name || s.user.id || null) : null;
-        await delay(500);
+        await api.request('GET', p, undefined, { raw: true });
+        report.api.push({ path: p, ok: true });
       } catch (err) {
-        report.errors.push(`Dev sign-in as ${args.smokeLogin} failed: ${err.message}`);
+        report.api.push({ path: p, ok: false, status: err.status || 0, error: err.message });
       }
     }
+
+    const info = await Promise.race([smokeReady, delay(SMOKE_READY_WAIT_MS).then(() => null)]);
+    if (!info) report.errors.push('The page never reported that it was ready (gc.app.rendererReady was not called).');
 
     const reported = info && Array.isArray(info.routes) ? info.routes : null;
     const routes = (args.smokeRoutes || reported || ['/'])
@@ -681,4 +785,7 @@ function bootstrap() {
 
 if (process.versions.electron && process.type === 'browser') bootstrap();
 
-module.exports = { parseArgs, findDeepLink, deepLinkRoute, routeSlug, detectRepoDir, wireSession, throttle };
+module.exports = {
+  parseArgs, findDeepLink, deepLinkRoute, routeSlug, detectRepoDir, identityOf, createSession,
+  createLatestTracker, wireNotifications, skipChecksForSmoke, createAppSync, wireInboxAfterInstall, pickUserDataDir, SMOKE_API_PATHS, SMOKE_SETTINGS,
+};

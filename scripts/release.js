@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 'use strict';
-// Publishes Guild Camp updates to the server: the addon, the app, or both.
-// The work happens in app/src/shared/release.js (the app's Releases page uses it too).
-// Run with --help for the options; docs/RELEASING.md walks through a release.
+// Publishes Guild Camp releases on GitHub (arrow-quiver/wow) with the GitHub CLI (gh): the addon,
+// the app, or both. The work happens in app/src/shared/release.js (the app's Releases page and CI use
+// it too). Run with --help for the options; docs/RELEASING.md walks through a release.
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
@@ -10,16 +10,16 @@ const release = require('../app/src/shared/release');
 const version = require('../app/src/shared/version');
 
 const DEFAULT_ROOT = path.join(__dirname, '..');
-const DEFAULT_SERVER = 'https://wow.cjplumbing.co.za';
+const REPO = release.GITHUB_REPO;
 
-const USAGE = `Publish Guild Camp updates.
+const USAGE = `Publish Guild Camp releases on GitHub (${REPO}).
 
 Usage: node scripts/release.js <addon|app|all|status> [options]
 
-  addon    bump addon/WowGuild/WowGuild.toc, zip the addon, upload it
-  app      bump app/package.json, build the installer, upload it
+  addon    bump addon/WowGuild/WowGuild.toc, zip the addon, publish release addon-v<version>
+  app      bump app/package.json, build the installer, publish release v<version>
   all      addon, then app
-  status   local versions next to what the server has published
+  status   the versions in this checkout next to the newest releases on GitHub
 
 Versions:
   --bump patch|minor|major|beta   bump the version first
@@ -29,21 +29,21 @@ Versions:
 Release notes:
   --notes "text"                  the notes players see
   --notes-file FILE               read the notes from a file
-  --notes-from-git                commit subjects since the last addon-v*/app-v* tag
+  --notes-from-git                commit subjects since the last addon-v* / v* tag
 
-Publishing:
-  --server URL                    server address (or GUILDCAMP_SERVER, or .release.json)
-  --token TOKEN                   publish token  (or GUILDCAMP_PUBLISH_TOKEN, or .release.json)
-  --dry-run                       build and zip, but upload nothing; shows where the files are
-  --force                         addon: publish even when the server has this or a newer version (rollback)
-  --skip-published                if the server already has this exact version, skip the upload (CI uses this)
+Publishing (needs GitHub CLI: install it from https://cli.github.com, then run gh auth login):
+  --dry-run                       build and zip, but publish nothing; shows where the files are
+  --skip-published                if GitHub already has this exact release, skip it (CI uses this)
   --curseforge                    also upload the addon zip to CurseForge (needs CF_API_TOKEN)
 
 Git:
-  --git                           commit the version bump and tag addon-v<version> / app-v<version>
-  --push                          push that commit and tag (implies --git)
-  --tag-only                      bump, commit and tag, but don't build or upload: pushing the tag
+  --git --push                    commit the version bump, tag it (addon-v<version> / v<version>),
+                                  push both, then publish the release on that tag
+  --tag-only                      bump, commit and tag, but don't build or publish: pushing the tag
                                   (add --push) lets GitHub Actions build and publish
+
+Battle.net sign-in is built into the app when GUILDCAMP_BNET_CLIENT_ID and
+GUILDCAMP_BNET_CLIENT_SECRET are set (or bnetClientId and bnetClientSecret in .release.json).
 
   -h, --help                      this help
 `;
@@ -51,10 +51,30 @@ Git:
 const FLAGS = {
   bump: 'string', version: 'string', 'no-bump': 'boolean', notes: 'string', 'notes-file': 'string',
   'notes-from-git': 'boolean', 'dry-run': 'boolean', git: 'boolean', push: 'boolean', curseforge: 'boolean',
-  server: 'string', token: 'string', force: 'boolean', 'skip-published': 'boolean', 'tag-only': 'boolean', help: 'boolean',
+  'skip-published': 'boolean', 'tag-only': 'boolean', help: 'boolean',
 };
 
+// Options of the server days, with what to do instead.
+const REMOVED = {
+  server: '--server is gone: releases go to GitHub now (docs/RELEASING.md).',
+  token: '--token is gone: publishing uses GitHub CLI. Run gh auth login once instead.',
+  force: '--force is gone: a GitHub release can\'t be replaced by an older version. Publish a new version with the old code instead (docs/RELEASING.md, "Rolling back").',
+};
+
+const GH_HELP_MISSING = `GitHub CLI (gh) isn't installed. Install GitHub CLI and run gh auth login:
+  1. Install it from https://cli.github.com (Windows: winget install --id GitHub.cli).
+  2. Run gh auth login. Choose GitHub.com and sign in with an account that can push to ${REPO}.
+In GitHub Actions, gh is already installed and uses GH_TOKEN.`;
+const GH_HELP_LOGIN = `GitHub CLI isn't signed in. Run gh auth login, choose GitHub.com, and sign in with an account that can push to ${REPO}. Then try again.`;
+
 class UsageError extends Error {}
+
+function codeError(message, code, cause) {
+  const e = new Error(message);
+  if (code) e.code = code;
+  if (cause && cause.status) e.status = cause.status;
+  return e;
+}
 
 // Small, strict argument parser: --flag, --flag value, --flag=value. Unknown flags are errors.
 function parseArgs(argv) {
@@ -66,7 +86,7 @@ function parseArgs(argv) {
     const eq = a.indexOf('=');
     const name = a.slice(2, eq < 0 ? undefined : eq);
     const type = FLAGS[name];
-    if (!type) throw new UsageError(`Unknown option --${name}. Run with --help to see the options.`);
+    if (!type) throw new UsageError(REMOVED[name] || `Unknown option --${name}. Run with --help to see the options.`);
     if (type === 'boolean') {
       if (eq >= 0) throw new UsageError(`--${name} doesn't take a value.`);
       flags[name] = true;
@@ -84,37 +104,24 @@ function parseArgs(argv) {
   if (notes.length > 1) throw new UsageError(`Use only one of --${notes.join(', --')}.`);
   if (flags.push || flags['tag-only']) flags.git = true;
   if (flags['tag-only'] && flags['dry-run']) throw new UsageError('--tag-only and --dry-run don\'t go together.');
+  if (positional[0] !== 'status' && flags.git && !flags.push && !flags['tag-only'] && !flags['dry-run']) {
+    throw new UsageError('--git needs --push when you publish: the GitHub release has to point at the tag on GitHub. Add --push, or use --tag-only to only make the tag.');
+  }
   return { command: positional[0], extra: positional.slice(1), flags };
 }
 
-// flags > environment > .release.json at the repo root > the default server.
-function loadConfig({ flags = {}, env = process.env, root = DEFAULT_ROOT } = {}) {
+// .release.json at the repo root (gitignored): { "bnetClientId": "…", "bnetClientSecret": "…" }.
+function loadConfig({ root = DEFAULT_ROOT } = {}) {
   const file = path.join(root, '.release.json');
-  let saved = {};
+  let config = {};
   if (fs.existsSync(file)) {
-    try { saved = JSON.parse(fs.readFileSync(file, 'utf8')) || {}; } catch (e) {
-      throw new UsageError(`.release.json isn't valid JSON (${e.message}). It should look like {"server": "https://…", "token": "…"}.`);
+    try { config = JSON.parse(fs.readFileSync(file, 'utf8')) || {}; } catch (e) {
+      throw new UsageError(`.release.json isn't valid JSON (${e.message}). It should look like {"bnetClientId": "…", "bnetClientSecret": "…"}.`);
     }
+    if (typeof config !== 'object' || Array.isArray(config)) throw new UsageError('.release.json must hold one JSON object, like {"bnetClientId": "…", "bnetClientSecret": "…"}.');
   }
-  const pick = (flag, envName, key, fallback) => {
-    if (flags[flag]) return { value: flags[flag], from: `--${flag}` };
-    if (env[envName]) return { value: env[envName], from: envName };
-    if (saved[key]) return { value: saved[key], from: '.release.json' };
-    return { value: fallback, from: fallback ? 'default' : null };
-  };
-  const server = pick('server', 'GUILDCAMP_SERVER', 'server', DEFAULT_SERVER);
-  const token = pick('token', 'GUILDCAMP_PUBLISH_TOKEN', 'token', '');
-  return { server: server.value.replace(/\/+$/, ''), serverFrom: server.from, token: token.value, tokenFrom: token.from };
+  return { config, file, repo: REPO, old: ['server', 'token'].filter((k) => config[k] !== undefined) };
 }
-
-const NO_TOKEN_HELP = `No publish token.
-  1. On the server, set PUBLISH_TOKEN to a long random string and restart it.
-     (Make one with: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
-  2. Give this script the same value, in one of these ways:
-       set GUILDCAMP_PUBLISH_TOKEN in your shell (PowerShell: $env:GUILDCAMP_PUBLISH_TOKEN = "…")
-       pass --token <value>
-       put {"token": "<value>"} in .release.json at the repo root (it's gitignored)
-     In GitHub Actions, add it as the repository secret GUILDCAMP_PUBLISH_TOKEN.`;
 
 function git(root, ...args) {
   return execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true }).trim();
@@ -125,12 +132,11 @@ function tagExists(root, tag) {
 }
 
 function lastTag(root, kind) {
-  try { return git(root, 'describe', '--tags', '--abbrev=0', '--match', `${kind}-v*`, 'HEAD'); } catch { return null; }
+  try { return git(root, 'describe', '--tags', '--abbrev=0', '--match', release.TAG_MATCH[kind], 'HEAD'); } catch { return null; }
 }
 
 function gitError(e) {
-  const said = e && e.stderr ? String(e.stderr).trim().split(/\r?\n/).slice(-3).join(' ') : (e && e.message) || '';
-  return said;
+  return e && e.stderr ? String(e.stderr).trim().split(/\r?\n/).slice(-3).join(' ') : (e && e.message) || '';
 }
 
 function readNotes(flags, root, kind) {
@@ -151,7 +157,7 @@ function bumpHow(flags) {
 
 // Commits the bumped files (only those: anything else staged stays staged) and tags the release.
 function commitAndTag(root, { kind, ver, files, push, log }) {
-  const tag = `${kind}-v${ver}`;
+  const tag = release.tagFor(kind, ver);
   const rel = files.map((f) => path.relative(root, f).split(path.sep).join('/'));
   let changed = false;
   try { git(root, 'diff', '--quiet', 'HEAD', '--', ...rel); } catch { changed = true; }
@@ -164,69 +170,102 @@ function commitAndTag(root, { kind, ver, files, push, log }) {
     git(root, 'tag', '-a', tag, '-m', `Guild Camp ${kind} ${ver}`);
     log(`Tagged ${tag}.`);
   } catch (e) {
-    throw new Error(`Git failed: ${gitError(e)}. The release itself is done; commit and tag by hand.`);
+    throw new Error(`Git failed: ${gitError(e)}. Nothing was published; commit and tag by hand, or try again.`);
   }
   if (push) {
     try {
       git(root, 'push', '--atomic', 'origin', 'HEAD', `refs/tags/${tag}`);
       log(`Pushed the commit and ${tag} to origin.`);
     } catch (e) {
-      throw new Error(`git push failed: ${gitError(e)}. Push by hand: git push origin HEAD ${tag}`);
+      throw new Error(`git push failed: ${gitError(e)}. Push by hand (git push origin HEAD ${tag}), then publish with --no-bump.`);
     }
   }
   return tag;
 }
 
-async function fetchPublished(cfg, opts, { required }) {
+// Before a build or publish: gh installed, signed in, and allowed to push.
+async function requireGh(o) {
+  const st = await release.ghStatus({ gh: o.gh, env: o.env });
+  if (!st.installed) throw codeError(GH_HELP_MISSING, 'NO_GH');
+  if (!st.loggedIn) throw codeError(GH_HELP_LOGIN, 'NOT_LOGGED_IN');
+  if (st.push === false) throw codeError(st.problem, 'NO_PUSH');
+  o.log(`GitHub CLI${st.version ? ` ${st.version}` : ''}: signed in${st.account ? ` as ${st.account}` : ''}.`);
+  if (st.note) o.warn(st.note);
+  return st;
+}
+
+async function fetchPublished(o, { required, useGh = true }) {
   try {
-    return await release.getReleases(cfg.server, { fetch: opts.fetch });
+    return await release.getReleases({ gh: o.gh, env: o.env, fetch: o.fetch, useGh });
   } catch (e) {
     if (required) throw e;
-    opts.warn(`Couldn't check what the server has. ${e.message}`);
+    o.warn(`Couldn't check what's on GitHub. ${e.message}`);
     return null;
   }
 }
 
-function needToken(cfg) {
-  if (!cfg.token) { const e = new Error(NO_TOKEN_HELP); e.code = 'NO_TOKEN'; throw e; }
+// In GitHub Actions without --git (a manual run of the workflow), a new tag goes on the commit that ran.
+function ciTarget(env, flags) {
+  return !flags.git && env.GITHUB_ACTIONS === 'true' && env.GITHUB_SHA ? env.GITHUB_SHA : undefined;
 }
 
-// Works out the version to release, refusing early when it can't be published.
-// → { current, next, skip } — skip: the server already has exactly this version (--skip-published).
-function planVersion({ kind, current, how, published, flags, log }) {
+// Works out the version to release, refusing early (before a long build) when it can't be published.
+// → { next, tag, live, skip } — skip: GitHub already has exactly this release (--skip-published).
+async function planVersion({ kind, current, how, published, flags, o, publish }) {
   const next = how ? release.nextVersion(current, how, kind === 'addon' ? 'WowGuild.toc' : 'app/package.json') : current;
   if (!version.valid(next)) throw new UsageError(`The ${kind} version "${next}" isn't valid. Pass --version x.y.z.`);
-  // The addon bundled in the server image (source 'bundled') stands in until one is published; the
-  // server takes any first upload over it, so it doesn't count as published here.
-  const rec = published && published[kind];
-  const live = rec && rec.source !== 'bundled' ? rec.version : null;
-  if (live && !version.gt(next, live)) {
-    if (flags['skip-published'] && version.compare(next, live) === 0) {
-      log(`The server already has ${kind} ${next}. Nothing to upload.`);
-      return { current, next, skip: true };
+  const tag = release.tagFor(kind, next);
+  const live = published && published[kind] ? published[kind].version : null;
+  let existing = Boolean(published && published.history.some((r) => r.tag === tag));
+  if (publish) {
+    const info = await release.ghReleaseInfo(tag, { gh: o.gh, env: o.env });
+    existing = info.exists && !info.draft;
+    if (info.exists && info.draft) {
+      o.warn(`GitHub has an unfinished draft release for ${tag} (from a cancelled upload). Delete it when you can: gh release delete ${tag} --repo ${REPO}`);
     }
-    const forceable = kind === 'addon' && flags.force;
-    if (!forceable && !flags['dry-run']) {
-      const hint = kind === 'addon' ? ' Use --bump patch for a new version, or --force to roll back to this one.' : ' Use --bump patch (or --version) for a new version.';
-      throw new UsageError(`The server already has ${kind} ${live}, and ${next} isn't newer.${hint}`);
-    }
-    if (!forceable) log(`Note: the server has ${kind} ${live}; ${next} isn't newer, so a real run would be refused.`);
   }
-  return { current, next, skip: false };
+  if (existing) {
+    if (flags['skip-published']) {
+      o.log(`GitHub already has the release ${tag}. Nothing to publish.`);
+      return { next, tag, live, skip: true };
+    }
+    if (!flags['dry-run']) throw new UsageError(`GitHub already has the release ${tag}. Use --bump patch (or --version) for a new version.`);
+  }
+  if (live && !version.gt(next, live)) {
+    if (!flags['dry-run']) throw new UsageError(`GitHub already has ${kind} ${live}, and ${next} isn't newer. Use --bump patch (or --version) for a new version.`);
+    o.log(`Note: GitHub has ${kind} ${live}; ${next} isn't newer, so a real run would be refused.`);
+  }
+  return { next, tag, live, skip: false };
 }
 
-async function releaseAddon(cfg, flags, opts) {
-  const { root, log } = opts;
+function pushedButNotPublished(err, kind, tag) {
+  return codeError(`${err.message}\nThe tag ${tag} is on GitHub, but the release wasn't made. Publish it with: node scripts/release.js ${kind} --no-bump`, err.code, err);
+}
+
+function logNotes(log, notes) {
+  if (notes) log(`Notes:\n${notes.split('\n').map((l) => `  ${l}`).join('\n')}`);
+}
+
+async function releaseAddon(cfg, flags, o) {
+  const { root, log } = o;
   const addonDir = path.join(root, 'addon', 'WowGuild');
   const tocFile = path.join(addonDir, 'WowGuild.toc');
   const current = release.readAddonVersion(addonDir);
   const tagOnly = flags['tag-only'];
-  const upload = !flags['dry-run'] && !tagOnly;
-  if (upload) needToken(cfg);
-  const published = tagOnly ? null : await fetchPublished(cfg, opts, { required: upload });
-  const plan = planVersion({ kind: 'addon', current, how: bumpHow(flags), published, flags, log });
-  if (flags.git && tagExists(root, `addon-v${plan.next}`)) throw new UsageError(`The tag addon-v${plan.next} already exists. Bump to a new version.`);
+  const publish = !flags['dry-run'] && !tagOnly;
+  if (publish) await requireGh(o);
+  const published = tagOnly ? null : await fetchPublished(o, { required: publish });
+  const plan = await planVersion({ kind: 'addon', current, how: bumpHow(flags), published, flags, o, publish });
   const notes = readNotes(flags, root, 'addon');
+
+  if (plan.skip) {
+    if (flags.curseforge && plan.next === current) {
+      const pack = release.packAddon(addonDir);
+      await uploadCurseForge({ addonDir, pack, notes, flags, o });
+    }
+    return { kind: 'addon', version: plan.next, skipped: true };
+  }
+  if (flags.git && tagExists(root, plan.tag)) throw new UsageError(`The tag ${plan.tag} already exists. Bump to a new version.`);
 
   if (plan.next !== current) {
     release.bumpAddonVersion(addonDir, plan.next);
@@ -241,40 +280,49 @@ async function releaseAddon(cfg, flags, opts) {
 
   const pack = release.packAddon(addonDir);
   log(`Packed ${pack.files.length} files: ${pack.fileName}, ${release.formatBytes(pack.size)}, sha256 ${pack.sha256.slice(0, 16)}…`);
-  if (notes) log(`Notes:\n${notes.split('\n').map((l) => `  ${l}`).join('\n')}`);
-
-  if (flags['dry-run']) {
-    const out = path.join(root, 'dist', pack.fileName);
-    fs.mkdirSync(path.dirname(out), { recursive: true });
-    fs.writeFileSync(out, pack.zip);
-    log(`Dry run: nothing uploaded. The zip is at ${out}`);
-  } else if (!plan.skip) {
-    await release.publishAddon({ server: cfg.server, token: cfg.token, pack, notes, force: Boolean(flags.force), onLog: log, fetch: opts.fetch });
-  }
-
-  if (flags.curseforge) {
-    const cf = require('./curseforge');
-    const toc = cf.readAddonToc(addonDir);
-    await cf.uploadToCurseForge({ zip: pack.zip, fileName: pack.fileName, toc, notes, dryRun: Boolean(flags['dry-run']), onLog: log, onWarn: opts.warn, fetch: opts.fetch });
-  }
+  logNotes(log, notes);
 
   let tag = null;
-  if (flags.git && !flags['dry-run']) tag = commitAndTag(root, { kind: 'addon', ver: plan.next, files: [tocFile], push: flags.push, log });
-  return { kind: 'addon', version: plan.next, pack, skipped: plan.skip, tag };
+  let url = null;
+  if (flags['dry-run']) {
+    const { zipFile, shaFile } = release.writeAddonAssets(pack, path.join(root, 'dist'));
+    log(`Dry run: nothing published. The files are at ${zipFile} and ${shaFile}`);
+  } else {
+    if (flags.git) tag = commitAndTag(root, { kind: 'addon', ver: plan.next, files: [tocFile], push: true, log });
+    try {
+      const out = await release.publishAddon({
+        pack, notes, outDir: path.join(root, 'dist'), gh: o.gh, env: o.env, onLog: log, verifyTag: Boolean(tag), target: ciTarget(o.env, flags),
+      });
+      url = out.url;
+    } catch (e) {
+      throw tag ? pushedButNotPublished(e, 'addon', tag) : e;
+    }
+  }
+
+  if (flags.curseforge) await uploadCurseForge({ addonDir, pack, notes, flags, o });
+  return { kind: 'addon', version: plan.next, pack, skipped: false, tag, url };
 }
 
-async function releaseApp(cfg, flags, opts) {
-  const { root, log } = opts;
+async function uploadCurseForge({ addonDir, pack, notes, flags, o }) {
+  const cf = require('./curseforge');
+  const toc = cf.readAddonToc(addonDir);
+  await cf.uploadToCurseForge({ zip: pack.zip, fileName: pack.fileName, toc, notes, dryRun: Boolean(flags['dry-run']), onLog: o.log, onWarn: o.warn, fetch: o.fetch });
+}
+
+async function releaseApp(cfg, flags, o) {
+  const { root, log } = o;
   const appDir = path.join(root, 'app');
   const current = release.readAppVersion(appDir);
   const tagOnly = flags['tag-only'];
-  const upload = !flags['dry-run'] && !tagOnly;
-  if (upload) needToken(cfg);
-  // Check the server before a build that takes minutes.
-  const published = tagOnly ? null : await fetchPublished(cfg, opts, { required: upload });
-  const plan = planVersion({ kind: 'app', current, how: bumpHow(flags), published, flags, log });
+  const publish = !flags['dry-run'] && !tagOnly;
+  // Read (and check) the Battle.net credentials before anything slow.
+  const bnet = tagOnly ? null : release.bnetCredentialsFrom({ env: o.env, config: cfg.config });
+  if (publish) await requireGh(o);
+  // Check GitHub before a build that takes minutes.
+  const published = tagOnly ? null : await fetchPublished(o, { required: publish });
+  const plan = await planVersion({ kind: 'app', current, how: bumpHow(flags), published, flags, o, publish });
   if (plan.skip) return { kind: 'app', version: plan.next, skipped: true };
-  if (flags.git && tagExists(root, `app-v${plan.next}`)) throw new UsageError(`The tag app-v${plan.next} already exists. Bump to a new version.`);
+  if (flags.git && tagExists(root, plan.tag)) throw new UsageError(`The tag ${plan.tag} already exists. Bump to a new version.`);
   const notes = readNotes(flags, root, 'app');
 
   const bumped = [path.join(appDir, 'package.json')];
@@ -290,43 +338,62 @@ async function releaseApp(cfg, flags, opts) {
     return { kind: 'app', version: plan.next, tag };
   }
 
-  const { distDir } = await (opts.buildApp || release.buildApp)(appDir, { onLog: log });
+  const { distDir } = await (o.buildApp || release.buildApp)(appDir, { onLog: log, onWarn: o.warn, bnet: bnet || null });
   const build = release.readAppBuild(distDir);
   if (build.version !== plan.next) {
     throw new Error(`The build in ${distDir} is version ${build.version}, but app/package.json says ${plan.next}. The build probably failed; check the output above.`);
   }
-  if (notes) log(`Notes:\n${notes.split('\n').map((l) => `  ${l}`).join('\n')}`);
-
-  if (flags['dry-run']) {
-    log('Dry run: nothing uploaded. The build is in:');
-    for (const f of build.files) log(`  ${f}`);
-    log(`  ${path.join(distDir, 'latest.yml')}`);
-  } else {
-    await release.publishApp({ server: cfg.server, token: cfg.token, distDir, notes, onLog: log, fetch: opts.fetch });
-  }
+  logNotes(log, notes);
 
   let tag = null;
-  if (flags.git && !flags['dry-run']) tag = commitAndTag(root, { kind: 'app', ver: plan.next, files: bumped, push: flags.push, log });
-  return { kind: 'app', version: plan.next, build, tag };
+  let url = null;
+  if (flags['dry-run']) {
+    log('Dry run: nothing published. The build is in:');
+    for (const f of build.files) log(`  ${f}`);
+    log(`  ${build.latestYmlFile}`);
+  } else {
+    if (flags.git) tag = commitAndTag(root, { kind: 'app', ver: plan.next, files: bumped, push: true, log });
+    try {
+      const out = await release.publishApp({ distDir, notes, gh: o.gh, env: o.env, onLog: log, verifyTag: Boolean(tag), target: ciTarget(o.env, flags) });
+      url = out.url;
+    } catch (e) {
+      throw tag ? pushedButNotPublished(e, 'app', tag) : e;
+    }
+  }
+  return { kind: 'app', version: plan.next, build, tag, url };
 }
 
-async function status(cfg, opts) {
-  const { root, log } = opts;
+async function status(cfg, o) {
+  const { root, log } = o;
   const addon = (() => { try { return release.readAddonVersion(path.join(root, 'addon', 'WowGuild')); } catch { return null; } })();
   const app = (() => { try { return release.readAppVersion(path.join(root, 'app')); } catch { return null; } })();
-  log(`Server: ${cfg.server} (${cfg.serverFrom})`);
-  log(`Token:  ${cfg.token ? `set (${cfg.tokenFrom})` : 'not set'}`);
-  const published = await fetchPublished(cfg, opts, { required: false });
-  // The server's bundled addon (source 'bundled') isn't a published release.
-  const liveOf = (k) => (published && published[k] && published[k].source !== 'bundled' ? published[k].version : null);
-  const shown = (k) => {
-    if (!published) return '?';
-    const rec = published[k];
-    if (rec && rec.source === 'bundled') return `none (bundled ${rec.version})`;
-    return (rec && rec.version) || 'none';
-  };
+  log(`Repository: ${REPO} (${release.releasesPage(REPO)})`);
+  const gh = await release.ghStatus({ gh: o.gh, env: o.env });
+  let ghLine;
+  if (!gh.installed) ghLine = 'not installed. Install it from https://cli.github.com, then run gh auth login.';
+  else if (!gh.loggedIn) ghLine = `${gh.version || 'installed'}, not signed in. Run gh auth login.`;
+  else {
+    const access = gh.push === true ? ', can publish' : gh.push === false ? `, can't push to ${REPO}` : '';
+    ghLine = `${gh.version || 'installed'}, signed in${gh.account ? ` as ${gh.account}` : ''}${access}.`;
+  }
+  log(`GitHub CLI: ${ghLine}`);
+  if (gh.private === true) {
+    log(`The repository is private, so players can't download updates yet. The owner makes it public with: gh repo edit ${REPO} --visibility public --accept-visibility-change-consequences`);
+  }
+  let bnetLine;
+  try {
+    const bnet = release.bnetCredentialsFrom({ env: o.env, config: cfg.config });
+    bnetLine = bnet ? `client id and secret set (${bnet.from}).` : 'not set, so app builds have no Battle.net sign-in.';
+  } catch (e) {
+    bnetLine = e.message;
+  }
+  log(`Battle.net: ${bnetLine}`);
+  if (cfg.old.length) o.warn(`.release.json still has ${cfg.old.join(' and ')}. They aren't used any more; you can remove them.`);
+
+  const published = await fetchPublished(o, { required: false, useGh: gh.loggedIn });
+  const shown = (k) => (!published ? '?' : (published[k] && published[k].version) || 'none');
   const rows = [
-    ['', 'Local', 'Published', 'Last tag'],
+    ['', 'Local', 'GitHub', 'Last tag'],
     ['Addon', addon || '-', shown('addon'), lastTag(root, 'addon') || '-'],
     ['App', app || '-', shown('app'), lastTag(root, 'app') || '-'],
   ];
@@ -334,15 +401,15 @@ async function status(cfg, opts) {
   for (const r of rows) log(`  ${r.map((v, c) => String(v).padEnd(widths[c])).join('   ')}`.trimEnd());
   if (published) {
     for (const [kind, local] of [['addon', addon], ['app', app]]) {
-      const live = liveOf(kind);
-      if (local && version.gt(local, live)) log(`The ${kind} ${local} isn't published yet: node scripts/release.js ${kind}`);
-      else if (local && live && version.lt(local, live)) log(`The server has a newer ${kind} (${live}) than this checkout (${local}). Pull first.`);
+      const live = published[kind] ? published[kind].version : null;
+      if (local && version.valid(local) && (!live || version.gt(local, live))) log(`The ${kind} ${local} isn't published yet: node scripts/release.js ${kind}`);
+      else if (local && live && version.lt(local, live)) log(`GitHub has a newer ${kind} (${live}) than this checkout (${local}). Pull first.`);
     }
   }
-  return { local: { addon, app }, published };
+  return { local: { addon, app }, published, gh };
 }
 
-// Entry point, also used by the tests. opts: { root, env, log, warn, fetch, buildApp }
+// Entry point, also used by the tests. opts: { root, env, log, warn, fetch, buildApp, gh }
 async function run(argv, opts = {}) {
   const o = {
     root: opts.root || DEFAULT_ROOT,
@@ -351,14 +418,15 @@ async function run(argv, opts = {}) {
     warn: opts.warn || ((line) => console.warn(line)),
     fetch: opts.fetch,
     buildApp: opts.buildApp,
+    gh: opts.gh,
   };
   const { command, extra, flags } = parseArgs(argv);
   if (flags.help || !command) { o.log(USAGE); if (!command && !flags.help) throw new UsageError('Pass a command: addon, app, all or status.'); return null; }
   if (extra.length) throw new UsageError(`Unexpected argument "${extra[0]}". Put notes in quotes: --notes "…"`);
   if (!['addon', 'app', 'all', 'status'].includes(command)) throw new UsageError(`Unknown command "${command}". Use addon, app, all or status.`);
-  const cfg = loadConfig({ flags, env: o.env, root: o.root });
+  const cfg = loadConfig({ root: o.root });
   if (command === 'status') return status(cfg, o);
-  if (!flags['tag-only']) o.log(`Server: ${cfg.server}${flags['dry-run'] ? ' (dry run)' : ''}`);
+  if (!flags['tag-only']) o.log(`Publishing to GitHub: ${REPO}${flags['dry-run'] ? ' (dry run)' : ''}`);
   const results = [];
   if (command === 'addon' || command === 'all') results.push(await releaseAddon(cfg, flags, o));
   if (command === 'app' || command === 'all') results.push(await releaseApp(cfg, flags, o));
@@ -367,15 +435,10 @@ async function run(argv, opts = {}) {
 
 if (require.main === module) {
   run(process.argv.slice(2)).catch((e) => {
-    if (e.code === 'NO_TOKEN') console.error(e.message);
-    else {
-      console.error(`Error: ${e.message}`);
-      if (e.status === 401 || e.status === 403) {
-        console.error('The token must match PUBLISH_TOKEN on the server (or be the guild owner\'s device token). Set it with GUILDCAMP_PUBLISH_TOKEN, --token, or .release.json.');
-      }
-    }
+    if (e.code === 'NO_GH' || e.code === 'NOT_LOGGED_IN') console.error(e.message);
+    else console.error(`Error: ${e.message}`);
     process.exitCode = 1;
   });
 }
 
-module.exports = { run, parseArgs, loadConfig, USAGE, DEFAULT_SERVER, NO_TOKEN_HELP };
+module.exports = { run, parseArgs, loadConfig, USAGE, GH_HELP_MISSING, GH_HELP_LOGIN, REMOVED };

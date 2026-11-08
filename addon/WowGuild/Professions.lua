@@ -50,15 +50,24 @@ function P.price(id)
 end
 
 -- ---------- reading the open profession ----------
+-- The profession's name and, when the game gives it, its skill-line id (164 Blacksmithing ...).
 local function professionName()
   if C_TradeSkillUI and C_TradeSkillUI.GetBaseProfessionInfo then
     local info = ns.try(C_TradeSkillUI.GetBaseProfessionInfo)
-    if info and info.professionName and info.professionName ~= "" then return info.professionName end
+    if info and info.professionName and info.professionName ~= "" then
+      local id = type(info.professionID) == "number" and info.professionID > 0 and info.professionID or nil
+      return info.professionName, id
+    end
   end
   if GetTradeSkillLine then
     local n = ns.try(GetTradeSkillLine)
     if n and n ~= "UNKNOWN" then return n end
   end
+end
+
+local function skillOf(name, id)
+  if id then return id end
+  return ns.Collect and ns.Collect.skillId and ns.Collect.skillId(name) or nil
 end
 
 local function modernReagents(recipeID)
@@ -78,7 +87,7 @@ end
 -- Returns { name = profession, recipes = { {key, id, name, diff, skillUps, reagents, canMake} } }
 function P.scan()
   if not safeCombat() then return end
-  local prof = professionName()
+  local prof, skill = professionName()
   if not prof then return end
   local recipes = {}
   if C_TradeSkillUI and C_TradeSkillUI.GetAllRecipeIDs and C_TradeSkillUI.GetRecipeInfo then
@@ -112,10 +121,10 @@ function P.scan()
       end
     end
   end
-  P.current = { name = prof, recipes = recipes, at = ns.now() }
+  P.current = { name = prof, skill = skillOf(prof, skill), recipes = recipes, at = ns.now() }
   P.lastScan = { at = ns.now(), prof = prof, recipes = #recipes,
     method = (C_TradeSkillUI and C_TradeSkillUI.GetAllRecipeIDs) and "modern" or (GetNumTradeSkills and "classic" or "none") }
-  -- Remember which reagents we care about so the guild server can send their guild prices and stock.
+  -- Remember which reagents we care about so the Guild Camp app can show their guild prices and stock.
   ns.db.reagentIds = ns.db.reagentIds or {}
   local seen = {}
   for _, id in ipairs(ns.db.reagentIds) do seen[id] = true end
@@ -222,17 +231,24 @@ function P.list()
   return ns.db.shopping
 end
 
+-- The list changed: redraw the tracker and let the guild know (the shared "sh" record).
+local function listChanged()
+  P.refreshTracker()
+  if ns.Collect and ns.Collect.changed then ns.Collect.changed() end
+end
+
 function P.addToList(recipe, qty)
   local list = P.list()
   for _, e in ipairs(list) do
-    if e.key == recipe.key then e.qty = e.qty + qty; P.refreshTracker(); return e end
+    if e.key == recipe.key then e.qty = e.qty + qty; listChanged(); return e end
   end
   local reagents = {}
   for _, g in ipairs(recipe.reagents) do reagents[#reagents + 1] = { id = g.id, name = g.name, qty = g.qty } end
-  local e = { key = recipe.key, name = recipe.name, qty = qty, prof = P.current and P.current.name, reagents = reagents }
+  local e = { key = recipe.key, name = recipe.name, qty = qty, prof = P.current and P.current.name,
+    skill = P.current and P.current.skill, reagents = reagents }
   table.insert(list, e)
   ns.print(string.format("Added %d × %s to your shopping list. /wow list shows it.", qty, recipe.name))
-  P.refreshTracker()
+  listChanged()
   return e
 end
 
@@ -245,13 +261,13 @@ function P.removeFromList(key, delta)
       break
     end
   end
-  P.refreshTracker()
+  listChanged()
 end
 
 function P.clearList()
   ns.db.shopping = {}
   P.done = {}
-  P.refreshTracker()
+  listChanged()
   ns.print("Shopping list cleared.")
 end
 
@@ -328,7 +344,7 @@ local pending = false
 local function onBags()
   if pending then return end
   pending = true
-  C_Timer.After(0.5, function()
+  ns.after(0.5, function()
     pending = false
     if #P.list() > 0 then P.checkComplete(); P.refreshTracker() end
   end)
@@ -350,7 +366,7 @@ function P.safeScan()
 end
 
 local function onTradeSkill()
-  C_Timer.After(0.6, function()
+  ns.after(0.6, function()
     if P.safeScan() then P.refreshGuide() end
   end)
 end

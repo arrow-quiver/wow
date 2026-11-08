@@ -1,26 +1,43 @@
 // DEV MOCK of window.gc, used only when the renderer is opened in a plain browser (no Electron preload).
-// It returns sample data for every IPC method and for the core server endpoints, so pages can be previewed.
+// It returns sample data for every IPC method and for the local core's endpoints (app/src/core), so pages can be
+// previewed. There are no accounts: "me" is the player on this PC, the guild is the one the addon reports, and
+// roles come from in-game ranks (rank 0 = Guild Master; rank ≤ officer_rank_max = officer).
 //
 // Pick a scenario with ?mock=<name> in the page URL (before the #):
-//   owner (default) · officer · member · setup (signed in, game not set up yet) · noguild (signed in, not in the guild)
-//   signedout (a returning member who is signed out) · fresh (signed out, brand new server without a guild)
-// Add &latency=0 to answer instantly, &fail=1 to make every server call fail.
+//   owner (default, the Guild Master) · officer · member
+//   setup (first run: no game folder found yet, no guild) · noguild (game and addon found, no guild synced yet)
+// Other switches:
+//   &bnet=in|out|none   Battle.net signed in (default for owner/officer/member), signed out, or not built in
+//   &blizzard=0         no Blizzard game data (this copy has no Battle.net app)
+//   &key=0              no Anthropic API key for the Coach
+//   &publish=1|0        whether this PC can publish releases (default: only the owner scenario)
+//   &match=later|never  in "setup" and "noguild", the first sync finds the guild about 7 s after the addon is in
+//                       place (later, the default) or never
+//   &share=full|empty|off  sharing in game (GET /api/share/status, mocks/share.js): full (default) has a change
+//                       waiting for an officer character, one ready to go, one the game refused as stale, one
+//                       sent, a change in my name this PC didn't make and (officers) a shared Discord webhook;
+//                       empty has sharing on with nothing waiting; off has the addon not sharing yet
+//   &restart=1          the game was running when Guild Camp made its news folder in WoW Forever: sharing waits for a
+//                       game restart, not a /reload (sync status restartNeeded and restartFolders)
+//   &latency=0          answer instantly · &fail=1 makes every core call fail
 //
-// Guild matching (guild.autoJoin, the 'membership' channel): in "noguild" the first check finds no match, then
-// a background check about 7 s later joins (an officer "opened the roster in game"). &match=now joins at once,
-// &match=never never matches, &match=off shows a guild that only takes invite links. In "fresh" the server has
-// no guild, so the addon's guild is offered for setup; &detect=0 hides the addon's characters (name it by hand).
-//
-// Other modules can add sample endpoints with addMockRoutes({ 'GET /api/thing/:id': ({ params, query, body }) => ... }).
+// Other modules add sample endpoints with addMockRoutes({ 'GET /api/thing/:id': ({ params, query, body, state }) => ... })
+// and use the shared guards below (needGuild, needOfficer, roleOf).
 
 const params = new URLSearchParams(typeof location !== 'undefined' ? location.search : '');
-const SCENARIO = params.get('mock') || 'owner';
-const LATENCY = params.has('latency') ? Number(params.get('latency')) || 0 : 220;
+const SCENARIO = ['owner', 'officer', 'member', 'setup', 'noguild'].includes(params.get('mock')) ? params.get('mock') : 'owner';
+// A little delay in a browser preview so loading states show; none in Node (the renderer tests).
+const LATENCY = params.has('latency') ? Number(params.get('latency')) || 0 : typeof location === 'undefined' ? 0 : 220;
 const FAIL_ALL = params.get('fail') === '1';
-const MATCH = params.get('match') || (SCENARIO === 'noguild' ? 'later' : 'now'); // now | later | never | off
-const DETECT = params.get('detect') !== '0';
+const MATCH = params.get('match') === 'never' ? 'never' : 'later';
+const BNET = ['in', 'out', 'none'].includes(params.get('bnet')) ? params.get('bnet') : (['setup', 'noguild'].includes(SCENARIO) ? 'out' : 'in');
+const BLIZZARD = params.get('blizzard') !== '0';
+const HAS_KEY = params.get('key') !== '0';
+const CAN_PUBLISH = params.has('publish') ? params.get('publish') === '1' : SCENARIO === 'owner';
 // Flavors the bundled addon supports (the main process reads them from the toc's ## Interface: list).
 const SUPPORTED_FLAVORS = new Set(['_forever_', '_retail_', '_classic_era_']);
+const GUILD_FOUND_MS = 7000;
+const RESTART = params.get('restart') === '1';
 
 const now = () => Date.now();
 const iso = (msAgo = 0) => new Date(now() - msAgo).toISOString();
@@ -30,55 +47,58 @@ const HOUR = 60 * MIN;
 const DAY = 24 * HOUR;
 const clone = (v) => (v === undefined ? v : JSON.parse(JSON.stringify(v)));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const short = (bt) => String(bt || '').split('#')[0];
 
-function httpError(status, message) {
+export function httpError(status, message, code) {
   const e = new Error(message);
   e.status = status;
+  if (code) e.code = code;
   return e;
 }
 
+// The core's words (app/src/core/http.js, routes/sync.js, routes/coach.js).
+export const NO_GUILD = "Guild Camp hasn't seen your guild yet. Log in to World of Warcraft with the Guild Camp addon on a character in your guild, then log out or type /reload.";
+const NO_GUILD_UPLOAD = 'None of your characters is in a guild yet. Guild Camp starts working as soon as you log in to a character in your guild.';
+const NO_BNET_APP = 'Blizzard game data is off: this copy of Guild Camp has no Battle.net app built in.';
+
 // ---------- sample world ----------
 
-const GUILD = { id: 1, name: 'Just Now WoW', faction: 'Horde', wowhead_game: 'classic', invite_code: 'EMBER-7Q2K', realm: 'Forever', created_at: sqlTime(90 * DAY) };
+const GUILD = {
+  id: 1, name: 'Just Now WoW', faction: 'Horde', ruleset: 'PvP', wowhead_game: 'classic', realm: 'Mirage Raceway', game_guild: 'Just Now WoW',
+  realm_status: { found: true, slug: 'mirage-raceway', name: 'Mirage Raceway', up: true, queue: false, population: 'High', checkedAt: iso(4 * MIN) },
+  official_roster_at: null, official_roster_note: null, roster_scanned_at: sqlTime(4 * MIN), bank_money: 12_345_678, bank_scanned_at: sqlTime(20 * HOUR),
+  coach_enabled: 1, coach_budget_usd: 15, officer_rank_max: 1, relay_rank_max: null, reset_at: null, created_at: sqlTime(90 * DAY),
+};
 
+// Players this PC knows: me, and guildmates whose addon shared with mine. rank_index is their best character's rank.
 const MEMBERS = [
-  { id: 1, battletag: 'Calvin#1234', role: 'owner', joined_at: sqlTime(90 * DAY), last_sync_at: sqlTime(3 * MIN), addon_version: '0.11.0', app_version: '0.11.0', main: 'Grimtusk' },
-  { id: 2, battletag: 'Velanne#2210', role: 'officer', joined_at: sqlTime(80 * DAY), last_sync_at: sqlTime(40 * MIN), addon_version: '0.11.0', app_version: '0.11.0', main: 'Velanne' },
-  { id: 3, battletag: 'Mokra#9031', role: 'member', joined_at: sqlTime(30 * DAY), last_sync_at: sqlTime(2 * DAY), addon_version: '0.10.2', app_version: '0.11.0', main: 'Mokra' },
-  { id: 4, battletag: 'Tazrik#4410', role: 'member', joined_at: sqlTime(12 * DAY), last_sync_at: sqlTime(9 * DAY), addon_version: '0.9.0', app_version: null, main: 'Tazrik' },
-  { id: 5, battletag: 'Ilyra#7777', role: 'member', joined_at: sqlTime(4 * DAY), last_sync_at: null, addon_version: null, app_version: null, main: null },
+  { id: 1, battletag: 'Calvin#1234', rank_index: 0, joined_at: sqlTime(90 * DAY), last_sync_at: sqlTime(3 * MIN), addon_version: '0.11.0', app_version: '0.11.0', main: 'Grimtusk', characters: 3 },
+  { id: 2, battletag: 'Velanne#2210', rank_index: 1, joined_at: sqlTime(80 * DAY), last_sync_at: sqlTime(40 * MIN), addon_version: '0.11.1', app_version: '0.11.1', main: 'Velanne', characters: 1 },
+  { id: 3, battletag: 'Mokra#9031', rank_index: 2, joined_at: sqlTime(30 * DAY), last_sync_at: sqlTime(2 * DAY), addon_version: '0.10.2', app_version: '0.11.0', main: 'Mokra', characters: 1 },
+  { id: 4, battletag: 'Tazrik#4410', rank_index: 3, joined_at: sqlTime(12 * DAY), last_sync_at: sqlTime(9 * DAY), addon_version: '0.9.0', app_version: null, main: 'Tazrik', characters: 1 },
+  { id: 5, battletag: 'Ilyra#7777', rank_index: 4, joined_at: sqlTime(4 * DAY), last_sync_at: null, addon_version: null, app_version: null, main: 'Ilyra', characters: 1 },
 ];
-
-const CHARACTERS = [
-  { name: 'Grimtusk', class: 'WARRIOR', race: 'Orc', level: 60, zone: 'Orgrimmar', online: true, user_id: 1, guild_rank: 'Warchief', item_level: 61, last_seen: sqlTime(2 * MIN) },
-  { name: 'Shadowfen', class: 'WARLOCK', race: 'Undead', level: 42, zone: 'Desolace', online: false, user_id: 1, guild_rank: 'Alt', item_level: 38, last_seen: sqlTime(3 * DAY) },
-  { name: 'Velanne', class: 'PRIEST', race: 'Troll', level: 60, zone: 'Blackrock Mountain', online: true, user_id: 2, guild_rank: 'Officer', item_level: 63, last_seen: sqlTime(5 * MIN) },
-  { name: 'Mokra', class: 'SHAMAN', race: 'Tauren', level: 58, zone: 'Winterspring', online: true, user_id: 3, guild_rank: 'Member', item_level: 52, last_seen: sqlTime(1 * MIN) },
-  { name: 'Tazrik', class: 'ROGUE', race: 'Troll', level: 35, zone: 'Stranglethorn Vale', online: false, user_id: 4, guild_rank: 'Member', item_level: 31, last_seen: sqlTime(9 * DAY) },
-  { name: 'Hrogar', class: 'HUNTER', race: 'Orc', level: 60, zone: 'Undercity', online: false, user_id: null, guild_rank: 'Member', item_level: 57, last_seen: sqlTime(20 * HOUR) },
-  { name: 'Ilyra', class: 'MAGE', race: 'Undead', level: 19, zone: 'The Barrens', online: true, user_id: 5, guild_rank: 'Initiate', item_level: 15, last_seen: sqlTime(30 * 1000) },
-  { name: 'Brannoc', class: 'DRUID', race: 'Tauren', level: 47, zone: 'Feralas', online: false, user_id: null, guild_rank: 'Member', item_level: 44, last_seen: sqlTime(2 * DAY) },
-  { name: 'Seraphel', class: 'PRIEST', race: 'Undead', level: 12, zone: 'Tirisfal Glades', online: false, user_id: null, guild_rank: 'Initiate', item_level: 10, last_seen: sqlTime(6 * DAY) },
-];
+const MAIN_INFO = { Grimtusk: ['WARRIOR', 60], Velanne: ['PRIEST', 60], Mokra: ['SHAMAN', 58], Tazrik: ['ROGUE', 35], Ilyra: ['MAGE', 19] };
+// What each player's addon reports about its characters (WowGuildDB.characters), for wow.detectGuild.
+const ADDON_CHARS = {
+  1: [{ name: 'Grimtusk', level: 60, class: 'WARRIOR' }, { name: 'Shadowfen', level: 42, class: 'WARLOCK' }],
+  2: [{ name: 'Velanne', level: 60, class: 'PRIEST' }],
+  3: [{ name: 'Mokra', level: 58, class: 'SHAMAN' }],
+};
+const LATEST = { app: '0.11.1', addon: '0.11.1' };
 
 function initialState() {
   const s = {
     settings: {
-      serverUrl: 'https://wow.cjplumbing.co.za', extraWowFolders: [], syncEnabled: true, closeToTray: true,
-      startWithWindows: false, addonAutoUpdate: true, addonAutoInstall: true, appAutoUpdate: true, notifications: true,
-      theme: 'system', repoDir: null, lastEventId: 0, windowBounds: null, onboarded: true, startupDefaulted: false,
+      extraWowFolders: [], syncEnabled: true, closeToTray: true, startWithWindows: false, addonAutoUpdate: true, addonAutoInstall: true,
+      appAutoUpdate: true, notifications: true, theme: 'system', repoDir: null, windowBounds: null, onboarded: true, startupDefaulted: false,
+      addonOptOut: [], discordWebhook: null, bnetRegion: 'eu', inboxRestart: {},
     },
-    membership: null, // last guild.autoJoin result
-    rosterAdds: [], // character names "scanned into" the guild roster during the preview
-    serverGuild: clone(GUILD),
-    signedIn: true,
+    guild: clone(GUILD), // the local guild: null until the first sync finds one
     userId: 1,
-    inGuild: true,
     members: clone(MEMBERS),
-    devices: [
-      { id: 11, name: 'CALVIN-PC', platform: 'win32', app_version: '0.11.0', created_at: sqlTime(20 * DAY), last_seen_at: sqlTime(1 * MIN), current: true },
-      { id: 12, name: 'LAPTOP', platform: 'win32', app_version: '0.10.0', created_at: sqlTime(60 * DAY), last_seen_at: sqlTime(8 * DAY), current: false },
-    ],
+    bnet: { available: BNET !== 'none', signedIn: BNET === 'in', signingIn: false, region: 'eu', error: null },
+    secrets: { anthropicKey: HAS_KEY },
     notifyPrefs: { cta: true, raids: true, notices: true, requests: true, bank: true, coach: true, drives: true },
     installs: [
       { dir: 'C:\\Program Files (x86)\\World of Warcraft\\_forever_', root: 'C:\\Program Files (x86)\\World of Warcraft', flavor: '_forever_', label: 'WoW Forever',
@@ -88,36 +108,62 @@ function initialState() {
         addonsDir: 'C:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns', wtfDir: 'C:\\Program Files (x86)\\World of Warcraft\\_retail_\\WTF',
         accounts: [], addon: null },
     ],
-    addon: { bundled: { version: '0.11.0' }, remote: { version: '0.11.1', notes: 'Shopping list shows guild bank stock.\nFixes a Lua error when opening the Coach in combat.', publishedAt: iso(2 * DAY) }, autoUpdate: true, checking: false, lastCheckAt: iso(20 * MIN), error: null, busy: {} },
-    sync: { enabled: true, state: 'idle', lastSyncAt: iso(3 * MIN), lastResult: { characters: 2, roster: 9, recipes: 141, prices: 812 }, lastError: null, nextRetryAt: null,
+    addon: {
+      bundled: { version: '0.11.0' },
+      remote: { version: '0.11.1', notes: 'Shopping list shows guild bank stock.\nFixes a Lua error when opening the Coach in combat.', publishedAt: iso(2 * DAY), size: 148_220, url: 'https://github.com/arrow-quiver/wow/releases/tag/addon-v0.11.1' },
+      checking: false, lastCheckAt: iso(20 * MIN), error: null, busy: {},
+    },
+    sync: {
+      state: 'idle', running: true, lastSyncAt: iso(3 * MIN), lastError: null, nextRetryAt: null, guildNote: null, coachWaiting: 0,
+      // A news folder made while the game ran waits for a game restart (main/sync.js status); ?restart=1 shows it.
+      restartNeeded: false, restartFolders: [],
+      lastResult: { characters: 2, roster: 11, recipes: 141, ctas: 0, inventory: 86, bank: 0, prices: 812, coachPending: 0, account: 'CALVIN', label: 'WoW Forever', guild: { name: GUILD.name, role: 'owner' } },
       recent: [
-        { at: iso(3 * MIN), kind: 'upload', ok: true, message: 'Uploaded 2 characters, 9 roster rows and 141 recipes.', account: 'CALVIN', label: 'WoW Forever' },
+        { at: iso(3 * MIN), kind: 'upload', ok: true, message: 'Read 2 characters, 11 roster rows and 141 recipes.', account: 'CALVIN', label: 'WoW Forever' },
         { at: iso(3 * MIN - 1500), kind: 'inbox', ok: true, message: 'Saved the guild news for the addon.', label: 'WoW Forever' },
-        { at: iso(2 * HOUR), kind: 'upload', ok: false, message: 'The server did not answer. Trying again in 5 seconds.', account: 'CALVIN', label: 'WoW Forever' },
-      ] },
+        { at: iso(2 * HOUR), kind: 'upload', ok: false, message: 'The saved file was still being written. Trying again in 5 seconds.', account: 'CALVIN', label: 'WoW Forever' },
+      ],
+    },
     updater: { state: 'available', current: '0.11.0', available: { version: '0.11.1', notes: 'Faster sync after /reload.\nNew Updates page.', date: iso(1 * DAY) }, progress: null, error: null, lastCheckAt: iso(12 * MIN) },
     releases: {
-      app: { version: '0.11.1', notes: 'Faster sync after /reload.\nNew Updates page.', publishedAt: iso(1 * DAY), file: 'Guild-Camp-Setup-0.11.1.exe', url: '/updates/app/Guild-Camp-Setup-0.11.1.exe', size: 92_405_112 },
-      addon: { version: '0.11.1', notes: 'Shopping list shows guild bank stock.', publishedAt: iso(2 * DAY), sha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', size: 148_220, url: '/updates/addon/WowGuild-0.11.1.zip' },
+      app: { kind: 'app', version: '0.11.1', tag: 'v0.11.1', notes: 'Faster sync after /reload.\nNew Updates page.', publishedAt: iso(1 * DAY), url: 'https://github.com/arrow-quiver/wow/releases/tag/v0.11.1' },
       history: [
-        { kind: 'app', version: '0.11.1', notes: 'Faster sync after /reload.', publishedAt: iso(1 * DAY), by: 'Calvin#1234' },
-        { kind: 'addon', version: '0.11.1', notes: 'Shopping list shows guild bank stock.', publishedAt: iso(2 * DAY), by: 'Calvin#1234' },
-        { kind: 'app', version: '0.11.0', notes: 'First Guild Camp desktop release.', publishedAt: iso(9 * DAY), by: 'Calvin#1234' },
+        { kind: 'app', version: '0.11.1', tag: 'v0.11.1', notes: 'Faster sync after /reload.', publishedAt: iso(1 * DAY), url: 'https://github.com/arrow-quiver/wow/releases/tag/v0.11.1' },
+        { kind: 'addon', version: '0.11.1', tag: 'addon-v0.11.1', notes: 'Shopping list shows guild bank stock.', publishedAt: iso(2 * DAY), url: 'https://github.com/arrow-quiver/wow/releases/tag/addon-v0.11.1' },
+        { kind: 'app', version: '0.11.0', tag: 'v0.11.0', notes: 'First Guild Camp desktop release.', publishedAt: iso(9 * DAY), url: 'https://github.com/arrow-quiver/wow/releases/tag/v0.11.0' },
       ],
+      checkedAt: iso(20 * MIN),
     },
     events: [],
     rendererReady: null,
+    // Sharing in game (GET /api/share/status): filled by mocks/share.js; mockQueue() adds my changes to it.
+    share: { outbox: [], refused: [], authorChecks: [], webhook: null, seq: 0 },
   };
   switch (SCENARIO) {
     case 'officer': s.userId = 2; break;
     case 'member': s.userId = 3; break;
-    case 'setup': s.settings.onboarded = false; break;
-    case 'noguild': s.inGuild = false; s.userId = 6; s.settings.onboarded = false; break;
-    case 'signedout': s.signedIn = false; s.settings.onboarded = false; break;
-    case 'fresh': s.signedIn = false; s.serverGuild = null; s.inGuild = false; s.settings.onboarded = false; s.members = []; break;
-    default: break;
+    case 'setup':
+      s.settings.onboarded = false;
+      s.guild = null;
+      s.installs = [];
+      break;
+    case 'noguild':
+      s.settings.onboarded = false;
+      s.guild = null;
+      break;
+    default:
+      s.settings.discordWebhook = 'https://discord.com/api/webhooks/123456789012345678/preview-sample-token';
+      break;
   }
-  if (s.userId === 6) s.members.push({ id: 6, battletag: 'Newcomer#5150', role: null, joined_at: null, last_sync_at: null });
+  if (RESTART && s.installs.length) {
+    s.sync.restartNeeded = true;
+    s.sync.restartFolders = [{ install: s.installs[0].dir, label: s.installs[0].label, since: iso(10 * MIN) }];
+  }
+  if (!s.guild) {
+    s.sync.lastResult = null;
+    s.sync.recent = [];
+    s.sync.lastSyncAt = null;
+  }
   return s;
 }
 
@@ -134,27 +180,99 @@ function emit(channel, payload) {
   }
 }
 
-// ---------- derived views ----------
+// ---------- roles from in-game ranks (the core's identity.roleFromRank) ----------
 
-function me() { return state.members.find((m) => m.id === state.userId) || null; }
+function roleFromRank(rank, max) {
+  if (rank === 0) return 'owner';
+  if (rank != null && max != null && rank <= max) return 'officer';
+  return 'member';
+}
 
-function authState() {
-  if (!state.signedIn) return { signedIn: false, server: state.settings.serverUrl, user: null, guild: null, role: null };
-  const m = me();
-  const user = m ? { id: m.id, battletag: m.battletag } : null;
-  const inGuild = state.inGuild && state.serverGuild;
+function syncRanks() {
+  const max = state.guild ? state.guild.officer_rank_max : null;
+  for (const m of state.members) m.role = roleFromRank(m.rank_index, max);
+}
+syncRanks();
+
+export function meOf(s = state) { return s.members.find((m) => m.id === s.userId) || null; }
+export function roleOf(s = state) { return s.guild ? meOf(s)?.role || null : null; }
+export function isOfficerIn(s = state) { return ['owner', 'officer'].includes(roleOf(s)); }
+export function needGuild(s = state) { if (!s.guild) throw httpError(403, NO_GUILD, 'NO_GUILD'); }
+export function needOfficer(s = state) {
+  needGuild(s);
+  if (!isOfficerIn(s)) throw httpError(403, 'Only officers can do that. Your rank in the in-game guild decides who is an officer.');
+}
+export function needOwner(s = state) { needGuild(s); if (roleOf(s) !== 'owner') throw httpError(403, 'Only the Guild Master can do that.'); }
+
+// ---------- sharing: my changes waiting to go out (the core's sharing.queue) ----------
+
+// The core's plain lines (app/src/core/share/text.js LINES, docs/SHARING.md §2).
+export const SHARE_SAVED = 'Saved. It goes to your guild the next time you log in or type /reload.';
+
+/**
+ * Adds a change of mine to the outbox, as the core's sharing.queue() does: a new entry for a record already
+ * waiting replaces it. Returns the entry. id is the record id ("CFG:1"), summary the plain line shown for it.
+ */
+export function mockQueue({ id, summary }) {
+  const sh = state.share;
+  sh.seq += 1;
+  const entry = {
+    op: `o${(1000 + sh.seq).toString(36)}m`, id, type: id.slice(0, id.indexOf(':')), summary, state: 'queued',
+    note: SHARE_SAVED, createdAt: sqlTime(), sentAt: null,
+  };
+  sh.outbox = [entry, ...sh.outbox.filter((e) => !(e.id === id && (e.state === 'queued' || e.state === 'waiting')))];
+  return entry;
+}
+
+// ---------- derived views (the core's JSON shapes) ----------
+
+// The name Guild Camp knows me by: the BattleTag, else my main's name, else "You".
+function myName() {
+  const m = meOf();
+  if (state.bnet.signedIn && m) return m.battletag;
+  if (state.guild && m && m.main) return m.main;
+  return 'You';
+}
+
+function userJson() {
+  const m = meOf();
+  const battletag = myName();
   return {
-    signedIn: true,
-    server: state.settings.serverUrl,
-    user,
-    guild: inGuild ? { id: state.serverGuild.id, name: state.serverGuild.name, faction: state.serverGuild.faction, wowhead_game: state.serverGuild.wowhead_game } : null,
-    role: inGuild && m ? m.role : null,
+    id: state.userId, battletag, name: short(battletag),
+    addon_version: state.guild ? m?.addon_version ?? null : null, app_version: '0.11.0',
+    last_sync_at: state.guild ? m?.last_sync_at ?? null : null, created_at: sqlTime(90 * DAY),
   };
 }
 
-function needSignedIn() { if (!state.signedIn) throw httpError(401, 'Please sign in again.'); }
-function needGuild() { needSignedIn(); if (!state.inGuild || !state.serverGuild) throw httpError(403, 'Join the guild first.'); }
-function needOfficer() { needGuild(); const r = me()?.role; if (r !== 'owner' && r !== 'officer') throw httpError(403, 'Only officers can do that.'); }
+export function guildJson(s = state) {
+  const g = s.guild;
+  if (!g) return null;
+  const role = roleOf(s);
+  const out = { ...clone(g), role };
+  if (role === 'owner' || role === 'officer') out.discord_webhook = s.settings.discordWebhook || null;
+  return out;
+}
+
+function bnetCharacters() {
+  if (!state.bnet.signedIn) return [];
+  return (ADDON_CHARS[state.userId] || ADDON_CHARS[1]).map((c) => ({
+    ...c, realm: GUILD.realm, realm_slug: 'mirage-raceway', race: 'Orc', faction: 'Horde', namespace: 'profile-classic1x-eu', guild: GUILD.name,
+  }));
+}
+
+function bnetState() {
+  const b = state.bnet;
+  const signedIn = b.available && b.signedIn;
+  return {
+    available: b.available, signedIn, signingIn: b.signingIn, battletag: signedIn ? meOf()?.battletag || null : null, region: state.settings.bnetRegion || 'eu',
+    characters: bnetCharacters(), profileAt: signedIn ? iso(2 * MIN) : null, canRefresh: signedIn, error: b.error,
+  };
+}
+
+// auth.state(): the Battle.net state plus who I am in the local core (same shapes as GET /api/me).
+function authState() {
+  return { ...bnetState(), user: userJson(), guild: guildJson(), role: roleOf() };
+}
 
 function compareVersions(a, b) {
   const pa = String(a || '0').split(/[.-]/).map((x) => Number(x) || 0);
@@ -165,11 +283,12 @@ function compareVersions(a, b) {
 
 function addonStatus() {
   const a = state.addon;
-  const latest = a.remote && compareVersions(a.remote.version, a.bundled.version) > 0
+  const latest = a.remote && compareVersions(a.remote.version, a.bundled.version) >= 0
     ? { version: a.remote.version, source: 'remote' } : { version: a.bundled.version, source: 'bundled' };
   return {
-    bundled: a.bundled, remote: a.remote, latest, autoUpdate: state.settings.addonAutoUpdate, checking: a.checking,
-    lastCheckAt: a.lastCheckAt, error: a.error,
+    bundled: a.bundled, remote: a.remote, latest, releases: clone(state.releases),
+    autoUpdate: state.settings.addonAutoUpdate, autoInstall: state.settings.addonAutoInstall !== false,
+    supportedFlavors: [...SUPPORTED_FLAVORS], checking: a.checking, lastCheckAt: a.lastCheckAt, error: a.error,
     installs: state.installs.map((i) => {
       const installed = i.addon ? { version: i.addon } : null;
       let st = 'missing';
@@ -177,140 +296,73 @@ function addonStatus() {
         const c = compareVersions(installed.version, latest.version);
         st = c < 0 ? 'outdated' : c > 0 ? 'newer' : 'current';
       }
-      return { dir: i.dir, root: i.root, flavor: i.flavor, label: i.label, addonsDir: i.addonsDir, installed, state: st, damaged: false, busy: !!a.busy[i.dir], action: null, error: null };
+      return {
+        dir: i.dir, root: i.root, flavor: i.flavor, label: i.label, addonsDir: i.addonsDir, installed, state: st, damaged: false,
+        supported: SUPPORTED_FLAVORS.has(i.flavor), optedOut: false, busy: !!a.busy[i.dir], action: null, error: null,
+        waitingForGame: false, // the preview's game is never running
+      };
     }),
   };
 }
 
 function syncStatus() {
-  const files = state.installs.flatMap((i) => i.accounts.map((file) => ({ file, account: file.split('\\').slice(-3, -2)[0], install: i.dir, label: i.label, flavor: i.flavor, lastUploadAt: state.sync.lastSyncAt, lastError: null, nextRetryAt: null })));
-  const base = { ...state.sync, enabled: state.settings.syncEnabled, files };
-  if (!state.signedIn) base.state = 'signed-out';
-  else if (!state.settings.syncEnabled) base.state = 'off';
-  else if (!state.installs.length) base.state = 'no-game';
-  else if (!state.inGuild || !state.serverGuild) {
-    base.state = 'no-guild';
-    base.lastError = state.membership?.reason || 'Waiting to match your guild.';
+  const files = state.installs.flatMap((i) => i.accounts.map((file) => ({
+    file, account: file.split('\\').slice(-3, -2)[0], install: i.dir, label: i.label, flavor: i.flavor,
+    lastUploadAt: state.sync.lastSyncAt, lastError: null, nextRetryAt: null,
+  })));
+  const base = { ...clone(state.sync), enabled: state.settings.syncEnabled, files, installCount: state.installs.length };
+  if (base.state !== 'syncing') {
+    if (!state.settings.syncEnabled) base.state = 'off';
+    else if (!state.installs.length) base.state = 'no-game';
   }
   return base;
 }
 
-// ---------- guild matching (guild.autoJoin) ----------
+// ---------- the first sync finds the guild ("setup" and "noguild") ----------
 
-// What wow.detectGuild reads from the addon's SavedVariables (WowGuildDB.characters) on this PC.
-function addonCharacters() {
-  if (!DETECT) return [];
-  const forever = state.installs.find((i) => i.flavor === '_forever_') || state.installs[0];
-  const where = { install: forever ? forever.dir : null, account: state.userId === 6 ? 'NEWCOMER' : 'CALVIN' };
-  const updated = Math.floor(now() / 1000) - 2 * 3600;
-  if (state.userId === 6 || !state.members.some((m) => m.id === state.userId && m.role)) {
-    return [
-      { name: 'Zulgar', realm: GUILD.realm, guild: GUILD.name, faction: 'Horde', level: 34, class: 'SHAMAN', updated, ...where },
-      { name: 'Zulbank', realm: GUILD.realm, guild: null, faction: 'Horde', level: 5, class: 'MAGE', updated: updated - 86400, ...where },
-    ];
+let guildTimer = null;
+function maybeFindGuild() {
+  if (state.guild || MATCH === 'never' || guildTimer) return;
+  const ready = state.installs.some((i) => i.addon && i.accounts.length);
+  if (!ready) {
+    // The addon is in place but the game hasn't saved anything yet: say why nothing is stored.
+    return;
   }
-  return CHARACTERS.filter((c) => c.user_id === state.userId).map((c, i) => ({
-    name: c.name, realm: GUILD.realm, guild: GUILD.name, faction: 'Horde', level: c.level, class: c.class, updated: updated - i * 3600, ...where,
-  }));
-}
-
-function detectedGuild(chars) {
-  const c = [...chars].filter((x) => x && x.guild).sort((a, b) => (b.updated || 0) - (a.updated || 0))[0];
-  return c ? { guild: c.guild, realm: c.realm || null, faction: c.faction || null } : null;
-}
-
-function membershipResult(fields) {
-  const g = state.serverGuild;
-  return { status: 'no-match', guild: g ? { id: g.id, name: g.name, faction: g.faction } : null, role: null, via: null, character: null, reason: '', detected: null, ...fields };
-}
-
-// Same rules as the server's tryAutoJoin, roughly: no guild → offer the addon's guild; a reported character in
-// the roster → join. MATCH bends it so each outcome can be previewed.
-function autoJoinResult(reported) {
-  if (!state.signedIn) throw httpError(401, 'Sign in first.');
-  const g = state.serverGuild;
-  const detected = detectedGuild(reported);
-  if (!g) {
-    return membershipResult({
-      status: 'no-guild-on-server', guild: null, detected,
-      reason: detected ? `Nobody has set up ${detected.guild} on this server yet.` : 'Nobody has set up a guild on this server yet.',
+  if (!state.sync.guildNote && state.installs.some((i) => i.accounts.length)) {
+    Object.assign(state.sync, { guildNote: NO_GUILD_UPLOAD, lastSyncAt: iso() });
+    state.sync.recent.unshift({ at: iso(), kind: 'guild', ok: false, message: NO_GUILD_UPLOAD, account: 'CALVIN', label: 'WoW Forever' });
+    emit('sync', syncStatus());
+  }
+  guildTimer = setTimeout(() => {
+    guildTimer = null;
+    state.guild = clone(GUILD);
+    syncRanks();
+    const message = `Guild Camp set up ${GUILD.name}.`;
+    Object.assign(state.sync, {
+      guildNote: null, lastSyncAt: iso(),
+      lastResult: { characters: 2, roster: 11, recipes: 141, ctas: 0, inventory: 86, bank: 0, prices: 812, coachPending: 0, account: 'CALVIN', label: 'WoW Forever', guild: { name: GUILD.name, role: roleOf() } },
     });
-  }
-  const m = me();
-  if (state.inGuild && m && m.role) return membershipResult({ status: 'already', role: m.role, reason: `You are already in ${g.name}.` });
-  if (MATCH === 'off') {
-    return membershipResult({ status: 'disabled', detected, reason: `${g.name} only takes new members with an invite link. Ask an officer for one.` });
-  }
-  const inRoster = (c) => CHARACTERS.some((x) => x.name.toLowerCase() === String(c.name).toLowerCase()) || state.rosterAdds.includes(String(c.name).toLowerCase());
-  const mine = reported.filter((c) => c && c.guild && c.guild.toLowerCase() === g.name.toLowerCase());
-  const hit = MATCH === 'now' ? mine[0] || reported[0] || { name: 'Zulgar' } : MATCH === 'never' ? null : mine.find(inRoster);
-  if (!hit) {
-    return membershipResult({
-      detected,
-      reason: mine.length
-        ? `None of your characters are in ${g.name}'s roster yet. Ask someone in the guild to open the guild roster in game, or use an invite link.`
-        : `Log in to World of Warcraft once with the Guild Camp addon on a character in ${g.name}, then Guild Camp will add you.`,
-    });
-  }
-  state.inGuild = true;
-  let who = m;
-  if (!who) { who = { id: state.userId, battletag: 'Newcomer#5150', role: null, joined_at: null, last_sync_at: null }; state.members.push(who); }
-  who.role = 'member';
-  who.joined_at = sqlTime();
-  emit('auth', authState());
-  return membershipResult({ status: 'joined', role: 'member', via: 'roster', character: hit.name, reason: `Matched ${hit.name} in the guild roster.`, detected });
-}
-
-// guild.autoJoin as the main process runs it: the result is kept and broadcast on 'membership'.
-let laterTimer = null;
-function runAutoJoin() {
-  const r = autoJoinResult(addonCharacters());
-  state.membership = r;
-  emit('membership', r);
-  emit('sync', syncStatus());
-  // "noguild": a guildie opens the roster in game a little later, and the app's background check matches.
-  if (r.status === 'no-match' && MATCH === 'later' && !laterTimer) {
-    laterTimer = setTimeout(() => {
-      state.rosterAdds.push('zulgar');
-      try { runAutoJoin(); } catch (e) { console.warn('[mock] background guild check failed', e); }
-    }, 7000);
-    laterTimer?.unref?.(); // never keeps a Node test run alive
-  }
-  return r;
+    state.sync.recent.unshift({ at: iso(), kind: 'guild', ok: true, message, account: 'CALVIN', label: 'WoW Forever' });
+    emit('sync', syncStatus());
+    emit('auth', authState());
+    emit('server-event', { id: state.events.length + 1, kind: 'guild', title: message, body: '', route: '/', created_at: sqlTime() });
+  }, GUILD_FOUND_MS);
+  guildTimer?.unref?.(); // never keeps a Node test run alive
 }
 
 function installsView() { return state.installs.map(({ addon, ...rest }) => rest); }
 
-function campView() {
-  const online = CHARACTERS.filter((c) => c.online);
-  return {
-    guild: { name: state.serverGuild?.name, faction: state.serverGuild?.faction },
-    online, rosterScannedAt: sqlTime(4 * MIN),
-    ctas: [{ id: 1, message: 'Horde needed at Tarren Mill, Alliance raid incoming!', character: 'Velanne', battletag: 'Velanne#2210', created_at: sqlTime(12 * MIN) }],
-    announcements: [
-      { id: 3, body: 'Molten Core on Friday 20:00 server time. Bring fire resistance.', battletag: 'Calvin#1234', created_at: sqlTime(5 * HOUR) },
-      { id: 2, body: 'Guild bank now has a tab for raid consumables. Ask an officer.', battletag: 'Velanne#2210', created_at: sqlTime(3 * DAY) },
-    ],
-    activity: [
-      { id: 9, kind: 'loot', text: 'Grimtusk won Onslaught Girdle (SR+ 30).', created_at: sqlTime(26 * HOUR) },
-      { id: 8, kind: 'level', text: 'Mokra reached level 58.', created_at: sqlTime(30 * HOUR) },
-      { id: 7, kind: 'craft', text: 'Velanne delivered 20 Major Healing Potions to Grimtusk.', created_at: sqlTime(2 * DAY) },
-    ],
-    onboarding: { show: SCENARIO === 'member', steps: [
-      { key: 'synced', label: 'Synced', done: true, href: '/addon' },
-      { key: 'professions', label: 'Professions opened', done: true, href: '/addon' },
-      { key: 'main', label: 'Main chosen', done: false, href: '/roster' },
-      { key: 'discord', label: 'Discord linked', done: false, href: '/settings?section=discord&link=1' },
-      { key: 'signup', label: 'Signed up for the next raid', done: false, href: '/raids' },
-    ] },
-  };
+// What wow.detectGuild reads from the addon's SavedVariables (WowGuildDB.characters) on this PC.
+function addonCharacters() {
+  const forever = state.installs.find((i) => i.flavor === '_forever_') || state.installs[0];
+  if (!forever) return [];
+  const where = { install: forever.dir, account: 'CALVIN' };
+  const updated = Math.floor(now() / 1000) - 2 * 3600;
+  const inGuild = Boolean(state.guild) || guildTimer !== null;
+  return (ADDON_CHARS[state.userId] || ADDON_CHARS[1]).map((c, i) => ({
+    name: c.name, realm: GUILD.realm, guild: inGuild ? GUILD.name : null, faction: 'Horde', level: c.level, class: c.class, updated: updated - i * 3600, ...where,
+  }));
 }
-
-const RAIDS = [
-  { id: 12, kind: 'raid', title: 'Molten Core', instance: 'Molten Core', starts_at: iso(-2 * DAY - 3 * HOUR), status: 'open', max_reserves: 2, signups: { coming: 18, maybe: 3, notComing: 2 }, mySignup: { status: 'coming', character: 'Grimtusk', role: 'tank' } },
-  { id: 13, kind: 'pvp', title: 'Tarren Mill premade', instance: null, starts_at: iso(-4 * DAY + 2 * HOUR), status: 'open', max_reserves: 0, signups: { coming: 9, maybe: 4, notComing: 0 }, mySignup: null },
-  { id: 14, kind: 'event', title: 'Fishing contest', instance: null, starts_at: iso(-6 * DAY), status: 'open', max_reserves: 0, signups: { coming: 5, maybe: 1, notComing: 0 }, mySignup: null },
-];
 
 // ---------- routes ----------
 
@@ -324,117 +376,116 @@ export function addMockRoutes(table) {
   }
 }
 
+const WOWHEAD_GAMES = [{ value: 'forever', label: 'WoW: Forever' }, { value: 'retail', label: 'Retail' }, { value: 'classic', label: 'Classic' }];
+const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+
 addMockRoutes({
   'GET /api/meta': () => ({
-    server: 'guild-camp', version: '0.11.0', devLogin: true, bnet: true,
-    guild: state.serverGuild ? { name: state.serverGuild.name, faction: state.serverGuild.faction } : null,
-    releases: { app: state.releases.app, addon: state.releases.addon },
+    app: 'guild-camp', version: '0.11.0',
+    guild: state.guild ? { name: state.guild.name, faction: state.guild.faction } : null,
+    blizzard: BLIZZARD,
+    latest: { app: { version: LATEST.app }, addon: { version: LATEST.addon } },
   }),
-  'POST /api/auth/signout': () => ({ ok: true }),
   'GET /api/me': () => {
-    needSignedIn();
-    const a = authState();
-    const bnetChars = state.userId === 6 ? 2 : CHARACTERS.filter((c) => c.user_id === state.userId).length;
+    const chars = bnetCharacters().length;
     return {
-      user: a.user, guild: a.guild ? { ...state.serverGuild } : null, role: a.role, device: state.devices.find((d) => d.current), notifyPrefs: state.notifyPrefs,
-      bnet: { characters: bnetChars, profile_at: sqlTime(2 * MIN), note: bnetChars ? 'Characters found in profile-eu.' : 'Battle.net listed no characters.' },
+      user: userJson(), guild: guildJson(), role: roleOf(), notifyPrefs: state.notifyPrefs,
+      bnet: {
+        characters: chars, profile_at: state.bnet.signedIn ? sqlTime(2 * MIN) : null,
+        note: state.bnet.signedIn ? (chars ? `Read ${chars} characters from Battle.net.` : 'Battle.net listed no characters.') : null,
+      },
     };
   },
-  'POST /api/guild/auto-join': ({ body }) => {
-    needSignedIn();
-    if (body?.characters !== undefined && !Array.isArray(body.characters)) throw httpError(400, 'characters must be a list.');
-    return autoJoinResult((body?.characters || []).slice(0, 50));
+  'PUT /api/me/notifications': ({ body }) => {
+    const patch = body && typeof body.notifyPrefs === 'object' ? body.notifyPrefs : body || {};
+    for (const [k, v] of Object.entries(patch)) if (k in state.notifyPrefs) state.notifyPrefs[k] = !!v;
+    return { notifyPrefs: state.notifyPrefs };
   },
-  'PUT /api/me/notifications': ({ body }) => { needSignedIn(); Object.assign(state.notifyPrefs, body || {}); return { notifyPrefs: state.notifyPrefs }; },
-  'GET /api/devices': () => { needSignedIn(); return { devices: state.devices }; },
-  'DELETE /api/devices/:id': ({ params: p }) => {
-    needSignedIn();
-    state.devices = state.devices.filter((d) => String(d.id) !== p.id);
-    return { ok: true };
-  },
-  'POST /api/guild': ({ body }) => {
-    needSignedIn();
-    if (state.serverGuild) throw httpError(409, 'This server already has a guild. Join it with an invite code.');
-    const name = String(body?.name || '').trim();
-    if (!name) throw httpError(400, 'Give the guild a name.');
-    if (name.length > 40) throw httpError(400, 'Guild names can be up to 40 characters.');
-    if (!['Horde', 'Alliance'].includes(body?.faction)) throw httpError(400, 'Pick Horde or Alliance.');
-    state.serverGuild = {
-      ...clone(GUILD), name, faction: body.faction,
-      realm: String(body.realm || '').trim().slice(0, 60) || null, game_guild: String(body.game_guild || '').trim().slice(0, 60) || null,
-    };
-    state.inGuild = true;
-    const m = me();
-    if (m) m.role = 'owner';
-    else state.members.push({ id: state.userId, battletag: 'Newcomer#5150', role: 'owner', joined_at: sqlTime(), last_sync_at: null });
-    emit('auth', authState());
-    return { guild: state.serverGuild };
-  },
-  'GET /api/guild/invite/:code': ({ params: p }) => {
-    if (!state.serverGuild || p.code.toUpperCase() !== state.serverGuild.invite_code) throw httpError(404, 'That invite code does not work. Ask an officer for a new link.');
-    return { name: state.serverGuild.name, faction: state.serverGuild.faction };
-  },
-  'POST /api/guild/join': ({ body }) => {
-    needSignedIn();
-    const code = String(body?.code || '').trim().toUpperCase();
-    if (!state.serverGuild) throw httpError(404, 'There is no guild on this server yet.');
-    if (state.inGuild) throw httpError(409, 'You are already in the guild.');
-    if (code !== state.serverGuild.invite_code) throw httpError(404, `That invite code does not work. In the preview, use ${state.serverGuild.invite_code}.`);
-    state.inGuild = true;
-    const m = me();
-    if (m) { m.role = 'member'; m.joined_at = sqlTime(); }
-    emit('auth', authState());
-    return { guild: state.serverGuild, role: 'member' };
-  },
-  'GET /api/guild': () => { needGuild(); return { guild: { ...state.serverGuild, inviteUrl: `${state.settings.serverUrl}/join/${state.serverGuild.invite_code}` }, role: me()?.role }; },
-  'PUT /api/guild/settings': ({ body }) => { needOfficer(); Object.assign(state.serverGuild, body || {}); emit('auth', authState()); return { guild: state.serverGuild }; },
-  'POST /api/guild/invite/reset': () => {
-    needOfficer();
-    state.serverGuild.invite_code = `CAMP-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
-    return { inviteCode: state.serverGuild.invite_code, inviteUrl: `${state.settings.serverUrl}/join/${state.serverGuild.invite_code}` };
-  },
-  'GET /api/members': () => { needGuild(); return { members: state.members.filter((m) => m.role) }; },
-  'POST /api/members/:id/:action': ({ params: p }) => {
-    needOfficer();
-    const m = state.members.find((x) => String(x.id) === p.id);
-    if (!m) throw httpError(404, 'That member is no longer in the guild.');
-    if (p.action === 'promote') m.role = 'officer';
-    else if (p.action === 'demote') m.role = 'member';
-    else if (p.action === 'remove') state.members = state.members.filter((x) => x !== m);
-    else throw httpError(404, 'Unknown action.');
-    return { ok: true };
-  },
-  'GET /api/events': ({ query }) => {
-    needSignedIn();
-    const after = Number(query.after) || 0;
-    return { events: state.events.filter((e) => e.id > after) };
-  },
-  'GET /api/releases': () => clone(state.releases),
-  'GET /api/inbox': () => { needGuild(); return { latestAddon: state.releases.addon.version, site: state.settings.serverUrl, notices: [] }; },
-
-  // Sample domain data so the shell and early pages have something to show. Domain shapes are owned by their
-  // engineers (docs/api/<domain>.md); adjust these when the real shapes land.
-  'GET /api/camp': () => { needGuild(); return campView(); },
-  'GET /api/roster': () => { needGuild(); return { characters: CHARACTERS, scannedAt: sqlTime(4 * MIN) }; },
-  'GET /api/characters/:name': ({ params: p }) => {
+  'GET /api/guild': () => {
     needGuild();
-    const c = CHARACTERS.find((x) => x.name.toLowerCase() === p.name.toLowerCase());
-    if (!c) throw httpError(404, 'No character by that name has synced yet.');
-    return { character: c, professions: [{ name: 'Alchemy', skill: 300, max_skill: 300 }, { name: 'Herbalism', skill: 287, max_skill: 300 }], alts: CHARACTERS.filter((x) => x.user_id && x.user_id === c.user_id && x !== c) };
+    return { guild: guildJson(), memberCount: state.members.length, options: { wowheadGames: WOWHEAD_GAMES } };
   },
-  'GET /api/raids': () => { needGuild(); return { raids: RAIDS }; },
-  'GET /api/raids/:id': ({ params: p }) => {
+  // Same rules as the core (routes/core.js): each field has its own rule; everything is checked before saving.
+  'PUT /api/guild/settings': ({ body }) => {
     needGuild();
-    const r = RAIDS.find((x) => String(x.id) === p.id);
-    if (!r) throw httpError(404, 'That raid was not found. It may have been cancelled.');
-    return { raid: r, signups: [], reserves: [] };
+    const b = body && typeof body === 'object' ? body : {};
+    const g = state.guild;
+    const next = {};
+    const messages = [];
+    if (has(b, 'discord_webhook')) throw httpError(400, 'The Discord webhook is set in Settings now, on this computer only.');
+    if (has(b, 'wowhead_game')) {
+      const game = WOWHEAD_GAMES.find((x) => x.value === b.wowhead_game);
+      if (!game) throw httpError(400, 'Pick WoW: Forever, Retail or Classic for item tooltips.');
+      next.wowhead_game = game.value;
+      messages.push(`Item tooltips now use Wowhead's ${game.value === 'forever' ? 'Forever' : game.label} database.`);
+    }
+    if (has(b, 'realm') || has(b, 'game_guild')) {
+      if (!isOfficerIn()) throw httpError(403, 'Only officers can change the realm and guild name.');
+      if (has(b, 'realm')) next.realm = String(b.realm || '').trim().slice(0, 60) || null;
+      if (has(b, 'game_guild')) next.game_guild = String(b.game_guild || '').trim().slice(0, 60) || null;
+      next.realm_status = null;
+      messages.push('Realm saved. Use "Refresh now" to fetch realm status and the official roster.');
+    }
+    if (has(b, 'coach_enabled') || has(b, 'coach_budget_usd')) {
+      if (has(b, 'coach_budget_usd')) {
+        const n = Number(b.coach_budget_usd);
+        if (b.coach_budget_usd === '' || b.coach_budget_usd === null || !Number.isFinite(n)) throw httpError(400, 'Set a monthly Coach budget between $0 and $500.');
+        next.coach_budget_usd = Math.round(Math.min(500, Math.max(0, n)) * 100) / 100;
+      }
+      if (has(b, 'coach_enabled')) next.coach_enabled = b.coach_enabled ? 1 : 0;
+      messages.push('Coach settings saved.');
+    }
+    let ranks = false;
+    if (has(b, 'officer_rank_max')) {
+      if (roleOf() !== 'owner') throw httpError(403, 'Only the Guild Master can choose which ranks are officers.');
+      const v = b.officer_rank_max;
+      const max = v === null || v === '' ? null : Number.isInteger(v) ? v : (typeof v === 'string' && /^\d$/.test(v.trim()) ? Number(v) : NaN);
+      if (max !== null && !(Number.isInteger(max) && max >= 0 && max <= 9)) throw httpError(400, 'Pick Off, or an in-game rank from 0 to 9, for officers.');
+      ranks = max !== g.officer_rank_max;
+      next.officer_rank_max = max;
+      messages.push(max == null ? 'In-game ranks no longer make anyone an officer here.'
+        : `Officers now follow in-game ranks: ${max === 0 ? 'Guild Master only' : `Guild Master + ${max} rank${max === 1 ? '' : 's'} below`}.`);
+    }
+    // Who passes on officer changes (docs/SHARING.md §5): null = officers only.
+    if (has(b, 'relay_rank_max')) {
+      if (roleOf() !== 'owner') throw httpError(403, 'Only the Guild Master can choose who passes on officer changes.');
+      const v = b.relay_rank_max;
+      const relay = v === null || v === '' ? null : Number.isInteger(v) ? v : (typeof v === 'string' && /^\d$/.test(v.trim()) ? Number(v) : NaN);
+      if (relay !== null && !(Number.isInteger(relay) && relay >= 0 && relay <= 9)) throw httpError(400, 'Pick officers only, or an in-game rank from 0 to 9.');
+      next.relay_rank_max = relay;
+      messages.push(relay == null ? 'Only officers pass on officer changes now.' : `Ranks down to rank ${relay} now pass on officer changes too.`);
+    }
+    if (!messages.length) throw httpError(400, 'Nothing to save.');
+    Object.assign(g, next);
+    if (ranks) { syncRanks(); emit('auth', authState()); }
+    // The Guild Master's settings travel as one CFG record.
+    if (has(b, 'officer_rank_max') || has(b, 'relay_rank_max')) {
+      mockQueue({ id: 'CFG:1', summary: `Guild settings: officers up to rank ${g.officer_rank_max == null ? 0 : g.officer_rank_max}` });
+      messages.push(SHARE_SAVED);
+    }
+    return { guild: guildJson(), messages };
   },
+  'GET /api/members': () => {
+    needGuild();
+    const order = { owner: 0, officer: 1, member: 2 };
+    const members = state.members.map((m) => {
+      const [cls, level] = MAIN_INFO[m.main] || [null, null];
+      return {
+        id: m.id, battletag: m.battletag, name: short(m.battletag), role: m.role, rank_index: m.rank_index, joined_at: m.joined_at,
+        characters: m.characters, main: m.main ? { name: m.main, class: cls, level, is_main: 1 } : null,
+        addon_version: m.addon_version, app_version: m.app_version, last_sync_at: m.last_sync_at, isMe: m.id === state.userId,
+      };
+    }).sort((a, b) => order[a.role] - order[b.role] || a.battletag.localeCompare(b.battletag));
+    return { members };
+  },
+  'GET /api/inbox': () => ({ latestAddon: LATEST.addon, notices: [] }),
+  'GET /api/calendar.ics': () => { needGuild(); return 'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Guild Camp//raids//EN\r\nEND:VCALENDAR\r\n'; },
 });
 
 async function apiRequest(method, path, body) {
   const m = String(method || 'GET').toUpperCase();
-  if (!/^\/api\//.test(path)) throw httpError(400, 'Server paths start with /api/.');
-  if (FAIL_ALL) throw httpError(503, 'The server is not answering. Check your internet connection and try again.');
+  if (!/^\/api\//.test(path)) throw httpError(400, 'Paths start with /api/.');
+  if (FAIL_ALL) throw httpError(500, "Guild Camp's data isn't answering. Restart Guild Camp.");
   const [pathname, search = ''] = path.split('?');
   const query = Object.fromEntries(new URLSearchParams(search));
   for (const r of routes) {
@@ -446,7 +497,7 @@ async function apiRequest(method, path, body) {
     return clone(await r.handler({ params: p, query, body: clone(body), state }));
   }
   console.warn(`[mock] no sample data for ${m} ${pathname}`);
-  throw httpError(404, `The preview has no sample data for ${m} ${pathname} yet.`);
+  throw httpError(404, 'Not found.');
 }
 
 // ---------- IPC methods ----------
@@ -462,59 +513,92 @@ async function addonJob(dir, fn) {
   addonChanged();
   await sleep(900);
   try { fn(inst); } finally { delete state.addon.busy[dir]; addonChanged(); }
-  return addonStatus();
+  // A freshly installed addon saves its file the first time the game runs ("setup").
+  if (inst.addon && !inst.accounts.length && SCENARIO === 'setup') {
+    inst.accounts.push(`${inst.wtfDir}\\Account\\CALVIN\\SavedVariables\\WowGuild.lua`);
+  }
+  maybeFindGuild();
+  // The main process adds restartNeeded when the game may be running; the preview's game never is.
+  return { ...addonStatus(), restartNeeded: false };
+}
+
+function publisherStatus() {
+  const steps = [
+    { id: 'repo', done: true, title: 'Get the Guild Camp source code', detail: 'Found at C:\\code\\wow.', command: null },
+    { id: 'gh', done: true, title: 'Install GitHub CLI', detail: 'GitHub CLI 2.62.0 is installed.', command: null },
+    { id: 'login', done: CAN_PUBLISH, title: 'Sign in to GitHub', detail: CAN_PUBLISH ? 'Signed in as calvin.' : 'Run this in a terminal, choose GitHub.com, and sign in.', command: CAN_PUBLISH ? null : 'gh auth login' },
+    { id: 'push', done: CAN_PUBLISH, title: 'Have push access to arrow-quiver/wow', detail: CAN_PUBLISH ? 'You can publish releases.' : 'Ask the owner of the repository for write access.', command: null },
+  ];
+  return {
+    canPublish: CAN_PUBLISH, reason: CAN_PUBLISH ? null : 'Sign in to GitHub first (gh auth login).',
+    setup: { steps, gh: { installed: true, version: '2.62.0', loggedIn: CAN_PUBLISH, account: CAN_PUBLISH ? 'calvin' : null, push: CAN_PUBLISH, problem: null, note: null } },
+    repo: 'arrow-quiver/wow', releasesUrl: 'https://github.com/arrow-quiver/wow/releases', repoPrivate: false, isPackaged: false,
+    runningVersion: '0.11.0', repoDir: state.settings.repoDir || 'C:\\code\\wow', repoSource: 'detected', repoProblem: null, hasGit: true,
+    addonSource: { dir: 'C:\\code\\wow\\addon\\WowGuild', version: '0.11.1' }, appSource: { version: '0.11.1' }, appVersion: '0.11.1',
+    published: { app: state.releases.app, addon: state.releases.history.find((r) => r.kind === 'addon') || null, history: state.releases.history },
+    publishedError: null, bnet: { ready: false, from: null, problem: null }, building: false, job: null, canCancel: false,
+    changelog: { app: '', addon: '' }, log: [], lastResult: null, lastError: null,
+  };
 }
 
 const methods = {
-  'app.info': () => ({ version: '0.11.0', isPackaged: false, platform: 'win32', logFile: 'C:\\Users\\you\\AppData\\Roaming\\Guild Camp\\logs\\guildcamp.log', userData: 'C:\\Users\\you\\AppData\\Roaming\\Guild Camp', repoDir: 'C:\\code\\wow', mock: SCENARIO }),
+  'app.info': () => ({
+    version: '0.11.0', isPackaged: false, platform: 'win32', arch: 'x64', electron: '45.0.0',
+    logFile: 'C:\\Users\\you\\AppData\\Roaming\\Guild Camp\\logs\\guildcamp.log', userData: 'C:\\Users\\you\\AppData\\Roaming\\Guild Camp',
+    dataFile: 'C:\\Users\\you\\AppData\\Roaming\\Guild Camp\\guildcamp.db', repoDir: 'C:\\code\\wow', bnetAvailable: BNET !== 'none',
+    secretsEncrypted: true, startWithWindowsSupported: true, smoke: false, mock: SCENARIO,
+  }),
   'app.openExternal': (url) => { window.open(String(url), '_blank', 'noopener'); return true; },
-  'app.openPath': (p) => { console.info('[mock] open', p); return ''; },
+  'app.openPath': (p) => { console.info('[mock] open', p); return true; },
   'app.showItemInFolder': (p) => { console.info('[mock] show in folder', p); return true; },
   'app.pickFolder': () => 'D:\\Games\\World of Warcraft',
   'app.quit': () => { console.info('[mock] quit'); return true; },
   'app.relaunch': () => { location.reload(); return true; },
   'app.rendererReady': (info) => { state.rendererReady = info; console.info('[mock] renderer ready', info); return true; },
   'log.recent': () => [
-    { t: iso(4 * MIN), level: 'info', scope: 'sync', msg: 'Uploaded WowGuild.lua for CALVIN (2 characters, 9 roster rows).' },
+    { t: iso(4 * MIN), level: 'info', scope: 'sync', msg: 'Read WowGuild.lua for CALVIN (2 characters, 11 roster rows).' },
     { t: iso(4 * MIN - 2000), level: 'info', scope: 'sync', msg: 'Wrote WowGuild_Inbox for WoW Forever.' },
-    { t: iso(20 * MIN), level: 'info', scope: 'addon', msg: 'Addon 0.11.1 is available on the server.' },
-    { t: iso(2 * HOUR), level: 'warn', scope: 'sync', msg: 'Server did not answer, trying again in 5 seconds.' },
+    { t: iso(20 * MIN), level: 'info', scope: 'addon', msg: 'GitHub has addon 0.11.1.' },
+    { t: iso(2 * HOUR), level: 'warn', scope: 'sync', msg: 'The saved file was still being written. Trying again in 5 seconds.' },
   ],
   'settings.get': () => clone(state.settings),
   'settings.set': (patch) => {
-    Object.assign(state.settings, patch || {});
+    const p = patch && typeof patch === 'object' ? patch : {};
+    if ('serverUrl' in p) throw httpError(400, 'Guild Camp has no server address any more.');
+    if ('discordWebhook' in p) {
+      const url = String(p.discordWebhook || '').trim();
+      if (url && !/^https:\/\/(discord|discordapp)\.com\/api\/webhooks\/\d+\/[\w-]+$/.test(url)) throw httpError(400, "That isn't a Discord webhook address. Copy it from the channel's Integrations settings.");
+      p.discordWebhook = url || null;
+    }
+    for (const k of ['windowBounds', 'startupDefaulted', 'addonOptOut']) delete p[k];
+    Object.assign(state.settings, p);
     emit('settings', state.settings);
     return clone(state.settings);
   },
   'auth.state': () => authState(),
   'auth.signIn': async () => {
+    if (!state.bnet.available) throw httpError(400, "Battle.net sign-in isn't part of this copy of Guild Camp.");
+    state.bnet.signingIn = true;
+    emit('auth', authState());
     await sleep(900);
-    state.signedIn = true;
-    if (SCENARIO === 'fresh') {
-      // A brand new person on a brand new server: not a member until they create the guild.
-      // (In the 'signedout' scenario a returning member signs in and lands straight on the game step.)
-      if (!state.members.some((m) => m.id === 6)) state.members.push({ id: 6, battletag: 'Newcomer#5150', role: null, joined_at: null, last_sync_at: null });
-      state.userId = 6;
-    }
-    emit('auth', authState());
-    emit('sync', syncStatus());
-    return authState();
-  },
-  'auth.devSignIn': async (battletag) => {
-    const tag = String(battletag || '').trim();
-    if (!/^[^#\s]{2,}#\d{3,6}$/.test(tag)) throw httpError(400, 'Enter a BattleTag like Name#1234.');
-    await sleep(300);
-    let m = state.members.find((x) => x.battletag.toLowerCase() === tag.toLowerCase());
-    if (!m) { m = { id: 100 + state.members.length, battletag: tag, role: null, joined_at: null, last_sync_at: null }; state.members.push(m); }
-    state.userId = m.id;
-    state.signedIn = true;
-    state.inGuild = !!m.role && !!state.serverGuild;
+    Object.assign(state.bnet, { signingIn: false, signedIn: true, error: null });
     emit('auth', authState());
     return authState();
   },
-  'auth.signOut': () => { state.signedIn = false; state.membership = null; emit('auth', authState()); emit('sync', syncStatus()); return authState(); },
+  'auth.signOut': () => { state.bnet.signedIn = false; emit('auth', authState()); return authState(); },
   'api.request': (method, path, body) => apiRequest(method, path, body),
   'api.download': (path, suggestedName) => `C:\\Users\\you\\Downloads\\${suggestedName || path.split('/').pop()}`,
+  'calendar.export': async () => {
+    needGuild();
+    await sleep(300);
+    return `C:\\Users\\you\\Documents\\${state.guild.name} raids.ics`;
+  },
+  'secrets.set': (name, value) => {
+    if (name !== 'anthropicKey') throw httpError(400, 'Guild Camp only keeps your Anthropic API key here.');
+    state.secrets.anthropicKey = Boolean(value);
+    return { name, set: Boolean(value), encrypted: true };
+  },
+  'secrets.has': (name) => (name === 'anthropicKey' ? Boolean(state.secrets.anthropicKey) : false),
   'wow.installs': () => installsView(),
   'wow.addFolder': (dir) => {
     const d = String(dir || '');
@@ -524,32 +608,34 @@ const methods = {
       state.settings.extraWowFolders = [...state.settings.extraWowFolders, d];
     }
     addonChanged();
+    emit('sync', syncStatus());
     return installsView();
   },
-  'wow.detectGuild': () => {
-    const characters = addonCharacters();
-    const d = detectedGuild(characters);
-    return { characters, guild: d ? { name: d.guild, realm: d.realm, faction: d.faction } : null };
-  },
-  'guild.autoJoin': () => runAutoJoin(),
-  'membership.status': () => clone(state.membership),
   'wow.removeFolder': (dir) => {
     state.settings.extraWowFolders = state.settings.extraWowFolders.filter((f) => f !== dir);
     state.installs = state.installs.filter((i) => i.root !== dir && i.dir !== dir);
     addonChanged();
+    emit('sync', syncStatus());
     return installsView();
+  },
+  'wow.detectGuild': () => {
+    const characters = addonCharacters();
+    const c = characters.filter((x) => x.guild).sort((a, b) => b.updated - a.updated)[0];
+    return { characters, guild: c ? { name: c.guild, realm: c.realm, faction: c.faction } : null };
   },
   'sync.status': () => syncStatus(),
   'sync.now': async () => {
-    if (!state.signedIn) throw httpError(401, 'Sign in to sync.');
+    if (!state.settings.syncEnabled) return syncStatus();
     setSync({ state: 'syncing' });
     await sleep(1200);
-    setSync({ state: 'idle', lastSyncAt: iso(), lastError: null });
+    setSync({ state: 'idle', lastSyncAt: state.guild ? iso() : state.sync.lastSyncAt, lastError: null });
+    maybeFindGuild();
     return syncStatus();
   },
   'sync.setEnabled': (on) => {
     state.settings.syncEnabled = !!on;
-    setSync({ enabled: !!on, state: on ? 'idle' : 'off' });
+    emit('settings', state.settings);
+    setSync({ enabled: !!on, state: 'idle' });
     return syncStatus();
   },
   'addon.status': () => addonStatus(),
@@ -571,7 +657,7 @@ const methods = {
   'addon.uninstall': (dir) => addonJob(dir, (i) => { i.addon = null; }),
   'addon.updateAll': async () => {
     for (const i of state.installs) if (i.addon) await addonJob(i.dir, (x) => { x.addon = addonStatus().latest.version; });
-    return addonStatus();
+    return { ...addonStatus(), restartNeeded: false };
   },
   'addon.openFolder': (dir) => { console.info('[mock] open addon folder', dir); return true; },
   'updater.status': () => clone(state.updater),
@@ -591,22 +677,21 @@ const methods = {
     return clone(state.updater);
   },
   'updater.install': () => { console.info('[mock] quit and install'); location.reload(); return true; },
-  'publisher.status': () => ({
-    canPublish: me()?.role === 'owner', repoDir: state.settings.repoDir || 'C:\\code\\wow',
-    addonSource: { dir: 'C:\\code\\wow\\addon\\WowGuild', version: '0.11.1' }, appVersion: '0.11.0',
-    published: { app: state.releases.app, addon: state.releases.addon },
-  }),
+  'publisher.status': () => publisherStatus(),
   'publisher.publishAddon': async ({ bump = 'patch', notes = '' } = {}) => {
-    const lines = ['Reading WowGuild.toc', `Bumping version (${bump})`, 'Zipping WowGuild (14 files)', 'Uploading 148 KB', 'The server accepted the addon.'];
-    for (const line of lines) { emit('publisher:log', { kind: 'addon', line }); await sleep(300); }
+    if (!CAN_PUBLISH) throw httpError(403, 'Sign in to GitHub first (gh auth login).', 'cannot-publish');
+    const lines = ['Reading WowGuild.toc', `Bumping version (${bump})`, 'Zipping WowGuild (14 files)', 'gh release create addon-v0.11.2', 'Published addon 0.11.2 on GitHub.'];
+    for (const line of lines) { emit('publisher:log', { t: iso(), kind: 'addon', level: 'info', line }); await sleep(300); }
     return { version: '0.11.2', notes };
   },
   'publisher.publishApp': async ({ bump = 'patch', notes = '' } = {}) => {
-    const lines = [`Bumping app version (${bump})`, 'npm run dist', '  • electron-builder  version=26', '  • building target=nsis arch=x64', 'Uploading Guild-Camp-Setup-0.11.2.exe', 'Committing latest.yml', 'Published.'];
-    for (const line of lines) { emit('publisher:log', { kind: 'app', line }); await sleep(400); }
+    if (!CAN_PUBLISH) throw httpError(403, 'Sign in to GitHub first (gh auth login).', 'cannot-publish');
+    const lines = [`Bumping app version (${bump})`, 'npm run dist', '  • electron-builder  version=26', '  • building target=nsis arch=x64', 'gh release create v0.11.2', 'Published Guild Camp 0.11.2 on GitHub.'];
+    for (const line of lines) { emit('publisher:log', { t: iso(), kind: 'app', level: 'info', line }); await sleep(400); }
     return { version: '0.11.2', notes };
   },
-  'publisher.setRepoDir': (dir) => { state.settings.repoDir = dir; return methods['publisher.status'](); },
+  'publisher.setRepoDir': (dir) => { state.settings.repoDir = dir; return publisherStatus(); },
+  'publisher.cancel': () => publisherStatus(),
   'notify.test': () => {
     try {
       if ('Notification' in window && Notification.permission === 'granted') new Notification('Guild Camp', { body: 'Notifications are working.' });
@@ -615,8 +700,11 @@ const methods = {
   },
 };
 
+// The channels the real preload knows (src/preload/preload.js). Like the real bridge, others throw.
+const CHANNELS = new Set(['auth', 'sync', 'addon', 'updater', 'publisher:log', 'server-event', 'navigate', 'log', 'settings']);
+
 export function createMock() {
-  console.info(`[mock] Guild Camp preview mode, scenario "${SCENARIO}". Use ?mock=owner|officer|member|setup|noguild|signedout|fresh (guild matching: &match=now|later|never|off, &detect=0).`);
+  console.info(`[mock] Guild Camp preview mode, scenario "${SCENARIO}". Use ?mock=owner|officer|member|setup|noguild (&bnet=in|out|none, &blizzard=0, &key=0, &publish=1|0, &match=never).`);
   const mock = {
     async invoke(method, ...args) {
       const fn = methods[method];
@@ -625,11 +713,12 @@ export function createMock() {
       return clone(await fn(...args));
     },
     on(channel, cb) {
+      if (!CHANNELS.has(channel)) throw new Error(`Unknown event channel: ${channel}`);
       if (!listeners.has(channel)) listeners.set(channel, new Set());
       listeners.get(channel).add(cb);
       return () => listeners.get(channel)?.delete(cb);
     },
-    // Preview helpers (not part of window.gc): fire a server event or any channel by hand from DevTools.
+    // Preview helpers (not part of window.gc): fire a core event or any channel by hand from DevTools.
     emit,
     serverEvent(kind, title = 'Test event', route = '/') {
       const ev = { id: state.events.length + 1, kind, title, body: '', route, created_at: sqlTime() };
@@ -639,9 +728,11 @@ export function createMock() {
     },
     state,
   };
+  // "noguild": the addon is in place, so the first sync finds the guild shortly.
+  maybeFindGuild();
   // Handy in DevTools: gcMock.serverEvent('raid', 'Raid tonight', '/raids/12')
   if (typeof window !== 'undefined') window.gcMock = mock;
   return mock;
 }
 
-export { SCENARIO };
+export { SCENARIO, LATEST, BLIZZARD, NO_BNET_APP };

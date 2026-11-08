@@ -152,6 +152,8 @@ function pages.camp(page)
     if latest then
       status[#status + 1] = "|cffe8a33dAddon version " .. latest .. " is out.|r " .. ns.UPDATE_HINT
     end
+    local sharing = ns.Share and ns.try(ns.Share.statusLine)
+    if type(sharing) == "string" and sharing ~= "" then status[#status + 1] = "|cff999999" .. sharing .. "|r" end
     local recipes, profs = 0, 0
     for _, list in pairs(me.recipes or {}) do recipes = recipes + #list end
     profs = me.professions and #me.professions or 0
@@ -163,7 +165,7 @@ end
 
 -- Call to arms: a form instead of /wow cta.
 function pages.cta(page)
-  local intro = label(page, "Call guildies to a fight. It posts to the guild's Discord as soon as you reload (the button below does that for you).", "GameFontHighlight")
+  local intro = label(page, "Call guildies to a fight. Guildmates online with Guild Camp see it in chat right away.", "GameFontHighlight")
   intro:SetPoint("TOPLEFT", 0, 0); intro:SetWidth(WIDTH - 40)
 
   local zl = label(page, "Where", "GameFontNormal"); zl:SetPoint("TOPLEFT", 0, -44)
@@ -181,19 +183,21 @@ function pages.cta(page)
   local send = button(page, "Sound the horn", 150); send:SetPoint("TOPLEFT", 0, -210)
   local sent = label(page, "", "GameFontHighlightSmall"); sent:SetPoint("TOPLEFT", 0, -244); sent:SetWidth(WIDTH - 40)
   send:SetScript("OnClick", function()
-    ns.addCta(zone:GetText() or "", tonumber(needed:GetText() or ""), msg:GetText() or "")
-    msg:SetText("")
+    if ns.addCta(zone:GetText() or "", tonumber(needed:GetText() or ""), msg:GetText() or "") then msg:SetText("") end
     page.refresh()
   end)
   page.zone, page.needed, page.msg, page.send = zone, needed, msg, send
   page.refresh = function()
     if (zone:GetText() or "") == "" and GetZoneText then zone:SetText(GetZoneText() or "") end
-    local q = ns.db.ctaQueue or {}
+    local q = ns.ctaRecent or {}
     if #q == 0 then sent:SetText("") return end
-    local lines = { "|cffffd100Waiting to send|r (they go out on your next reload or logout):" }
-    for i = #q, math.max(1, #q - 4), -1 do
+    local lines = { "|cffffd100Calls to arms since you logged in|r" }
+    for i = #q, 1, -1 do
       local c = q[i]
-      lines[#lines + 1] = string.format("  %s%s %s |cff999999%s|r", c.zone, c.needed and (" (need " .. c.needed .. ")") or "", c.msg or "", ns.ago(c.at))
+      local need = c.needed and string.format(" (need %d)", c.needed) or ""
+      local msgText = (c.message and c.message ~= "") and (" " .. c.message) or ""
+      lines[#lines + 1] = string.format("  %s%s%s |cff999999%s, %s|r", c.zone or "", need, msgText,
+        c.mine and "you" or tostring(c.character or "?"), ns.ago(c.at))
     end
     sent:SetText(table.concat(lines, "\n"))
   end
@@ -286,6 +290,9 @@ function pages.guild(page)
   page.refresh = function() body.set(ns.textGuild()) end
 end
 
+-- Where players get the Guild Camp app (its newest GitHub release).
+W.APP_URL = "https://github.com/arrow-quiver/wow/releases/latest"
+
 -- Settings: every option, the link to get the Guild Camp app, versions.
 function pages.settings(page)
   page.boxes = {}
@@ -315,8 +322,7 @@ function pages.settings(page)
   page.site = site
   page.refresh = function()
     for _, cb in ipairs(page.boxes) do cb:SetChecked(ns.opt(cb.key) and true or false) end
-    local inbox = WowGuildInbox
-    site.value = (inbox and inbox.site) and (inbox.site .. "/get") or "Not known yet: sync once with the Guild Camp app."
+    site.value = W.APP_URL
     site:SetText(site.value)
     local latest = ns.updateAvailable()
     ver:SetText("Addon version " .. ns.addonVersion() .. (latest and (".  |cffe8a33d" .. latest .. " is available.|r " .. ns.UPDATE_HINT) or ""))

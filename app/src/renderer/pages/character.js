@@ -27,7 +27,7 @@ export default function CharacterPage({ params = {} }) {
     ${missing
       ? html`<${Empty} icon="character" title=${`${name} isn't on the guild roster yet.`}
           action=${html`<${Button} href="/roster" icon="roster">Back to the roster<//>`}>
-          Characters show up after someone in the guild syncs a roster scan, or after their player logs in with the addon.
+          Characters show up after your addon reads the guild roster in game, or once their player shares them with Guild Camp.
         <//>`
       : html`<${Async} q=${q} loadingLabel="Looking up the character…" errorTitle="Couldn't open this character.">
           ${(d) => html`<${CharacterBody} d=${d} />`}
@@ -75,7 +75,7 @@ function Header({ c, alts, isMine }) {
         <div class="row">${facts}</div>
       </div>
       <dl class="character-meta">
-        <div><dt>Player</dt><dd>${c.battletag ? html`<span title=${c.battletag}>${shortTag(c.battletag)}${isMine ? ' (you)' : ''}</span>` : html`<span class="faint">not linked</span>`}</dd></div>
+        <div><dt>Player</dt><dd>${c.battletag ? html`<span title=${c.battletag}>${shortTag(c.battletag)}${isMine ? ' (you)' : ''}</span>` : html`<span class="faint" title="This player doesn't use Guild Camp, or hasn't shared with you yet">not known</span>`}</dd></div>
         ${c.faction ? html`<div><dt>Faction</dt><dd>${c.faction}</dd></div>` : null}
         ${isMine && c.money != null ? html`<div><dt>Gold</dt><dd><${Money} copper=${c.money} /></dd></div>` : null}
         ${c.updated_at ? html`<div><dt>Synced</dt><dd><${TimeAgo} t=${c.updated_at} /></dd></div>` : null}

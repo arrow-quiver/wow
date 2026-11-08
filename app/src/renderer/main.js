@@ -1,15 +1,19 @@
-// Renderer entry: applies the theme, reads the sign-in state, picks the first page and renders the app shell.
+// Renderer entry: applies the theme, reads who I am and the app settings, picks the first page and renders the
+// app shell. The gate (lib/session.js pageGate): the welcome flow until setup is done (settings.onboarded), then
+// every page; pages that need guild data show "Waiting for your guild" with a link to Addon & sync until the game
+// has shown Guild Camp a guild.
 import { html, render, Component, useEffect, useReducer, useRef, useState } from './lib/html.js';
 import { gc } from './lib/gc.js';
 import routes, { NAV_SECTIONS, staticPaths } from './pages/index.js';
 import { setRoutes, useLocation, findRoute, navigate, currentLocation } from './lib/router.js';
-import { useSession, refreshSession, setSession, sessionStore } from './lib/session.js';
+import { useSession, refreshSession, setSession, sessionStore, pageGate, isOnboarded } from './lib/session.js';
 import { applyTheme } from './lib/theme.js';
 import { watchTooltips } from './lib/wowhead.js';
-import { syncStatus, updaterStatus, addonStatus } from './lib/status.js';
+import { syncStatus, updaterStatus, addonStatus, settingsStatus, useSettings } from './lib/status.js';
 import { Sidebar, TopBar } from './components/Shell.js';
 import { Splash, shouldShowSplash, whenVisible } from './components/Splash.js';
 import { Page, Toasts, ErrorBox, Empty, Loading, Button } from './components/index.js';
+import { NoGuild } from './components/NoGuild.js';
 
 setRoutes(routes);
 
@@ -114,6 +118,26 @@ function NotFound() {
   <//><//>`;
 }
 
+// A guild page before the game has shown Guild Camp a guild: the core's sentence, not an error.
+function NoGuildPage({ route }) {
+  return html`<${Rendered}><${Page} title=${route.title}>
+    <${NoGuild} />
+  <//><//>`;
+}
+
+// The local guild data didn't answer (GET /api/me failed).
+function Unavailable({ route, error }) {
+  const [busy, setBusy] = useState(false);
+  const retry = async () => {
+    setBusy(true);
+    try { await refreshSession(); } finally { setBusy(false); }
+  };
+  return html`<${Rendered}><${Page} title=${route.title}>
+    <${ErrorBox} title="Guild Camp couldn't read your guild data." error=${error || 'Restart Guild Camp if this keeps happening.'}
+      onRetry=${busy ? undefined : retry} />
+  <//><//>`;
+}
+
 function NotAllowed({ route }) {
   return html`<${Rendered}><${Page} title=${route.title}>
     <${Empty} icon="shield" title=${route.owner ? 'Only the guild owner can open this page.' : 'Only officers can open this page.'}
@@ -123,9 +147,10 @@ function NotAllowed({ route }) {
 
 // ---------- app ----------
 
-function App({ initialSplash }) {
+function App({ initialSplash, smoke = false }) {
   const loc = useLocation();
   const session = useSession();
+  const settings = useSettings();
   const [splash, setSplash] = useState(initialSplash);
   const contentRef = useRef(null);
   const firstPath = useRef(true);
@@ -133,13 +158,12 @@ function App({ initialSplash }) {
   const found = findRoute(routes, loc.path);
   const route = found ? found.route : NOT_FOUND;
   const params = found ? found.params : {};
-  const needsSession = !route.public;
-  const allowed = session.signedIn && !!session.guild;
+  const gate = pageGate({ route, session, onboarded: isOnboarded(settings), smoke });
 
-  // Signed out (or removed from the guild): back to the welcome flow.
+  // Setup isn't done yet (first run): the welcome flow. Its "Done" marks setup done before it opens the camp.
   useEffect(() => {
-    if (session.loaded && needsSession && !allowed) navigate('/welcome', { replace: true });
-  }, [session.loaded, needsSession, allowed]);
+    if (gate === 'welcome') navigate('/welcome', { replace: true });
+  }, [gate]);
 
   // New page: start at the top and move keyboard focus to the content (not on the very first page).
   useEffect(() => {
@@ -178,8 +202,10 @@ function App({ initialSplash }) {
   }
 
   let body;
-  if (needsSession && !allowed) body = html`<div class="page-loading"><${Loading} label="Checking your sign-in…" /></div>`;
+  if (gate === 'loading' || gate === 'welcome') body = html`<div class="page-loading"><${Loading} label="Opening Guild Camp…" /></div>`;
   else if (route === NOT_FOUND) body = html`<${NotFound} />`;
+  else if (gate === 'unavailable') body = html`<${Unavailable} route=${route} error=${session.error} />`;
+  else if (gate === 'no-guild') body = html`<${NoGuildPage} route=${route} />`;
   else if ((route.officer && !session.isOfficer) || (route.owner && !session.isOwner)) body = html`<${NotAllowed} route=${route} />`;
   else {
     body = html`<${PageBoundary} key=${loc.path} title=${route.title}>
@@ -206,29 +232,34 @@ async function boot() {
   try {
     settings = await gc.settings.get();
     applyTheme(settings?.theme);
+    // The gate reads the settings from this store; it follows the 'settings' channel from here on.
+    if (settings && typeof settings === 'object') settingsStatus.store.set(settings);
   } catch (err) {
     console.warn('Could not read settings:', err?.message);
   }
   gc.on('settings', (s) => { if (s && typeof s === 'object' && 'theme' in s) applyTheme(s.theme); });
 
-  let session;
+  // A smoke run visits every page itself, so it never stops at the welcome flow.
+  let smoke = false;
+  try { smoke = Boolean((await gc.app.info())?.smoke); } catch { /* not a smoke run */ }
+
   try {
-    session = await refreshSession();
+    await refreshSession();
   } catch (err) {
     console.warn('Could not read the sign-in state:', err?.message);
-    session = setSession(null);
+    setSession(null);
   }
 
-  // First run, signed out, not in a guild, or the game not set up yet: start with the welcome flow.
-  const needsWelcome = !session.signedIn || !session.guild || settings?.onboarded === false;
-  if (needsWelcome && currentLocation().path !== '/welcome') navigate('/welcome', { replace: true });
+  // First run (setup not done yet): start with the welcome flow. A guild isn't needed: pages wait for it.
+  if (!smoke && !isOnboarded(settings) && currentLocation().path !== '/welcome') navigate('/welcome', { replace: true });
 
   // Start following live statuses now so the sidebar has them on first paint, and ask again whenever someone
   // signs in or out (the sync engine's state depends on it).
+  settingsStatus.start();
   syncStatus.start();
   updaterStatus.start();
   addonStatus.start();
-  let wasSignedIn = session.signedIn;
+  let wasSignedIn = sessionStore.get().signedIn;
   sessionStore.subscribe((s) => {
     if (s.signedIn === wasSignedIn) return;
     wasSignedIn = s.signedIn;
@@ -236,7 +267,7 @@ async function boot() {
     addonStatus.refresh();
   });
 
-  render(html`<${App} initialSplash=${shouldShowSplash()} />`, root);
+  render(html`<${App} initialSplash=${shouldShowSplash()} smoke=${smoke} />`, root);
 }
 
 boot().catch((err) => {

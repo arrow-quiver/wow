@@ -311,4 +311,24 @@ describe('helpers', () => {
     assert.equal(await isWowRunning({ platform: 'linux', exec: async () => 'bash\nnode\n' }), false);
     assert.equal(await isWowRunning({ platform: 'win32', exec: async () => { throw new Error('no tasklist'); } }), null);
   });
+
+  test('gameProcessIds lists the game clients\' process ids, so sync can tell a restarted game from the session it wrote a new news folder in', async () => {
+    const { gameProcessIds } = wow;
+    const tasklist = async (cmd, args) => {
+      assert.equal(cmd, 'tasklist');
+      assert.deepEqual(args, ['/FO', 'CSV', '/NH']);
+      return '"explorer.exe","1","Console","1","90,000 K"\r\n"WowClassic.exe","2412","Console","1","2,000,000 K"\r\n'
+        + '"WowUp.exe","3","Console","1","1 K"\r\n"Wow.exe","8800","Console","1","1 K"\r\n';
+    };
+    assert.deepEqual(await gameProcessIds({ platform: 'win32', exec: tasklist }), [2412, 8800]);
+    assert.deepEqual(await gameProcessIds({ platform: 'win32', exec: async () => '"Guild Camp.exe","4","Console","1","1 K"\r\n' }), []);
+    const ps = async (cmd, args) => {
+      assert.equal(cmd, 'ps');
+      assert.deepEqual(args, ['-A', '-o', 'pid=,comm=']);
+      return '    1 /sbin/launchd\n 4321 /Applications/World of Warcraft/_retail_/World of Warcraft.app/Contents/MacOS/World of Warcraft\n  77 node\n';
+    };
+    assert.deepEqual(await gameProcessIds({ platform: 'darwin', exec: ps }), [4321]);
+    assert.deepEqual(await gameProcessIds({ platform: 'linux', exec: async () => '  10 bash\n 990 Wow.exe\n' }), [990]);
+    assert.equal(await gameProcessIds({ platform: 'win32', exec: async () => { throw new Error('no tasklist'); } }), null);
+  });
 });

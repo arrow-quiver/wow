@@ -4,9 +4,12 @@
 //   const store = createStore(userData, { encrypt, decrypt });
 //   store.get()                      → copy of the settings (defaults filled in)
 //   store.set({ theme: 'dark' })     → shallow merge, atomic write, emits 'change' (settings, changedKeys)
-//   store.getSecret('deviceToken')   → string | null
-//   store.setSecret('deviceToken', v | null)
+//   store.getSecret('bnetToken')     → string | null   (also 'anthropicKey' for the Coach AI)
+//   store.setSecret('bnetToken', v | null)
 //   store.secretsEncrypted()         → false when secrets had to be saved as plain text
+//
+// createStore(userData, { overrides: { syncEnabled: false } }) reports those values from get() for this run only:
+// they are never written to settings.json, and a set() of one of them changes it in memory only (smoke runs).
 //
 // Secrets are encrypted with Electron's safeStorage, injected as encrypt(string) → Buffer and
 // decrypt(Buffer) → string so this module stays plain Node. When encryption is unavailable
@@ -17,7 +20,6 @@ const path = require('path');
 const { EventEmitter } = require('events');
 
 const DEFAULTS = Object.freeze({
-  serverUrl: 'https://wow.cjplumbing.co.za',
   extraWowFolders: [],
   syncEnabled: true,
   closeToTray: true,
@@ -28,7 +30,10 @@ const DEFAULTS = Object.freeze({
   notifications: true,
   theme: 'system',
   repoDir: null,
-  lastEventId: 0,
+  // Discord webhook this app posts to when its own player does something (a raid, a call to arms...).
+  discordWebhook: null,
+  // Battle.net region for sign-in and Blizzard game data.
+  bnetRegion: 'eu',
   windowBounds: null,
   onboarded: false,
   // Set once "start with Windows" has had its default (on the first sign-in of an installed app) or
@@ -37,11 +42,14 @@ const DEFAULTS = Object.freeze({
   // Game folders where the person removed the addon: automatic installs leave them alone until the
   // addon is installed there again by hand.
   addonOptOut: [],
+  // Game folders whose news folder (WowGuild_Inbox) sync.js made while the game may have been running:
+  // { [folder key]: { dir, at, pids } }. That game session never loads it, so sharing waits for a game restart.
+  inboxRestart: {},
 });
 
 // Keys the app manages itself. The renderer may send them back (e.g. a spread of settings),
 // but they are ignored there rather than trusted.
-const INTERNAL_KEYS = ['lastEventId', 'windowBounds', 'startupDefaulted', 'addonOptOut'];
+const INTERNAL_KEYS = ['windowBounds', 'startupDefaulted', 'addonOptOut', 'inboxRestart'];
 
 const clone = (v) => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)));
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -105,8 +113,9 @@ function readJsonFile(file, onCorrupt) {
  * @param {(text: string) => Buffer} [crypto.encrypt]
  * @param {(buf: Buffer) => string} [crypto.decrypt]
  * @param {() => boolean} [crypto.isEncryptionAvailable]
+ * @param {object} [crypto.overrides] settings for this run only, on top of settings.json and never saved to it
  */
-function createStore(dir, { encrypt, decrypt, isEncryptionAvailable } = {}) {
+function createStore(dir, { encrypt, decrypt, isEncryptionAvailable, overrides } = {}) {
   fs.mkdirSync(dir, { recursive: true });
   const settingsFile = path.join(dir, 'settings.json');
   const secretsFile = path.join(dir, 'secrets.json');
@@ -123,6 +132,13 @@ function createStore(dir, { encrypt, decrypt, isEncryptionAvailable } = {}) {
       if (loaded[key] !== undefined) settings[key] = loaded[key];
     }
   }
+  // In-memory settings for this run (a smoke run's "no sync, no updates, no notifications"): get() shows them on
+  // top of the saved ones, and settings.json keeps what the person chose.
+  let held = {};
+  if (overrides && typeof overrides === 'object') {
+    for (const [key, value] of Object.entries(overrides)) if (value !== undefined) held[key] = clone(value);
+  }
+  const isHeld = (key) => Object.prototype.hasOwnProperty.call(held, key);
 
   let secrets = null; // name → { e: 1, v: base64 } | { e: 0, v: plain }   (loaded lazily)
   const secretCache = new Map(); // decrypted values, so state() calls don't hit safeStorage every time
@@ -145,22 +161,27 @@ function createStore(dir, { encrypt, decrypt, isEncryptionAvailable } = {}) {
     return true;
   }
 
-  store.get = () => clone(settings);
+  store.get = () => clone({ ...settings, ...held });
 
   store.set = (patch) => {
     if (!patch || typeof patch !== 'object') return store.get();
     const next = { ...settings };
+    const nextHeld = { ...held };
     const changed = [];
+    let save = false;
     for (const [key, value] of Object.entries(patch)) {
       if (value === undefined) continue;
-      if (!same(next[key], value)) {
-        next[key] = clone(value);
+      const target = isHeld(key) ? nextHeld : next; // an overridden setting changes for this run only
+      if (!same(target[key], value)) {
+        target[key] = clone(value);
         changed.push(key);
+        if (target === next) save = true;
       }
     }
     if (!changed.length) return store.get();
-    writeFileAtomic(settingsFile, `${JSON.stringify(next, null, 2)}\n`);
+    if (save) writeFileAtomic(settingsFile, `${JSON.stringify(next, null, 2)}\n`);
     settings = next;
+    held = nextHeld;
     emitter.emit('change', store.get(), changed);
     return store.get();
   };
@@ -203,7 +224,7 @@ function createStore(dir, { encrypt, decrypt, isEncryptionAvailable } = {}) {
       }
       if (!entry) {
         entry = { e: 0, v: text };
-        store.secretWarning = 'Your sign-in is saved without encryption because this computer has no secure storage available.';
+        store.secretWarning = 'Your Battle.net sign-in and API key are saved without encryption because this computer has no secure storage available.';
       }
       all[name] = entry;
       secretCache.set(name, text);
@@ -224,26 +245,19 @@ function createStore(dir, { encrypt, decrypt, isEncryptionAvailable } = {}) {
 // Validation for settings coming from the renderer (settings.set). Throws an Error with a plain
 // sentence when a value is not acceptable. Internal keys are dropped silently.
 
-const PRIVATE_HOST = /^(localhost|127(?:\.\d{1,3}){3}|\[?::1\]?|10(?:\.\d{1,3}){3}|192\.168(?:\.\d{1,3}){2}|172\.(?:1[6-9]|2\d|3[01])(?:\.\d{1,3}){2}|[\w-]+(?:\.[\w-]+)*\.(?:local|lan|home|internal|test|localhost))$/i;
+const WEBHOOK_RE = /^https:\/\/(discord|discordapp)\.com\/api\/webhooks\/[\w/-]+$/;
+const BNET_REGIONS = ['eu', 'us', 'kr', 'tw'];
 
-function normaliseServerUrl(value) {
-  const text = String(value == null ? '' : value).trim();
-  if (!text) throw new Error('Enter the guild server address, like https://guild.example.com.');
-  let url;
-  try {
-    url = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(text) ? text : `https://${text}`);
-  } catch {
-    throw new Error("That server address doesn't look right. It should look like https://guild.example.com.");
+// A Discord webhook address, or null to remove it.
+function cleanWebhook(value) {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== 'string') throw new Error('The Discord webhook must be a web address.');
+  const url = value.trim();
+  if (!url) return null;
+  if (url.length > 300 || !WEBHOOK_RE.test(url)) {
+    throw new Error("That isn't a Discord webhook address. In Discord, open the channel's settings, then Integrations, then Webhooks, and copy the webhook URL.");
   }
-  if (url.protocol !== 'https:' && url.protocol !== 'http:') {
-    throw new Error('The server address must start with https://.');
-  }
-  if (url.username || url.password) throw new Error("The server address can't contain a user name or password.");
-  if (url.protocol === 'http:' && !PRIVATE_HOST.test(url.hostname)) {
-    throw new Error('Use an https:// address. Plain http:// only works for a server on this computer or your home network.');
-  }
-  const pathname = url.pathname.replace(/\/+$/, '');
-  return `${url.protocol}//${url.host}${pathname}`;
+  return url;
 }
 
 function cleanFolderList(value) {
@@ -275,8 +289,12 @@ function sanitizeSettingsPatch(patch) {
     if (BOOLEAN_KEYS.includes(key)) {
       if (typeof value !== 'boolean') throw new Error(`"${key}" must be on or off.`);
       out[key] = value;
-    } else if (key === 'serverUrl') {
-      out.serverUrl = normaliseServerUrl(value);
+    } else if (key === 'discordWebhook') {
+      out.discordWebhook = cleanWebhook(value);
+    } else if (key === 'bnetRegion') {
+      const region = typeof value === 'string' ? value.trim().toLowerCase() : '';
+      if (!BNET_REGIONS.includes(region)) throw new Error('Pick a Battle.net region: Europe, Americas, Korea or Taiwan.');
+      out.bnetRegion = region;
     } else if (key === 'extraWowFolders') {
       out.extraWowFolders = cleanFolderList(value);
     } else if (key === 'theme') {
@@ -291,4 +309,4 @@ function sanitizeSettingsPatch(patch) {
   return out;
 }
 
-module.exports = { createStore, sanitizeSettingsPatch, normaliseServerUrl, writeFileAtomic, DEFAULTS, INTERNAL_KEYS };
+module.exports = { createStore, sanitizeSettingsPatch, cleanWebhook, writeFileAtomic, DEFAULTS, INTERNAL_KEYS, BNET_REGIONS, WEBHOOK_RE };

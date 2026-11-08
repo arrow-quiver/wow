@@ -1,7 +1,8 @@
 // Preview sample data for the community pages (used only when the renderer runs in a plain browser without window.gc).
-// Shapes match docs/api/community.md. A small in-memory world so posting calls to arms, notices, requests and
-// partner posts, claiming and delivering, and choosing a main all work in the preview.
-import { addMockRoutes } from '../mock.js';
+// Shapes match docs/api/community.md (the local core's routes/community.js). A small in-memory world so posting
+// calls to arms, notices, requests and partner posts, claiming and delivering, and choosing a main all work in the
+// preview. Ranks: 0 Warchief (Guild Master), 1 Officer, 2 Veteran, 3 Member, 4 Initiate, 5 Alt, 6 Bank.
+import { addMockRoutes, httpError, needGuild, isOfficerIn } from '../mock.js';
 
 const MIN = 60 * 1000;
 const HOUR = 60 * MIN;
@@ -10,32 +11,26 @@ const sqlTime = (msAgo = 0) => new Date(Date.now() - msAgo).toISOString().replac
 const iso = (msFromNow) => new Date(Date.now() + msFromNow).toISOString();
 const short = (bt) => String(bt || '').split('#')[0];
 
-function httpError(status, message) {
-  const e = new Error(message);
-  e.status = status;
-  return e;
-}
-
-// Members of the base mock (lib/mock.js MEMBERS).
+// Players of the base mock (lib/mock.js MEMBERS).
 const USERS = { 1: 'Calvin#1234', 2: 'Velanne#2210', 3: 'Mokra#9031', 4: 'Tazrik#4410', 5: 'Ilyra#7777' };
 
-const CHARS = [
-  { id: 1, name: 'Grimtusk', class: 'WARRIOR', race: 'Orc', level: 60, rank: 'Warchief', zone: 'Orgrimmar', online: 1, last_seen: sqlTime(2 * MIN), is_main: 1, is_bank: 0, in_official_roster: 1, user_id: 1, faction: 'Horde', money: 4235190,
+export const CHARS = [
+  { id: 1, name: 'Grimtusk', class: 'WARRIOR', race: 'Orc', level: 60, rank: 'Warchief', rank_index: 0, zone: 'Orgrimmar', online: 1, last_seen: sqlTime(2 * MIN), is_main: 1, is_bank: 0, in_official_roster: 1, user_id: 1, faction: 'Horde', money: 4235190,
     readiness: { ilvl: 61.2, durability: 88, consumables: { flask: 2, potion: 14, food: 20 }, at: Math.floor((Date.now() - 20 * MIN) / 1000) },
     extras: { pvp: { rank: 8, rankName: 'Blood Guard', honor: 18450, hk: 2210, weekHk: 64, weekContribution: 5400, lastWeekRank: 'Stone Guard', highestRank: 8 },
       reputations: [{ name: 'Orgrimmar', standing: 7, value: 9200, max: 21000 }, { name: 'Argent Dawn', standing: 6, value: 3100, max: 12000 }, { name: 'Timbermaw Hold', standing: 5, value: 1400, max: 6000 }, { name: 'Gelkis Clan Centaur', standing: 4, value: 0, max: 3000 }],
       currencies: [{ id: 3001, name: "Merchant's Favor", qty: 12, max: 50 }, { id: 3002, name: 'Honor Token', qty: 4 }] } },
-  { id: 2, name: 'Shadowfen', class: 'WARLOCK', race: 'Undead', level: 42, rank: 'Alt', zone: 'Desolace', online: 0, last_seen: sqlTime(3 * DAY), is_main: 0, is_bank: 0, in_official_roster: 1, user_id: 1, faction: 'Horde', money: 150230 },
-  { id: 3, name: 'Velanne', class: 'PRIEST', race: 'Troll', level: 60, rank: 'Officer', zone: 'Blackrock Mountain', online: 1, last_seen: sqlTime(5 * MIN), is_main: 1, is_bank: 0, in_official_roster: 1, user_id: 2, faction: 'Horde' },
-  { id: 4, name: 'Mokra', class: 'SHAMAN', race: 'Tauren', level: 58, rank: 'Member', zone: 'Winterspring', online: 1, last_seen: sqlTime(1 * MIN), is_main: 0, is_bank: 0, in_official_roster: 1, user_id: 3, faction: 'Horde',
+  { id: 2, name: 'Shadowfen', class: 'WARLOCK', race: 'Undead', level: 42, rank: 'Alt', rank_index: 5, zone: 'Desolace', online: 0, last_seen: sqlTime(3 * DAY), is_main: 0, is_bank: 0, in_official_roster: 1, user_id: 1, faction: 'Horde', money: 150230 },
+  { id: 3, name: 'Velanne', class: 'PRIEST', race: 'Troll', level: 60, rank: 'Officer', rank_index: 1, zone: 'Blackrock Mountain', online: 1, last_seen: sqlTime(5 * MIN), is_main: 1, is_bank: 0, in_official_roster: 1, user_id: 2, faction: 'Horde' },
+  { id: 4, name: 'Mokra', class: 'SHAMAN', race: 'Tauren', level: 58, rank: 'Veteran', rank_index: 2, zone: 'Winterspring', online: 1, last_seen: sqlTime(1 * MIN), is_main: 0, is_bank: 0, in_official_roster: 1, user_id: 3, faction: 'Horde',
     readiness: { ilvl: 50.4, durability: 22, consumables: {}, at: Math.floor((Date.now() - 2 * HOUR) / 1000) } },
-  { id: 5, name: 'Tazrik', class: 'ROGUE', race: 'Troll', level: 35, rank: 'Member', zone: 'Stranglethorn Vale', online: 0, last_seen: sqlTime(9 * DAY), is_main: 1, is_bank: 0, in_official_roster: 1, user_id: 4, faction: 'Horde' },
-  { id: 6, name: 'Hrogar', class: 'HUNTER', race: 'Orc', level: 60, rank: 'Member', zone: 'Undercity', online: 0, last_seen: sqlTime(20 * HOUR), is_main: 0, is_bank: 0, in_official_roster: 1, user_id: null },
-  { id: 7, name: 'Ilyra', class: 'MAGE', race: 'Undead', level: 19, rank: 'Initiate', zone: 'The Barrens', online: 1, last_seen: sqlTime(30 * 1000), is_main: 1, is_bank: 0, in_official_roster: 0, user_id: 5, faction: 'Horde' },
-  { id: 8, name: 'Brannoc', class: 'DRUID', race: 'Tauren', level: 47, rank: 'Member', zone: 'Feralas', online: 0, last_seen: sqlTime(2 * DAY), is_main: 0, is_bank: 0, in_official_roster: 1, user_id: null },
-  { id: 9, name: 'Seraphel', class: 'PRIEST', race: 'Undead', level: 12, rank: 'Initiate', zone: 'Tirisfal Glades', online: 0, last_seen: null, is_main: 0, is_bank: 0, in_official_roster: 1, user_id: null },
-  { id: 10, name: 'Vaultkeep', class: 'WARRIOR', race: 'Orc', level: 5, rank: 'Bank', zone: 'Orgrimmar', online: 0, last_seen: sqlTime(4 * DAY), is_main: 0, is_bank: 1, in_official_roster: 1, user_id: 1 },
-  { id: 11, name: 'Kazgul', class: 'PALADIN', race: 'Orc', level: 24, rank: 'Member', zone: "Ashenvale", online: 1, last_seen: sqlTime(3 * MIN), is_main: 0, is_bank: 0, in_official_roster: 1, user_id: null },
+  { id: 5, name: 'Tazrik', class: 'ROGUE', race: 'Troll', level: 35, rank: 'Member', rank_index: 3, zone: 'Stranglethorn Vale', online: 0, last_seen: sqlTime(9 * DAY), is_main: 1, is_bank: 0, in_official_roster: 1, user_id: 4, faction: 'Horde' },
+  { id: 6, name: 'Hrogar', class: 'HUNTER', race: 'Orc', level: 60, rank: 'Veteran', rank_index: 2, zone: 'Undercity', online: 0, last_seen: sqlTime(20 * HOUR), is_main: 0, is_bank: 0, in_official_roster: 1, user_id: null },
+  { id: 7, name: 'Ilyra', class: 'MAGE', race: 'Undead', level: 19, rank: 'Initiate', rank_index: 4, zone: 'The Barrens', online: 1, last_seen: sqlTime(30 * 1000), is_main: 1, is_bank: 0, in_official_roster: 0, user_id: 5, faction: 'Horde' },
+  { id: 8, name: 'Brannoc', class: 'DRUID', race: 'Tauren', level: 47, rank: 'Member', rank_index: 3, zone: 'Feralas', online: 0, last_seen: sqlTime(2 * DAY), is_main: 0, is_bank: 0, in_official_roster: 1, user_id: null },
+  { id: 9, name: 'Seraphel', class: 'PRIEST', race: 'Undead', level: 12, rank: 'Initiate', rank_index: 4, zone: 'Tirisfal Glades', online: 0, last_seen: null, is_main: 0, is_bank: 0, in_official_roster: 1, user_id: null },
+  { id: 10, name: 'Vaultkeep', class: 'WARRIOR', race: 'Orc', level: 5, rank: 'Bank', rank_index: 6, zone: 'Orgrimmar', online: 0, last_seen: sqlTime(4 * DAY), is_main: 0, is_bank: 1, in_official_roster: 1, user_id: 1 },
+  { id: 11, name: 'Kazgul', class: 'PALADIN', race: 'Orc', level: 24, rank: 'Member', rank_index: 3, zone: "Ashenvale", online: 1, last_seen: sqlTime(3 * MIN), is_main: 0, is_bank: 0, in_official_roster: 1, user_id: null },
 ];
 
 const PROFS = {
@@ -68,9 +63,9 @@ const world = {
     { id: 30, kind: 'craft', text: 'Velanne is making Runecloth Bag', created_at: sqlTime(20 * MIN) },
     { id: 29, kind: 'buddy', text: 'Ilyra is looking for leveling partners in The Barrens', created_at: sqlTime(50 * MIN) },
     { id: 28, kind: 'craft', text: 'Ilyra asked for Runecloth Bag', created_at: sqlTime(2 * HOUR) },
-    { id: 27, kind: 'character', text: 'Kazgul linked their character', created_at: sqlTime(6 * HOUR) },
+    { id: 27, kind: 'character', text: 'Kazgul reached level 24', created_at: sqlTime(6 * HOUR) },
     { id: 26, kind: 'craft', text: 'Major Healing Potion delivered', created_at: sqlTime(26 * HOUR) },
-    { id: 25, kind: 'member', text: 'Ilyra joined the camp', created_at: sqlTime(4 * DAY) },
+    { id: 25, kind: 'member', text: 'Ilyra joined the guild', created_at: sqlTime(4 * DAY) },
   ],
   requests: [
     { id: 14, item: 'Runecloth Bag', notes: 'I have 5 runecloth, will mail', status: 'claimed', requester_id: 5, crafter_id: 2, created_at: sqlTime(2 * HOUR), updated_at: sqlTime(20 * MIN) },
@@ -102,12 +97,7 @@ const world = {
 // ---------- helpers ----------
 
 const me = (state) => state.userId;
-const role = (state) => (state.members.find((m) => m.id === state.userId) || {}).role || null;
-const isOfficer = (state) => ['owner', 'officer'].includes(role(state));
-function needGuild(state) {
-  if (!state.signedIn) throw httpError(401, 'Sign in first.');
-  if (!state.inGuild || !state.serverGuild) throw httpError(403, 'Join a guild first.');
-}
+const isOfficer = (state) => isOfficerIn(state);
 const charByName = (name) => CHARS.find((c) => c.name.toLowerCase() === String(name).toLowerCase()) || null;
 const myChars = (uid) => CHARS.filter((c) => c.user_id === uid).sort((a, b) => b.is_main - a.is_main || b.level - a.level);
 const mainOf = (uid) => myChars(uid)[0] || null;
@@ -127,6 +117,7 @@ function requestJson(r, uid) {
     canClaim: r.status === 'open' && r.requester_id !== uid,
     canDone: r.status === 'claimed' && (r.crafter_id === uid || r.requester_id === uid),
     canCancel: r.requester_id === uid && (r.status === 'open' || r.status === 'claimed'),
+    canWithdraw: r.status === 'claimed' && r.crafter_id === uid,
   };
 }
 function onboarding(uid) {
@@ -135,7 +126,6 @@ function onboarding(uid) {
     { key: 'synced', done: chars.length > 0, label: 'Install the addon, then log in to the game once', href: '/addon' },
     { key: 'professions', done: chars.some((c) => PROFS[c.name]), label: 'Open each profession window in game, then /reload', href: '/crafters' },
     { key: 'main', done: chars.some((c) => c.is_main), label: 'Pick your main character', href: chars[0] ? `/characters/${encodeURIComponent(chars[0].name)}` : '/roster' },
-    { key: 'discord', done: uid === 1, label: 'Link your Discord', href: '/settings?section=discord&link=1' },
     { key: 'signup', done: uid === 1, label: 'Sign up for Molten Core', href: '/raids/12' },
   ];
   return { steps, done: steps.filter((s) => s.done).length, total: steps.length };
@@ -156,7 +146,7 @@ addMockRoutes({
     const main = mainOf(uid);
     const recent = myChars(uid).filter((c) => c.zone).sort((a, b) => String(b.last_seen || '').localeCompare(String(a.last_seen || '')))[0];
     return {
-      guild: { id: 1, name: state.serverGuild.name, faction: state.serverGuild.faction, realm: 'Mirage Raceway' },
+      guild: { id: 1, name: state.guild.name, faction: state.guild.faction, realm: state.guild.realm ?? null },
       realm: { found: true, name: 'Mirage Raceway', up: true, queue: false, population: 'High', checkedAt: iso(-4 * MIN) },
       rosterScannedAt: sqlTime(4 * MIN),
       online: CHARS.filter((c) => c.online).sort((a, b) => b.level - a.level || a.name.localeCompare(b.name))
@@ -220,8 +210,8 @@ addMockRoutes({
   'GET /api/roster': ({ state }) => {
     needGuild(state);
     const characters = [...CHARS].sort((a, b) => b.online - a.online || b.level - a.level || a.name.localeCompare(b.name))
-      .map(({ id, name, class: cls, race, level, rank, zone, online, last_seen, is_main, is_bank, in_official_roster, user_id }) => ({
-        id, name, class: cls, race, level, rank, zone, online, last_seen, is_main, is_bank, in_official_roster, user_id,
+      .map(({ id, name, class: cls, race, level, rank, rank_index, zone, online, last_seen, is_main, is_bank, in_official_roster, user_id }) => ({
+        id, name, class: cls, race, level, rank, rank_index, zone, online, last_seen, is_main, is_bank, in_official_roster, user_id,
         updated_at: last_seen, battletag: user_id ? battletag(user_id) : null,
       }));
     return {
@@ -318,8 +308,8 @@ addMockRoutes({
     const r = { id: ++world.nextId, item, notes: String(body?.notes || '').trim().slice(0, 200), status: 'open', requester_id: uid, crafter_id: null, created_at: sqlTime(), updated_at: sqlTime() };
     world.requests.unshift(r);
     stamp('craft', `${short(battletag(uid))} asked for ${item}`);
-    const told = crafterChars(item).some((c) => c.user_id && c.user_id !== uid);
-    return { request: requestJson(r, uid), message: told ? 'Request posted. Crafters who know it have been told.' : 'Request posted.' };
+    // Crafters hear about it from their own apps once it reaches them in game (the core says just this).
+    return { request: requestJson(r, uid), message: 'Request posted.' };
   },
 
   'POST /api/requests/:id/:verb': ({ state, params }) => {
@@ -332,7 +322,11 @@ addMockRoutes({
     if (params.verb === 'claim' && can.canClaim) {
       Object.assign(r, { status: 'claimed', crafter_id: uid, updated_at: sqlTime() });
       stamp('craft', `${short(battletag(uid))} is making ${r.item}`);
-      message = `You're making ${r.item}. ${short(battletag(r.requester_id))} can see that.`;
+      message = `You're making ${r.item}.`;
+    } else if (params.verb === 'withdraw' && can.canWithdraw) {
+      // The crafter gives it back: open again for other crafters.
+      Object.assign(r, { status: 'open', crafter_id: null, updated_at: sqlTime() });
+      message = `You're no longer making ${r.item}.`;
     } else if (params.verb === 'done' && can.canDone) {
       Object.assign(r, { status: 'done', updated_at: sqlTime() });
       stamp('craft', `${r.item} delivered`);
@@ -370,7 +364,7 @@ addMockRoutes({
       note: String(body?.note || '').trim().slice(0, 140), created_at: sqlTime(), level: c ? c.level : null };
     world.partners.unshift(post);
     stamp('buddy', `${character} is looking for leveling partners${zone ? ` in ${zone}` : ''}`);
-    return { post: { ...post, class: c ? c.class : null, battletag: battletag(uid), mine: true }, message: 'Posted. Guildies can see it for 3 days.' };
+    return { post: { ...post, class: c ? c.class : null, battletag: battletag(uid), mine: true }, message: 'Posted. It stays up for 3 days.' };
   },
 
   'POST /api/partners/:id/close': ({ state, params }) => {

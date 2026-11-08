@@ -21,7 +21,7 @@ title:SetText("Guild Camp")
 local sub = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
 sub:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -8)
 sub:SetWidth(560); sub:SetJustifyH("LEFT")
-sub:SetText("The addon only reads information outside combat. The Guild Camp app sends it to your guild when you log out or /reload, and brings guild news back.")
+sub:SetText("The addon reads information only outside combat. It shares guild data with guildmates in game. The Guild Camp app shows it after you log out or type /reload.")
 
 panel.boxes = {}
 for i, o in ipairs(OPTIONS) do
@@ -44,10 +44,8 @@ version:SetPoint("TOPLEFT", 16, -60 - #OPTIONS * 32 - 16)
 
 panel:SetScript("OnShow", function()
   for _, cb in ipairs(panel.boxes) do cb:SetChecked(ns.opt(cb.key) and true or false) end
-  local inbox = WowGuildInbox
   local latest = ns.updateAvailable()
-  version:SetText("Version " .. ns.addonVersion() .. (inbox and inbox.site and ("  ·  Guild server: " .. inbox.site) or "")
-    .. (latest and ("\n" .. latest .. " is available. " .. ns.UPDATE_HINT) or ""))
+  version:SetText("Version " .. ns.addonVersion() .. (latest and ("\n" .. latest .. " is available. " .. ns.UPDATE_HINT) or ""))
 end)
 
 local category

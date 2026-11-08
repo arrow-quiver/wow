@@ -2,23 +2,41 @@
 // Installs, updates, repairs and removes the WowGuild addon (listed in the game as "Guild Camp") in
 // every World of Warcraft folder Guild Camp knows about.
 //
-//   const addon = createAddonManager({ store, log, wow, api, resourcesDir, fetch });
-//   addon.status()            → { bundled, remote, latest, autoUpdate, autoInstall, supportedFlavors, checking,
+//   const addon = createAddonManager({ store, log, wow, resourcesDir, fetch });
+//   addon.status()            → { bundled, remote, latest, releases, autoUpdate, autoInstall, supportedFlavors, checking,
 //                                 lastCheckAt, error, installs }
-//   await addon.check()       → asks the server for its newest addon, looks for game folders again, then
+//   await addon.check()       → reads GitHub's newest addon release (cached, see below), looks for game folders again, then,
+//                               once World of Warcraft is closed (see below):
 //                               - settings.addonAutoUpdate: updates outdated installs
 //                               - settings.addonAutoInstall: installs the addon into game folders that don't have
 //                                 it yet, but only for game versions the addon supports (from the bundled
 //                                 WowGuild.toc "## Interface:" list, see flavorsForInterface) and never where the
 //                                 person removed it (settings.addonOptOut, until they install it there again)
+//   await addon.check({ force: true })   the same, for the person pressing Check: asks GitHub now
 //   await addon.install(dir)  · update(dir) · repair(dir) · uninstall(dir) · updateAll()   → status
+//                               install/update/repair/updateAll add restartNeeded: true when the game may be running
+//                               and the change added the WowGuild folder or changed its .toc file list (see below)
 //   events: 'status' (status) after every change
+//
+// World of Warcraft reads the AddOns folders and each addon's .toc file list when it starts; a /reload reloads the
+// same files. So:
+//   - automatic installs and updates wait while the game runs, or when Guild Camp can't tell (wow.isWowRunning()
+//     true or null): the folder shows waitingForGame, and Guild Camp looks again every minute and runs the check
+//     once the game has closed. It asks again right before the folder is replaced, in case the game started while
+//     the new addon was downloading;
+//   - an install, update or repair the person starts still happens, and says restartNeeded when a /reload can't load
+//     it: a new WowGuild folder, or a WowGuild.toc that lists other files than before.
 //
 // Where the addon comes from:
 //   bundled  <resourcesDir>/addon/WowGuild, shipped inside the app (in dev, the repo's addon/WowGuild).
-//   remote   GET /api/releases → addon { version, notes, publishedAt, sha256, size, url }. The zip is downloaded
-//            from the server, checked against sha256 and cached as <userData>/addon-cache/WowGuild-<version>.zip.
-// The higher version of the two is "latest"; on a tie the server's copy wins.
+//   remote   the newest GitHub release whose tag starts with addon-v (and that has its zip), from
+//            GET https://api.github.com/repos/arrow-quiver/wow/releases?per_page=30 (no sign-in). The answer is
+//            kept in <userData>/github-releases.json with its ETag; automatic checks ask GitHub at most every
+//            30 minutes, a check the person asks for at most every 10 seconds (shared/release.js readReleaseFeed).
+//            WowGuild-<v>.zip is downloaded from the release, checked against WowGuild-<v>.zip.sha256 (and the
+//            digest GitHub reports, when it does) and cached as <userData>/addon-cache/WowGuild-<version>.zip.
+// The higher version of the two is "latest"; on a tie the GitHub copy wins.
+// status().releases carries the newest app release and the release history for the Updates page.
 //
 // Every change is atomic, so a failure never leaves a half-copied addon behind:
 //   1. unpack into AddOns/.guildcamp-tmp-<random>/WowGuild and check that its WowGuild.toc has the right version
@@ -30,7 +48,8 @@
 // (temp folders, an old folder without a new one) are tidied up or restored before the next change.
 //
 // Only AddOns/WowGuild is ever replaced, and only WowGuild + WowGuild_Inbox are ever removed (after checking their
-// .toc says they are ours). Other addons are never touched. WowGuild_Inbox itself is written by sync.js.
+// .toc says they are ours). Other addons are never touched. WowGuild_Inbox itself is written by sync.js (main.js asks
+// for it as soon as a folder gets the addon, so the game finds both folders when it next starts).
 //
 // Plain Node (no Electron): everything outside is injected so tests can run against temp folders.
 
@@ -52,12 +71,15 @@ const TMP_PREFIX = '.guildcamp-tmp-';
 const OLD_MARK = '.old-'; // WowGuild.old-<ts>: the previous version while a new one moves in
 const REMOVED_MARK = '.removed-'; // WowGuild.removed-<ts>: an uninstalled folder waiting to be deleted
 const MAX_DOWNLOAD = 50 * 1024 * 1024;
-const RELEASES_TIMEOUT = 15000;
+const MAX_SHA_FILE = 4096;
+const SHA_TIMEOUT = 15000;
 const DOWNLOAD_TIMEOUT = 2 * 60 * 1000;
+const HISTORY_NOTES_MAX = 4000; // characters of notes per release in status().releases.history
 const INSTALLS_TTL = 3000; // how long a scan of the game folders is reused by status()
 const CACHE_KEEP = 3; // cached addon zips kept on disk
 // Waits between rename attempts while Windows holds a lock (about 5.5 seconds in all).
 const RETRY_DELAYS = [150, 300, 600, 1000, 1500, 2000];
+const GAME_WAIT_MS = 60 * 1000; // how often a waiting automatic install or update asks whether the game has closed
 // Error codes Windows (and POSIX) give when a file or folder is in use or briefly locked.
 const LOCK_CODES = new Set(['EPERM', 'EBUSY', 'EACCES', 'ENOTEMPTY', 'EEXIST']);
 const PERMISSION_CODES = new Set(['EPERM', 'EACCES', 'EROFS']);
@@ -82,6 +104,11 @@ class AddonError extends Error {
 }
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// The app's own version, for the User-Agent GitHub asks API callers to send.
+function ownVersion() {
+  try { return require('../../package.json').version || '0.0.0'; } catch { return '0.0.0'; }
+}
 
 // ---------------------------------------------------------------------------------------------
 // Pure helpers (exported for tests)
@@ -110,7 +137,7 @@ function flavorsForInterface(value) {
   return out;
 }
 
-/** The newer of the bundled and the server's addon; the server wins a tie. → { version, source } | null */
+/** The newer of the bundled addon and GitHub's; GitHub's wins a tie. → { version, source } | null */
 function pickLatest(bundled, remote) {
   const b = bundled && version.valid(bundled.version) ? bundled : null;
   const r = remote && version.valid(remote.version) ? remote : null;
@@ -131,17 +158,55 @@ function computeState(installed, latest) {
   return c < 0 ? 'outdated' : c > 0 ? 'newer' : 'current';
 }
 
-/** The addon entry of GET /api/releases, cleaned up. → { version, notes, publishedAt, sha256, size, url } | null */
+/**
+ * One GitHub release (raw from the API, or release.normalizeRelease()) → what the addon manager needs, or null
+ * when it isn't a published addon release with its zip:
+ * { version, tag, notes, publishedAt, url, zipUrl, shaUrl, size, digest }
+ *   url: the release page · zipUrl / shaUrl: WowGuild-<v>.zip and WowGuild-<v>.zip.sha256
+ *   digest: the zip's sha256 as GitHub reports it ("sha256:<hex>" → hex), when it does
+ */
 function normalizeRemote(raw) {
-  if (!raw || typeof raw !== 'object' || !version.valid(raw.version)) return null;
-  const size = Number(raw.size);
+  const rel = release.normalizeRelease(raw);
+  if (!rel || rel.kind !== 'addon' || rel.draft || rel.prerelease) return null;
+  const names = release.addonAssetNames(rel.version);
+  const zipAsset = rel.assets.find((a) => a.name === names.zip && a.url);
+  if (!zipAsset) return null;
+  const shaAsset = rel.assets.find((a) => a.name === names.sha && a.url);
+  const digest = typeof zipAsset.digest === 'string' && /^sha256:[0-9a-f]{64}$/i.test(zipAsset.digest) ? zipAsset.digest.slice(7).toLowerCase() : null;
   return {
-    version: String(raw.version).trim(),
-    notes: typeof raw.notes === 'string' ? raw.notes : '',
-    publishedAt: raw.publishedAt || raw.published_at || raw.created_at || null,
-    sha256: typeof raw.sha256 === 'string' ? raw.sha256.trim().toLowerCase() : null,
-    size: Number.isFinite(size) && size > 0 ? size : null,
-    url: typeof raw.url === 'string' ? raw.url.trim() : null,
+    version: rel.version,
+    tag: rel.tag,
+    notes: rel.notes,
+    publishedAt: rel.publishedAt,
+    url: rel.url,
+    zipUrl: zipAsset.url,
+    shaUrl: shaAsset ? shaAsset.url : null,
+    size: zipAsset.size,
+    digest,
+  };
+}
+
+/** The newest addon release (by version) that has its zip. → normalizeRemote() | null */
+function pickRemote(list) {
+  let best = null;
+  for (const raw of Array.isArray(list) ? list : []) {
+    const r = normalizeRemote(raw);
+    if (r && (!best || version.gt(r.version, best.version))) best = r;
+  }
+  return best;
+}
+
+/** A release for status().releases: what the Updates page shows. */
+function releaseCard(r) {
+  if (!r) return null;
+  const notes = String(r.notes || '');
+  return {
+    kind: r.kind,
+    version: r.version,
+    tag: r.tag,
+    notes: notes.length > HISTORY_NOTES_MAX ? `${notes.slice(0, HISTORY_NOTES_MAX).trimEnd()}…` : notes,
+    publishedAt: r.publishedAt || null,
+    url: r.url || null,
   };
 }
 
@@ -155,6 +220,15 @@ function readAddonToc(folder, name) {
   }
   const v = toc.tocVersion(text);
   return { version: version.valid(v) ? v : null, title: cleanTitle(toc.tocField(text, 'Title')), text };
+}
+
+/**
+ * The files an addon's .toc loads, in order ("Core.lua", "Share.lua" ...): its lines that aren't empty or comments
+ * ("## Title: ..." directives are comments too), with / for \ and in lower case. null when there is no .toc.
+ */
+function tocFiles(text) {
+  if (typeof text !== 'string') return null;
+  return text.split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !l.startsWith('#')).map((l) => l.replace(/\\/g, '/').toLowerCase());
 }
 
 /** True when AddOns/<folder> is a Guild Camp addon folder (its .toc title says so). */
@@ -178,7 +252,7 @@ function exists(p) {
 }
 
 function hostOf(url) {
-  try { return new URL(url).host; } catch { return 'the server'; }
+  try { return new URL(url).host; } catch { return 'GitHub'; }
 }
 
 // Plain wording for a failed download (fetch wraps the real reason in err.cause).
@@ -195,20 +269,24 @@ function networkReason(err) {
  * @param {object} deps
  * @param {object} deps.store         settings store (get, on 'change', file)
  * @param {object} [deps.log]         logger (info/warn/error), already scoped to "addon" by main.js
- * @param {object} deps.wow           { findInstalls({ extraRoots, scanDefaults }) }
- * @param {object} deps.api           { request(method, path, body, opts) }
+ * @param {object} deps.wow           { findInstalls({ extraRoots, scanDefaults }), isWowRunning() → true|false|null }
+ *                                    (without isWowRunning the game counts as closed)
  * @param {string} [deps.resourcesDir] folder that holds addon/WowGuild
- * @param {typeof fetch} [deps.fetch] used for the zip download
+ * @param {typeof fetch} [deps.fetch] used for the GitHub release list and the downloads
+ * @param {string} [deps.appVersion]  for the User-Agent GitHub asks for (default: app/package.json's version)
+ * @param {string} [deps.releasesUrl] the release list address (default: the GitHub API for arrow-quiver/wow)
+ * @param {string|null} [deps.feedFile] cache of the release list (default <folder of settings.json>/github-releases.json)
+ * @param {number} [deps.minCheckInterval] automatic checks ask GitHub at most this often (default 30 minutes)
  * @param {string} [deps.cacheDir]    default <folder of settings.json>/addon-cache
- * @param {() => string} [deps.getServer] default settings.serverUrl
  * @param {boolean} [deps.scanDefaults=true] passed to wow.findInstalls
  * @param {number[]} [deps.retryDelays] waits between rename attempts (tests shorten them)
  * @param {number} [deps.downloadTimeout]
  * @param {object} [deps.fsOps]       { rename(from, to), rm(path) } overrides (tests inject failures)
+ * @param {number} [deps.gameWaitMs]  how often a waiting automatic change asks whether the game has closed (1 minute)
  */
 function createAddonManager({
-  store, log: logger, wow, api, resourcesDir, fetch: fetchImpl, cacheDir, getServer, scanDefaults = true,
-  retryDelays = RETRY_DELAYS, downloadTimeout = DOWNLOAD_TIMEOUT, fsOps = {},
+  store, log: logger, wow, resourcesDir, fetch: fetchImpl, appVersion, releasesUrl, feedFile, minCheckInterval = release.FEED_MIN_INTERVAL,
+  cacheDir, scanDefaults = true, retryDelays = RETRY_DELAYS, downloadTimeout = DOWNLOAD_TIMEOUT, fsOps = {}, gameWaitMs = GAME_WAIT_MS,
 } = {}) {
   const emitter = new EventEmitter();
   emitter.setMaxListeners(50);
@@ -217,13 +295,19 @@ function createAddonManager({
   const doFetch = fetchImpl || globalThis.fetch;
   const bundledDir = resourcesDir ? path.join(resourcesDir, 'addon', ADDON) : null;
   const cacheFolder = cacheDir || (store && store.file ? path.join(path.dirname(store.file), 'addon-cache') : null);
+  const feedCache = feedFile !== undefined ? feedFile
+    : store && store.file ? path.join(path.dirname(store.file), 'github-releases.json')
+      : cacheFolder ? path.join(cacheFolder, 'github-releases.json') : null;
+  const listUrl = releasesUrl || release.releasesApiUrl();
+  const userAgent = `GuildCamp/${appVersion || ownVersion()}`;
   const ops = {
     rename: fsOps.rename || ((from, to) => fsp.rename(from, to)),
     rm: fsOps.rm || ((p) => fsp.rm(p, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })),
   };
 
-  let remote = null; // normalizeRemote() of the server's addon
-  let remoteError = null; // why the last server check failed
+  let remote = null; // normalizeRemote() of GitHub's newest addon release
+  let remoteError = null; // why the last GitHub check failed
+  let releases = { app: null, history: [], checkedAt: null }; // for the Updates page
   let lastCheckAt = null;
   let checkPromise = null;
   let scan = { list: [], at: 0 };
@@ -232,11 +316,13 @@ function createAddonManager({
   const errors = new Map(); // pathKey(dir) → message of the last failed action
   const downloads = new Map(); // version → Promise<Buffer>
   const tidying = new Map(); // pathKey(dir) → Promise of a background tidy() started by check()
+  const waiting = new Map(); // pathKey(dir) → 'install' | 'update': an automatic change waiting for the game to close
+  let gameTimer = null; // looks every gameWaitMs whether the game has closed, while something waits
+  let gameAsking = false;
 
   const settings = () => (store ? store.get() : {});
   const autoUpdateOn = () => settings().addonAutoUpdate !== false;
   const autoInstallOn = () => settings().addonAutoInstall !== false;
-  const serverBase = () => String((getServer ? getServer() : settings().serverUrl) || '').trim().replace(/\/+$/, '');
 
   // ---- what is where ------------------------------------------------------------------------
 
@@ -322,6 +408,14 @@ function createAddonManager({
     return null;
   }
 
+  // An automatic change still waiting for the game: only while the folder still needs it and automatic care is on.
+  function isWaiting(key, state) {
+    const kind = waiting.get(key);
+    if (kind === 'update') return state === 'outdated' && autoUpdateOn();
+    if (kind === 'install') return state === 'missing' && autoInstallOn();
+    return false;
+  }
+
   function status() {
     const b = bundled();
     const lat = pickLatest(b, remote);
@@ -329,8 +423,9 @@ function createAddonManager({
     const optOut = optedOut();
     return {
       bundled: b,
-      remote: remote ? { version: remote.version, notes: remote.notes, publishedAt: remote.publishedAt, size: remote.size } : null,
+      remote: remote ? { version: remote.version, notes: remote.notes, publishedAt: remote.publishedAt, size: remote.size, url: remote.url } : null,
       latest: lat,
+      releases: { app: releases.app ? { ...releases.app } : null, history: releases.history.map((r) => ({ ...r })), checkedAt: releases.checkedAt },
       autoUpdate: autoUpdateOn(),
       autoInstall: autoInstallOn(),
       supportedFlavors: flavors,
@@ -340,6 +435,7 @@ function createAddonManager({
       installs: scanInstalls().map((inst) => {
         const have = installed(inst.addonsDir);
         const key = pathKey(inst.dir);
+        const state = computeState(have, lat);
         return {
           dir: inst.dir,
           root: inst.root || null,
@@ -347,13 +443,15 @@ function createAddonManager({
           label: inst.label || inst.flavor || path.basename(inst.dir),
           addonsDir: inst.addonsDir,
           installed: have,
-          state: computeState(have, lat),
+          state,
           damaged: Boolean(have && !have.version),
           supported: isSupported(inst, flavors),
           optedOut: optOut.has(key),
           busy: busy.has(key),
           action: busy.get(key) || null,
           error: errors.get(key) || null,
+          // An automatic install or update waits until World of Warcraft is closed.
+          waitingForGame: isWaiting(key, state),
         };
       }),
     };
@@ -377,29 +475,61 @@ function createAddonManager({
 
   const labelOf = (inst) => inst.label || inst.flavor || path.basename(inst.dir);
 
-  // ---- server release + download ------------------------------------------------------------
+  // ---- GitHub release + download -------------------------------------------------------------
 
-  async function refreshRemote() {
-    if (!api || typeof api.request !== 'function') return;
+  // Reads the release list through the shared cache. Without force, GitHub is asked at most every
+  // minCheckInterval; the last answer (maybe from an earlier run) is used in between.
+  async function refreshRemote(force) {
+    let feed;
     try {
-      const data = await api.request('GET', '/api/releases', null, { auth: false, timeout: RELEASES_TIMEOUT });
-      const next = normalizeRemote(data && data.addon);
-      if (next && (!remote || remote.version !== next.version)) log.info(`The server has addon ${next.version}.`);
-      remote = next;
-      remoteError = null;
+      feed = await release.readReleaseFeed({ cacheFile: feedCache, url: listUrl, fetch: doFetch, userAgent, force, minInterval: minCheckInterval });
     } catch (err) {
-      remoteError = err && err.message ? err.message : "Couldn't reach the server.";
-      log.warn(`Couldn't check the server for addon updates: ${remoteError}`);
+      feed = { releases: null, error: (err && err.message) || "Couldn't reach GitHub.", fetchedAt: null, fromNetwork: false };
     }
+    if (feed.releases) {
+      const next = pickRemote(feed.releases);
+      if (next && (!remote || remote.version !== next.version)) log.info(`GitHub has addon ${next.version}.`);
+      remote = next;
+      const sum = release.summarizeReleases(feed.releases);
+      releases = { app: releaseCard(sum.app), history: sum.history.map(releaseCard), checkedAt: feed.fetchedAt || null };
+    }
+    remoteError = feed.error || null;
+    if (remoteError && feed.fromNetwork) log.warn(`Couldn't check GitHub for addon updates: ${remoteError}`);
   }
 
-  function downloadUrl(u) {
-    if (typeof u === 'string' && /^https?:\/\//i.test(u)) return u;
-    if (typeof u === 'string' && u.startsWith('/') && !u.startsWith('//')) {
-      const base = serverBase();
-      if (base) return base + u;
+  function downloadUrl(u, what) {
+    if (typeof u === 'string' && /^https:\/\//i.test(u)) return u;
+    if (typeof u === 'string' && /^http:\/\/(127\.0\.0\.1|localhost)[:/]/i.test(u)) return u; // tests' local stand-in for GitHub
+    throw new AddonError(`The addon release on GitHub has no usable ${what} link. Try again later.`, 'bad-package');
+  }
+
+  // The published checksum: WowGuild-<v>.zip.sha256 from the release.
+  async function publishedSha(rel) {
+    const v = rel.version;
+    if (!rel.shaUrl) {
+      throw new AddonError(`The addon ${v} release on GitHub has no checksum file, so Guild Camp can't check the download. It will be offered again once the release is fixed.`, 'bad-package');
     }
-    throw new AddonError("The server didn't say where to download the addon from. Try again later.", 'bad-package');
+    const url = downloadUrl(rel.shaUrl, 'checksum');
+    let res;
+    try {
+      res = await doFetch(url, { signal: AbortSignal.timeout(SHA_TIMEOUT), headers: { Accept: 'text/plain, application/octet-stream', 'User-Agent': userAgent } });
+    } catch (err) {
+      throw new AddonError(`Couldn't download the checksum of addon ${v} (${networkReason(err)}). Check your internet connection and try again.`, 'download');
+    }
+    if (!res.ok) throw new AddonError(`GitHub couldn't send the checksum of addon ${v} (it answered ${res.status}). Try again later.`, 'download');
+    let text = '';
+    try { text = (await res.text()).slice(0, MAX_SHA_FILE); } catch (err) {
+      throw new AddonError(`The checksum download of addon ${v} was cut off (${networkReason(err)}). Try again.`, 'download');
+    }
+    const want = release.parseSha256Text(text, release.addonAssetNames(v).zip);
+    if (!want) {
+      throw new AddonError(`The checksum file of addon ${v} on GitHub can't be read, so Guild Camp can't check the download. It will be offered again once the release is fixed.`, 'bad-package');
+    }
+    if (rel.digest && rel.digest !== want) {
+      log.warn(`Addon ${v}: the .sha256 file says ${want} but GitHub reports ${rel.digest} for the zip.`);
+      throw new AddonError(`The checksums published for addon ${v} don't agree, so it wasn't installed. Your current addon was left as it was.`, 'checksum');
+    }
+    return want;
   }
 
   function cacheFile(v) {
@@ -438,24 +568,22 @@ function createAddonManager({
 
   async function download(rel) {
     const v = rel.version;
-    const want = rel.sha256;
-    if (!want || !/^[0-9a-f]{64}$/.test(want)) {
-      throw new AddonError(`The server didn't publish a checksum for addon ${v}, so Guild Camp can't check the download. Ask the guild owner to publish the addon again.`, 'bad-package');
-    }
+    const want = await publishedSha(rel);
     const cached = await readCache(v, want);
     if (cached) {
       log.info(`Using the saved download of addon ${v}.`);
       return cached;
     }
-    const url = downloadUrl(rel.url);
+    if (rel.size && rel.size > MAX_DOWNLOAD) throw new AddonError(`The addon download is far too large (${Math.round(rel.size / 1048576)} MB), so it wasn't installed.`, 'bad-package');
+    const url = downloadUrl(rel.zipUrl, 'download');
     log.info(`Downloading addon ${v} from ${hostOf(url)}.`);
     let res;
     try {
-      res = await doFetch(url, { signal: AbortSignal.timeout(downloadTimeout), headers: { Accept: 'application/zip, application/octet-stream' } });
+      res = await doFetch(url, { signal: AbortSignal.timeout(downloadTimeout), headers: { Accept: 'application/zip, application/octet-stream', 'User-Agent': userAgent } });
     } catch (err) {
       throw new AddonError(`Couldn't download addon ${v} (${networkReason(err)}). Check your internet connection and try again.`, 'download');
     }
-    if (!res.ok) throw new AddonError(`The server couldn't send addon ${v} (it answered ${res.status}). Try again later.`, 'download');
+    if (!res.ok) throw new AddonError(`GitHub couldn't send addon ${v} (it answered ${res.status}). Try again later.`, 'download');
     const length = Number(res.headers && typeof res.headers.get === 'function' ? res.headers.get('content-length') : 0);
     if (length > MAX_DOWNLOAD) throw new AddonError(`The addon download is far too large (${Math.round(length / 1048576)} MB), so it wasn't installed.`, 'bad-package');
     let buf;
@@ -468,7 +596,7 @@ function createAddonManager({
     const got = sha256(buf);
     if (got !== want) {
       log.warn(`Addon ${v} download checksum ${got} doesn't match the published ${want}.`);
-      throw new AddonError(`The download of addon ${v} didn't match the checksum the server published, so it wasn't installed. Your current addon was left as it was. Try again in a few minutes.`, 'checksum');
+      throw new AddonError(`The download of addon ${v} didn't match the checksum published with it, so it wasn't installed. Your current addon was left as it was. Try again in a few minutes.`, 'checksum');
     }
     await writeCache(v, buf);
     return buf;
@@ -492,8 +620,8 @@ function createAddonManager({
     }
   }
 
-  // The zip for the latest addon. When the server's copy can't be fetched (offline, server down, a broken release
-  // entry), the copy that came with the app is used instead if it is still an improvement. A checksum mismatch never
+  // The zip for the latest addon. When GitHub's copy can't be fetched (offline, GitHub down, a broken release),
+  // the copy that came with the app is used instead if it is still an improvement. A checksum mismatch never
   // falls back: that download may have been tampered with, and the user should see it.
   async function packageFor(target, current, rel) {
     if (target.source !== 'remote') return bundledPackage();
@@ -518,6 +646,74 @@ function createAddonManager({
         await sleep(retryDelays[attempt]);
       }
     }
+  }
+
+  // ---- the game -----------------------------------------------------------------------------
+
+  // true / false, or null when Guild Camp can't tell. Without wow.isWowRunning there is nothing to ask: closed.
+  async function gameRunning() {
+    if (!wow || typeof wow.isWowRunning !== 'function') return false;
+    try {
+      const r = await wow.isWowRunning();
+      return r === true ? true : r === false ? false : null;
+    } catch {
+      return null;
+    }
+  }
+
+  // Automatic installs and updates wait while the game runs (or when Guild Camp can't tell): the game reads the
+  // AddOns folders and each .toc's file list only when it starts, so after a /reload it would run half of the new
+  // addon. → true when the change must wait (the folders are marked waitingForGame and a watch starts).
+  async function waitsForGame(targets, kind) {
+    const running = await gameRunning();
+    if (running === false) {
+      for (const inst of targets) waiting.delete(pathKey(inst.dir));
+      return false;
+    }
+    let added = false;
+    for (const inst of targets) {
+      const key = pathKey(inst.dir);
+      if (waiting.get(key) !== kind) {
+        added = true;
+        log.info(running
+          ? `Waiting for World of Warcraft to close before ${kind === 'install' ? 'installing' : 'updating'} the addon in ${labelOf(inst)}.`
+          : `Couldn't tell whether World of Warcraft is running, so the addon in ${labelOf(inst)} is ${kind === 'install' ? 'installed' : 'updated'} once Guild Camp sees it closed.`);
+      }
+      waiting.set(key, kind);
+    }
+    watchGame();
+    if (added) emitStatus();
+    return true;
+  }
+
+  function stopWatching() {
+    if (gameTimer) clearInterval(gameTimer);
+    gameTimer = null;
+  }
+
+  // While something waits, ask every gameWaitMs whether the game has closed; then run the check again.
+  function watchGame() {
+    if (gameTimer) return;
+    gameTimer = setInterval(async () => {
+      if (gameAsking) return;
+      gameAsking = true;
+      try {
+        if (!status().installs.some((i) => i.waitingForGame)) {
+          waiting.clear();
+          stopWatching();
+          return;
+        }
+        if ((await gameRunning()) !== false) return;
+        stopWatching();
+        log.info('World of Warcraft has closed.');
+        await check();
+      } catch (err) {
+        log.warn(`Couldn't finish the addon change that waited for the game: ${err.message}`);
+      } finally {
+        gameAsking = false;
+      }
+    }, Math.max(10, gameWaitMs));
+    if (typeof gameTimer.unref === 'function') gameTimer.unref();
   }
 
   // Only called once the retries are used up. When the game is known not to be running, something else holds the
@@ -641,6 +837,7 @@ function createAddonManager({
   // ---- actions ------------------------------------------------------------------------------
 
   // Runs one action for one game folder: marks it busy, tidies leftovers first, records the outcome.
+  // → status(), plus what work() returned ({ restartNeeded }).
   async function withInstall(dir, action, work) {
     const inst = await findInstall(dir);
     const key = pathKey(inst.dir);
@@ -648,10 +845,11 @@ function createAddonManager({
     busy.set(key, action);
     errors.delete(key);
     emitStatus();
+    let extra = null;
     try {
       if (tidying.has(key)) await tidying.get(key).catch(noop);
       await tidy(inst.addonsDir);
-      await work(inst);
+      extra = await work(inst);
     } catch (err) {
       const e = err instanceof AddonError ? err : await inUse(err, inst, ACTION_WORDS[action].fail);
       errors.set(key, e.message);
@@ -662,7 +860,15 @@ function createAddonManager({
       scan.at = 0;
       emitStatus();
     }
-    return status();
+    return extra && typeof extra === 'object' ? { ...status(), ...extra } : status();
+  }
+
+  // After a change the person made: true when the game may be running and a /reload can't load what changed,
+  // because the WowGuild folder is new (or had no .toc) or its .toc now lists other files.
+  async function needsRestart(before, inst) {
+    const after = tocFiles((readAddonToc(path.join(inst.addonsDir, ADDON), ADDON) || {}).text);
+    const changed = !before || !after || before.join('\n') !== after.join('\n');
+    return changed && (await gameRunning()) !== false;
   }
 
   function installLatest(dir, action, { auto = false } = {}) {
@@ -670,36 +876,46 @@ function createAddonManager({
       const rel = remote; // a check finishing meanwhile must not change what this install fetches
       const target = pickLatest(bundled(), rel);
       if (!target) {
-        throw new AddonError("There's no addon to install: this copy of Guild Camp has none built in and the server hasn't published one. Check for updates and try again.", 'nothing-to-install');
+        throw new AddonError("There's no addon to install: this copy of Guild Camp has none built in and none could be found on GitHub. Check for updates and try again.", 'nothing-to-install');
       }
       const current = installed(inst.addonsDir);
       const state = computeState(current, target);
       if (action === 'update' && (state === 'current' || state === 'newer')) {
         log.info(`The addon in ${labelOf(inst)} is already ${current.version}; nothing to update.`);
-        return;
+        return { restartNeeded: false };
       }
       const from = current && current.version ? ` (was ${current.version})` : '';
       log.info(`${ACTION_WORDS[action].doing} addon ${target.version} in ${labelOf(inst)}${from}${auto ? ' automatically' : ''}: ${inst.addonsDir}`);
       const pkg = await packageFor(target, current, rel);
+      // The game may have started while the package was downloaded: an automatic change still waits for it to close.
+      if (auto && await waitsForGame([inst], action === 'install' ? 'install' : 'update')) return { restartNeeded: false, waited: true };
+      const filesBefore = tocFiles((readAddonToc(path.join(inst.addonsDir, ADDON), ADDON) || {}).text);
       await swapIn(inst, pkg);
+      waiting.delete(pathKey(inst.dir));
       log.info(`Addon ${pkg.version} ${ACTION_WORDS[action].done} in ${labelOf(inst)}${pkg.source === 'bundled' ? ' (the copy that came with Guild Camp)' : ''}.`);
       // Installed by hand where it was removed before: automatic installs may look after it again.
       if (!auto) setOptOut(inst.dir, false);
+      // Automatic changes only happen with the game closed; one the person made may need a game restart.
+      const restartNeeded = !auto && await needsRestart(filesBefore, inst);
+      if (restartNeeded) log.info(`Restart World of Warcraft to load addon ${pkg.version} in ${labelOf(inst)}. A /reload isn't enough this time.`);
+      return { restartNeeded };
     });
   }
 
   // Automatic installs (settings.addonAutoInstall): every game folder without the addon whose game version the addon
   // supports, except folders where the person removed it. Failures are logged and shown per folder, never thrown.
+  // They wait while the game runs (waitsForGame).
   async function installMissing() {
     if (!autoInstallOn() || !latest()) return [];
     const flavors = supportedFlavors();
     if (!flavors.length) return [];
     const targets = status().installs.filter((i) => i.state === 'missing' && !i.busy && i.supported && !i.optedOut);
+    if (!targets.length || await waitsForGame(targets, 'install')) return [];
     const done = [];
     for (const inst of targets) {
       try {
-        await installLatest(inst.dir, 'install', { auto: true });
-        done.push(inst.dir);
+        const r = await installLatest(inst.dir, 'install', { auto: true });
+        if (!(r && r.waited)) done.push(inst.dir);
       } catch {
         // withInstall logged it and keeps the message on the folder's status.
       }
@@ -732,13 +948,18 @@ function createAddonManager({
     });
   }
 
+  // Updates every outdated install. Automatic updates wait while the game runs (waitsForGame); the person's own
+  // "Update all" goes ahead and says restartNeeded when any folder needs a game restart.
   async function updateAll({ auto = false } = {}) {
     await freshInstalls();
     const outdated = status().installs.filter((i) => i.state === 'outdated' && !i.busy);
+    if (auto && outdated.length && await waitsForGame(outdated, 'update')) return status();
     const failed = [];
+    let restartNeeded = false;
     for (const inst of outdated) {
       try {
-        await installLatest(inst.dir, 'update', { auto });
+        const r = await installLatest(inst.dir, 'update', { auto });
+        if (r && r.restartNeeded) restartNeeded = true;
       } catch (err) {
         failed.push(`${inst.label}: ${err.message}`);
       }
@@ -747,12 +968,12 @@ function createAddonManager({
       const err = new AddonError(failed.length === 1 ? failed[0] : `The addon couldn't be updated in ${failed.length} game folders. ${failed.join(' ')}`, 'failed');
       throw err;
     }
-    return status();
+    return auto ? status() : { ...status(), restartNeeded };
   }
 
-  async function runCheck() {
+  async function runCheck(force) {
     try {
-      await refreshRemote();
+      await refreshRemote(force);
       const list = await freshInstalls();
       // Finish or undo interrupted changes in folders nobody is working on. An action that starts meanwhile waits
       // for this (see withInstall), so the two never step on each other's temp folders.
@@ -764,7 +985,7 @@ function createAddonManager({
         await p;
       }
       const lat = latest();
-      log.info(lat ? `Checked for addon updates. The newest is ${lat.version} (${lat.source === 'remote' ? 'from the server' : 'built in'}).` : 'Checked for addon updates. No addon is available yet.');
+      log.info(lat ? `Checked for addon updates. The newest is ${lat.version} (${lat.source === 'remote' ? 'on GitHub' : 'built in'}).` : 'Checked for addon updates. No addon is available yet.');
       if (autoUpdateOn()) await updateAll({ auto: true });
       if (autoInstallOn()) await installMissing();
     } catch (err) {
@@ -777,10 +998,12 @@ function createAddonManager({
     return status();
   }
 
-  // Concurrent calls share one check.
-  function check() {
+  // Concurrent calls share one check. { force: true } (the person pressed Check) asks GitHub now instead of
+  // using an answer from the last 30 minutes.
+  function check(opts) {
+    const force = Boolean(opts && typeof opts === 'object' && opts.force);
     if (!checkPromise) {
-      checkPromise = Promise.resolve().then(runCheck);
+      checkPromise = Promise.resolve().then(() => runCheck(force));
       emitStatus(); // checking: true
     }
     return checkPromise;
@@ -791,7 +1014,6 @@ function createAddonManager({
   function onSettings(_settings, keys) {
     if (!Array.isArray(keys)) return;
     let changed = false;
-    if (keys.includes('serverUrl')) { remote = null; remoteError = null; changed = true; }
     if (keys.includes('extraWowFolders')) { scan.at = 0; changed = true; }
     if (keys.includes('addonAutoUpdate')) {
       changed = true;
@@ -817,6 +1039,7 @@ function createAddonManager({
     updateAll: () => updateAll(),
     dispose() {
       if (store && typeof store.off === 'function') store.off('change', onSettings);
+      stopWatching();
     },
   });
 }
@@ -828,8 +1051,10 @@ module.exports = {
   pickLatest,
   computeState,
   normalizeRemote,
+  pickRemote,
   looksLikeOurs,
   cleanTitle,
+  tocFiles,
   ADDON,
   INBOX,
 };

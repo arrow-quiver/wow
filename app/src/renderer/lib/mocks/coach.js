@@ -1,26 +1,21 @@
 // Preview sample data for the coach pages (used only when the renderer runs in a plain browser without window.gc).
-// The engineer who owns the coach pages keeps these shapes identical to docs/api/coach.md.
-import { addMockRoutes, SCENARIO } from '../mock.js';
+// Shapes match docs/api/coach.md (the local core's routes/coach.js). The AI part follows the player's own
+// Anthropic API key (gc.secrets, &key=0 in the URL for none), and Coach on/off and budget in Guild settings.
+import { addMockRoutes, SCENARIO, httpError, needGuild } from '../mock.js';
 
-// Extra preview states with &coach=<mode> in the page URL: nokey | off | budget | empty | busy.
+// Extra preview states with &coach=<mode> in the page URL: budget (used up) | empty | busy.
 const MODE = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('coach') : null;
-const AI = {
-  nokey: { available: false, hasKey: false, enabled: true, budgetLeft: true, reason: "The AI part of the Coach isn't set up yet (the server has no Claude API key)." },
-  off: { available: false, hasKey: true, enabled: false, budgetLeft: true, reason: "An officer has switched the Coach's AI off." },
-  budget: { available: false, hasKey: true, enabled: true, budgetLeft: false, reason: "The guild's Coach budget for this month is used up. An officer can raise it in Guild settings." },
-};
+// The core's reasons (routes/coach.js aiState).
+const NO_KEY = "The Coach's AI answers are off. Add your Anthropic API key in Settings to turn them on.";
+const OFF = "The Coach's AI answers are switched off in Guild settings.";
+const BUDGET = 'Your Coach budget for this month is used up. You can raise it in Guild settings.';
+const SPENT = 1.8423;
 
 const MIN = 60 * 1000;
 const HOUR = 60 * MIN;
 const sqlTime = (msAgo = 0) => new Date(Date.now() - msAgo).toISOString().replace('T', ' ').slice(0, 19);
 const iso = (msAhead = 0) => new Date(Date.now() + msAhead).toISOString();
 const unix = (msAgo = 0) => Math.floor((Date.now() - msAgo) / 1000);
-
-function httpError(status, message) {
-  const e = new Error(message);
-  e.status = status;
-  return e;
-}
 
 const SRC = [
   { url: 'https://www.wowhead.com/classic/guide/classes/warrior/arms-pvp', title: 'Arms Warrior PvP guide' },
@@ -119,13 +114,17 @@ function nextSteps(c, plan) {
   return steps;
 }
 
-function myRole(state) {
-  return (state.members || []).find((m) => m.id === state.userId)?.role || 'member';
+function aiState(state) {
+  const hasKey = Boolean(state.secrets && state.secrets.anthropicKey);
+  const enabled = Boolean(state.guild && state.guild.coach_enabled);
+  const budget = Number(state.guild ? state.guild.coach_budget_usd : 0) || 0;
+  const budgetLeft = MODE !== 'budget' && SPENT < budget;
+  const reason = !hasKey ? NO_KEY : !enabled ? OFF : !budgetLeft ? BUDGET : null;
+  return { available: !reason, hasKey, enabled, budgetLeft, reason };
 }
 
 function view({ query, state }) {
-  if (!state.signedIn) throw httpError(401, 'Sign in first.');
-  if (!state.inGuild) throw httpError(403, 'Join a guild first.');
+  needGuild(state);
   // Preview: answers that were "thinking" arrive after a few seconds.
   for (const q of QUESTIONS) {
     if (q.status === 'pending' && Date.now() - q._t > 4000) {
@@ -147,7 +146,7 @@ function view({ query, state }) {
   const c = name ? CHARS[name] : null;
   const { plan: _plan, ...character } = c || {};
   const plan = c ? planJson(c) : null;
-  const officer = ['owner', 'officer'].includes(myRole(state));
+  const ai = aiState(state);
   return {
     characters: chars,
     character: c ? character : null,
@@ -156,24 +155,32 @@ function view({ query, state }) {
     nextSteps: c ? nextSteps(c, plan) : [],
     questions: c ? QUESTIONS.map(({ _t, ...q }) => q) : [],
     limits: { questionsPerDay: 30, plansPerDay: 5, questionsLeft: 30 - QUESTIONS.filter((q) => q.source === 'app').length, plansLeft: 4 },
-    ai: AI[MODE] || { available: true, hasKey: true, enabled: true, budgetLeft: true, reason: null },
-    usage: officer ? { month: new Date().toISOString().slice(0, 7), spentUsd: 1.8423, budgetUsd: 15, questions: 87, plans: 12 } : null,
+    ai,
+    // The key and the budget are the player's own, so everyone sees what this month cost.
+    usage: { month: new Date().toISOString().slice(0, 7), spentUsd: MODE === 'budget' ? state.guild.coach_budget_usd : SPENT, budgetUsd: state.guild.coach_budget_usd, questions: 87, plans: 12 },
   };
 }
 
 addMockRoutes({
   'GET /api/coach': view,
   'POST /api/coach/ask': ({ body = {}, state }) => {
-    if (!state.inGuild) throw httpError(403, 'Join a guild first.');
+    needGuild(state);
     const question = String(body.question || '').trim().slice(0, 500);
     if (!question) throw httpError(400, 'Type a question first.');
+    const ai = aiState(state);
+    if (!ai.hasKey) throw httpError(503, NO_KEY);
+    if (!ai.available) throw httpError(403, ai.reason);
     const q = { id: nextId++, char_name: CHARS[body.char] ? body.char : 'Grimtusk', source: 'app', question, answer: null, sources: [],
       status: 'pending', error: null, created_at: sqlTime(), answered_at: null, _t: Date.now() };
     QUESTIONS.unshift(q);
     const { _t, ...out } = q;
     return { question: out, message: "The Coach is still thinking. The answer shows here when it's ready." };
   },
-  'POST /api/coach/plan': ({ body = {} }) => {
+  'POST /api/coach/plan': ({ body = {}, state }) => {
+    needGuild(state);
+    const ai = aiState(state);
+    if (!ai.hasKey) throw httpError(503, NO_KEY);
+    if (!ai.available) throw httpError(403, ai.reason);
     const c = CHARS[body.char] || CHARS.Grimtusk;
     if (c.name === 'Shadowfen' && !c.plan) {
       planBusyUntil = Date.now() + 5000;

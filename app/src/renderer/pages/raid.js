@@ -1,5 +1,6 @@
 // One raid (or PvP premade / guild event): when and where, my sign-up, my soft reserves, who's coming with
 // their readiness, the reserve list, loot given out, and the raid leader's tools (lock, cancel, close).
+// Sign-ups, reserves and the leader's changes go to guildmates through the addon.
 // Shapes: docs/api/raids.md (GET /api/raids/:id).
 import { html, useState, useEffect, useMemo } from '../lib/html.js';
 import { api, useApi, useAction } from '../lib/api.js';
@@ -8,6 +9,7 @@ import {
   Page, Card, Table, Button, ConfirmButton, CopyButton, Modal, Input, Select, Checkbox, Pill, Notice, Empty, ErrorBox,
   Loading, ClassName, ItemLink, LocalTime, TimeAgo, Icon, useNow, toast,
 } from '../components/index.js';
+import { ShareHint } from '../components/ShareHint.js';
 import {
   KIND_LABEL, STATUS_LABEL, STATUS_PILL, ROLE_LABEL, ROLE_PLURAL, ROLES, AWARD_LABEL,
   KindPill, StatePill, RoleCounts, countdown, durationLabel,
@@ -167,11 +169,28 @@ function SignupCard({ d, onSaved }) {
       <${Segmented} label="Coming?" options=${STATUS_OPTIONS} value=${f.status} onValue=${set('status')} columns=${2} />
       <${Input} label="Note" value=${f.note} onValue=${set('note')} maxLength="120" placeholder="Might be 15 min late" />
       <${Button} type="submit" variant="primary" busy=${save.busy} block>${mySignup ? 'Update sign-up' : 'Sign up'}<//>
+      <${ShareHint} />
     </form>
   <//>`;
 }
 
 // ---------- soft reserves ----------
+
+export const SIGN_UP_FIRST = 'Sign up first, then pick your reserves.';
+
+/**
+ * Whether I can pick reserves on a raid that takes them, and the notice the card shows when I can't (exported
+ * for tests). My reserves travel on my sign-up, so without one the list is read-only and says to sign up first:
+ * GET /api/raids/:id says needsSignup (an older core without it: canReserve with no sign-up means the same).
+ * → { editable, notice: { kind, text } | null }
+ */
+export function reservesState(d) {
+  const raid = (d && d.raid) || {};
+  const needsSignup = d.needsSignup === true || (d.needsSignup === undefined && Boolean(d.canReserve) && !d.mySignup);
+  if (needsSignup) return { editable: false, notice: { kind: 'info', text: SIGN_UP_FIRST } };
+  if (d.canReserve) return { editable: true, notice: null };
+  return { editable: false, notice: { kind: 'warn', text: raid.status === 'locked' ? 'Reserves are locked. Your picks are shown below.' : 'Reserves are closed for this raid.' } };
+}
 
 function ReservesCard({ d, onSaved }) {
   const { raid, items } = d;
@@ -208,7 +227,7 @@ function ReservesCard({ d, onSaved }) {
     <//>`;
   }
 
-  const editable = d.canReserve;
+  const { editable, notice } = reservesState(d);
   const changed = idsKey(picked) !== mineKey;
   const toggle = (id, on) => setPicked((s) => {
     const next = new Set(s);
@@ -222,14 +241,17 @@ function ReservesCard({ d, onSaved }) {
   const full = picked.size >= limit;
 
   return html`<${Card} title=${title} sub=${`${picked.size} of ${limit} picked`}
-      footer=${editable ? html`<div class="row row--between">
-        <span>Your bonus grows by +10 every raid you attend with the same item reserved. It resets when you win it.</span>
-        <div class="actions-row">
-          ${picked.size ? html`<${Button} variant="ghost" size="sm" onClick=${() => setPicked(new Set())}>Clear<//>` : null}
-          <${Button} variant="primary" busy=${save.busy} disabled=${!changed} onClick=${submit}>Save reserves<//>
+      footer=${editable ? html`<div class="stack stack--tight">
+        <div class="row row--between">
+          <span>Your bonus grows by +10 every raid you attend with the same item reserved. It resets when you win it.</span>
+          <div class="actions-row">
+            ${picked.size ? html`<${Button} variant="ghost" size="sm" onClick=${() => setPicked(new Set())}>Clear<//>` : null}
+            <${Button} variant="primary" busy=${save.busy} disabled=${!changed} onClick=${submit}>Save reserves<//>
+          </div>
         </div>
+        <${ShareHint} />
       </div>` : null}>
-    ${!editable ? html`<${Notice} kind="warn" class="raid-reserves-locked">${raid.status === 'locked' ? 'Reserves are locked. Your picks are shown below.' : 'Reserves are closed for this raid.'}<//>` : null}
+    ${notice ? html`<${Notice} kind=${notice.kind} class="raid-reserves-locked">${notice.text}<//>` : null}
     <p class="hint">Pick up to ${plural(limit, 'item')}. When one drops, everyone who reserved it rolls and adds their bonus.</p>
     <div class="raid-bosses">
       ${groups.map((g) => html`<fieldset key=${g.boss} class="raid-boss">
@@ -355,6 +377,9 @@ function LootGivenCard({ loot }) {
 
 // ---------- raid leader ----------
 
+// Discord posts go out when the game confirms the change reached the guild, not when it is saved here.
+export const CANCEL_DISCORD_HINT = 'A cancellation also posts to your Discord channel once it goes out.';
+
 function LeaderCard({ d, onChanged }) {
   const { raid } = d;
   const [closing, setClosing] = useState(false);
@@ -373,12 +398,13 @@ function LeaderCard({ d, onChanged }) {
       <${ConfirmButton} variant="ghost" size="md" icon="close" question=${`Cancel ${raid.title}?`} yes="Cancel it" no="Keep"
         onConfirm=${() => run('cancel')} class="raid-cancel">Cancel ${KIND_LABEL[raid.kind] === 'Event' ? 'event' : KIND_LABEL[raid.kind] === 'PvP' ? 'premade' : 'raid'}<//>
       <p class="hint">${isRaid && raid.sr_limit ? 'Lock reserves when the raid starts. Sign-ups stay open. ' : ''}Close it afterwards to record who was there${isRaid ? ' and update loyalty bonuses' : ''}.</p>
+      <${ShareHint} officer discord=${CANCEL_DISCORD_HINT} />
     </div>` : null}
     ${raid.status === 'done' ? html`<div class="stack stack--tight">
       <p class="muted">This raid is closed.${isRaid ? ' Bonuses were updated.' : ''}</p>
       ${isRaid ? html`<${Button} icon="loot" href=${`/raids/${raid.id}/loot`} block>Record late loot<//>` : null}
     </div>` : null}
-    ${raid.status === 'cancelled' ? html`<p class="muted">This was cancelled. Everyone who signed up was told.</p>` : null}
+    ${raid.status === 'cancelled' ? html`<p class="muted">This was cancelled.</p>` : null}
     <${CloseRaidModal} open=${closing} d=${d} onClose=${() => setClosing(false)} onDone=${() => { setClosing(false); onChanged(); }} />
   <//>`;
 }

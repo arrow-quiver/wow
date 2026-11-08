@@ -1,11 +1,12 @@
 // Leveling partners (the old "buddies"): post where you're questing and when, so guildies within a few levels can
 // come along. A new post for the same character replaces the old one; posts disappear after 3 days.
-// Data: GET /api/partners (docs/api/community.md).
+// Posts go to guildmates through the addon. Data: GET /api/partners (docs/api/community.md).
 import { html, useState, useEffect, useMemo } from '../lib/html.js';
 import { api, useApi, useAction } from '../lib/api.js';
 import {
   Page, Card, Button, ConfirmButton, Input, Select, Pill, Empty, Async, ClassName, TimeAgo,
 } from '../components/index.js';
+import { ShareHint } from '../components/ShareHint.js';
 
 const shortTag = (bt) => String(bt || '').split('#')[0];
 // "Near your level": within this many levels of one of your characters.
@@ -58,6 +59,7 @@ function PostCard({ chars, onPosted }) {
         <${Button} type="submit" variant="primary" icon="partners" busy=${post.busy}>Post<//>
         <span class="hint">A new post for the same character replaces your old one. Posts show for 3 days.</span>
       </div>
+      <${ShareHint} />
     </form>
   <//>`;
 }

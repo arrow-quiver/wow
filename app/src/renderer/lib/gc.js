@@ -15,10 +15,11 @@ export const METHODS = [
   'app.rendererReady',
   'log.recent',
   'settings.get', 'settings.set',
-  'auth.state', 'auth.signIn', 'auth.devSignIn', 'auth.signOut',
+  'auth.state', 'auth.signIn', 'auth.signOut',
   'api.request', 'api.download',
+  'calendar.export',
+  'secrets.set', 'secrets.has',
   'wow.installs', 'wow.addFolder', 'wow.removeFolder', 'wow.detectGuild',
-  'guild.autoJoin', 'membership.status',
   'sync.status', 'sync.now', 'sync.setEnabled',
   'addon.status', 'addon.check', 'addon.install', 'addon.update', 'addon.updateAll', 'addon.repair', 'addon.uninstall',
   'addon.openFolder',
@@ -27,7 +28,7 @@ export const METHODS = [
   'notify.test',
 ];
 
-export const CHANNELS = ['auth', 'sync', 'addon', 'updater', 'publisher:log', 'server-event', 'navigate', 'log', 'settings', 'membership'];
+export const CHANNELS = ['auth', 'sync', 'addon', 'updater', 'publisher:log', 'server-event', 'navigate', 'log', 'settings'];
 
 const bridge = (typeof window !== 'undefined' && window.gc) || await (async () => {
   const m = await import('./mock.js');

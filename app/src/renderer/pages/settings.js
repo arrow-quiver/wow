@@ -1,37 +1,46 @@
-// Settings: the signed-in account and its devices, desktop notifications, Discord linking, the private calendar
-// feed, how the app behaves on this PC, and version/log details for getting help.
-// Server shapes: docs/api/core.md (/api/me, /api/devices), docs/api/discord.md, the admin domain's /api/calendar.
-// App settings go through gc.settings.set and arrive back on the 'settings' channel.
-// ?section=discord (or account, notifications, calendar, app, about) scrolls straight to that card.
-// ?section=discord&link=1 also makes a Discord link code straight away when the member isn't linked yet.
+// Settings: Battle.net (sign in, region, BattleTag, characters), desktop notifications, the Discord webhook this
+// app posts to (officers can share it with the other officers through the addon, and use one another officer
+// shared: GET /api/share/status webhookOffer, POST /api/share/webhook/accept|dismiss|share), the Coach's AI key,
+// exporting raids to a calendar, how the app behaves on this PC, and version/log details for getting help.
+// App settings go through gc.settings.set and arrive back on the 'settings' channel. Notification choices per kind
+// live in the local guild data (GET /api/me → notifyPrefs, PUT /api/me/notifications).
+// ?section=battlenet (or notifications, discord, coach, calendar, app, about) scrolls straight to that card.
 import { html, cx, useState, useEffect, useRef, useCallback } from '../lib/html.js';
 import { gc, useGcEvent } from '../lib/gc.js';
-import { api, useApi, useAction } from '../lib/api.js';
-import { useSession, setSession } from '../lib/session.js';
-import { navigate, Link } from '../lib/router.js';
+import { api, useApi } from '../lib/api.js';
+import { useSession, setSession, splitBattleTag } from '../lib/session.js';
+import { Link } from '../lib/router.js';
 import { applyTheme, THEMES } from '../lib/theme.js';
-import { localTime } from '../lib/format.js';
+import { plural } from '../lib/format.js';
+import { useShareStatus, shareStatus as shareLive, syncStatus, savedLine, savedReply } from '../lib/status.js';
 import {
-  Page, Card, Table, Button, ConfirmButton, CopyButton, Checkbox, Notice, Pill, Icon, Async, ErrorBox, Loading,
-  TimeAgo, useNow, toast,
+  Page, Card, Table, Button, ConfirmButton, Checkbox, Input, Select, Notice, Pill, Icon, ErrorBox, Loading,
+  ClassName, TimeAgo, toast,
 } from '../components/index.js';
+import { ShareHint } from '../components/ShareHint.js';
 
 // ---------- helpers (exported for tests) ----------
 
 export const SECTIONS = [
-  { id: 'account', label: 'Account', icon: 'character' },
+  { id: 'battlenet', label: 'Battle.net', icon: 'battlenet' },
   { id: 'notifications', label: 'Notifications', icon: 'bell' },
   { id: 'discord', label: 'Discord', icon: 'link' },
+  { id: 'coach', label: 'Coach AI', icon: 'coach' },
   { id: 'calendar', label: 'Calendar', icon: 'raids' },
   { id: 'app', label: 'App', icon: 'settings' },
   { id: 'about', label: 'About & help', icon: 'info' },
 ];
+// Older links (?section=account) still land somewhere sensible.
+const SECTION_ALIASES = { account: 'battlenet' };
 const sectionDomId = (id) => `settings-${id}`;
 
-// Slash commands named in the Discord card, in the old Settings page's order (/link is explained separately).
-const COMMAND_LIST = ['online', 'raids', 'craft', 'price', 'cta', 'signup'];
+/** The section a ?section= value means, or null. */
+export function sectionFor(value) {
+  const id = SECTION_ALIASES[value] || value;
+  return SECTIONS.some((s) => s.id === id) ? id : null;
+}
 
-// The notifyPrefs switches (docs/api/core.md), in the order shown. `officer` ones only matter to officers.
+// The notifyPrefs switches, in the order shown. `officer` ones only matter to officers.
 export const NOTIFY_KINDS = [
   { key: 'cta', label: 'Calls to arms', hint: 'Someone needs help in a fight.' },
   { key: 'raids', label: 'Raids and reminders', hint: 'New raids and events, and a reminder before they start.' },
@@ -42,26 +51,47 @@ export const NOTIFY_KINDS = [
   { key: 'drives', label: 'Supply drives', hint: 'New drives, and drives that reach their goal.' },
 ];
 
+// Battle.net regions (settings.bnetRegion). "us" also covers Latin America and Oceania.
+export const REGIONS = [
+  { value: 'eu', label: 'Europe' },
+  { value: 'us', label: 'Americas and Oceania' },
+  { value: 'kr', label: 'Korea' },
+  { value: 'tw', label: 'Taiwan' },
+];
+export const regionLabel = (r) => (REGIONS.find((x) => x.value === r) || REGIONS[0]).label;
+
+/** "profile-classic1x-eu" → "Classic Era", "profile-classic-eu" → "Classic", "profile-eu" → "Retail". */
+export function gameLabel(namespace) {
+  const ns = String(namespace || '').toLowerCase();
+  if (ns.startsWith('profile-classic1x-')) return 'Classic Era';
+  if (ns.startsWith('profile-classic-')) return 'Classic';
+  if (/^profile-[a-z]{2}$/.test(ns)) return 'Retail';
+  return 'World of Warcraft';
+}
+
+// Same rule as the main process (store.js): a Discord webhook address.
+const WEBHOOK_RE = /^https:\/\/(discord|discordapp)\.com\/api\/webhooks\/[\w/-]+$/;
+export const isWebhookUrl = (v) => typeof v === 'string' && v.trim().length <= 300 && WEBHOOK_RE.test(v.trim());
+
+/** Shows which webhook is set without showing the part that lets anyone post: ".../webhooks/1234…/••••". */
+export function maskWebhook(url) {
+  const m = /^https:\/\/((?:discord|discordapp)\.com)\/api\/webhooks\/(\d+)\//.exec(String(url || '').trim());
+  if (!m) return url ? 'A webhook is set.' : '';
+  const id = m[2].length > 6 ? `${m[2].slice(0, 6)}…` : m[2];
+  return `${m[1]}/api/webhooks/${id}/••••`;
+}
+
+// What the page says when an Anthropic key can't be saved (the main process checks it again).
+export function keyProblem(value) {
+  const v = String(value ?? '').trim();
+  if (!v) return 'Paste your key first.';
+  if (/\s/.test(v)) return "A key has no spaces. Copy it again from console.anthropic.com.";
+  if (v.length < 20 || v.length > 300) return "That doesn't look like an Anthropic API key. It starts with sk-ant-.";
+  return '';
+}
+
 const PLATFORMS = { win32: 'Windows', darwin: 'macOS', linux: 'Linux' };
 export const platformName = (p) => PLATFORMS[p] || (p ? String(p) : 'Unknown');
-
-export function hostOf(url) {
-  try { return new URL(url).host; } catch { return url || ''; }
-}
-
-// Google Calendar subscribes from a webcal:// address passed as ?cid=.
-export function googleCalendarUrl(feedUrl) {
-  return `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(String(feedUrl || '').replace(/^https?:/i, 'webcal:'))}`;
-}
-
-// Whole minutes left until an ISO time (0 once it has passed).
-export function minutesLeft(iso, now = Date.now()) {
-  const t = Date.parse(iso);
-  if (!Number.isFinite(t)) return 0;
-  return Math.max(0, Math.ceil((t - now) / 60000));
-}
-
-const ROLE_LABEL = { owner: 'Guild owner', officer: 'Officer', member: 'Member' };
 
 // App settings, kept fresh from the 'settings' channel. change(patch) saves optimistically and rolls back on error.
 function useAppSettings() {
@@ -85,7 +115,7 @@ function useAppSettings() {
       return true;
     } catch (err) {
       setSettings(before);
-      toast(err?.message || "Couldn't change that setting.", 'alarm');
+      if (err?.code !== 'cancelled') toast(err?.message || "Couldn't change that setting.", 'alarm');
       return false;
     }
   }, []);
@@ -139,6 +169,14 @@ function scrollToSection(id, smooth = true) {
   if (el) el.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'start' });
 }
 
+// A method an older main process may not have yet: a plain message instead of a broken page.
+function invokeOptional(method, ...args) {
+  return gc.invoke(method, ...args).catch((err) => {
+    if (err?.status === 404) throw Object.assign(new Error("This version of Guild Camp can't do that yet. Update the app."), { status: 404 });
+    throw err;
+  });
+}
+
 // ---------- small building blocks ----------
 
 // An on/off switch (a checkbox with role="switch").
@@ -167,7 +205,7 @@ function ToggleRow({ title, hint, checked, onValue, disabled }) {
   <//>`;
 }
 
-// A path or address shown in full, selectable, with buttons beside it.
+// A path shown in full, selectable, with buttons beside it.
 function PathBox({ value, children, label }) {
   return html`<div class="settings-path">
     <code class="settings-path-text" title=${value} aria-label=${label}>${value || '—'}</code>
@@ -181,15 +219,15 @@ export default function SettingsPage({ query = {} }) {
   const session = useSession();
   const [settings, change] = useAppSettings();
   const info = useAppInfo();
-  const me = useApi('/api/me');
   const layoutRef = useRef(null);
   const [active, setActive] = useActiveSection(layoutRef);
 
   // ?section=discord: jump to that card once the page has laid out.
   useEffect(() => {
-    if (!SECTIONS.some((s) => s.id === query.section)) return undefined;
-    setActive(query.section);
-    const t = setTimeout(() => scrollToSection(query.section, false), 60);
+    const id = sectionFor(query.section);
+    if (!id) return undefined;
+    setActive(id);
+    const t = setTimeout(() => scrollToSection(id, false), 60);
     return () => clearTimeout(t);
   }, [query.section]);
 
@@ -204,9 +242,10 @@ export default function SettingsPage({ query = {} }) {
         </button>`)}
       </nav>
       <div class="settings-main">
-        <${AccountCard} me=${me} session=${session} />
-        <${NotificationsCard} me=${me} settings=${settings} change=${change} isOfficer=${session.isOfficer} />
-        <${DiscordCard} isOfficer=${session.isOfficer} autoStart=${query.link === '1'} />
+        <${BattleNetCard} bnet=${session.bnet} settings=${settings} change=${change} />
+        <${NotificationsCard} settings=${settings} change=${change} isOfficer=${session.isOfficer} />
+        <${DiscordCard} settings=${settings} change=${change} isOfficer=${session.isOfficer} />
+        <${CoachCard} />
         <${CalendarCard} />
         <${AppCard} settings=${settings} change=${change} info=${info} />
         <${AboutCard} info=${info} />
@@ -215,116 +254,158 @@ export default function SettingsPage({ query = {} }) {
   <//>`;
 }
 
-// ---------- 1. account ----------
+// ---------- 1. Battle.net ----------
 
-function AccountCard({ me, session }) {
-  const devices = useApi('/api/devices');
-  const [signingOut, setSigningOut] = useState(false);
+function BattleNetCard({ bnet, settings, change }) {
+  const [busy, setBusy] = useState(''); // 'signin' | 'refresh' | ''
+  const [error, setError] = useState('');
+  const seq = useRef(0);
+  const mounted = useRef(true);
+  useEffect(() => () => { mounted.current = false; }, []);
 
-  const signOut = async () => {
-    setSigningOut(true);
+  const region = settings?.bnetRegion || bnet.region || 'eu';
+  const waiting = busy === 'signin' || bnet.signingIn;
+
+  const signIn = async () => {
+    const id = ++seq.current;
+    setError('');
+    setBusy('signin');
     try {
-      const state = await gc.auth.signOut();
-      setSession(state && typeof state === 'object' ? state : { signedIn: false });
-      toast('Signed out. Sign in again whenever you like.', 'ok');
-      navigate('/welcome', { replace: true });
+      const s = await gc.auth.signIn();
+      setSession({ bnet: s });
+      if (s?.signedIn) toast(`Signed in to Battle.net as ${s.battletag}.`, 'ok');
     } catch (err) {
-      setSigningOut(false);
-      toast(err?.message || "Couldn't sign out. Try again.", 'alarm');
+      if (mounted.current && id === seq.current && err?.code !== 'cancelled') setError(err?.message || "Battle.net sign-in didn't work. Try again.");
+    } finally {
+      if (mounted.current && id === seq.current) setBusy('');
     }
   };
 
-  const revoke = async (d) => {
-    await api.del(`/api/devices/${d.id}`);
-    toast(`${d.name || 'That device'} is signed out.`, 'ok');
-    devices.reload();
-  };
-  const revokeKey = async (k) => {
-    await api.del(`/api/sync-keys/${k.id}`);
-    toast('Sync key revoked. The old companion can no longer upload with it.', 'ok');
-    devices.reload();
+  // Also stops a sign-in that is still waiting for the browser.
+  const signOut = async () => {
+    seq.current += 1;
+    setBusy('');
+    setError('');
+    const s = await gc.auth.signOut();
+    setSession({ bnet: s });
+    if (bnet.signedIn) toast('Signed out of Battle.net. Guild Camp forgot your BattleTag and characters.', 'ok');
   };
 
+  const refresh = async () => {
+    setError('');
+    setBusy('refresh');
+    try {
+      const s = await gc.auth.state({ refresh: true });
+      setSession({ bnet: s });
+      if (!s?.signedIn) toast(s?.error || 'You are signed out of Battle.net.', 'warn');
+      else if (s.error) toast(s.error, 'warn');
+      else toast(`Characters updated: ${plural(s.characters?.length || 0, 'character')}.`, 'ok');
+    } catch (err) {
+      toast(err?.message || "Couldn't read your characters. Try again.", 'alarm');
+    } finally {
+      if (mounted.current) setBusy('');
+    }
+  };
+
+  const setRegion = (value) => change({ bnetRegion: value }, `Battle.net region: ${regionLabel(value)}.`);
+
+  if (!bnet.available) {
+    return html`<${Card} id=${sectionDomId('battlenet')} title="Battle.net" class="settings-card">
+      <${Notice} kind="info" title="Battle.net sign-in isn't part of this copy of Guild Camp.">
+        Everything else works without it. Installed copies of Guild Camp can sign in to show your BattleTag and list your characters.
+      <//>
+    <//>`;
+  }
+
+  const regionRow = html`<${Row} title="Region" hint="Where your World of Warcraft account plays.">
+    <${Select} label="" aria-label="Battle.net region" value=${region} options=${REGIONS} disabled=${!settings || waiting}
+      onValue=${setRegion} />
+  <//>`;
+
+  if (!bnet.signedIn) {
+    return html`<${Card} id=${sectionDomId('battlenet')} title="Battle.net" class="settings-card"
+        actions=${html`<${Pill} kind="muted" dot>Not signed in<//>`}>
+      <div class="stack">
+        <p class="mb-0">Sign in to show your BattleTag and list your World of Warcraft characters. Your web browser opens
+          Battle.net. Guild Camp never sees your password.</p>
+        ${error ? html`<${Notice} kind="alarm">${error}<//>` : null}
+        ${!error && bnet.error ? html`<${Notice} kind="warn">${bnet.error}<//>` : null}
+        ${waiting
+          ? html`<${Notice} kind="info" icon="battlenet" title="Finish signing in in your web browser.">
+              Didn't see Battle.net open? <button type="button" class="link-btn" onClick=${signIn}>Open it again</button> or <button type="button" class="link-btn" onClick=${() => signOut().catch(() => {})}>cancel</button>.
+            <//>`
+          : html`<div class="actions-row"><${Button} variant="primary" icon="battlenet" onClick=${signIn}>Sign in with Battle.net<//></div>`}
+        ${regionRow}
+      </div>
+    <//>`;
+  }
+
+  const { name, digits } = splitBattleTag(bnet.battletag);
+  const otherRegion = region !== bnet.region;
   const columns = [
-    {
-      key: 'name', label: 'Device',
-      render: (d) => html`<div class="settings-device">
-        <span class="settings-device-name">${d.name || 'Unnamed device'}${d.current ? html` <${Pill} kind="accent">This PC<//>` : null}</span>
-        <span class="settings-device-sub">${platformName(d.platform)}${d.prefix ? html` · <span class="mono">${d.prefix}…</span>` : null}</span>
-      </div>`,
-    },
-    { key: 'app_version', label: 'App', render: (d) => d.app_version || html`<span class="muted">—</span>`, width: '80px' },
-    { key: 'created_at', label: 'Signed in', render: (d) => html`<${TimeAgo} t=${d.created_at} />`, width: '110px' },
-    { key: 'last_used_at', label: 'Last used', render: (d) => html`<${TimeAgo} t=${d.last_used_at} />`, width: '110px' },
-    {
-      key: 'actions', label: html`<span class="sr">Actions</span>`, align: 'right', width: '190px',
-      render: (d) => (d.current
-        ? html`<span class="hint">Use Sign out above</span>`
-        : html`<${ConfirmButton} icon="signout" question="Sign it out?" yes="Sign out" onConfirm=${() => revoke(d)}>Sign out<//>`),
-    },
+    { key: 'name', label: 'Character', sortable: true, render: (c) => html`<${ClassName} name=${c.name} cls=${c.class} link=${false} />` },
+    { key: 'level', label: 'Level', sortable: true, num: true, width: '70px', render: (c) => (c.level ?? html`<span class="muted">—</span>`) },
+    { key: 'realm', label: 'Realm', sortable: true },
+    { key: 'namespace', label: 'Game', sortable: true, value: (c) => gameLabel(c.namespace), render: (c) => gameLabel(c.namespace) },
+    { key: 'guild', label: 'Guild', sortable: true, render: (c) => c.guild || html`<span class="muted">—</span>` },
   ];
 
-  return html`<${Card} id=${sectionDomId('account')} title="Account" class="settings-card"
-      actions=${html`<${ConfirmButton} icon="signout" question="Sign out of Guild Camp?" yes="Sign out" busy=${signingOut}
-        onConfirm=${signOut}>Sign out<//>`}>
-    <${Async} q=${me} loadingLabel="Loading your account…">${(data) => {
-      const user = data?.user || session.user || {};
-      const guild = data?.guild || session.guild;
-      const role = data?.role || session.role;
-      const tag = String(user.battletag || '');
-      const [name, digits] = tag.split('#');
-      return html`<div class="settings-who">
-        <span class="settings-avatar" aria-hidden="true">${(name || '?').slice(0, 1).toUpperCase()}</span>
-        <div class="settings-who-text">
-          <span class="settings-who-tag">${name || 'Signed in'}${digits ? html`<span class="settings-who-digits">#${digits}</span>` : null}</span>
-          <span class="muted">${guild
-            ? html`${ROLE_LABEL[role] || 'Member'} of <strong>${guild.name}</strong>${guild.faction ? ` (${guild.faction})` : ''}`
-            : 'Not in a guild yet.'}</span>
-          <span class="hint">Signed in with Battle.net${session.server ? ` on ${hostOf(session.server)}` : ''}.</span>
-        </div>
-      </div>`;
-    }}<//>
+  return html`<${Card} id=${sectionDomId('battlenet')} title="Battle.net" class="settings-card"
+      actions=${html`<${ConfirmButton} icon="signout" question="Sign out of Battle.net?" yes="Sign out" onConfirm=${signOut}>Sign out<//>`}>
+    <div class="settings-who">
+      <span class="settings-avatar" aria-hidden="true">${(name || '?').slice(0, 1).toUpperCase()}</span>
+      <div class="settings-who-text">
+        <span class="settings-who-tag">${name || 'Signed in'}${digits ? html`<span class="settings-who-digits">#${digits}</span>` : null}</span>
+        <span class="muted">Battle.net · ${regionLabel(bnet.region)}</span>
+        <span class="hint">To use another Battle.net account, sign out here and on battle.net in your browser, then sign in again.</span>
+      </div>
+    </div>
+
+    ${error ? html`<${Notice} kind="alarm">${error}<//>` : null}
+    ${bnet.error ? html`<${Notice} kind="warn">${bnet.error}<//>` : null}
 
     <div class="settings-sub">
-      <h3 class="settings-sub-title">Signed-in devices</h3>
-      <p class="hint">Every PC where you signed in to Guild Camp. Sign out the ones you no longer use.</p>
-      <${Async} q=${devices} loadingLabel="Loading devices…">${(data) => html`
-        <div class="settings-table">
-          <${Table} columns=${columns} rows=${data?.devices || []} rowKey=${(d) => d.id} dense
-            empty="No devices are signed in." />
-        </div>
-        ${data?.syncKeys?.length ? html`<div class="settings-keys">
-          <h4 class="settings-sub-title">Old sync keys</h4>
-          <p class="hint">Keys from the old companion app still upload game data. Revoke them once you use Guild Camp.</p>
-          <ul class="list-lines">
-            ${data.syncKeys.map((k) => html`<li key=${k.id} class="settings-key">
-              <span class="mono">${k.prefix}…</span>
-              <span class="hint">Made <${TimeAgo} t=${k.created_at} />, last used <${TimeAgo} t=${k.last_used_at} /></span>
-              <span class="spacer"></span>
-              <${ConfirmButton} question="Revoke this key?" yes="Revoke" onConfirm=${() => revokeKey(k)}>Revoke<//>
-            </li>`)}
-          </ul>
-        </div>` : null}`}<//>
+      <div class="row row--between">
+        <h3 class="settings-sub-title mb-0">Your characters</h3>
+        ${bnet.canRefresh
+          ? html`<${Button} size="sm" icon="refresh" busy=${busy === 'refresh'} onClick=${refresh}>Refresh<//>`
+          : html`<${Button} size="sm" icon="battlenet" busy=${waiting} onClick=${signIn}>Sign in again to update<//>`}
+      </div>
+      <p class="hint">${bnet.profileAt
+        ? html`From Battle.net, <${TimeAgo} t=${bnet.profileAt} />. Retail, Classic and Classic Era.`
+        : 'Retail, Classic and Classic Era characters on your account.'}
+        ${!bnet.canRefresh ? ' Battle.net sign-ins last about a day, so updating the list needs a new sign-in.' : ''}</p>
+      ${otherRegion && !bnet.canRefresh ? html`<${Notice} kind="info">Sign in again to load your characters from ${regionLabel(region)}.<//>` : null}
+      <div class="settings-table">
+        <${Table} columns=${columns} rows=${bnet.characters} rowKey=${(c) => `${c.namespace}|${c.realm_slug}|${c.name}`} dense
+          empty="Battle.net shows no World of Warcraft characters on this account yet." />
+      </div>
     </div>
+    <div class="settings-sub">${regionRow}</div>
   <//>`;
 }
 
 // ---------- 2. notifications ----------
 
-function NotificationsCard({ me, settings, change, isOfficer }) {
+function NotificationsCard({ settings, change, isOfficer }) {
+  const me = useApi('/api/me', { focus: false });
   const [prefs, setPrefs] = useState(null);
   const [testing, setTesting] = useState(false);
-  useEffect(() => { if (me.data?.notifyPrefs) setPrefs(me.data.notifyPrefs); }, [me.data]);
+  useEffect(() => {
+    const p = me.data && me.data.notifyPrefs;
+    if (p && typeof p === 'object') setPrefs(p);
+  }, [me.data]);
 
   const master = settings ? settings.notifications !== false : true;
   const kinds = NOTIFY_KINDS.filter((k) => !k.officer || isOfficer);
+  const unsupported = !!me.data && !(me.data.notifyPrefs && typeof me.data.notifyPrefs === 'object');
 
   const setPref = async (key, on) => {
     const before = prefs;
     setPrefs((p) => ({ ...(p || {}), [key]: on }));
     try {
       const r = await api.put('/api/me/notifications', { [key]: on });
-      if (r?.notifyPrefs) setPrefs(r.notifyPrefs);
+      if (r?.notifyPrefs && typeof r.notifyPrefs === 'object') setPrefs(r.notifyPrefs);
     } catch (err) {
       setPrefs(before);
       toast(err?.message || "Couldn't save that choice.", 'alarm');
@@ -335,7 +416,7 @@ function NotificationsCard({ me, settings, change, isOfficer }) {
     setTesting(true);
     try {
       await gc.notify.test();
-      toast('Test sent. If nothing popped up, check Windows notification settings for Guild Camp.', 'ok');
+      toast('Test sent. If nothing popped up, check the Windows notification settings for Guild Camp.', 'ok');
     } catch (err) {
       toast(err?.message || "Couldn't show a notification.", 'alarm');
     } finally {
@@ -343,9 +424,20 @@ function NotificationsCard({ me, settings, change, isOfficer }) {
     }
   };
 
+  let body;
+  if (me.error && !prefs) body = html`<${ErrorBox} error=${me.error} title="Couldn't load your choices." onRetry=${me.reload} />`;
+  else if (unsupported) body = html`<p class="hint mb-0">Choosing by kind isn't available in this version. You get all of them.</p>`;
+  else if (!prefs) body = html`<${Loading} label="Loading your choices…" />`;
+  else {
+    body = html`<div class="settings-kinds">
+      ${kinds.map((k) => html`<${Checkbox} key=${k.key} label=${k.label} hint=${k.hint}
+        checked=${prefs[k.key] !== false} disabled=${!master} onValue=${(on) => setPref(k.key, on)} />`)}
+    </div>`;
+  }
+
   return html`<${Card} id=${sectionDomId('notifications')} title="Notifications" class="settings-card"
       footer=${html`<div class="row row--between">
-        <span>Guild Camp checks for news every 20 seconds while it runs, also from the tray.</span>
+        <span>Guild Camp shows these while it runs, also from the tray.</span>
         <${Button} size="sm" icon="bell" busy=${testing} onClick=${test}>Send a test notification<//>
       </div>`}>
     <${ToggleRow} title="Desktop notifications" checked=${master} disabled=${!settings}
@@ -354,151 +446,260 @@ function NotificationsCard({ me, settings, change, isOfficer }) {
     <div class=${cx('settings-sub', !master && 'is-off')}>
       <h3 class="settings-sub-title">Tell me about</h3>
       ${!master ? html`<p class="hint">Turn on desktop notifications to get these.</p>` : null}
-      ${me.error && !prefs
-        ? html`<${ErrorBox} error=${me.error} title="Couldn't load your choices." onRetry=${me.reload} />`
-        : !prefs ? html`<${Loading} label="Loading your choices…" />`
-          : html`<div class="settings-kinds">
-            ${kinds.map((k) => html`<${Checkbox} key=${k.key} label=${k.label} hint=${k.hint}
-              checked=${prefs[k.key] !== false} disabled=${!master} onValue=${(on) => setPref(k.key, on)} />`)}
-          </div>`}
+      ${body}
     </div>
   <//>`;
 }
 
-// ---------- 3. discord ----------
+// ---------- 3. Discord webhook ----------
 
-function DiscordCard({ isOfficer, autoStart = false }) {
-  const [link, setLink] = useState(null); // { code, expires_at, command, linked }
-  const now = useNow();
-  const left = link ? minutesLeft(link.expires_at, now) : 0;
-  const waiting = !!link && left > 0 && !link.linked;
-  // While a fresh code is on screen, look every few seconds for the link to happen in Discord.
-  const q = useApi('/api/discord', { interval: waiting ? 4000 : 0 });
-  const linked = !!q.data?.linked;
+/** "Velanne shared a Discord webhook. Use it?" for GET /api/share/status webhookOffer ({ from, at }), or ''. */
+export function webhookOfferText(offer) {
+  if (!offer || typeof offer !== 'object') return '';
+  const from = typeof offer.from === 'string' && offer.from.trim() ? offer.from.trim() : 'An officer';
+  return `${from} shared a Discord webhook. Use it?`;
+}
 
-  useEffect(() => {
-    if (waiting && linked) {
-      setLink(null);
-      toast('Discord linked. You can use /signup and /cta now.', 'ok');
+// Discord posts go out when the game confirms a change reached the guild, not when it is saved here.
+export const WEBHOOK_SAVED = 'Saved. What you create in Guild Camp posts to that Discord channel once it goes out to your guild.';
+
+// An officer shared the guild's webhook over the officer channel in game: use it here, or not now.
+function WebhookOffer({ offer, current, change }) {
+  const [busy, setBusy] = useState('');
+  const accept = async () => {
+    setBusy('use');
+    try {
+      const r = await api.post('/api/share/webhook/accept');
+      if (r && r.url) await change({ discordWebhook: r.url }, WEBHOOK_SAVED);
+    } catch (err) {
+      toast(err?.message || "Couldn't use that webhook. Please try again.", 'alarm');
+    } finally {
+      setBusy('');
+      shareLive.refresh();
     }
-  }, [linked]);
-
-  const getCode = useAction(() => api.post('/api/discord/link', {}));
-  const unlink = async () => {
-    await api.post('/api/discord/unlink', {});
-    setLink(null);
-    toast('Discord unlinked.', 'ok');
-    q.reload();
   };
-  const register = useAction(() => api.post('/api/discord/register', {}), { success: (r) => r?.message || 'Slash commands registered.' });
-
-  const newCode = async () => {
-    const r = await getCode.run();
-    if (r.ok) setLink(r.value);
+  const dismiss = async () => {
+    setBusy('dismiss');
+    try {
+      await api.post('/api/share/webhook/dismiss');
+    } catch (err) {
+      toast(err?.message || 'That did not work. Please try again.', 'alarm');
+    } finally {
+      setBusy('');
+      shareLive.refresh();
+    }
   };
-
-  // ?link=1 (e.g. from the Camp's "Link your Discord" step) starts linking straight away, once.
-  const autoLinked = useRef(false);
-  useEffect(() => {
-    if (!autoStart || autoLinked.current || !q.data) return;
-    autoLinked.current = true;
-    if (q.data.configured && !q.data.linked) newCode();
-  }, [autoStart, q.data]);
-
-  return html`<${Card} id=${sectionDomId('discord')} title="Discord" class="settings-card"
-      actions=${q.data?.configured ? html`<${Pill} kind=${linked ? 'ok' : 'muted'} dot>${linked ? 'Linked' : 'Not linked'}<//>` : null}>
-    <${Async} q=${q} loadingLabel="Checking Discord…">${(d) => (!d?.configured
-      ? html`<${Notice} kind="info" title="Discord isn't set up on this server yet.">
-          Once the server owner adds the Discord app, you can link your account here and use slash commands
-          like <code>/raids</code> and <code>/signup</code> in your guild's Discord.
-        <//>`
-      : html`<div class="stack">
-          <p class="mb-0">${'Use '}${COMMAND_LIST.map((c, i) => html`${i ? (i === COMMAND_LIST.length - 1 ? ' and ' : ', ') : ''}<code>/${c}</code>`)}
-            ${' straight from Discord. '}${linked
-              ? 'Your Discord is linked, so /signup and /cta know who you are.'
-              : 'Link your Discord once so /signup and /cta know who you are.'}</p>
-
-          ${link ? html`<${LinkCode} link=${link} left=${left} onNew=${newCode} busy=${getCode.busy} />` : null}
-
-          <div class="actions-row">
-            ${!link ? html`<${Button} variant=${linked ? 'secondary' : 'primary'} icon="link" busy=${getCode.busy} onClick=${newCode}>
-              ${linked ? 'Get a new link code' : 'Link Discord'}<//>` : null}
-            ${linked ? html`<${ConfirmButton} size="md" variant="ghost" question="Unlink Discord?" yes="Unlink" onConfirm=${unlink}>Unlink<//>` : null}
-          </div>
-
-          ${isOfficer ? html`<div class="settings-officer">
-            <div class="row row--between">
-              <h3 class="settings-sub-title mb-0">For officers</h3>
-              <${Pill} kind=${d.server_linked ? 'ok' : 'warn'} dot>${d.server_linked ? 'Server connected' : 'Server not connected yet'}<//>
-            </div>
-            <p class="hint">${d.server_linked
-              ? 'Your Discord server is connected. '
-              : 'The server connects by itself the first time someone runs /link in it. '}${'To add the commands to your server, invite the app, then register them. '}${"Inviting it as a bot also lets it put raids in Discord's Events list."}</p>
-            <div class="actions-row">
-              ${d.invite_url ? html`<${Button} href=${d.invite_url} icon="external">Invite the app<//>` : null}
-              <${Button} icon="upload" busy=${register.busy} disabled=${!d.bot_configured} onClick=${() => register.run()}>Register slash commands<//>
-            </div>
-            ${!d.bot_configured ? html`<p class="hint mb-0">Registering needs the bot token on the server (DISCORD_BOT_TOKEN).</p>` : null}
-            <p class="hint mb-0">Posts to a Discord channel (calls to arms, notices, requests) use the webhook in <${Link} href="/guild-settings">Guild settings<//>.</p>
-          </div>` : null}
-        </div>`)}<//>
+  return html`<${Notice} kind="info" icon="link" class="settings-webhook-offer">
+    <p class="mb-0"><strong>${webhookOfferText(offer)}</strong>${current ? ' It replaces the webhook you have now.' : ''}</p>
+    <div class="row settings-webhook-offer-actions">
+      <${Button} size="sm" variant="primary" busy=${busy === 'use'} disabled=${Boolean(busy)} onClick=${accept}>Use it<//>
+      <${Button} size="sm" variant="ghost" busy=${busy === 'dismiss'} disabled=${Boolean(busy)} onClick=${dismiss}>Not now<//>
+    </div>
   <//>`;
 }
 
-function LinkCode({ link, left, onNew, busy }) {
-  if (left <= 0) {
-    return html`<${Notice} kind="warn" title="That code has expired.">
-      Codes last 15 minutes. <button type="button" class="link-btn" onClick=${onNew} disabled=${busy}>Get a new code</button>
-    <//>`;
-  }
-  return html`<div class="settings-code" role="group" aria-label="Your Discord link code">
-    <div class="settings-code-main">
-      <span class="settings-code-label">Type this in your guild's Discord server</span>
-      <code class="settings-code-cmd">${link.command || `/link ${link.code}`}</code>
-      <span class="hint">Works once. Expires in ${left} min (at ${localTime(link.expires_at, 'time')}).</span>
+export function ShareWebhook() {
+  const [busy, setBusy] = useState(false);
+  const share = async () => {
+    setBusy(true);
+    try {
+      const r = await api.post('/api/share/webhook/share');
+      toast(savedReply(r && r.message, syncStatus.get()) || savedLine(syncStatus.get()), 'ok');
+    } catch (err) {
+      toast(err?.message || "Couldn't share the webhook. Please try again.", 'alarm');
+    } finally {
+      setBusy(false);
+      shareLive.refresh();
+    }
+  };
+  return html`<div class="settings-webhook-share">
+    <div class="row">
+      <${Button} size="sm" icon="partners" busy=${busy} onClick=${share}>Share with officers<//>
+      <span class="hint">Other officers' Guild Camp asks them whether to use it. Only officers get it.</span>
     </div>
-    <div class="settings-code-actions">
-      <${CopyButton} text=${link.command || `/link ${link.code}`} label="Copy" done="Copied. Paste it in Discord." variant="primary" size="md" />
-      <${Button} variant="ghost" size="sm" icon="refresh" busy=${busy} onClick=${onNew}>New code<//>
-    </div>
+    <${ShareHint} officer />
   </div>`;
 }
 
-// ---------- 4. calendar ----------
+function DiscordCard({ settings, change, isOfficer }) {
+  const current = settings?.discordWebhook || '';
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState('');
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const share = useShareStatus();
+  const offer = share?.data?.webhookOffer || null;
+  const showForm = !current || editing;
 
-function CalendarCard() {
-  const q = useApi('/api/calendar');
-  const reset = async () => {
-    const r = await api.post('/api/calendar/reset', {});
-    if (r?.url) q.setData(r);
-    else q.reload();
-    toast(r?.message || 'New calendar link made. The old one no longer works.', 'ok');
+  const save = async (e) => {
+    e?.preventDefault();
+    const v = value.trim();
+    if (!v) { setError('Paste the webhook URL first.'); return; }
+    if (!isWebhookUrl(v)) {
+      setError("That isn't a Discord webhook URL. It starts with https://discord.com/api/webhooks/.");
+      return;
+    }
+    setError('');
+    setSaving(true);
+    const ok = await change({ discordWebhook: v }, WEBHOOK_SAVED);
+    setSaving(false);
+    if (ok) { setValue(''); setEditing(false); }
   };
 
-  return html`<${Card} id=${sectionDomId('calendar')} title="Calendar" class="settings-card"
-      footer=${q.data?.url ? html`<div class="row row--between">
-        <span>Keep this link to yourself: anyone who has it can see the guild's raids.</span>
-        <${ConfirmButton} icon="refresh" question="Make a new link? The old one stops working." yes="Replace" onConfirm=${reset}>Replace link<//>
-      </div>` : null}>
-    <p>Add the guild's raids and events to Google, Apple or Outlook calendar. They update by themselves, with a reminder
-      30 minutes before.</p>
-    <${Async} q=${q} loadingLabel="Getting your calendar link…" errorTitle="Couldn't get your calendar link.">${(d) => (d?.url
-      ? html`<div class="stack">
-          <${PathBox} value=${d.url} label="Your private calendar link">
-            <${CopyButton} text=${d.url} label="Copy link" done="Calendar link copied." variant="primary" />
-            <${Button} size="sm" href=${d.googleUrl || googleCalendarUrl(d.url)} icon="external">Google Calendar<//>
-          <//>
-          <ul class="settings-howto">
-            <li><strong>Google Calendar:</strong> Other calendars → + → From URL, then paste the link.</li>
-            <li><strong>Apple Calendar:</strong> File → New Calendar Subscription, then paste the link.</li>
-            <li><strong>Outlook:</strong> Add calendar → Subscribe from web, then paste the link.</li>
-          </ul>
-        </div>`
-      : html`<p class="muted">The server didn't send a calendar link.</p>`)}<//>
+  const remove = async () => {
+    if (await change({ discordWebhook: null }, 'Webhook removed. Guild Camp no longer posts to Discord.')) {
+      setEditing(false);
+      setValue('');
+    }
+  };
+
+  return html`<${Card} id=${sectionDomId('discord')} title="Discord" class="settings-card"
+      actions=${html`<${Pill} kind=${current ? 'ok' : 'muted'} dot>${current ? 'Posting to Discord' : 'Not set'}<//>`}>
+    <div class="stack">
+      <p class="mb-0">Guild Camp can post to a channel in your guild's Discord when something <strong>you</strong> create here goes out to
+        your guild: a raid you schedule, a call to arms, a notice or a request. It only posts what you create, so nothing shows up twice
+        when guildmates use it too.</p>
+
+      ${offer ? html`<${WebhookOffer} offer=${offer} current=${current} change=${change} />` : null}
+
+      ${current && !editing ? html`<${PathBox} value=${maskWebhook(current)} label="Discord webhook">
+          <${Button} size="sm" icon="edit" onClick=${() => { setEditing(true); setError(''); }}>Change<//>
+          <${ConfirmButton} question="Stop posting to Discord?" yes="Remove" onConfirm=${remove}>Remove<//>
+        <//>` : null}
+
+      ${current && !editing && isOfficer ? html`<${ShareWebhook} />` : null}
+
+      ${showForm ? html`<form class="stack stack--tight" onSubmit=${save} novalidate>
+          <div class="form-row">
+            <${Input} label="Webhook URL" type="password" value=${value} onValue=${(v) => { setValue(v); setError(''); }}
+              placeholder="https://discord.com/api/webhooks/…" error=${error} spellcheck="false" autocomplete="off" disabled=${!settings} />
+            <${Button} type="submit" variant="primary" busy=${saving} disabled=${!settings}>Save<//>
+            ${editing ? html`<${Button} variant="ghost" onClick=${() => { setEditing(false); setValue(''); setError(''); }}>Cancel<//>` : null}
+          </div>
+          <p class="hint mb-0">In Discord: Server Settings → Integrations → Webhooks → New Webhook. Pick the channel, then Copy Webhook URL.
+            Anyone with this address can post to that channel, so keep it to yourself.</p>
+        </form>` : null}
+    </div>
   <//>`;
 }
 
-// ---------- 5. app ----------
+// ---------- 4. Coach AI key ----------
+
+function CoachCard() {
+  const [has, setHas] = useState(null); // null while asking
+  const [unavailable, setUnavailable] = useState('');
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState('');
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [plainText, setPlainText] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    invokeOptional('secrets.has', 'anthropicKey')
+      .then((v) => { if (live) setHas(!!v); })
+      .catch((err) => { if (live) { setHas(false); setUnavailable(err?.message || "Guild Camp couldn't check for a key."); } });
+    return () => { live = false; };
+  }, []);
+
+  const save = async (e) => {
+    e?.preventDefault();
+    const problem = keyProblem(value);
+    if (problem) { setError(problem); return; }
+    setError('');
+    setSaving(true);
+    try {
+      const r = await invokeOptional('secrets.set', 'anthropicKey', value.trim());
+      setValue(''); // never keep the key on the page
+      setHas(true);
+      setEditing(false);
+      setPlainText(r && r.encrypted === false);
+      toast('Key saved. The Coach can answer with AI now.', 'ok');
+    } catch (err) {
+      setError(err?.message || "Couldn't save the key. Try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const remove = async () => {
+    await invokeOptional('secrets.set', 'anthropicKey', null);
+    setHas(false);
+    setEditing(false);
+    setPlainText(false);
+    toast("Key removed. The Coach's AI answers are off.", 'ok');
+  };
+
+  const showForm = has === false || editing;
+  const keysLink = 'https://console.anthropic.com/settings/keys';
+
+  return html`<${Card} id=${sectionDomId('coach')} title="Coach AI" class="settings-card"
+      actions=${has === null ? null : html`<${Pill} kind=${has ? 'ok' : 'muted'} dot>${has ? 'Key saved' : 'No key'}<//>`}>
+    <div class="stack">
+      <p class="mb-0">The Coach can answer your questions with Claude, Anthropic's AI. It uses your own Anthropic API key,
+        so Anthropic bills you for what you ask. The key stays on this PC, encrypted, and Guild Camp never shows it again.</p>
+      ${unavailable ? html`<${Notice} kind="warn">${unavailable}<//>` : null}
+      ${plainText ? html`<${Notice} kind="warn">This PC has no secure storage, so the key is saved without encryption.<//>` : null}
+
+      ${has && !editing ? html`<div class="actions-row">
+          <${Button} size="sm" icon="key" onClick=${() => { setEditing(true); setError(''); }}>Replace key<//>
+          <${ConfirmButton} question="Remove your key?" yes="Remove" onConfirm=${remove}>Remove key<//>
+        </div>` : null}
+
+      ${showForm && !unavailable ? html`<form class="stack stack--tight" onSubmit=${save} novalidate>
+          <div class="form-row">
+            <${Input} label="Anthropic API key" type="password" value=${value} onValue=${(v) => { setValue(v); setError(''); }}
+              placeholder="sk-ant-…" error=${error} spellcheck="false" autocomplete="off" />
+            <${Button} type="submit" variant="primary" busy=${saving}>Save key<//>
+            ${editing ? html`<${Button} variant="ghost" onClick=${() => { setEditing(false); setValue(''); setError(''); }}>Cancel<//>` : null}
+          </div>
+          <p class="hint mb-0">No key yet? Make one at <${Link} href=${keysLink}>console.anthropic.com<//>, then paste it here.</p>
+        </form>` : null}
+    </div>
+  <//>`;
+}
+
+// ---------- 5. calendar ----------
+
+function CalendarCard() {
+  const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState(null);
+
+  const exportIcs = async () => {
+    setBusy(true);
+    try {
+      const file = await invokeOptional('calendar.export');
+      if (file) {
+        setSaved(file);
+        toast('Calendar file saved. Open it to add the raids to your calendar.', 'ok');
+      }
+    } catch (err) {
+      toast(err?.message || "Couldn't save the calendar file.", 'alarm');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const show = async () => {
+    try { await gc.app.showItemInFolder(saved); } catch (err) { toast(err?.message || "Couldn't show the file.", 'alarm'); }
+  };
+
+  return html`<${Card} id=${sectionDomId('calendar')} title="Calendar" class="settings-card">
+    <div class="stack">
+      <p class="mb-0">Save the guild's raids and events as a calendar file, with a reminder 30 minutes before each one.
+        Open it with Outlook or Apple Calendar, or import it into Google Calendar.</p>
+      <div class="actions-row">
+        <${Button} variant="primary" icon="download" busy=${busy} onClick=${exportIcs}>Export raids to your calendar<//>
+      </div>
+      ${saved ? html`<${PathBox} value=${saved} label="Saved calendar file">
+          <${Button} size="sm" icon="folder" onClick=${show}>Show in folder<//>
+        <//>` : null}
+      <p class="hint mb-0">The file doesn't change by itself. Export it again when raids change.</p>
+    </div>
+  <//>`;
+}
+
+// ---------- 6. app ----------
 
 function AppCard({ settings, change, info }) {
   const s = settings || {};
@@ -512,9 +713,6 @@ function AppCard({ settings, change, info }) {
   };
 
   return html`<${Card} id=${sectionDomId('app')} title="App" class="settings-card">
-    <${Row} title="Server" hint=${s.serverUrl ? html`<span class="mono">${s.serverUrl}</span>` : 'Not set'}>
-      <${Button} size="sm" onClick=${() => navigate('/welcome?step=server')}>Change server<//>
-    <//>
     <${Row} title="Theme" hint="Match Windows follows your light or dark mode setting.">
       <div class="settings-seg" role="radiogroup" aria-label="Theme">
         ${THEMES.map((t) => html`<button key=${t.value} type="button" role="radio" aria-checked=${(s.theme || 'system') === t.value ? 'true' : 'false'}
@@ -523,7 +721,7 @@ function AppCard({ settings, change, info }) {
       </div>
     <//>
     <${ToggleRow} title="Start with Windows" checked=${s.startWithWindows} disabled=${!ready || !startupSupported}
-      hint=${startupSupported ? 'Starts quietly in the tray when you sign in to Windows, so sync is always on.' : 'Only the installed app can start with Windows.'}
+      hint=${startupSupported ? 'Starts quietly in the tray when you sign in to Windows, so your guild stays in sync.' : 'Only the installed app can start with Windows.'}
       onValue=${(on) => change({ startWithWindows: on }, on ? 'Guild Camp will start with Windows.' : 'Guild Camp will no longer start with Windows.')} />
     <${ToggleRow} title="Keep running when I close the window" checked=${s.closeToTray} disabled=${!ready}
       hint="Guild Camp stays in the tray and keeps syncing while you play. Quit from the tray icon."
@@ -532,18 +730,18 @@ function AppCard({ settings, change, info }) {
       hint="Downloads new versions of Guild Camp and installs them the next time it starts."
       onValue=${(on) => change({ appAutoUpdate: on }, on ? 'App updates will download by themselves.' : 'App updates will wait for you.')} />
     <${ToggleRow} title="Update the addon automatically" checked=${s.addonAutoUpdate} disabled=${!ready}
-      hint="Keeps the Guild Camp addon up to date in every game folder."
+      hint="Keeps the Guild Camp addon up to date in every game folder. It updates while World of Warcraft is closed."
       onValue=${(on) => change({ addonAutoUpdate: on }, on ? 'The addon will update by itself.' : 'Addon updates will wait for you.')} />
     <${ToggleRow} title="Install the addon in new game folders automatically" checked=${s.addonAutoInstall !== false} disabled=${!ready}
-      hint="When Guild Camp finds a game folder without the addon, it installs it there for you."
+      hint="When Guild Camp finds a game folder without the addon, it installs it there for you while World of Warcraft is closed."
       onValue=${(on) => change({ addonAutoInstall: on }, on ? 'New game folders get the addon by themselves.' : 'New game folders will wait for you to install the addon.')} />
-    <${ToggleRow} title="Sync game data" checked=${s.syncEnabled} disabled=${!ready}
-      hint=${html`Uploads your characters, professions and bank after each /reload or logout. Details on <${Link} href="/addon">Addon & sync<//>.`}
-      onValue=${(on) => change({ syncEnabled: on }, on ? 'Sync is on.' : 'Sync is off. Your game data stays on this PC.')} />
+    <${ToggleRow} title="Sync with the game" checked=${s.syncEnabled} disabled=${!ready}
+      hint=${html`Reads your characters, professions and bank after each /reload or logout, and passes guild news back to the addon. Details on <${Link} href="/addon">Addon & sync<//>.`}
+      onValue=${(on) => change({ syncEnabled: on }, on ? 'Sync is on.' : 'Sync is off. Guild Camp stops reading the game.')} />
   <//>`;
 }
 
-// ---------- 6. about & help ----------
+// ---------- 7. about & help ----------
 
 function AboutCard({ info }) {
   const open = async (fn, path) => {
@@ -564,10 +762,11 @@ function AboutCard({ info }) {
         <${Button} size="sm" href="/addon" icon="addon">Addon & sync<//>
       </div>
     </div>
+    ${info.secretsEncrypted === false ? html`<${Notice} kind="warn">This PC has no secure storage, so your Battle.net sign-in and API key are saved without encryption.<//>` : null}
     ${info.userData ? html`<div class="settings-file">
       <div class="settings-row-text">
         <span class="settings-row-title">Data folder</span>
-        <span class="settings-row-hint">Settings, the sign-in token and logs for this PC.</span>
+        <span class="settings-row-hint">Your guild data, settings, Battle.net sign-in and logs on this PC.</span>
       </div>
       <${PathBox} value=${info.userData} label="Data folder">
         <${Button} size="sm" icon="folder" onClick=${() => open(gc.app.openPath, info.userData)}>Open folder<//>

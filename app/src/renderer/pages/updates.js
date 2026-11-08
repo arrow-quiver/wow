@@ -1,15 +1,19 @@
 // Updates: the app's own version (check, download, restart to install, automatic updates), the addon in every
-// game folder, and the release history the server keeps.
+// game folder, and the release history. Everything comes from the releases on GitHub (arrow-quiver/wow): the app
+// updater follows the release marked Latest, and the addon manager reads the release list (addon status
+// `releases`), so this page needs no server.
 import { html, useState, useEffect, useMemo, useRef } from '../lib/html.js';
 import { gc, useGcEvent } from '../lib/gc.js';
 import { Link } from '../lib/router.js';
-import { useApi } from '../lib/api.js';
 import { useUpdaterStatus, useAddonStatus, updaterStatus, addonStatus } from '../lib/status.js';
 import { bytes, plural } from '../lib/format.js';
 import {
-  Page, Card, Button, Checkbox, Notice, Pill, Progress, Tabs, Table, Empty, ErrorBox, Loading, Spinner,
+  Page, Card, Button, Checkbox, Notice, Pill, Progress, Tabs, Table, Empty, Loading, Spinner,
   TimeAgo, LocalTime, toast,
 } from '../components/index.js';
+import { updateAllText } from './addon.js';
+
+export const RELEASES_URL = 'https://github.com/arrow-quiver/wow/releases';
 
 // ---------- shared bits (releases.js uses ReleaseNotes too) ----------
 
@@ -28,6 +32,7 @@ export function ReleaseNotes({ text, empty = 'No release notes.', class: cls }) 
 }
 
 // "Intro\n- one\n- two\n\nOutro" → [{ text: 'Intro' }, { list: true, items: ['one', 'two'] }, { text: 'Outro' }]
+// Markdown headings ("## Fixes") become plain paragraphs.
 export function splitNotes(text) {
   const out = [];
   let para = [];
@@ -35,7 +40,7 @@ export function splitNotes(text) {
   const flushPara = () => { if (para.length) { out.push({ text: para.join('\n') }); para = []; } };
   const flushList = () => { if (list) { out.push({ list: true, items: list }); list = null; } };
   for (const raw of String(text || '').replace(/\r\n?/g, '\n').split('\n')) {
-    const line = raw.trimEnd();
+    const line = raw.trimEnd().replace(/^#{1,6}\s+/, '');
     const bullet = /^\s*[-*•]\s+(.*)$/.exec(line);
     if (bullet) { flushPara(); (list ||= []).push(bullet[1]); continue; }
     if (!line.trim()) { flushPara(); flushList(); continue; }
@@ -49,6 +54,12 @@ export function splitNotes(text) {
 }
 
 const KIND_LABEL = { app: 'App', addon: 'Addon' };
+
+/** The release history from the addon status (newest first), with the kinds the table filters on. */
+export function historyRows(addon) {
+  const list = addon && addon.releases && Array.isArray(addon.releases.history) ? addon.releases.history : [];
+  return list.filter((r) => r && (r.kind === 'app' || r.kind === 'addon') && r.version);
+}
 
 // Settings, kept fresh from the 'settings' channel.
 function useSettings() {
@@ -80,17 +91,16 @@ export default function UpdatesPage() {
   const upd = useUpdaterStatus();
   const addon = useAddonStatus();
   const [settings, setSettings] = useSettings();
-  const releases = useApi('/api/releases', { refreshOn: ['release'] });
   const [checking, setChecking] = useState(false);
 
+  // A check the person asked for: GitHub is asked now, not the answer from the last half hour.
   const checkAll = async () => {
     setChecking(true);
     try {
       const [app] = await Promise.all([
-        gc.updater.check().then((s) => { if (s) updaterStatus.store.set(s); return s; }),
-        gc.addon.check().then(() => addonStatus.refresh()).catch(() => null),
+        gc.updater.check({ force: true }).then((s) => { if (s) updaterStatus.store.set(s); return s; }),
+        gc.addon.check({ force: true }).then(() => addonStatus.refresh()).catch(() => null),
       ]);
-      releases.reload();
       if (app && app.state === 'not-available') toast('Guild Camp is up to date.', 'ok');
       else if (app && (app.state === 'available' || app.state === 'downloading') && app.available) toast(`Guild Camp ${app.available.version} is available.`, 'info');
     } catch (err) {
@@ -100,8 +110,8 @@ export default function UpdatesPage() {
     }
   };
 
-  // Nothing checked yet (the app has only just started): ask the server about the app quietly. The addon is left to
-  // its own schedule, because an addon check can also update the game folders.
+  // Nothing checked yet (the app has only just started): ask about the app quietly. The addon is left to its own
+  // schedule, because an addon check can also update the game folders.
   const askedOnOpen = useRef(false);
   useEffect(() => {
     if (!upd || askedOnOpen.current) return;
@@ -112,13 +122,13 @@ export default function UpdatesPage() {
   }, [upd]);
 
   return html`<${Page} title="Updates" width="normal"
-      lede="Guild Camp keeps itself and the addon up to date from your guild's server."
-      actions=${html`<${Button} icon="refresh" busy=${checking || upd?.state === 'checking'} onClick=${checkAll}>Check for updates<//>`}>
+      lede="Guild Camp keeps itself and the addon up to date from the releases on GitHub."
+      actions=${html`<${Button} icon="refresh" busy=${checking || upd?.state === 'checking' || addon?.checking} onClick=${checkAll}>Check for updates<//>`}>
     <div class="grid-2 updates-top">
       <${AppCard} upd=${upd} settings=${settings} onSettings=${setSettings} onCheck=${checkAll} checking=${checking} />
       <${AddonCard} addon=${addon} settings=${settings} />
     </div>
-    <${HistoryCard} q=${releases} />
+    <${HistoryCard} addon=${addon} onCheck=${checkAll} checking=${checking} />
   <//>`;
 }
 
@@ -159,6 +169,7 @@ function AppCard({ upd, settings, onSettings, onCheck, checking }) {
   const avail = upd.available;
   const auto = settings ? settings.appAutoUpdate !== false : upd.autoUpdate !== false;
   const isDev = upd.state === 'dev';
+  const releaseLink = upd.releasesUrl || `${RELEASES_URL}/latest`;
 
   let body;
   if (isDev) {
@@ -167,15 +178,15 @@ function AppCard({ upd, settings, onSettings, onCheck, checking }) {
         It doesn't update itself. Pull the latest code and start it again instead.
       <//>
       ${avail ? html`<div class="updates-headline">
-          <strong>The server has Guild Camp ${avail.version}.</strong>
+          <strong>Guild Camp ${avail.version} is out on GitHub.</strong>
           ${avail.date ? html`<span class="muted small">Published <${TimeAgo} t=${avail.date} />.</span>` : null}
         </div>
         <${ReleaseNotes} text=${avail.notes} />`
-        : upd.latest ? html`<p class="muted">The server's newest app is ${upd.latest.version}, the same as or older than this build.</p>`
-          : upd.lastCheckAt && !upd.error ? html`<p class="muted">The server hasn't published an app release yet.</p>` : null}
+        : upd.latest ? html`<p class="muted">The newest app release on GitHub is ${upd.latest.version}, the same as or older than this build.</p>`
+          : upd.lastCheckAt && !upd.error ? html`<p class="muted">No app release is on GitHub yet.</p>` : null}
       ${upd.error ? html`<${Notice} kind="warn">${upd.error}<//>` : null}`;
   } else if (upd.state === 'checking') {
-    body = html`<div class="loading"><${Spinner} label="" /> Checking the server for a newer version…</div>`;
+    body = html`<div class="loading"><${Spinner} label="" /> Checking GitHub for a newer version…</div>`;
   } else if (upd.state === 'downloading') {
     const p = upd.progress;
     const detail = p && p.total ? `${bytes(p.transferred)} of ${bytes(p.total)}${p.bytesPerSecond ? ` · ${bytes(p.bytesPerSecond)}/s` : ''}` : 'Starting the download…';
@@ -208,12 +219,15 @@ function AppCard({ upd, settings, onSettings, onCheck, checking }) {
   } else if (upd.state === 'error') {
     body = html`
       <${Notice} kind=${/No app release/.test(upd.error || '') ? 'info' : 'alarm'}>${upd.error}<//>
-      <div class="form-actions"><${Button} icon="refresh" busy=${checking} onClick=${onCheck}>Try again<//></div>`;
+      <div class="form-actions">
+        <${Button} icon="refresh" busy=${checking} onClick=${onCheck}>Try again<//>
+        <${Button} variant="ghost" icon="external" href=${releaseLink}>Open the releases page<//>
+      </div>`;
   } else if (upd.state === 'not-available') {
     body = html`<div class="updates-uptodate">
       <span class="updates-check" aria-hidden="true">✓</span>
       <div><strong>You have the newest version.</strong>
-        <div class="muted small">Guild Camp ${upd.current} is the latest on your guild's server.</div></div>
+        <div class="muted small">Guild Camp ${upd.current} is the latest release.</div></div>
     </div>`;
   } else {
     body = html`<p class="muted">Guild Camp hasn't checked for updates yet.</p>
@@ -249,15 +263,15 @@ function AddonCard({ addon, settings }) {
   const installed = installs.filter((i) => i.installed);
   const outdated = installs.filter((i) => i.state === 'outdated');
   const latest = addon.latest;
-  const fromServer = latest && latest.source === 'remote';
+  const fromGithub = latest && latest.source === 'remote';
   const auto = settings ? settings.addonAutoUpdate !== false : addon.autoUpdate !== false;
 
   const updateAll = async () => {
     setUpdating(true);
     try {
-      await gc.addon.updateAll();
+      const s = await gc.addon.updateAll();
       await addonStatus.refresh();
-      toast(outdated.length === 1 ? 'Addon updated. Type /reload in game to load it.' : 'Addon updated everywhere. Type /reload in game to load it.', 'ok');
+      toast(updateAllText(latest?.version, Boolean(s?.restartNeeded)), 'ok');
     } catch (err) {
       toast(err?.message || "Couldn't update the addon.", 'alarm');
     } finally {
@@ -272,7 +286,9 @@ function AddonCard({ addon, settings }) {
     summary = html`<${Notice} kind="info">The addon isn't installed in any game folder yet.<//>`;
   } else if (outdated.length) {
     summary = html`<${Notice} kind="warn" title=${`${plural(outdated.length, 'game folder')} ${outdated.length === 1 ? 'has' : 'have'} an older addon.`}>
-      ${auto ? 'Guild Camp updates it at the next check, or update now.' : 'Automatic addon updates are off, so update it here.'}
+      ${!auto ? 'Automatic addon updates are off, so update it here.'
+        : outdated.some((i) => i.waitingForGame) ? 'Guild Camp updates it once World of Warcraft is closed, or update now.'
+          : 'Guild Camp updates it at the next check, or update now.'}
     <//>`;
   } else if (installed.length < installs.length) {
     summary = html`<p class="muted updates-addon-ok">The addon is up to date wherever it is installed.</p>`;
@@ -287,14 +303,14 @@ function AddonCard({ addon, settings }) {
         <${Button} size="sm" variant="ghost" href="/addon" iconRight="forward">Addon & sync<//>
       </div>`}>
     <div class="stack">
-      ${addon.error ? html`<${Notice} kind="warn">${addon.error}<//>` : null}
+      ${addon.error ? html`<${Notice} kind="warn">${addon.error}${latest ? ' The addon versions below may be out of date.' : ''}<//>` : null}
       ${latest ? html`<div class="updates-headline">
           <strong>Addon ${latest.version}</strong>
-          <span class="muted small">${fromServer
-            ? html`published <${TimeAgo} t=${addon.remote?.publishedAt} never="on the server" />`
+          <span class="muted small">${fromGithub
+            ? html`published <${TimeAgo} t=${addon.remote?.publishedAt} never="on GitHub" />`
             : 'comes with this version of the app'}</span>
         </div>` : null}
-      ${fromServer && addon.remote?.notes ? html`<${ReleaseNotes} text=${addon.remote.notes} />` : null}
+      ${fromGithub && addon.remote?.notes ? html`<${ReleaseNotes} text=${addon.remote.notes} />` : null}
       ${summary}
       ${installs.length ? html`<ul class="updates-installs">
         ${installs.map((i) => {
@@ -317,21 +333,25 @@ function AddonCard({ addon, settings }) {
 
 // ---------- history ----------
 
-function HistoryCard({ q }) {
+function HistoryCard({ addon, onCheck, checking }) {
   const [tab, setTab] = useState('all');
-  const history = Array.isArray(q.data?.history) ? q.data.history : [];
+  const history = historyRows(addon);
   const rows = tab === 'all' ? history : history.filter((h) => h.kind === tab);
   const count = (k) => history.filter((h) => h.kind === k).length;
+  const checkedAt = addon?.releases?.checkedAt || null;
 
   let body;
-  if (q.error && !q.data) {
-    body = html`<div class="updates-pad"><${ErrorBox} error=${q.error} title="Couldn't load the release history." onRetry=${q.reload} /></div>`;
-  } else if (q.loading && !q.data) {
+  if (!addon) {
     body = html`<${Loading} label="Loading the release history…" />`;
+  } else if (!history.length && addon.error) {
+    body = html`<div class="updates-pad stack">
+      <${Notice} kind="warn" title="Couldn't load the release history.">${addon.error}<//>
+      <div class="form-actions"><${Button} icon="refresh" busy=${checking} onClick=${onCheck}>Try again<//></div>
+    </div>`;
   } else if (!history.length) {
-    body = html`<${Empty} compact icon="releases" title="Nothing has been published yet.">New app and addon versions show up here when the guild owner publishes them.<//>`;
+    body = html`<${Empty} compact icon="releases" title="Nothing has been published yet.">New app and addon versions show up here when they are released on GitHub.<//>`;
   } else {
-    body = html`<${Table} dense rowKey=${(r, i) => `${r.kind}-${r.version}-${i}`} rows=${rows}
+    body = html`<${Table} dense rowKey=${(r) => r.tag || `${r.kind}-${r.version}`} rows=${rows}
       empty="Nothing of this kind has been published yet."
       columns=${[
         { key: 'version', label: 'Version', width: '150px', render: (r) => html`<span class="row nowrap">
@@ -339,11 +359,12 @@ function HistoryCard({ q }) {
             <strong class="num">${r.version}</strong></span>` },
         { key: 'publishedAt', label: 'Published', width: '150px', render: (r) => html`<${LocalTime} t=${r.publishedAt} style="day" empty="unknown" />` },
         { key: 'notes', label: 'Notes', class: 'wrap-cell', render: (r) => html`<${ReleaseNotes} text=${r.notes} empty="No notes." class="updates-notes--compact" />` },
-        { key: 'by', label: 'By', width: '140px', render: (r) => (r.by ? html`<span class="muted small">${r.by}</span>` : null) },
+        { key: 'url', label: '', width: '90px', render: (r) => (r.url ? html`<${Button} size="sm" variant="ghost" icon="external" href=${r.url}>GitHub<//>` : null) },
       ]} />`;
   }
 
   return html`<${Card} title="Release history" flush class="updates-history"
+      sub=${checkedAt ? html`from GitHub, checked <${TimeAgo} t=${checkedAt} />` : 'from GitHub'}
       actions=${history.length ? html`<${Tabs} value=${tab} onChange=${setTab} label="Release kind" idPrefix="updates-history"
         tabs=${[{ id: 'all', label: 'All', count: history.length }, { id: 'app', label: 'App', count: count('app') }, { id: 'addon', label: 'Addon', count: count('addon') }]} />` : null}>
     ${body}

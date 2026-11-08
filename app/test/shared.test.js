@@ -161,7 +161,7 @@ test('toLua → parse round trip keeps nested data, unicode, quotes, newlines an
 
 test('toLua output is valid Lua (checked with fengari when it is installed)', (t) => {
   let fengari;
-  try { fengari = require(require.resolve('fengari', { paths: [path.join(REPO, 'server')] })); } catch { t.skip('fengari is not installed (npm install in server/)'); return; }
+  try { fengari = require('fengari'); } catch { t.skip('fengari is not installed (npm install in app/)'); return; }
   const { lua, lauxlib, lualib, to_luastring, to_jsstring } = fengari;
   const L = lauxlib.luaL_newstate();
   lualib.luaL_openlibs(L);

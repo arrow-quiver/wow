@@ -711,26 +711,77 @@ a.wh.q0 { color: var(--q-0) !important; } a.wh.q1 { color: var(--q-1) !important
 .admin-danger > .btn { flex: none; }
 .admin-legend { display: flex; flex-wrap: wrap; gap: var(--s-1) var(--s-4); }
 .admin-legend > span { display: inline-flex; align-items: center; gap: 6px; }
+.admin-tabs { padding: var(--s-2) var(--s-5) 0; border-bottom: 1px solid var(--line-strong); }
+.admin-tabs .tabs { box-shadow: none; }
+.admin-gap-bottom { margin-bottom: var(--s-3); }
+.admin-backup-foot { flex-wrap: nowrap; }
+.admin-backup-foot > span { min-width: 0; }
+.admin-backup-foot > .btn { flex: none; }
 @media (max-width: 1100px) { .admin-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } .admin-summary .stat:nth-child(3) { border-left: 0; padding-left: 0; } .admin-pair { grid-template-columns: minmax(0, 1fr); } }
 
 /* ---------- guild settings page (pages/guild-settings.js) ---------- */
 .guild-settings-pair { align-items: start; }
-.guild-settings-choices { border: 0; margin: 0; padding: 0; min-width: 0; display: flex; flex-direction: column; gap: var(--s-2); }
-.guild-settings-choice { display: flex; padding: var(--s-2) var(--s-3); border: 1px solid var(--line); border-radius: var(--radius-m); background: var(--surface); transition: border-color var(--t-fast), background var(--t-fast); }
-.guild-settings-choice:hover { border-color: var(--line-strong); }
-.guild-settings-choice.is-on { border-color: color-mix(in srgb, var(--accent) 60%, var(--line)); background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
-.guild-settings-choice:has(input:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; }
-.guild-settings-link { display: flex; gap: var(--s-2); align-items: center; flex-wrap: wrap; }
-.guild-settings-link-text { flex: 1 1 280px; min-width: 0; font-family: "Cascadia Mono", Consolas, ui-monospace, monospace; font-size: var(--fs-s); background: var(--surface-2); }
+.guild-settings-trust { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(260px, 1fr); gap: var(--s-4); align-items: start; }
+.guild-settings-trust > .card { scroll-margin-top: var(--s-4); }
+.guild-settings-trust .guild-settings-ranks-grid { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 1100px) { .guild-settings-trust { grid-template-columns: minmax(0, 1fr); } }
+.guild-settings-ranks-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: var(--s-5); align-items: start; }
+.guild-settings-ranks-table { display: flex; flex-direction: column; gap: var(--s-2); min-width: 0; }
+.guild-settings-ranks-table .table-wrap { border: 1px solid var(--line); border-radius: var(--radius-m); }
+.guild-settings-ranks-table .table th:first-child, .guild-settings-ranks-table .table td:first-child { padding-left: var(--s-3); }
+.table tr.guild-settings-rank--lead td { background: color-mix(in srgb, var(--accent) 6%, transparent); }
+.guild-settings-current { display: flex; flex-direction: column; gap: 4px; padding: var(--s-3); border: 1px solid var(--line); border-radius: var(--radius-m); background: var(--surface-2); }
+.guild-settings-notice-action { margin-top: var(--s-2); }
 .guild-settings-who { white-space: nowrap; }
-.guild-settings-versions { display: inline-flex; gap: 6px; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.guild-settings-actions { justify-content: flex-end; flex-wrap: nowrap; }
-.guild-settings-steps { margin: 0; padding-left: 1.2rem; display: flex; flex-direction: column; gap: var(--s-3); }
-.guild-settings-steps li > span { display: block; margin-bottom: var(--s-2); }
-.guild-settings-status { margin-top: var(--s-4); padding-top: var(--s-3); border-top: 1px solid var(--line); }
+.guild-settings-status { padding-top: var(--s-3); border-top: 1px solid var(--line); }
 .guild-settings-status:empty { display: none; }
 .guild-settings code { word-break: normal; white-space: nowrap; }
-@media (max-width: 1100px) { .guild-settings-pair { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 1100px) { .guild-settings-pair, .guild-settings-ranks-grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* ---------- "goes out to the guild" hint (components/ShareHint.js), used by the guild pages ---------- */
+.share-hint { display: flex; align-items: flex-start; gap: 6px; margin: 0; font-size: var(--fs-s); color: var(--text-2); }
+.share-hint-icon { flex: none; width: 14px; height: 14px; margin-top: 2px; color: var(--info); }
+.share-hint--off .share-hint-icon { color: var(--warn); }
+.card-foot .share-hint { color: inherit; }
+.hint + .share-hint, .form-row + .share-hint { margin-top: 4px; }
+
+/* ---------- sharing in game: Addon & sync card (pages/addon.js), author checks (components/AuthorChecks.js),
+   "waiting for your guild" (components/NoGuild.js), the webhook offer (pages/settings.js) ---------- */
+.share-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-4); padding-bottom: var(--s-3); border-bottom: 1px solid var(--line); }
+.share-stats .stat-value { font-size: var(--fs-xl); }
+.share-section { display: flex; flex-direction: column; gap: var(--s-2); min-width: 0; }
+.share-section + .share-section { padding-top: var(--s-3); border-top: 1px solid var(--line); }
+.share-section-title { display: flex; align-items: center; gap: var(--s-2); margin: 0; font: 700 var(--fs-m)/1.3 var(--font-body); color: var(--text); }
+.share-count { display: inline-grid; place-items: center; min-width: 22px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--surface-3); color: var(--text-2); font-size: var(--fs-xs); font-weight: 700; font-variant-numeric: tabular-nums; }
+.share-section--refused .share-count { background: color-mix(in srgb, var(--alarm) 16%, var(--surface)); color: var(--alarm); }
+.share-fold { background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }
+.share-fold:hover > span:first-of-type { text-decoration: underline; text-underline-offset: 3px; }
+.share-fold-icon { width: 14px; height: 14px; color: var(--text-2); transition: transform var(--t-fast); }
+.share-fold-icon.is-open { transform: rotate(-90deg); }
+.share-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: var(--radius-m); }
+.share-entry { display: flex; align-items: center; gap: var(--s-2) var(--s-4); padding: var(--s-2) var(--s-3); min-width: 0; flex-wrap: wrap; }
+.share-entry + .share-entry { border-top: 1px solid var(--line); }
+.share-entry-main { display: flex; flex-direction: column; gap: 2px; flex: 1 1 280px; min-width: 0; }
+.share-entry-summary { font-weight: 700; overflow-wrap: anywhere; }
+.share-entry-note { font-size: var(--fs-s); color: var(--text-2); }
+.share-entry--refused .share-entry-note { color: var(--alarm); }
+.share-entry--waiting .share-entry-note { color: var(--warn); }
+.share-entry-side { display: flex; align-items: center; gap: var(--s-2); flex: none; flex-wrap: wrap; justify-content: flex-end; }
+.share-empty { font-size: var(--fs-s); }
+.share-retry { margin-top: var(--s-2); }
+.share-check .notice-body { display: flex; flex-direction: column; gap: var(--s-2); }
+.share-check-text { margin: 0; font-weight: 600; }
+.share-check-actions { gap: var(--s-2); }
+.no-guild .btn { margin-top: var(--s-2); }
+.no-guild--compact { display: flex; align-items: flex-start; gap: var(--s-3); color: var(--text-2); }
+.no-guild-icon { flex: none; width: 20px; height: 20px; margin-top: 1px; color: var(--accent-deep); }
+.settings-webhook-offer .notice-body { display: flex; flex-direction: column; gap: var(--s-2); }
+.settings-webhook-share { display: flex; flex-direction: column; gap: var(--s-2); padding-top: var(--s-3); border-top: 1px solid var(--line); }
+.settings-webhook-share .hint { flex: 1 1 260px; }
+.camp-share-lines { display: flex; flex-direction: column; gap: 4px; margin-top: var(--s-3); padding-top: var(--s-3); border-top: 1px solid var(--line); font-size: var(--fs-s); }
+.camp-share-icon { width: 15px; height: 15px; flex: none; color: var(--info); }
+.camp-share-icon--bad { color: var(--alarm); }
+@media (max-width: 760px) { .share-stats { grid-template-columns: minmax(0, 1fr); } }
 
 /* ---------- economy pages: bank (pages/bank.js), prices (pages/prices.js), drives (pages/drives.js) ---------- */
 .bank-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--s-4); }
@@ -818,6 +869,7 @@ a.wh.q0 { color: var(--q-0) !important; } a.wh.q1 { color: var(--q-1) !important
 .camp-cols { grid-template-columns: minmax(0, 1fr) 360px; }
 @media (max-width: 1100px) { .camp-cols { grid-template-columns: minmax(0, 1fr); } }
 .camp-onboard .card-body { display: flex; flex-direction: column; gap: var(--s-3); }
+.camp-sync-note { margin-top: var(--s-2); }
 .camp-onboard .progress-meta { display: none; } /* the card title already says "n of m done" */
 .camp-steps { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--s-2) var(--s-5); }
 .camp-steps li { display: flex; align-items: center; gap: var(--s-2); min-width: 0; }
@@ -867,6 +919,7 @@ a.wh.q0 { color: var(--q-0) !important; } a.wh.q1 { color: var(--q-1) !important
 .roster-search { width: 240px; }
 .roster-class { width: 150px; }
 .roster-name { gap: 6px; }
+.roster-rank { gap: 6px; }
 .roster-dot-off { display: inline-block; width: .55rem; height: .55rem; margin-right: .4rem; }
 .roster-zone { display: inline-block; max-width: 220px; vertical-align: bottom; }
 
@@ -914,6 +967,7 @@ a.wh.q0 { color: var(--q-0) !important; } a.wh.q1 { color: var(--q-1) !important
 .requests-what { gap: 2px; }
 .requests-crafters { line-height: 1.7; }
 .requests-actions { flex-wrap: nowrap; justify-content: flex-end; }
+.requests-foot { padding: var(--s-3) var(--s-5); border-top: 1px solid var(--line); }
 .table tr.requests-row--craftable td { background: color-mix(in srgb, var(--ok) 6%, transparent); }
 .table tr.requests-row--craftable td:first-child { box-shadow: inset 3px 0 0 var(--ok); }
 
@@ -1078,6 +1132,7 @@ a.wh.q0 { color: var(--q-0) !important; } a.wh.q1 { color: var(--q-1) !important
 
 .raid-loot-intro { gap: var(--s-2) var(--s-3); }
 .raid-loot-layout { display: grid; grid-template-columns: 360px minmax(0, 1fr); gap: var(--s-5); align-items: start; }
+.raid-loot-share { justify-content: center; }
 .raid-loot-list { list-style: none; margin: 0; padding: var(--s-2); display: flex; flex-direction: column; gap: var(--s-2); max-height: 60vh; overflow-y: auto; }
 .raid-loot-pick { position: relative; width: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 12px 14px; min-height: 60px; text-align: left; cursor: pointer;
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-m); font-size: var(--fs-l); transition: border-color var(--t-fast), background var(--t-fast); }

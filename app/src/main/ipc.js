@@ -8,9 +8,13 @@
 //
 // Events go the other way with broadcast(channel, payload) → webContents.send('gc:event', channel, payload).
 //
-//   const methods = buildMethods({ store, log, auth, api, wow, sync, addon, updater, publisher, notify, startup, membership, ... });
+//   const methods = buildMethods({ store, log, auth, api, wow, sync, addon, updater, publisher, notify, startup, ... });
 //   const ipc = createIpc({ methods, getWindows, log });
-//   forwardEvents({ broadcast: ipc.broadcast, store, log, auth, sync, addon, updater, publisher, membership });
+//   forwardEvents({ broadcast: ipc.broadcast, store, log, auth, sync, addon, updater, publisher });
+//
+// `auth` here is main.js's session (createSession): Battle.net sign-in in the app plus who I am in the local
+// core, so auth.state() = { available, signedIn, battletag, region, characters, profileAt, error, ...,
+// user, guild, role }.
 
 const fs = require('fs');
 const path = require('path');
@@ -26,10 +30,11 @@ const METHOD_NAMES = [
   'app.quit', 'app.relaunch', 'app.rendererReady',
   'log.recent',
   'settings.get', 'settings.set',
-  'auth.state', 'auth.signIn', 'auth.devSignIn', 'auth.signOut',
+  'auth.state', 'auth.signIn', 'auth.signOut',
   'api.request', 'api.download',
+  'calendar.export',
+  'secrets.set', 'secrets.has',
   'wow.installs', 'wow.addFolder', 'wow.removeFolder', 'wow.detectGuild',
-  'guild.autoJoin', 'membership.status',
   'sync.status', 'sync.now', 'sync.setEnabled',
   'addon.status', 'addon.check', 'addon.install', 'addon.update', 'addon.updateAll', 'addon.repair', 'addon.uninstall', 'addon.openFolder',
   'updater.status', 'updater.check', 'updater.download', 'updater.install',
@@ -38,19 +43,26 @@ const METHOD_NAMES = [
 ];
 
 // Keep in sync with CHANNELS in src/preload/preload.js and src/renderer/lib/gc.js.
-const EVENT_CHANNELS = ['auth', 'sync', 'addon', 'updater', 'publisher:log', 'server-event', 'navigate', 'log', 'settings', 'membership'];
+const EVENT_CHANNELS = ['auth', 'sync', 'addon', 'updater', 'publisher:log', 'server-event', 'navigate', 'log', 'settings'];
+
+// Secrets the renderer may set (never read back): the player's own Anthropic API key for the Coach AI.
+const RENDERER_SECRETS = ['anthropicKey'];
 
 // JavaScript's own error types mean a bug, not a message written for people.
 const BUG_ERRORS = ['TypeError', 'ReferenceError', 'SyntaxError', 'RangeError', 'EvalError', 'URIError'];
 
-/** Turns anything thrown into the { message, status? } shape the renderer receives. */
+// Error codes passed on to the renderer: the app's own ('in-use', 'cancelled') and the core's ('NO_GUILD').
+// Node's system codes (ENOENT, EPERM ...) look the same, which is harmless: the renderer only reacts to codes it knows.
+const ERROR_CODE = /^[A-Za-z][A-Za-z0-9_-]{1,39}$/;
+
+/** Turns anything thrown into the { message, status?, code? } shape the renderer receives. */
 function serialiseError(err) {
   const out = { message: 'Something went wrong. Details are in the log.' };
   if (err && typeof err === 'object') {
     const isBug = err instanceof Error && BUG_ERRORS.includes(err.name) && !Number.isInteger(err.status);
     if (!isBug && typeof err.message === 'string' && err.message.trim()) out.message = err.message.trim().slice(0, 1000);
     if (Number.isInteger(err.status)) out.status = err.status;
-    if (typeof err.code === 'string' && /^[a-z][a-z-]{1,40}$/.test(err.code)) out.code = err.code;
+    if (typeof err.code === 'string' && ERROR_CODE.test(err.code)) out.code = err.code;
   } else if (typeof err === 'string' && err.trim()) {
     out.message = err.trim().slice(0, 1000);
   }
@@ -124,7 +136,7 @@ function createIpc({ methods, getWindows, log, ipcMain, isTrustedSender = defaul
 }
 
 /** Forwards service events to the renderer. Returns a function that removes the listeners. */
-function forwardEvents({ broadcast, store, log, auth, sync, addon, updater, publisher, membership }) {
+function forwardEvents({ broadcast, store, log, auth, sync, addon, updater, publisher }) {
   const subs = [];
   const on = (source, event, fn) => {
     if (!source || typeof source.on !== 'function') return;
@@ -136,10 +148,9 @@ function forwardEvents({ broadcast, store, log, auth, sync, addon, updater, publ
   on(addon, 'status', (status) => broadcast('addon', status));
   on(updater, 'status', (status) => broadcast('updater', status));
   on(publisher, 'log', (line) => broadcast('publisher:log', line));
-  on(membership, 'change', (result) => broadcast('membership', result));
   on(log, 'line', (line) => broadcast('log', line));
   on(store, 'change', (settings, keys) => {
-    // Window position and the event cursor change often and mean nothing to the UI.
+    // Window position and other internal keys change often and mean nothing to the UI.
     if (!Array.isArray(keys) || keys.some((k) => !INTERNAL_KEYS.includes(k))) broadcast('settings', settings);
   });
   return () => subs.splice(0).forEach((off) => off());
@@ -181,8 +192,8 @@ function safeDecode(s) {
 }
 
 /**
- * The path part of a server path the renderer asked for, exactly as the server will see it, or null
- * when it would not reach the server as written: "..", "." and their %2e spellings, backslashes and
+ * The path part of a core path the renderer asked for, exactly as the core will see it, or null
+ * when it would not reach the core as written: "..", "." and their %2e spellings, backslashes and
  * empty segments are refused. Only the path is checked; the query may contain anything ("q=a..b").
  * Percent-encoded characters are fine ("/api/characters/Gr%C3%BCm"); so is a raw "ü", which the URL
  * parser encodes on the way out.
@@ -193,7 +204,7 @@ function serverPathname(p) {
   let pathname;
   try { pathname = new URL(raw, 'http://x').pathname; } catch { return null; }
   // The URL parser removes dot segments (also %2e ones); any difference besides percent-encoding means
-  // the server would answer for another path than the one asked for.
+  // the core would answer for another path than the one asked for.
   const a = safeDecode(pathname);
   const b = safeDecode(raw);
   if (a === null || b === null ? pathname !== raw : a !== b) return null;
@@ -201,52 +212,30 @@ function serverPathname(p) {
   return pathname;
 }
 
-// Express matches routes without regard to case or a trailing slash, so these checks don't either.
-const AUTH_PATH = /^\/api\/auth(?![\w-])/i;
-const PUBLISH_PATH = /^\/api\/publish(?![\w-])/i;
-
-// Server paths the renderer may call. Sign-in endpoints hand out tokens, which the renderer must
-// never see, so they are only reachable through auth.*; publishing goes through publisher.* (owner
-// checks, and the token never reaches the page).
+// Paths the renderer may call on the local core: anything under /api/.
 function checkApiPath(p) {
   const pathname = serverPathname(p);
-  if (!pathname || !pathname.startsWith('/api/')) throw userError('Server requests must use a path that starts with /api/.', 400);
-  const decoded = safeDecode(pathname) || pathname;
-  if (AUTH_PATH.test(pathname) || AUTH_PATH.test(decoded)) throw userError('Use the sign-in and sign-out buttons for that.', 400);
-  if (PUBLISH_PATH.test(pathname) || PUBLISH_PATH.test(decoded)) throw userError('Publish releases from the Releases page.', 400);
+  if (!pathname || !pathname.startsWith('/api/')) throw userError('Requests must use a path that starts with /api/.', 400);
   return pathname;
 }
 
-// Paths api.download may fetch: /api/... (same rules as checkApiPath) or the published files under /updates/.
+// Paths api.download may fetch: the same as checkApiPath.
 function checkDownloadPath(p) {
   const pathname = serverPathname(p);
-  if (pathname && pathname.startsWith('/updates/')) return pathname;
-  if (!pathname || !pathname.startsWith('/api/')) throw userError('Downloads must come from /api/ or /updates/.', 400);
-  const decoded = safeDecode(pathname) || pathname;
-  if (AUTH_PATH.test(pathname) || AUTH_PATH.test(decoded) || PUBLISH_PATH.test(pathname) || PUBLISH_PATH.test(decoded)) {
-    throw userError('That cannot be downloaded.', 400);
-  }
+  if (!pathname || !pathname.startsWith('/api/')) throw userError('Downloads must come from /api/.', 400);
   return pathname;
 }
-
-function hostOf(url) {
-  try { return new URL(url).host; } catch { return String(url || ''); }
-}
-
-// Calls that can change who you are in the guild; the cached auth state is refreshed after them.
-const SESSION_PATHS = /^\/api\/(guild|members|me)(\/|\?|$)/;
 
 /**
  * Builds the flat method map for createIpc. Every dependency is injected so this can be tested
  * with fakes.
  *
  * @param {object} d
- * @param {object} d.store  @param {object} d.log  @param {object} d.auth  @param {object} d.api
+ * @param {object} d.store  @param {object} d.log  @param {object} d.auth (main.js session)  @param {object} d.api
  * @param {object} d.wow    @param {object} d.sync @param {object} d.addon @param {object} d.updater
  * @param {object} d.publisher @param {object} d.notify @param {object} d.startup
- * @param {object} d.membership createMembership() result: autoJoin(), status()
  * @param {object} d.shell  { openExternal, openPath, showItemInFolder }
- * @param {object} d.dialog { showOpenDialog, showSaveDialog, showMessageBox } (showMessageBox confirms a server change)
+ * @param {object} d.dialog { showOpenDialog, showSaveDialog }
  * @param {() => object|null} d.getWindow parent for dialogs
  * @param {() => object} d.appInfo
  * @param {() => void} d.quit
@@ -255,7 +244,7 @@ const SESSION_PATHS = /^\/api\/(guild|members|me)(\/|\?|$)/;
  * @param {string} d.downloadsDir
  */
 function buildMethods(d) {
-  const { store, log, auth, api, wow, sync, addon, updater, publisher, notify, startup, membership, shell, dialog } = d;
+  const { store, log, auth, api, wow, sync, addon, updater, publisher, notify, startup, shell, dialog } = d;
   const parent = () => {
     const win = d.getWindow ? d.getWindow() : null;
     return win && !win.isDestroyed() ? win : undefined;
@@ -264,37 +253,11 @@ function buildMethods(d) {
     Promise.resolve().then(fn).catch((err) => log.warn(`${what}: ${err.message}`));
   };
 
-  // A new server address decides where sign-in, sync and app updates come from, so a change asked for
-  // by the page is confirmed by the person in a native dialog the page can't click for them.
-  async function confirmServerChange(url) {
-    if (!dialog || typeof dialog.showMessageBox !== 'function') throw userError("Guild Camp couldn't ask you to confirm the new server, so it kept the old one.");
-    const signedIn = Boolean(auth.state().signedIn);
-    const res = await dialog.showMessageBox(parent(), {
-      type: 'warning',
-      title: 'Change server',
-      message: `Switch Guild Camp to ${hostOf(url)}?${signedIn ? " You'll be signed out." : ''}`,
-      detail: `Sign-in, guild data, sync and app updates will come from ${url}. Only use a server address your guild officers gave you.`,
-      buttons: ['Switch', 'Cancel'],
-      defaultId: 0,
-      cancelId: 1,
-      noLink: true,
-    });
-    if (!res || res.response !== 0) {
-      throw Object.assign(new Error('The server address was not changed.'), { code: 'cancelled' });
-    }
-  }
-
-  async function setSettings(raw, { fromPage = false } = {}) {
+  async function setSettings(raw) {
     const patch = sanitizeSettingsPatch(raw);
     const current = store.get();
     const changed = Object.keys(patch).filter((k) => JSON.stringify(patch[k]) !== JSON.stringify(current[k]));
     if (!changed.length) return current;
-
-    if (fromPage && changed.includes('serverUrl')) {
-      await confirmServerChange(patch.serverUrl);
-      // The dialog waited for the person; act on the settings as they are now.
-      return setSettings(raw);
-    }
 
     // Side effects that can fail run first, so a failure leaves the setting unchanged.
     if (changed.includes('startWithWindows')) {
@@ -302,32 +265,16 @@ function buildMethods(d) {
       patch.startupDefaulted = true; // the person chose: the first sign-in default never overrides it
     }
 
-    const serverChanged = changed.includes('serverUrl');
-    if (serverChanged) {
-      // The device token belongs to the old server: sign out there before switching.
-      if (auth.state().signedIn) await auth.signOut();
-      patch.lastEventId = 0;
-    }
-
     store.set(patch);
 
     if (changed.includes('syncEnabled')) sync.setEnabled(patch.syncEnabled);
-    if (serverChanged) {
-      log.info(`Server changed to ${patch.serverUrl}.`);
-      await auth.refresh();
-      background(() => updater.check(), 'Update check failed');
-      background(() => addon.check(), 'Addon check failed');
-    }
+    if (changed.includes('discordWebhook')) log.info(patch.discordWebhook ? 'Discord webhook saved.' : 'Discord webhook removed.');
     if (changed.includes('extraWowFolders')) background(() => addon.check(), 'Addon check failed');
     return store.get();
   }
 
   function installs() {
     return wow.findInstalls({ extraRoots: store.get().extraWowFolders, scanDefaults: true });
-  }
-
-  function requireOwner() {
-    if (auth.state().role !== 'owner') throw userError('Only the guild owner can publish releases.', 403);
   }
 
   return {
@@ -375,24 +322,19 @@ function buildMethods(d) {
     // --- log / settings -------------------------------------------------------------------
     'log.recent': () => log.recent(),
     'settings.get': () => store.get(),
-    'settings.set': (patch) => setSettings(patch, { fromPage: true }),
+    'settings.set': (patch) => setSettings(patch),
 
-    // --- auth -----------------------------------------------------------------------------
+    // --- auth (Battle.net in the app, plus who I am in the local core) ---------------------
     'auth.state': (opts) => (opts && opts.refresh ? auth.refresh() : auth.state()),
     'auth.signIn': () => auth.signIn(),
-    'auth.devSignIn': (battletag) => auth.devSignIn(battletag),
     'auth.signOut': () => auth.signOut(),
 
-    // --- server API -----------------------------------------------------------------------
+    // --- the local core's API -------------------------------------------------------------
     'api.request': async (method, p, body) => {
       const verb = typeof method === 'string' ? method.toUpperCase() : '';
       if (!['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].includes(verb)) throw userError('Request method must be GET, POST, PUT or DELETE.', 400);
       checkApiPath(p);
-      const data = await api.request(verb, p, verb === 'GET' ? undefined : body);
-      if (verb !== 'GET' && SESSION_PATHS.test(p)) {
-        try { await auth.refresh(); } catch { /* the call itself worked */ }
-      }
-      return data;
+      return api.request(verb, p, verb === 'GET' ? undefined : body);
     },
     'api.download': async (p, suggestedName) => {
       checkDownloadPath(p);
@@ -406,6 +348,50 @@ function buildMethods(d) {
       await fs.promises.writeFile(res.filePath, data);
       log.info(`Saved ${name} to ${res.filePath}`);
       return res.filePath;
+    },
+
+    // --- calendar -------------------------------------------------------------------------
+    // Saves the guild's raids and events as an .ics file the player imports into their calendar.
+    'calendar.export': async () => {
+      const ics = await api.request('GET', '/api/calendar.ics', undefined, { raw: true });
+      if (typeof ics !== 'string' || !ics.startsWith('BEGIN:VCALENDAR')) throw userError("Guild Camp couldn't make the calendar file.");
+      let guildName = 'Guild';
+      try {
+        const s = auth.state();
+        if (s && s.guild && s.guild.name) guildName = s.guild.name;
+      } catch { /* the default name is fine */ }
+      const name = cleanFileName(`${guildName} raids.ics`, 'Guild raids.ics');
+      const res = await dialog.showSaveDialog(parent(), {
+        title: 'Export to calendar',
+        defaultPath: d.downloadsDir ? path.join(d.downloadsDir, name) : name,
+        filters: [{ name: 'Calendar file', extensions: ['ics'] }],
+      });
+      if (res.canceled || !res.filePath) return null;
+      await fs.promises.writeFile(res.filePath, ics, 'utf8');
+      log.info(`Saved the raid calendar to ${res.filePath}`);
+      return res.filePath;
+    },
+
+    // --- secrets (set only; the page never reads one back) ----------------------------------
+    'secrets.set': async (name, value) => {
+      if (!RENDERER_SECRETS.includes(name)) throw userError("Guild Camp doesn't keep that.", 400);
+      if (value === null || value === undefined || value === '') {
+        store.setSecret(name, null);
+        log.info('Anthropic API key removed. The Coach\'s AI answers are off.');
+        return { name, set: false, encrypted: store.secretsEncrypted() };
+      }
+      if (typeof value !== 'string') throw userError('Paste the key as text.', 400);
+      const key = value.trim();
+      if (key.length < 20 || key.length > 300 || /\s/.test(key)) {
+        throw userError('That doesn\'t look like an Anthropic API key. Copy it again from console.anthropic.com (it starts with sk-ant-).', 400);
+      }
+      store.setSecret(name, key);
+      log.info('Anthropic API key saved. The Coach can answer with AI now.');
+      return { name, set: true, encrypted: store.secretsEncrypted() };
+    },
+    'secrets.has': (name) => {
+      if (!RENDERER_SECRETS.includes(name)) throw userError("Guild Camp doesn't keep that.", 400);
+      return Boolean(store.getSecret(name));
     },
 
     // --- game folders ---------------------------------------------------------------------
@@ -427,10 +413,6 @@ function buildMethods(d) {
     },
     'wow.detectGuild': () => wow.detectGuild({ extraRoots: store.get().extraWowFolders, scanDefaults: true }),
 
-    // --- guild membership -----------------------------------------------------------------
-    'guild.autoJoin': () => membership.autoJoin(),
-    'membership.status': () => membership.status(),
-
     // --- sync -----------------------------------------------------------------------------
     'sync.status': () => sync.status(),
     'sync.now': () => sync.syncNow(),
@@ -441,7 +423,7 @@ function buildMethods(d) {
 
     // --- addon ----------------------------------------------------------------------------
     'addon.status': () => addon.status(),
-    'addon.check': () => addon.check(),
+    'addon.check': (opts) => addon.check({ force: !!(opts && opts.force === true) }),
     'addon.install': (dir) => addon.install(dir),
     'addon.update': (dir) => addon.update(dir),
     'addon.updateAll': () => addon.updateAll(),
@@ -461,24 +443,15 @@ function buildMethods(d) {
 
     // --- updater --------------------------------------------------------------------------
     'updater.status': () => updater.status(),
-    'updater.check': () => updater.check(),
+    'updater.check': (opts) => updater.check({ force: !!(opts && opts.force === true) }),
     'updater.download': () => updater.download(),
     'updater.install': () => updater.install(),
 
-    // --- publisher ------------------------------------------------------------------------
+    // --- publisher (GitHub releases with the gh CLI; it checks for itself who may publish) ---
     'publisher.status': () => publisher.status(),
-    'publisher.publishAddon': async (opts) => {
-      requireOwner();
-      return publisher.publishAddon(opts && typeof opts === 'object' ? opts : {});
-    },
-    'publisher.publishApp': async (opts) => {
-      requireOwner();
-      return publisher.publishApp(opts && typeof opts === 'object' ? opts : {});
-    },
-    'publisher.cancel': async () => {
-      requireOwner();
-      return publisher.cancel();
-    },
+    'publisher.publishAddon': async (opts) => publisher.publishAddon(opts && typeof opts === 'object' ? opts : {}),
+    'publisher.publishApp': async (opts) => publisher.publishApp(opts && typeof opts === 'object' ? opts : {}),
+    'publisher.cancel': async () => publisher.cancel(),
     'publisher.setRepoDir': async (dir) => publisher.setRepoDir(dir === null || dir === '' ? null : absolutePath(dir, 'folder')),
 
     // --- notifications --------------------------------------------------------------------
@@ -498,6 +471,7 @@ module.exports = {
   serverPathname,
   METHOD_NAMES,
   EVENT_CHANNELS,
+  RENDERER_SECRETS,
   INVOKE_CHANNEL,
   EVENT_CHANNEL,
 };

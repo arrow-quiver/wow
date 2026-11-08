@@ -1,12 +1,12 @@
 // Coach: play style, the AI build plan, next steps and questions to the Coach, for one of my characters.
 // Data: GET /api/coach?char=<name>, POST /api/coach/ask, POST /api/coach/plan (docs/api/coach.md).
-// Slow answers and plans finish on the server in the background; the page reloads on 'coach' events and
-// checks every few seconds while something is on its way.
+// AI answers use the player's own Anthropic API key (Settings) and budget (Guild settings). Slow answers and plans
+// finish in the background; the page reloads on 'coach' events and checks every few seconds while one is on its way.
 import { html, useState, useEffect, cx } from '../lib/html.js';
 import { api, useApi, useAction, qs } from '../lib/api.js';
-import { useSession } from '../lib/session.js';
 import { Link, setQuery } from '../lib/router.js';
 import { classInfo, className, plural } from '../lib/format.js';
+import { useSyncStatus, syncStatus, needsGameRestart } from '../lib/status.js';
 import {
   Page, Card, Button, Textarea, Checkbox, Notice, Pill, Progress, Empty, Loading, Spinner, Async, Icon,
   ClassName, TimeAgo, LocalTime, toast,
@@ -96,10 +96,9 @@ export default function CoachPage({ query = {} }) {
 }
 
 function CoachBody({ data, reload }) {
-  const { isOfficer } = useSession();
   const ch = data.character;
   return html`<div class="stack stack--loose coach">
-    <${AiNotice} ai=${data.ai} isOfficer=${isOfficer} hasCharacter=${!!ch} />
+    <${AiNotice} ai=${data.ai} hasCharacter=${!!ch} />
     ${!ch ? html`<${GettingStarted} />` : html`
       ${data.characters.length > 1 ? html`<${CharacterPicker} characters=${data.characters} current=${ch.name} />` : null}
       <${StyleCard} ch=${ch} />
@@ -116,27 +115,31 @@ function CoachBody({ data, reload }) {
 
 // ---------- AI availability ----------
 
-function AiNotice({ ai, isOfficer, hasCharacter }) {
+/** What the "AI is off" notice says: { title, text, link: { href, label } | null } (exported for tests). */
+export function aiNoticeText(ai, hasCharacter) {
   if (!ai || ai.available) return null;
   const still = hasCharacter
     ? 'Your play style and next steps still work.'
     : 'Play-style tracking and next steps still work once you sync.';
-  const settings = isOfficer && ai.hasKey
-    ? html` <${Link} href="/guild-settings">Open Guild settings<//>`
-    : null;
-  let title = 'The Coach AI is off.';
-  let text = ai.reason || 'Build plans and answers are off for now.';
   if (!ai.hasKey) {
-    title = "The Coach AI isn't set up yet.";
-    text = 'The server has no Claude API key, so build plans and answers are off.';
-  } else if (!ai.enabled) {
-    title = 'The Coach AI is switched off.';
-    text = 'An officer switched off build plans and answers in Guild settings.';
-  } else if (!ai.budgetLeft) {
-    title = "This month's Coach budget is used up.";
-    text = 'Build plans and answers are back next month, or sooner if an officer raises the budget.';
+    return { title: 'Add your API key to turn on AI answers.', text: `The Coach answers with your own Anthropic API key, so you only pay for what you ask. ${still}`,
+      link: { href: '/settings?section=coach', label: 'Add your key in Settings' } };
   }
-  return html`<${Notice} kind=${ai.hasKey ? 'warn' : 'info'} title=${title}>${text} ${still}${settings}<//>`;
+  if (!ai.enabled) {
+    return { title: 'The Coach AI is switched off.', text: `Turn it back on in Guild settings. ${still}`,
+      link: { href: '/guild-settings?section=coach', label: 'Open Guild settings' } };
+  }
+  if (!ai.budgetLeft) {
+    return { title: "This month's Coach budget is used up.", text: `Plans and answers are back next month, or raise your budget in Guild settings. ${still}`,
+      link: { href: '/guild-settings?section=coach', label: 'Change the budget' } };
+  }
+  return { title: 'The Coach AI is off.', text: `${ai.reason || 'Build plans and answers are off for now.'} ${still}`, link: null };
+}
+
+function AiNotice({ ai, hasCharacter }) {
+  const n = aiNoticeText(ai, hasCharacter);
+  if (!n) return null;
+  return html`<${Notice} kind=${ai.hasKey ? 'warn' : 'info'} title=${n.title}>${n.text}${n.link ? html` <${Link} href=${n.link.href}>${n.link.label}<//>` : null}<//>`;
 }
 
 // ---------- no data yet ----------
@@ -238,10 +241,29 @@ function Observed({ stats }) {
   </dl>`;
 }
 
-// ---------- build plan ----------
+// ---------- build plan (PlanCard is exported for tests) ----------
 
-function PlanCard({ data, reload }) {
+// When a new plan reaches the game. While a game folder's news folder (WowGuild_Inbox) was made during the game session
+// that still runs (sync status restartNeeded), that session never loads it, also not after a /reload.
+export const PLAN_LINE = 'A new plan reaches the game after your next sync and /reload.';
+export const PLAN_LINE_RESTART = "A new plan reaches the game after you restart World of Warcraft. A /reload isn't enough the first time.";
+// The core's reply when a plan is ready (core/routes/coach.js), and what it says while the game needs a restart.
+export const PLAN_READY = 'Your new build plan is ready. It reaches the game after your next sync and /reload.';
+export const PLAN_READY_RESTART = "Your new build plan is ready. It reaches the game after you restart World of Warcraft. A /reload isn't enough the first time.";
+
+/** The plan card's "reaches the game" line, with the restart wording while the game needs one. */
+export function planLine(sync) {
+  return needsGameRestart(sync) ? PLAN_LINE_RESTART : PLAN_LINE;
+}
+
+/** The core's reply after making a plan: its "ready" line gets the restart wording while the game needs one. */
+export function planReply(message, sync) {
+  return message === PLAN_READY && needsGameRestart(sync) ? PLAN_READY_RESTART : message;
+}
+
+export function PlanCard({ data, reload }) {
   const { character: ch, plan, planBusy, ai, limits } = data;
+  const sync = useSyncStatus();
   const make = useAction(() => api.post('/api/coach/plan', { char: ch.name }));
   const good = plan && !plan.error ? plan : null;
   const canMake = ai.available && limits.plansLeft > 0;
@@ -249,7 +271,7 @@ function PlanCard({ data, reload }) {
   const onMake = async () => {
     const r = await make.run();
     if (!r.ok) return;
-    toast(r.value.message, r.value.status === 'ready' ? 'ok' : 'info');
+    toast(planReply(r.value.message, syncStatus.get()), r.value.status === 'ready' ? 'ok' : 'info');
     reload();
   };
 
@@ -258,7 +280,7 @@ function PlanCard({ data, reload }) {
   const footer = !ai.available
     ? 'Build plans need the Coach AI.'
     : limits.plansLeft > 0
-      ? `${limits.plansLeft} of ${limits.plansPerDay} plans left today. A new plan reaches the game after your next sync and /reload.`
+      ? `${limits.plansLeft} of ${limits.plansPerDay} plans left today. ${planLine(sync)}`
       : "You've made today's plans. More tomorrow (the limit resets at midnight UTC).";
   const sub = good && good.level
     ? html`made at level ${good.level}${good.at ? html`, <${TimeAgo} t=${good.at} />` : null}`
@@ -361,7 +383,7 @@ function StepsCard({ ch, steps }) {
   <//>`;
 }
 
-// ---------- officers: spending ----------
+// ---------- spending (your own key and budget) ----------
 
 function UsageCard({ usage }) {
   const budget = Number(usage.budgetUsd) || 0;
@@ -372,7 +394,7 @@ function UsageCard({ usage }) {
     <div class="stack stack--tight">
       <p class="coach-usage-big"><strong>${usd(spent)}</strong> <span class="muted">of ${usd(budget)}</span></p>
       <${Progress} label="Monthly Coach budget used" value=${budget > 0 ? Math.min(spent, budget) : 0} max=${budget > 0 ? budget : 1} kind=${over ? 'alarm' : undefined} />
-      <p class="hint">${plural(usage.questions || 0, 'question')} and ${plural(usage.plans || 0, 'plan')} so far. Officers only.</p>
+      <p class="hint">${plural(usage.questions || 0, 'question')} and ${plural(usage.plans || 0, 'plan')} so far, on your own API key.</p>
     </div>
   <//>`;
 }

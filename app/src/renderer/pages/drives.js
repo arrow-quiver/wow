@@ -1,5 +1,6 @@
 // Supply drives: pool effort toward a shared goal (crates for faction rep, mats for raid consumables, gold for the
-// bank). Members log what they hand in; officers start and close drives. API: docs/api/economy.md.
+// bank). Members log what they hand in; officers start and close drives. Drives and hand-ins go to guildmates
+// through the addon. API: docs/api/economy.md.
 import { html, useState } from '../lib/html.js';
 import { api, useApi, useAction } from '../lib/api.js';
 import { useSession } from '../lib/session.js';
@@ -8,6 +9,7 @@ import {
   Page, Card, Table, Button, ConfirmButton, Modal, Pill, Input, Select, Textarea, Empty, Async,
   LocalTime, toast,
 } from '../components/index.js';
+import { ShareHint } from '../components/ShareHint.js';
 
 export default function DrivesPage() {
   const { isOfficer } = useSession();
@@ -87,14 +89,17 @@ function GiveForm({ drive, myCharacters, onDone }) {
     const r = await give.run({ amount: n, character: character.trim(), note: note.trim() });
     if (r.ok) { setAmount(''); setNote(''); onDone(); }
   };
-  return html`<form class="drive-give" onSubmit=${submit} novalidate>
-    <${Input} label="Handed in" type="number" min="1" placeholder="10" value=${amount} error=${error}
-      onValue=${(v) => { setAmount(v); if (error) setError(null); }} fieldClass="drive-give-amount" />
-    ${myCharacters.length
-      ? html`<${Select} label="Character" options=${myCharacters} value=${character} onValue=${setCharacter} fieldClass="drive-give-char" />`
-      : html`<${Input} label="Character" value=${character} onValue=${setCharacter} maxLength="40" placeholder="Optional" fieldClass="drive-give-char" />`}
-    <${Input} label="Note" value=${note} onValue=${setNote} maxLength="120" placeholder="Optional" fieldClass="drive-give-note" />
-    <${Button} type="submit" variant="primary" busy=${give.busy}>Log it<//>
+  return html`<form class="stack stack--tight" onSubmit=${submit} novalidate>
+    <div class="drive-give">
+      <${Input} label="Handed in" type="number" min="1" placeholder="10" value=${amount} error=${error}
+        onValue=${(v) => { setAmount(v); if (error) setError(null); }} fieldClass="drive-give-amount" />
+      ${myCharacters.length
+        ? html`<${Select} label="Character" options=${myCharacters} value=${character} onValue=${setCharacter} fieldClass="drive-give-char" />`
+        : html`<${Input} label="Character" value=${character} onValue=${setCharacter} maxLength="40" placeholder="Optional" fieldClass="drive-give-char" />`}
+      <${Input} label="Note" value=${note} onValue=${setNote} maxLength="120" placeholder="Optional" fieldClass="drive-give-note" />
+      <${Button} type="submit" variant="primary" busy=${give.busy}>Log it<//>
+    </div>
+    <${ShareHint} />
   </form>`;
 }
 
@@ -159,7 +164,7 @@ function StartDrive({ open, onClose, onDone }) {
       <${Textarea} label="Notes" rows="3" value=${form.notes} onValue=${set('notes')} maxLength="300"
         placeholder="Hand in at the Razor Hill camp, then log it here" hint="Optional. Where to hand things in, and why." />
       ${error ? html`<p class="field-error" role="alert">${error}</p>` : null}
-      <p class="hint mb-0">Everyone gets a notification, and the drive is posted to Discord if the guild has a webhook.</p>
+      <${ShareHint} officer discord />
       <button type="submit" hidden></button>
     </form>
   <//>`;

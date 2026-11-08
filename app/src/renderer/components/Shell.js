@@ -1,20 +1,22 @@
-// The app frame: left sidebar (brand, navigation, sync + update status, who is signed in) and the top bar
+// The app frame: left sidebar (brand, navigation, sync + update status, who you are) and the top bar
 // (window drag strip with the page title and actions). main.js composes them with the content area.
 import { html, cx } from '../lib/html.js';
 import { Link, back as goBack } from '../lib/router.js';
 import { useStore } from '../lib/store.js';
 import { useSession } from '../lib/session.js';
-import { useSyncStatus, useUpdaterStatus, useAddonStatus, describeSync, describeUpdates } from '../lib/status.js';
+import {
+  useSyncStatus, useUpdaterStatus, useAddonStatus, usePublisherStatus, describeSync, describeUpdates, ROLE_NAMES,
+} from '../lib/status.js';
 import { Icon } from './Icon.js';
 import { Button } from './Button.js';
 import { TimeAgo } from './wow.js';
 import { pageStore } from './Page.js';
 
-const ROLE_LABEL = { owner: 'Owner', officer: 'Officer', member: 'Member' };
-
-// Which routes the signed-in person may see in the sidebar.
-export function visibleNav(routes, session) {
-  return routes.filter((r) => r.nav && (!r.officer || session.isOfficer) && (!r.owner || session.isOwner));
+// Which routes the sidebar shows. officer / owner follow the role from in-game ranks; publisher routes (Releases)
+// only show on a PC that can publish (publisher.status().canPublish: a source checkout and the GitHub CLI).
+export function visibleNav(routes, session, { canPublish = false } = {}) {
+  return routes.filter((r) => r.nav && (!r.officer || session.isOfficer) && (!r.owner || session.isOwner)
+    && (!r.publisher || canPublish));
 }
 
 export function Sidebar({ routes, sections }) {
@@ -22,9 +24,10 @@ export function Sidebar({ routes, sections }) {
   const sync = useSyncStatus();
   const updater = useUpdaterStatus();
   const addon = useAddonStatus();
+  const publisher = usePublisherStatus();
   const { guild, user, role } = session;
 
-  const items = visibleNav(routes, session);
+  const items = visibleNav(routes, session, { canPublish: Boolean(publisher && publisher.canPublish) });
   const groups = sections.map((s) => [s, items.filter((r) => r.nav === s)]).filter(([, list]) => list.length);
   const syncInfo = describeSync(sync);
   const updates = describeUpdates(updater, addon);
@@ -71,7 +74,7 @@ export function Sidebar({ routes, sections }) {
       ${user ? html`<${Link} href="/settings" class="foot-link" activeClass="" title="Settings">
         <${Icon} name="character" />
         <span class="who ellipsis">${user.battletag}</span>
-        ${role ? html`<span class="who-role">${ROLE_LABEL[role] || role}</span>` : null}
+        ${role ? html`<span class="who-role">${ROLE_NAMES[role] || role}</span>` : null}
       <//>` : null}
     </div>
   </aside>`;

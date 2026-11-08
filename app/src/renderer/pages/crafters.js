@@ -36,7 +36,7 @@ function SearchCard({ q }) {
       <${Button} type="submit" variant="primary" icon="search">Search<//>
       ${q ? html`<${Button} variant="ghost" onClick=${() => setQuery({ q: undefined }, { replace: false })}>Clear<//>` : null}
     </form>
-    <p class="hint mb-0">Recipes show up once their owner has opened that profession window in game and synced.</p>
+    <p class="hint mb-0">Recipes show up once their owner opens that profession window in game. Guildmates' recipes arrive through the addon.</p>
   <//>`;
 }
 
@@ -81,7 +81,7 @@ function ResultsCard({ q, results }) {
       ? html`<${Table} columns=${columns} rows=${results} rowKey=${(r) => r.recipe} />`
       : html`<${Empty} icon="search" title="No matches."
           action=${html`<${Button} icon="requests" onClick=${() => navigate(`/requests${qs({ item: q })}`)}>Post a request anyway<//>`}>
-          Try part of the name. Recipes only show up once their owner has opened that profession in game and synced.
+          Try part of the name. Recipes only show up once their owner has opened that profession window in game.
         <//>`}
   <//>`;
 }
@@ -118,7 +118,7 @@ function MatsTable({ mats, mine }) {
     { key: 'need', label: 'Need', num: true, sortable: true, width: '80px' },
     mine ? {
       key: 'chars', label: 'Where you have it',
-      render: (m) => (m.chars.length ? m.chars.map((c) => `${c.name} ${c.n}`).join(', ') : html`<span class="faint">none synced</span>`),
+      render: (m) => (m.chars.length ? m.chars.map((c) => `${c.name} ${c.n}`).join(', ') : html`<span class="faint">none on your characters</span>`),
     } : null,
     mine ? { key: 'guildBank', label: 'Guild bank', num: true, sortable: true, width: '100px', render: (m) => (m.guildBank ? m.guildBank : '') } : null,
     { key: 'price', label: 'Each', num: true, sortable: true, width: '120px', render: (m) => html`<${Money} copper=${m.price} />` },
@@ -142,7 +142,7 @@ function ShoppingCard({ shop }) {
   }
   return html`<${Card} flush title="Your shopping list" sub=${html`from the addon, <${TimeAgo} t=${shop.updatedAt} />`}
       actions=${html`<${Total} total=${shop.total} unpriced=${shop.unpriced} />`}
-      footer=${html`Prices come from the guild price index (members' Auctionator scans). Manage the list in game with <code>/wow list</code>.`}>
+      footer=${html`Prices come from Auctionator scans, yours and those guildmates share. Manage the list in game with <code>/wow list</code>.`}>
     <div class="crafters-shop-items">
       <span class="muted small">Making:</span>
       ${shop.items.map((e) => html`<${Pill} key=${e.name} kind="accent">${e.qty} × ${e.name}<//>`)}

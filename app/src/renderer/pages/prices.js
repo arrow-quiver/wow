@@ -82,9 +82,9 @@ export default function PricesPage({ query = {} }) {
   const data = prices.data || (prices.error ? null : last.current);
   const lede = data && data.stats
     ? (data.stats.items
-      ? `${plural(data.stats.items, 'item')} priced from guild Auctionator scans, newest from ${dayLabel(data.stats.newest)}.`
-      : 'No prices yet. Anyone running Auctionator with Guild Camp adds their scans here automatically.')
-    : 'Guild auction prices from members’ Auctionator scans.';
+      ? `${plural(data.stats.items, 'item')} priced from Auctionator scans, yours and those guildmates share. Newest from ${dayLabel(data.stats.newest)}.`
+      : 'No prices yet. Scan the auction house with Auctionator and Guild Camp adds the prices by itself.')
+    : 'Auction prices from Auctionator scans, yours and those guildmates share.';
 
   return html`<${Page} title="Prices" lede=${lede}
       actions=${html`<${Button} variant="ghost" icon="refresh" label="Refresh" busy=${prices.refreshing} onClick=${prices.reload} />`}>
@@ -165,7 +165,7 @@ function Results({ data, q, stale }) {
   ];
   if (!q && !data.stats.items) {
     return html`<${Card}><${Empty} icon="prices" title="No prices yet.">
-      Anyone running Auctionator with Guild Camp adds their scans here automatically. Scan the auction house in game, then log out or /reload.
+      Scan the auction house in game with Auctionator, then log out or type /reload. Prices guildmates share through the addon show up here too.
     <//><//>`;
   }
   return html`<${Card} flush class=${stale ? 'prices-stale' : undefined}
@@ -174,7 +174,7 @@ function Results({ data, q, stale }) {
     <${Table} key=${q} dense columns=${columns} rows=${rows} rowKey=${(r) => r.item_id}
       sort=${q ? { key: 'name', dir: 'asc' } : undefined}
       empty=${q
-        ? html`<${Empty} compact icon="search" title=${`No scanned item matches “${q}”.`}>Item names are learned from what members carry, so very rare items may only show by number.<//>`
+        ? html`<${Empty} compact icon="search" title=${`No scanned item matches “${q}”.`}>Item names are learned from what people carry, so very rare items may only show by number.<//>`
         : 'Nothing the guild holds has a recent price yet.'} />
   <//>`;
 }

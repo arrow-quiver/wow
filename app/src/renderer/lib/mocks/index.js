@@ -6,3 +6,4 @@ import './coach.js';
 import './admin.js';
 import './settings.js';
 import './app.js';
+import './share.js';

@@ -15,10 +15,11 @@ const METHODS = [
   'app.quit', 'app.relaunch', 'app.rendererReady',
   'log.recent',
   'settings.get', 'settings.set',
-  'auth.state', 'auth.signIn', 'auth.devSignIn', 'auth.signOut',
+  'auth.state', 'auth.signIn', 'auth.signOut',
   'api.request', 'api.download',
+  'calendar.export',
+  'secrets.set', 'secrets.has',
   'wow.installs', 'wow.addFolder', 'wow.removeFolder', 'wow.detectGuild',
-  'guild.autoJoin', 'membership.status',
   'sync.status', 'sync.now', 'sync.setEnabled',
   'addon.status', 'addon.check', 'addon.install', 'addon.update', 'addon.updateAll', 'addon.repair', 'addon.uninstall', 'addon.openFolder',
   'updater.status', 'updater.check', 'updater.download', 'updater.install',
@@ -26,7 +27,7 @@ const METHODS = [
   'notify.test',
 ];
 
-const CHANNELS = ['auth', 'sync', 'addon', 'updater', 'publisher:log', 'server-event', 'navigate', 'log', 'settings', 'membership'];
+const CHANNELS = ['auth', 'sync', 'addon', 'updater', 'publisher:log', 'server-event', 'navigate', 'log', 'settings'];
 
 async function invoke(method, ...args) {
   if (typeof method !== 'string' || !METHODS.includes(method)) {

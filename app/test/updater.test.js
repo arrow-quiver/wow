@@ -1,19 +1,26 @@
-// App self-update (src/main/updater.js) with a fake electron-updater autoUpdater, plus the dev-build
-// path that only reads GET /api/releases.
+// App self-update (src/main/updater.js): installed builds drive electron-updater's autoUpdater (a fake here) with
+// the github provider from app-update.yml; development builds read the newest app release from the GitHub API (a
+// local fake server here). Nothing talks to GitHub.
 const test = require('node:test');
 const assert = require('node:assert');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const http = require('http');
 const { EventEmitter } = require('events');
 
-const { createUpdater, friendlyError, notesText, feedUrlFor, NOT_PUBLISHED } = require('../src/main/updater');
+const { createUpdater, friendlyError, notesText, NOT_PUBLISHED, LATEST_URL } = require('../src/main/updater');
 
 // A stand-in for electron-updater's autoUpdater. Each method records its call; tests script what
-// the "server" answers by setting fake.onCheck / fake.onDownload.
+// GitHub "answers" by setting fake.onCheck / fake.onDownload. setFeedURL throws: the feed comes from
+// app-update.yml, and the updater must never point electron-updater anywhere else.
 function fakeAutoUpdater() {
   const fake = new EventEmitter();
   fake.calls = [];
-  fake.feeds = [];
   fake.autoDownload = true;
   fake.autoInstallOnAppQuit = false;
+  fake.allowPrerelease = true;
+  fake.allowDowngrade = true;
   fake.logger = null;
   fake.onCheck = async () => { fake.emit('update-not-available', { version: '0.11.0' }); return { isUpdateAvailable: false }; };
   fake.onDownload = async () => {
@@ -21,7 +28,7 @@ function fakeAutoUpdater() {
     fake.emit('update-downloaded', { version: '0.12.0', releaseNotes: 'Faster.' });
     return ['C:/fake/Guild-Camp-Setup-0.12.0.exe'];
   };
-  fake.setFeedURL = (opts) => { fake.calls.push('setFeedURL'); fake.feeds.push(opts); };
+  fake.setFeedURL = () => { throw new Error('setFeedURL must not be called: the github provider comes from app-update.yml'); };
   fake.checkForUpdates = async () => {
     fake.calls.push('checkForUpdates');
     fake.emit('checking-for-update');
@@ -33,9 +40,10 @@ function fakeAutoUpdater() {
 }
 
 // The bits of store.js the updater uses.
-function fakeStore(initial = {}) {
+function fakeStore(initial = {}, file = null) {
   const s = new EventEmitter();
-  let settings = { serverUrl: 'https://guild.example.com', appAutoUpdate: true, ...initial };
+  let settings = { appAutoUpdate: true, ...initial };
+  s.file = file;
   s.get = () => ({ ...settings });
   s.set = (patch) => {
     const keys = Object.keys(patch).filter((k) => settings[k] !== patch[k]);
@@ -54,15 +62,19 @@ function fakeLog() {
   return log;
 }
 
-function setup({ isPackaged = true, settings, api, appVersion = '0.11.0', onBeforeInstall } = {}) {
-  const store = fakeStore(settings);
+function tmpDir(t) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gc-updater-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  return dir;
+}
+
+// feedFile: where dev builds cache the release list (default: none, unless storeFile is given; then next to it).
+function setup({ isPackaged = true, settings, appVersion = '0.11.0', onBeforeInstall, releasesUrl, feedFile, storeFile = null } = {}) {
+  const store = fakeStore(settings, storeFile);
   const fake = fakeAutoUpdater();
   const log = fakeLog();
-  const updater = createUpdater({
-    store, log, api, appVersion, isPackaged, onBeforeInstall,
-    getServer: () => store.get().serverUrl,
-    autoUpdater: fake,
-  });
+  const feed = feedFile !== undefined || storeFile ? { feedFile } : { feedFile: null };
+  const updater = createUpdater({ store, log, appVersion, isPackaged, onBeforeInstall, autoUpdater: fake, releasesUrl, ...feed });
   const states = [];
   updater.on('status', (st) => states.push(st.state));
   return { store, fake, log, updater, states };
@@ -70,26 +82,45 @@ function setup({ isPackaged = true, settings, api, appVersion = '0.11.0', onBefo
 
 const tick = () => new Promise((r) => setImmediate(r));
 
-test('feed URL is <server>/updates/app and is set before every check', async () => {
-  const { updater, fake, store } = setup();
-  await updater.check();
-  assert.deepStrictEqual(fake.feeds[0], { provider: 'generic', url: 'https://guild.example.com/updates/app' });
-  store.set({ serverUrl: 'http://127.0.0.1:3928/' });
-  await updater.check();
-  assert.deepStrictEqual(fake.feeds[1], { provider: 'generic', url: 'http://127.0.0.1:3928/updates/app' });
-  assert.deepStrictEqual(fake.calls, ['setFeedURL', 'checkForUpdates', 'setFeedURL', 'checkForUpdates']);
-  assert.strictEqual(feedUrlFor('https://a.example/x/'), 'https://a.example/x/updates/app');
-  assert.strictEqual(feedUrlFor(''), null);
-});
+// A GitHub API stand-in: GET /repos/arrow-quiver/wow/releases?per_page=30, with ETags.
+async function fakeGithub(t, releases) {
+  const state = { releases, requests: [], status: 200, etag: '"r1"' };
+  const srv = http.createServer((req, res) => {
+    state.requests.push({ url: req.url, headers: req.headers });
+    if (state.status !== 200) { res.writeHead(state.status, { 'Content-Type': 'application/json' }); res.end('{"message":"Not Found"}'); return; }
+    if (req.headers['if-none-match'] === state.etag) { res.writeHead(304, { ETag: state.etag }); res.end(); return; }
+    res.writeHead(200, { 'Content-Type': 'application/json', ETag: state.etag });
+    res.end(JSON.stringify(state.releases));
+  });
+  await new Promise((resolve) => srv.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise((resolve) => srv.close(resolve)));
+  state.url = `http://127.0.0.1:${srv.address().port}/repos/arrow-quiver/wow/releases?per_page=30`;
+  return state;
+}
 
-test('configures electron-updater: auto download from settings, install on quit, logger', async () => {
+const appRelease = (v, extra = {}) => ({
+  tag_name: `v${v}`, name: `Guild Camp ${v}`, body: `Notes for ${v}.`, draft: false, prerelease: false,
+  published_at: '2026-11-06T10:00:00Z', html_url: `https://github.com/arrow-quiver/wow/releases/tag/v${v}`, assets: [], ...extra,
+});
+const addonRelease = (v) => ({ ...appRelease(v), tag_name: `addon-v${v}`, html_url: `https://github.com/arrow-quiver/wow/releases/tag/addon-v${v}` });
+
+// ---------------------------------------------------------------------------------------------
+// installed builds
+
+test('configures electron-updater for GitHub: auto download from settings, install on quit, Latest only, no feed URL', async () => {
   const { updater, fake, log } = setup({ settings: { appAutoUpdate: false } });
-  await updater.check();
+  const st = await updater.check();
+  assert.strictEqual(st.state, 'not-available');
+  assert.deepStrictEqual(fake.calls, ['checkForUpdates'], 'only checkForUpdates: the feed comes from app-update.yml');
   assert.strictEqual(fake.autoDownload, false);
   assert.strictEqual(fake.autoInstallOnAppQuit, true);
+  assert.strictEqual(fake.allowDowngrade, false);
+  assert.strictEqual(fake.allowPrerelease, false, 'follows the release marked Latest, never an addon-v* entry of the feed');
   assert.ok(fake.logger && typeof fake.logger.info === 'function');
   fake.logger.info('Checking for update');
   assert.ok(log.lines.some(([lvl, msg]) => lvl === 'info' && msg === 'Checking for update'));
+  assert.strictEqual(st.releasesUrl, 'https://github.com/arrow-quiver/wow/releases/latest');
+  assert.strictEqual(LATEST_URL, st.releasesUrl);
 });
 
 test('no update: checking → not-available, with the latest version and the check time', async () => {
@@ -100,6 +131,8 @@ test('no update: checking → not-available, with the latest version and the che
   assert.strictEqual(st.available, null);
   assert.strictEqual(st.latest.version, '0.11.0');
   assert.ok(st.lastCheckAt);
+  assert.strictEqual(st.isPackaged, true);
+  assert.strictEqual(st.note, null);
   assert.deepStrictEqual(states, ['checking', 'not-available']);
 });
 
@@ -107,17 +140,18 @@ test('update with automatic updates on: available → downloading (progress) →
   let quittingMarked = false;
   const { updater, fake, states } = setup({ onBeforeInstall: () => { quittingMarked = true; } });
   fake.onCheck = async () => {
-    fake.emit('update-available', { version: '0.12.0', releaseNotes: 'Faster sync.\nNew Updates page.', releaseDate: '2026-11-06T10:00:00.000Z' });
+    // The github provider hands over the release notes as HTML.
+    fake.emit('update-available', { version: '0.12.0', releaseNotes: '<p>Faster sync.</p><ul><li>New Updates page.</li></ul>', releaseDate: '2026-11-06T10:00:00.000Z' });
     // electron-updater downloads by itself when autoDownload is true.
     setImmediate(() => {
       fake.emit('download-progress', { percent: 42.5, bytesPerSecond: 2048, transferred: 425, total: 1000 });
-      fake.emit('update-downloaded', { version: '0.12.0', releaseNotes: 'Faster sync.\nNew Updates page.' });
+      fake.emit('update-downloaded', { version: '0.12.0', releaseNotes: '<p>Faster sync.</p>' });
     });
     return { isUpdateAvailable: true };
   };
-  const afterCheck = await updater.check();
+  const afterCheck = await updater.check({ force: true });
   assert.strictEqual(afterCheck.state, 'downloading');
-  assert.deepStrictEqual(afterCheck.available, { version: '0.12.0', notes: 'Faster sync.\nNew Updates page.', date: '2026-11-06T10:00:00.000Z' });
+  assert.deepStrictEqual(afterCheck.available, { version: '0.12.0', notes: 'Faster sync.\n- New Updates page.', date: '2026-11-06T10:00:00.000Z' });
   await tick();
   const st = updater.status();
   assert.strictEqual(st.state, 'downloaded');
@@ -162,18 +196,18 @@ test('automatic updates off: waits at available; turning it on starts the downlo
   assert.strictEqual(updater.status().autoUpdate, true);
 });
 
-test('errors become plain sentences: nothing published (404) and offline', async () => {
+test('errors become plain sentences: nothing on GitHub yet, and offline', async () => {
   const { updater, fake } = setup();
   fake.onCheck = async () => {
-    const err = new Error('Cannot find channel "latest.yml" update info: HttpError: 404 Not Found');
-    err.code = 'ERR_UPDATER_CHANNEL_FILE_NOT_FOUND';
+    const err = new Error('Unable to find latest version on GitHub (https://github.com/arrow-quiver/wow/releases/latest), please ensure a production release exists: HttpError: 404');
+    err.code = 'ERR_UPDATER_LATEST_VERSION_NOT_FOUND';
     fake.emit('error', err);
     throw err;
   };
   let st = await updater.check();
   assert.strictEqual(st.state, 'error');
   assert.strictEqual(st.error, NOT_PUBLISHED);
-  assert.strictEqual(st.error, 'No app release has been published on this server yet.');
+  assert.strictEqual(st.error, 'No app release has been published on GitHub yet.');
 
   fake.onCheck = async () => {
     const err = new Error('net::ERR_INTERNET_DISCONNECTED');
@@ -182,11 +216,11 @@ test('errors become plain sentences: nothing published (404) and offline', async
   };
   st = await updater.check();
   assert.strictEqual(st.state, 'error');
-  assert.match(st.error, /Couldn't reach the guild server/);
+  assert.match(st.error, /Couldn't reach GitHub/);
   assert.match(st.error, /internet connection/);
 
   // A rejection without an 'error' event still ends the check.
-  fake.onCheck = async () => { throw Object.assign(new Error('getaddrinfo ENOTFOUND guild.example.com'), { code: 'ENOTFOUND' }); };
+  fake.onCheck = async () => { throw Object.assign(new Error('getaddrinfo ENOTFOUND github.com'), { code: 'ENOTFOUND' }); };
   st = await updater.check();
   assert.strictEqual(st.state, 'error');
   assert.match(st.error, /Couldn't reach/);
@@ -219,7 +253,7 @@ test('one check at a time', async () => {
   let release;
   fake.onCheck = () => new Promise((resolve) => { release = () => { fake.emit('update-not-available', { version: '0.11.0' }); resolve({}); }; });
   const a = updater.check();
-  const b = updater.check();
+  const b = updater.check({ force: true });
   await tick();
   assert.strictEqual(fake.calls.filter((c) => c === 'checkForUpdates').length, 1);
   assert.strictEqual(updater.status().state, 'checking');
@@ -229,129 +263,89 @@ test('one check at a time', async () => {
   assert.strictEqual(sb.state, 'not-available');
 });
 
-test('a new server address forgets what the old one offered', async () => {
-  const { updater, fake, store } = setup({ settings: { appAutoUpdate: false } });
+test('settings other than automatic updates leave the updater alone; dispose stops listening', async () => {
+  const { updater, fake, store, states } = setup({ settings: { appAutoUpdate: false } });
   fake.onCheck = async () => { fake.emit('update-available', { version: '0.12.0' }); return {}; };
   await updater.check();
-  assert.strictEqual(updater.status().available.version, '0.12.0');
-  store.set({ serverUrl: 'https://other.example.com' });
-  assert.strictEqual(updater.status().state, 'idle');
-  assert.strictEqual(updater.status().available, null);
-});
-
-test('a new server address drops a downloaded update: not offered, not installed on quit', async () => {
-  const { updater, fake, store, log } = setup({ settings: { appAutoUpdate: false } });
-  fake.onCheck = async () => { fake.emit('update-available', { version: '0.12.0' }); return {}; };
-  await updater.check();
-  await updater.download();
-  assert.strictEqual(updater.status().state, 'downloaded');
-  assert.strictEqual(fake.autoInstallOnAppQuit, true);
-
-  store.set({ serverUrl: 'https://other.example.com' });
-  const st = updater.status();
-  assert.strictEqual(st.state, 'idle');
-  assert.strictEqual(st.available, null);
-  assert.strictEqual(fake.autoInstallOnAppQuit, false, 'electron-updater will not run the old installer when the app quits');
-  assert.throws(() => updater.install(), /no downloaded update/);
-  assert.ok(log.lines.some(([, m]) => /will not be installed/.test(m)));
-
-  // The new server is asked next time (a check isn't skipped as "already downloaded").
-  fake.onCheck = async () => { fake.emit('update-not-available', { version: '0.11.0' }); return {}; };
-  const after = await updater.check();
-  assert.strictEqual(after.state, 'not-available');
-  assert.deepStrictEqual(fake.feeds.at(-1), { provider: 'generic', url: 'https://other.example.com/updates/app' });
-  assert.strictEqual(fake.autoInstallOnAppQuit, false, 'still nothing to install');
-});
-
-test('a download from the old server that finishes after the change is dropped; a fresh one installs again', async () => {
-  const { updater, fake, store } = setup({ settings: { appAutoUpdate: false } });
-  fake.onCheck = async () => { fake.emit('update-available', { version: '0.12.0' }); return {}; };
-  await updater.check();
-  let finish;
-  fake.onDownload = () => new Promise((resolve) => { finish = resolve; });
-  const pending = updater.download();
-  assert.strictEqual(updater.status().state, 'downloading');
-
-  store.set({ serverUrl: 'https://other.example.com' });
-  assert.strictEqual(updater.status().state, 'idle');
-  fake.emit('download-progress', { percent: 90 });
-  fake.emit('update-downloaded', { version: '0.12.0' });
-  finish(['C:/fake/old.exe']);
-  await pending;
-  assert.strictEqual(updater.status().state, 'idle', 'not offered');
-  assert.strictEqual(updater.status().progress, null);
-  assert.strictEqual(fake.autoInstallOnAppQuit, false);
-
-  // The new server offers its own update; downloading it turns install-on-quit back on.
-  fake.onCheck = async () => { fake.emit('update-available', { version: '0.13.0' }); return {}; };
-  fake.onDownload = async () => { fake.emit('update-downloaded', { version: '0.13.0' }); return []; };
-  await updater.check();
-  const st = await updater.download();
-  assert.strictEqual(st.state, 'downloaded');
-  assert.strictEqual(st.available.version, '0.13.0');
-  assert.strictEqual(fake.autoInstallOnAppQuit, true);
-});
-
-test("an answer from the old server's check that arrives after the change is ignored", async () => {
-  const { updater, fake, store } = setup({ settings: { appAutoUpdate: false } });
-  let answer;
-  fake.onCheck = () => new Promise((resolve) => { answer = resolve; });
-  const first = updater.check();
+  const before = states.length;
+  store.set({ theme: 'dark', serverUrl: 'https://anything.example' });
+  assert.strictEqual(states.length, before);
+  assert.strictEqual(updater.status().available.version, '0.12.0', 'there is no server to switch away from');
+  updater.dispose();
+  store.set({ appAutoUpdate: true });
   await tick();
-  store.set({ serverUrl: 'https://other.example.com' });
-  // The page asks again for the new server while the old check is still out.
-  fake.onCheck = async () => { fake.emit('update-not-available', { version: '0.11.0' }); return {}; };
-  const second = updater.check();
-  fake.emit('update-available', { version: '6.6.6' }); // the old server's reply
-  answer({});
-  await first;
-  const st = await second;
-  assert.strictEqual(st.available, null);
-  assert.strictEqual(st.state, 'not-available');
-  assert.deepStrictEqual(fake.feeds.map((f) => f.url), ['https://guild.example.com/updates/app', 'https://other.example.com/updates/app'],
-    'the new address is asked after the old check finished');
+  assert.ok(!fake.calls.includes('downloadUpdate'));
 });
 
-test('dev builds: state dev, never touch electron-updater, report a newer server release', async () => {
-  const requests = [];
-  const api = {
-    request: async (method, path, body, opts) => {
-      requests.push({ method, path, opts });
-      return { app: { version: '0.12.0', notes: 'New Updates page.', publishedAt: '2026-11-06 10:00:00' }, addon: null, history: [] };
-    },
-  };
-  const { updater, fake, states } = setup({ isPackaged: false, api });
+// ---------------------------------------------------------------------------------------------
+// development builds
+
+test('dev builds: state dev, never touch electron-updater, report a newer release from GitHub', async (t) => {
+  const gh = await fakeGithub(t, [addonRelease('0.13.0'), appRelease('0.12.0'), appRelease('0.11.0'), appRelease('0.14.0', { draft: true })]);
+  const dir = tmpDir(t);
+  const { updater, fake, states } = setup({ isPackaged: false, releasesUrl: gh.url, storeFile: path.join(dir, 'settings.json') });
   assert.strictEqual(updater.status().state, 'dev');
   assert.match(updater.status().note, /development build/);
   const st = await updater.check();
   assert.strictEqual(st.state, 'dev');
-  assert.deepStrictEqual(st.available, { version: '0.12.0', notes: 'New Updates page.', date: '2026-11-06 10:00:00' });
-  assert.strictEqual(st.latest.version, '0.12.0');
+  assert.deepStrictEqual(st.available, { version: '0.12.0', notes: 'Notes for 0.12.0.', date: '2026-11-06T10:00:00Z' });
+  assert.strictEqual(st.latest.version, '0.12.0', 'addon releases and drafts are not app releases');
+  assert.strictEqual(st.releasesUrl, 'https://github.com/arrow-quiver/wow/releases/tag/v0.12.0');
+  assert.strictEqual(st.error, null);
   assert.ok(st.lastCheckAt);
-  assert.strictEqual(requests[0].method, 'GET');
-  assert.strictEqual(requests[0].path, '/api/releases');
-  assert.strictEqual(requests[0].opts.auth, false);
+  const h = gh.requests[0].headers;
+  assert.strictEqual(h.accept, 'application/vnd.github+json');
+  assert.strictEqual(h['user-agent'], 'GuildCamp/0.11.0');
+  assert.ok(fs.existsSync(path.join(dir, 'github-releases.json')), 'the answer is cached next to settings.json, shared with the addon manager');
   assert.deepStrictEqual(fake.calls, []);
   assert.ok(states.every((x) => x === 'dev'));
   await assert.rejects(updater.download(), /development build/);
   assert.throws(() => updater.install(), /development build/);
+
+  // The next automatic check uses the cached answer; a check the person asks for goes to GitHub (with the ETag).
+  await updater.check();
+  assert.strictEqual(gh.requests.length, 1);
+  // (Forced checks are at most every 10 seconds: make the last attempt a minute old.)
+  const cache = path.join(dir, 'github-releases.json');
+  const saved = JSON.parse(fs.readFileSync(cache, 'utf8'));
+  fs.writeFileSync(cache, JSON.stringify({ ...saved, attemptAt: new Date(Date.now() - 60000).toISOString() }));
+  const forced = await updater.check({ force: true });
+  assert.strictEqual(gh.requests.length, 2);
+  assert.strictEqual(gh.requests[1].headers['if-none-match'], '"r1"');
+  assert.strictEqual(forced.available.version, '0.12.0');
 });
 
-test('dev builds: same or older on the server → nothing available; errors are kept as text', async () => {
-  let answer = { app: { version: '0.11.0', notes: '', publishedAt: null } };
-  const api = { request: async () => { if (answer instanceof Error) throw answer; return answer; } };
-  const { updater } = setup({ isPackaged: false, api });
-  let st = await updater.check();
+test('dev builds: same or older on GitHub → nothing available; errors are kept as text', async (t) => {
+  const gh = await fakeGithub(t, [appRelease('0.11.0')]);
+  const dir = tmpDir(t);
+  const feedFile = path.join(dir, 'feed.json');
+  const { updater } = setup({ isPackaged: false, releasesUrl: gh.url, feedFile });
+  let st = await updater.check({ force: true });
   assert.strictEqual(st.available, null);
   assert.strictEqual(st.latest.version, '0.11.0');
-  answer = { app: null, addon: null, history: [] };
-  st = await updater.check();
-  assert.strictEqual(st.latest, null);
-  answer = Object.assign(new Error("Can't reach the guild server (guild.example.com: connection refused)."), { status: 0 });
-  st = await updater.check();
+
+  fs.rmSync(feedFile);
+  gh.releases = [addonRelease('0.12.0')];
+  gh.etag = '"r2"';
+  st = await updater.check({ force: true });
+  assert.strictEqual(st.latest, null, 'no app release yet');
+  assert.strictEqual(st.releasesUrl, LATEST_URL);
+
+  fs.rmSync(feedFile);
+  gh.status = 404;
+  st = await updater.check({ force: true });
   assert.strictEqual(st.state, 'dev');
-  assert.match(st.error, /Can't reach the guild server/);
+  assert.match(st.error, /couldn't find its releases on GitHub\. The project may not be public yet/);
+
+  // Unreachable: still a sentence, and still dev.
+  const off = setup({ isPackaged: false, releasesUrl: 'http://127.0.0.1:9/repos/arrow-quiver/wow/releases?per_page=30', feedFile: path.join(dir, 'off.json') });
+  st = await off.updater.check();
+  assert.strictEqual(st.state, 'dev');
+  assert.match(st.error, /Couldn't reach GitHub/);
 });
+
+// ---------------------------------------------------------------------------------------------
+// wording
 
 test('release notes: strings, per-version arrays and HTML become plain text', () => {
   assert.strictEqual(notesText('Line one\nLine two'), 'Line one\nLine two');
@@ -362,9 +356,15 @@ test('release notes: strings, per-version arrays and HTML become plain text', ()
 
 test('friendlyError wording', () => {
   assert.strictEqual(friendlyError(Object.assign(new Error('x'), { statusCode: 404 })), NOT_PUBLISHED);
-  assert.match(friendlyError(new Error('net::ERR_NAME_NOT_RESOLVED')), /Couldn't reach/);
-  assert.match(friendlyError(new Error('net::ERR_CONNECTION_REFUSED'), { during: 'download' }), /download stopped/);
+  assert.strictEqual(friendlyError(Object.assign(new Error('No published versions on GitHub'), { code: 'ERR_UPDATER_NO_PUBLISHED_VERSIONS' })), NOT_PUBLISHED);
+  assert.match(friendlyError(Object.assign(new Error('Cannot find latest.yml in the latest release artifacts'), { code: 'ERR_UPDATER_CHANNEL_FILE_NOT_FOUND' }), { during: 'download' }), /missing from the GitHub release/);
+  assert.match(friendlyError(new Error('net::ERR_NAME_NOT_RESOLVED')), /Couldn't reach GitHub/);
+  assert.match(friendlyError(new Error('net::ERR_CONNECTION_REFUSED'), { during: 'download' }), /download stopped because GitHub could not be reached/);
   assert.match(friendlyError(new Error('ENOSPC: no space left on device')), /disk space/);
-  assert.match(friendlyError(new Error('HttpError: 502 Bad Gateway')), /server had a problem/);
+  assert.match(friendlyError(new Error('HttpError: 502 Bad Gateway')), /GitHub had a problem/);
+  assert.match(friendlyError(new Error('HttpError: 403 Forbidden rate limit exceeded')), /limiting requests/);
+  assert.match(friendlyError(new Error('EPERM: operation not permitted')), /github\.com\/arrow-quiver\/wow\/releases\/latest/);
+  assert.match(friendlyError(Object.assign(new Error('bad feed'), { code: 'ERR_UPDATER_INVALID_RELEASE_FEED' })), /update information on GitHub couldn't be read/);
   assert.match(friendlyError(new Error('Something odd\n    at stack')), /^Couldn't check for updates \(Something odd\)\.$/);
+  for (const msg of [NOT_PUBLISHED, friendlyError(new Error('net::ERR_TIMED_OUT'))]) assert.doesNotMatch(msg, /server|guild owner/i, 'no server left to mention');
 });

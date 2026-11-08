@@ -1,6 +1,6 @@
 // Preview sample data for the economy pages (Bank, Prices, Drives). Used only when the renderer runs in a plain
-// browser without window.gc. Shapes match docs/api/economy.md exactly.
-import { addMockRoutes } from '../mock.js';
+// browser without window.gc. Shapes match docs/api/economy.md (the local core's routes/economy.js).
+import { addMockRoutes, httpError, needGuild, needOfficer } from '../mock.js';
 
 const MIN = 60 * 1000;
 const HOUR = 60 * MIN;
@@ -9,12 +9,6 @@ const iso = (msAgo = 0) => new Date(Date.now() - msAgo).toISOString();
 const sqlTime = (msAgo = 0) => iso(msAgo).replace('T', ' ').slice(0, 19);
 const dayStr = (daysAgo) => iso(daysAgo * DAY).slice(0, 10);
 const short = (tag) => String(tag || '').split('#')[0];
-
-function httpError(status, message) {
-  const e = new Error(message);
-  e.status = status;
-  return e;
-}
 
 const ITEMS = {
   14047: 'Runecloth', 12359: 'Thorium Bar', 12363: 'Arcane Crystal', 13444: 'Major Mana Potion', 13446: 'Major Healing Potion',
@@ -117,15 +111,6 @@ const db = {
 };
 
 const meOf = (state) => state.members.find((m) => m.id === state.userId) || null;
-const officer = (state) => ['owner', 'officer'].includes(meOf(state)?.role);
-function needGuild(state) {
-  if (!state.signedIn) throw httpError(401, 'Sign in first.');
-  if (!state.inGuild) throw httpError(403, 'Join a guild first.');
-}
-function needOfficer(state) {
-  needGuild(state);
-  if (!officer(state)) throw httpError(403, 'Officers only.');
-}
 
 const requestJson = (r, state) => ({
   id: r.id, item: r.item, count: r.count, note: r.note || null, status: r.status, requester_id: r.requester_id,
@@ -209,7 +194,7 @@ addMockRoutes({
     if (!r || !['sent', 'declined', 'cancel'].includes(params.verb)) throw httpError(404, 'Request not found.');
     if (r.status !== 'open') throw httpError(409, 'That request has already been handled.');
     if (params.verb === 'cancel' && r.requester_id !== state.userId) throw httpError(403, 'Only the person who asked can cancel a request.');
-    if (params.verb !== 'cancel' && !officer(state)) throw httpError(403, 'Officers only.');
+    if (params.verb !== 'cancel') needOfficer(state);
     const me = meOf(state);
     Object.assign(r, { status: params.verb === 'cancel' ? 'cancelled' : params.verb, handled_by: me.id, handler_tag: me.battletag, updated_at: sqlTime() });
     const message = params.verb === 'sent' ? 'Marked as sent.' : params.verb === 'declined' ? 'Request declined.' : 'Request cancelled.';

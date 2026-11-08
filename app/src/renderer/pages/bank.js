@@ -1,5 +1,6 @@
 // Bank: the guild bank (tabs, gold, value), bank requests, bank characters (guilds without a guild bank),
-// a search across your own alts' bags and banks, and the guild bank log. API: docs/api/economy.md.
+// a search across your own alts' bags and banks, and the guild bank log. Requests, their answers and the bank
+// characters go to guildmates through the addon. API: docs/api/economy.md.
 import { html, useState, useEffect, useMemo, cx } from '../lib/html.js';
 import { api, useApi, useAction, qs } from '../lib/api.js';
 import { useSession } from '../lib/session.js';
@@ -9,6 +10,7 @@ import {
   Page, Card, Stat, Table, Button, ConfirmButton, Tabs, tabId, tabPanelId, Pill, Input, Checkbox, Empty, Async,
   ItemLink, ClassName, Money, TimeAgo,
 } from '../components/index.js';
+import { ShareHint } from '../components/ShareHint.js';
 
 const TABS = ['guild', 'requests', 'characters', 'alts', 'log'];
 const ASK_ITEM_ID = 'bank-ask-item';
@@ -78,7 +80,7 @@ function Summary({ data, open }) {
         hint="Last time someone opened it" />
       <${Stat} label="Open requests" value=${number(open || 0)} hint=${open ? 'Waiting for an officer' : 'Nothing waiting'} />
     </div>
-    ${nothing ? html`<p class="hint bank-summary-note">Nothing synced yet. Open the guild bank in game with the addon, or have an officer mark a bank character.</p>` : null}
+    ${nothing ? html`<p class="hint bank-summary-note">Nothing here yet. Open the guild bank in game with the addon, or have an officer mark a bank character.</p>` : null}
   <//>`;
 }
 
@@ -108,7 +110,7 @@ function GuildBankTab({ data }) {
   if (!tabs.length) {
     return html`<${Card}>
       <${Empty} icon="bank" title="The guild bank hasn't been read yet.">
-        Anyone with the addon who opens the guild bank in game updates it here after their next sync.
+        Open the guild bank in game with the addon, then log out or type /reload. Guildmates' scans arrive through the addon too.
         No guild bank? Officers can mark bank characters instead.
       <//>
     <//>`;
@@ -146,7 +148,8 @@ function RequestsTab({ data, isOfficer, onChange }) {
   const done = data.requests.filter((r) => r.status !== 'open');
   return html`<div class="cols bank-requests">
     <div class="stack stack--loose">
-      <${Card} title="Open requests" sub=${open.length ? plural(open.length, 'request') : null} flush>
+      <${Card} title="Open requests" sub=${open.length ? plural(open.length, 'request') : null} flush
+          footer=${open.length && isOfficer ? html`<${ShareHint} officer />` : null}>
         ${open.length
           ? html`<ul class="list-plain bank-req-list">${open.map((r) => html`<${RequestRow} key=${r.id} r=${r} isOfficer=${isOfficer} onChange=${onChange} />`)}</ul>`
           : html`<${Empty} compact icon="bank" title="No open requests." />`}
@@ -207,7 +210,8 @@ function RequestForm({ onDone }) {
       <div class="form-actions">
         <${Button} type="submit" variant="primary" icon="bank" busy=${send.busy}>Send request<//>
       </div>
-      <p class="hint mb-0">Officers get a notification and mark it sent when it's in your mailbox.</p>
+      <p class="hint mb-0">An officer marks it sent when it's in your mailbox.</p>
+      <${ShareHint} discord />
     </form>
   <//>`;
 }
@@ -221,14 +225,14 @@ function CharactersTab({ data, isOfficer, onChange }) {
       <p class="hint mb-0">Characters that hold guild stock. Worth about <${Money} copper=${data.value.bankCharacters || null} compact empty="nothing yet" /> together.</p>
       ${chars.map((c) => html`<${Card} key=${c.name} flush
           title=${html`<${ClassName} name=${c.name} cls=${c.class} />`}
-          sub=${[c.level ? `Level ${c.level}` : null, c.owner ? `${c.owner}'s character` : 'No owner', html`synced <${TimeAgo} t=${c.updated_at} />`]
+          sub=${[c.level ? `Level ${c.level}` : null, c.owner ? `${c.owner}'s character` : 'No owner', html`updated <${TimeAgo} t=${c.updated_at} />`]
             .filter(Boolean).map((x, i) => html`${i ? ' · ' : ''}${x}`)}
           actions=${html`<span class="bank-worth">Worth about <${Money} copper=${c.value || null} compact empty="—" /></span>`}>
         <${Table} dense columns=${itemColumns(false)} rows=${c.items} rowKey=${(r) => r.item_id} sort=${{ key: 'name', dir: 'asc' }}
-          empty=${`Nothing synced for ${c.name} yet. Its bags and bank show here after its owner syncs it.`} />
+          empty=${`Nothing known for ${c.name} yet. Its bags and bank show here once its owner logs in on it with the addon.`} />
       <//>`)}`
     : html`<${Card}><${Empty} icon="character" title="No bank characters yet.">
-        No guild bank? Officers can mark the characters that hold guild stock. Their bags and bank show here once their owner syncs.
+        No guild bank? Officers can mark the characters that hold guild stock. Their bags and bank show here once their owner logs in on them with the addon.
       <//><//>`}
     ${isOfficer ? html`<${BankCharacterEditor} onSaved=${onChange} />` : null}
   </div>`;
@@ -253,18 +257,21 @@ function BankCharacterEditor({ onSaved }) {
 
   return html`<${Card} tone="accent" title="Choose bank characters" sub="Officers"
       actions=${html`<${Input} type="search" class="bank-filter" placeholder="Find a character" aria-label="Find a character" value=${filter} onValue=${setFilter} />`}
-      footer=${html`<div class="row row--between">
-        <span class="hint">${picked ? `${plural(picked.size, 'bank character')} picked.` : ''}</span>
-        <div class="actions-row">
-          ${changed ? html`<${Button} variant="ghost" onClick=${() => setPicked(new Set(saved))}>Undo<//>` : null}
-          <${Button} variant="primary" busy=${save.busy} disabled=${!changed} onClick=${submit}>Save bank characters<//>
+      footer=${html`<div class="stack stack--tight">
+        <div class="row row--between">
+          <span class="hint">${picked ? `${plural(picked.size, 'bank character')} picked.` : ''}</span>
+          <div class="actions-row">
+            ${changed ? html`<${Button} variant="ghost" onClick=${() => setPicked(new Set(saved))}>Undo<//>` : null}
+            <${Button} variant="primary" busy=${save.busy} disabled=${!changed} onClick=${submit}>Save bank characters<//>
+          </div>
         </div>
+        <${ShareHint} officer />
       </div>`}>
     <${Async} q=${alts} loadingLabel="Loading characters…">${() => (list.length
       ? html`<div class="bank-alt-grid">${list.map((c) => html`<${Checkbox} key=${c.name} class="bank-alt"
             checked=${picked?.has(c.name)} onValue=${(on) => toggle(c.name, on)}
             label=${html`<${ClassName} name=${c.name} cls=${c.class} link=${false} />`}
-            hint=${[c.level ? `Level ${c.level}` : null, c.owner || 'no owner', c.items ? plural(c.items, 'item') : 'nothing synced'].filter(Boolean).join(' · ')} />`)}</div>`
+            hint=${[c.level ? `Level ${c.level}` : null, c.owner || 'no owner', c.items ? plural(c.items, 'item') : 'nothing known yet'].filter(Boolean).join(' · ')} />`)}</div>`
       : html`<${Empty} compact icon="character" title=${filter ? `No character matches “${filter}”.` : 'No linked characters yet.'} />`)}<//>
   <//>`;
 }
@@ -286,7 +293,7 @@ function AltsTab({ find }) {
         value=${text} onValue=${setText} maxLength="60" />
       <${Button} type="submit" icon="search">Find<//>
     </form>
-    ${!find ? html`<p class="hint bank-pad">Searches the bags and banks of every character you have synced. Bank contents update when you open the bank in game.</p>`
+    ${!find ? html`<p class="hint bank-pad">Searches the bags and banks of all your characters Guild Camp knows. Bank contents update when you open the bank in game.</p>`
       : html`<${Async} q=${results} loadingLabel="Searching your characters…">${(r) => html`<${Table} dense rows=${r.results}
           rowKey=${(x) => `${x.character}:${x.location}:${x.item_id}`}
           columns=${[
@@ -295,7 +302,7 @@ function AltsTab({ find }) {
             { key: 'character', label: 'Character', sortable: true, render: (x) => html`<${ClassName} name=${x.character} cls=${x.class} />` },
             { key: 'location', label: 'Where', sortable: true, render: (x) => (x.location === 'bank' ? 'Bank' : 'Bags') },
           ]}
-          empty=${html`<${Empty} compact icon="search" title=${`None of your synced characters carry “${r.q}”.`}>Bank contents update when you open the bank in game.<//>`} />`}<//>`}
+          empty=${html`<${Empty} compact icon="search" title=${`None of your characters carry “${r.q}”.`}>Bank contents update when you open the bank in game.<//>`} />`}<//>`}
   <//>`;
 }
 

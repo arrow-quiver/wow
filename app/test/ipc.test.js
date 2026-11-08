@@ -1,6 +1,7 @@
 'use strict';
-// IPC dispatcher, method table, preload bridge, event forwarding, the event-feed poller and the
-// small pure helpers of the Electron-facing modules (app:// paths, join links, sign-in URL parsing).
+// IPC dispatcher, method table, preload bridge, event forwarding and the small pure helpers of the
+// Electron-facing modules (app:// paths, guildcamp:// links). main.js's session and notification wiring
+// is tested in main.test.js.
 const { test, describe, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -12,18 +13,16 @@ const { EventEmitter } = require('events');
 const ipc = require('../src/main/ipc');
 const { dispatch, serialiseError, buildMethods, forwardEvents, createIpc, METHOD_NAMES, EVENT_CHANNELS } = ipc;
 const { createStore } = require('../src/main/store');
-const { createEvents, readFeed } = require('../src/main/events');
 const { resolveAppPath, isAppUrl, isExternalUrl } = require('../src/main/window');
-const { parseDoneUrl, signInUrl } = require('../src/main/auth');
-const { parseArgs, deepLinkRoute, findDeepLink, routeSlug, throttle } = require('../src/main/main');
+const { parseArgs, deepLinkRoute, findDeepLink, routeSlug } = require('../src/main/main');
 
 const CONTRACT_METHODS = [
   'app.info', 'app.openExternal', 'app.openPath', 'app.showItemInFolder', 'app.pickFolder', 'app.quit', 'app.relaunch',
   'log.recent', 'settings.get', 'settings.set',
-  'auth.state', 'auth.signIn', 'auth.devSignIn', 'auth.signOut',
+  'auth.state', 'auth.signIn', 'auth.signOut',
   'api.request', 'api.download',
+  'calendar.export', 'secrets.set', 'secrets.has',
   'wow.installs', 'wow.addFolder', 'wow.removeFolder', 'wow.detectGuild',
-  'guild.autoJoin', 'membership.status',
   'sync.status', 'sync.now', 'sync.setEnabled',
   'addon.status', 'addon.check', 'addon.install', 'addon.update', 'addon.updateAll', 'addon.repair', 'addon.uninstall', 'addon.openFolder',
   'updater.status', 'updater.check', 'updater.download', 'updater.install',
@@ -31,7 +30,9 @@ const CONTRACT_METHODS = [
   'notify.test',
 ];
 
-const CONTRACT_CHANNELS = ['auth', 'sync', 'addon', 'updater', 'publisher:log', 'server-event', 'navigate', 'log', 'settings', 'membership'];
+const CONTRACT_CHANNELS = ['auth', 'sync', 'addon', 'updater', 'publisher:log', 'server-event', 'navigate', 'log', 'settings'];
+// Gone with the server: joining by itself, dev sign-in, the membership channel.
+const REMOVED_METHODS = ['guild.autoJoin', 'membership.status', 'auth.devSignIn'];
 
 /** `export const NAME = [ ... ];` from a renderer ES module, read as text (no browser or mock needed). */
 function rendererList(file, name) {
@@ -94,6 +95,20 @@ describe('dispatch', () => {
     assert.deepEqual(serialiseError(err), { message: err.message, status: 0 });
     assert.deepEqual(serialiseError(undefined), { message: 'Something went wrong. Details are in the log.' });
   });
+
+  test("the core's 403 NO_GUILD keeps its code on the way to the renderer, so pages show the no-guild screen from it", async () => {
+    const { NO_GUILD } = require('../src/core/http');
+    const noGuild = Object.assign(new Error(NO_GUILD), { status: 403, code: 'NO_GUILD', name: 'ApiError' });
+    assert.deepEqual(serialiseError(noGuild), { message: NO_GUILD, status: 403, code: 'NO_GUILD' });
+    const res = await dispatch({ 'api.request': () => { throw noGuild; } }, 'api.request', []);
+    assert.deepEqual(res, { ok: false, error: { message: NO_GUILD, status: 403, code: 'NO_GUILD' } });
+    // Letters, digits, underscores and dashes, up to 40 characters; anything else is left out.
+    assert.equal(serialiseError({ message: 'x', code: 'in-use' }).code, 'in-use');
+    assert.equal(serialiseError({ message: 'x', code: 'RATE_LIMIT_2' }).code, 'RATE_LIMIT_2');
+    for (const bad of ['no guild', '_x', '9lives', 'x', `A${'b'.repeat(40)}`, 'NO_GUILD<script>', 42]) {
+      assert.equal('code' in serialiseError({ message: 'x', code: bad }), false, String(bad));
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------------------------
@@ -120,15 +135,14 @@ describe('method list', () => {
     assert.deepEqual([...gc.channels], EVENT_CHANNELS, 'preload.js CHANNELS');
     assert.deepEqual(rendererList('lib/gc.js', 'METHODS'), METHOD_NAMES, 'lib/gc.js METHODS');
     assert.deepEqual(rendererList('lib/gc.js', 'CHANNELS'), EVENT_CHANNELS, 'lib/gc.js CHANNELS');
-    for (const m of ['wow.detectGuild', 'guild.autoJoin', 'membership.status']) assert.ok(METHOD_NAMES.includes(m), m);
-    assert.ok(EVENT_CHANNELS.includes('membership'));
+    for (const m of REMOVED_METHODS) assert.ok(!METHOD_NAMES.includes(m), m);
+    assert.ok(!EVENT_CHANNELS.includes('membership'));
   });
 
-  test('the sync badge has words for every sync state, including waiting for a guild', async () => {
+  test('the sync badge has words for every sync state', async () => {
     const { pathToFileURL } = require('url');
     const status = await import(pathToFileURL(path.join(__dirname, '..', 'src', 'renderer', 'lib', 'status.js')).href);
-    assert.deepEqual(status.describeSync({ state: 'no-guild' }), { kind: 'warn', label: 'Waiting to match your guild' });
-    for (const state of ['off', 'idle', 'syncing', 'error', 'signed-out', 'no-game', 'no-guild']) {
+    for (const state of ['off', 'idle', 'syncing', 'error', 'no-game']) {
       const d = status.describeSync({ state });
       assert.ok(d.label && !/undefined/.test(d.label), state);
     }
@@ -277,28 +291,26 @@ function fakeDeps(dir, overrides = {}) {
   const calls = [];
   const record = (name, value) => (...args) => { calls.push([name, ...args]); return typeof value === 'function' ? value(...args) : value; };
   const store = createStore(dir);
-  store.setSecret('deviceToken', 'gcd_signedin12345');
-  let authState = { signedIn: true, server: store.get().serverUrl, user: { battletag: 'Owner#1' }, guild: { name: 'G' }, role: 'owner' };
+  // main.js's session: Battle.net in the app plus who I am in the local core.
+  let authState = { available: true, signedIn: true, battletag: 'Owner#1', characters: [], user: { battletag: 'Owner#1' }, guild: { name: 'Camp Fire' }, role: 'owner' };
   const auth = Object.assign(new EventEmitter(), {
     state: () => authState,
     refresh: record('auth.refresh', () => authState),
     signIn: record('auth.signIn', () => authState),
-    devSignIn: record('auth.devSignIn', () => authState),
-    signOut: record('auth.signOut', () => { authState = { ...authState, signedIn: false, user: null, guild: null, role: null }; return authState; }),
-    setRole: (role) => { authState = { ...authState, role }; },
+    signOut: record('auth.signOut', () => { authState = { ...authState, signedIn: false, battletag: null }; return authState; }),
+    setGuild: (guild) => { authState = { ...authState, guild }; },
   });
   const deps = {
     store,
     log: { info() {}, warn() {}, error() {}, recent: () => [{ t: 'x', level: 'info', scope: 'app', msg: 'hi' }] },
     auth,
-    api: { request: record('api.request', (m, p, b) => ({ m, p, b })), download: record('api.download', Buffer.from('backup-bytes')) },
+    api: {
+      request: record('api.request', (m, p, b, o) => (p === '/api/calendar.ics' ? 'BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n' : { m, p, b, ...(o ? { o } : {}) })),
+      download: record('api.download', Buffer.from('backup-bytes')),
+    },
     wow: {
       findInstalls: record('wow.findInstalls', []),
       detectGuild: record('wow.detectGuild', { characters: [{ name: 'Thrallia', guild: 'Just Now WoW' }], guild: { name: 'Just Now WoW', realm: 'Forever', faction: 'Horde' } }),
-    },
-    membership: {
-      autoJoin: record('membership.autoJoin', { status: 'joined', guild: { id: 1, name: 'Just Now WoW', faction: 'Horde' }, role: 'member', via: 'roster', character: 'Thrallia', reason: "You're in Just Now WoW.", detected: null }),
-      status: record('membership.status', null),
     },
     sync: { status: () => ({ state: 'idle' }), syncNow: record('sync.syncNow', { state: 'syncing' }), setEnabled: record('sync.setEnabled') },
     addon: {
@@ -314,7 +326,6 @@ function fakeDeps(dir, overrides = {}) {
     dialog: {
       showOpenDialog: record('dialog.showOpenDialog', { canceled: false, filePaths: [dir] }),
       showSaveDialog: record('dialog.showSaveDialog', { canceled: false, filePath: path.join(dir, 'saved.zip') }),
-      showMessageBox: record('dialog.showMessageBox', { response: 0 }), // "Switch"
     },
     getWindow: () => null,
     appInfo: () => ({ version: '0.11.0' }),
@@ -333,9 +344,9 @@ describe('buildMethods', () => {
   test('settings.set validates, persists and returns settings', async () => {
     const { deps, store } = fakeDeps(tmp);
     const m = buildMethods(deps);
-    const out = await m['settings.set']({ theme: 'dark', lastEventId: 999 });
+    const out = await m['settings.set']({ theme: 'dark', windowBounds: { x: 999 } });
     assert.equal(out.theme, 'dark');
-    assert.equal(store.get().lastEventId, 0, 'internal keys from the renderer are ignored');
+    assert.equal(store.get().windowBounds, null, 'internal keys from the renderer are ignored');
     await assert.rejects(m['settings.set']({ theme: 'neon' }), /system, light or dark/);
   });
 
@@ -347,7 +358,7 @@ describe('buildMethods', () => {
     assert.deepEqual(calls.find((c) => c[0] === 'sync.setEnabled'), ['sync.setEnabled', false]);
     assert.equal(store.get().startWithWindows, true);
     assert.equal(store.get().syncEnabled, false);
-    assert.equal(store.get().startupDefaulted, true, 'a choice made by the person is never overridden by the first sign-in default');
+    assert.equal(store.get().startupDefaulted, true, 'a choice made by the person is never overridden by the first-launch default');
   });
 
   test('settings.set accepts addonAutoInstall but not the app-managed keys', async () => {
@@ -360,17 +371,14 @@ describe('buildMethods', () => {
     await assert.rejects(m['settings.set']({ addonAutoInstall: 'yes' }), /on or off/);
   });
 
-  test('wow.detectGuild reads the folders from settings; guild.autoJoin and membership.status reach membership', async () => {
+  test('wow.detectGuild reads the folders from settings', async () => {
     const { deps, calls, store } = fakeDeps(tmp);
     store.set({ extraWowFolders: [tmp] });
     const m = buildMethods(deps);
     const found = await m['wow.detectGuild']();
     assert.equal(found.guild.name, 'Just Now WoW');
     assert.deepEqual(calls.find((c) => c[0] === 'wow.detectGuild'), ['wow.detectGuild', { extraRoots: [path.resolve(tmp)], scanDefaults: true }]);
-    const result = await m['guild.autoJoin']();
-    assert.equal(result.status, 'joined');
-    assert.equal(await m['membership.status'](), null);
-    assert.deepEqual(names(calls), ['wow.detectGuild', 'membership.autoJoin', 'membership.status']);
+    for (const gone of REMOVED_METHODS) assert.equal(m[gone], undefined, gone);
   });
 
   test('a failing startup change leaves the setting unchanged', async () => {
@@ -381,79 +389,32 @@ describe('buildMethods', () => {
     assert.equal(store.get().startWithWindows, false);
   });
 
-  test('changing the server signs out first, resets the event cursor and re-checks updates', async () => {
+  test('settings.set takes the Discord webhook and the Battle.net region; there is no server address any more', async () => {
     const { deps, calls, store } = fakeDeps(tmp);
-    store.set({ lastEventId: 55 });
     const m = buildMethods(deps);
-    let serverAtSignOut = null;
-    const realSignOut = deps.auth.signOut;
-    deps.auth.signOut = (...a) => { serverAtSignOut = store.get().serverUrl; return realSignOut(...a); };
-    const out = await m['settings.set']({ serverUrl: 'https://other.example.com/' });
-    await new Promise((r) => setImmediate(r));
-    assert.equal(out.serverUrl, 'https://other.example.com');
-    assert.equal(serverAtSignOut, 'https://wow.cjplumbing.co.za', 'signs out against the old server');
-    assert.equal(store.get().lastEventId, 0);
-    assert.equal(names(calls)[0], 'dialog.showMessageBox', 'confirmed before anything changes');
-    assert.ok(names(calls).includes('auth.refresh'));
-    assert.ok(names(calls).includes('updater.check'));
-    assert.ok(names(calls).includes('addon.check'));
-  });
-
-  test('a server change from the page is confirmed in a native dialog on the main window', async () => {
-    const win = { isDestroyed: () => false, id: 'main' };
-    const { deps, calls } = fakeDeps(tmp, { getWindow: () => win });
-    const m = buildMethods(deps);
-    await m['settings.set']({ serverUrl: 'https://other.example.com:8443/guild', theme: 'dark' });
-    const [, parentWin, opts] = calls.find((c) => c[0] === 'dialog.showMessageBox');
-    assert.equal(parentWin, win);
-    assert.equal(opts.message, "Switch Guild Camp to other.example.com:8443? You'll be signed out.");
-    assert.deepEqual(opts.buttons, ['Switch', 'Cancel']);
-    assert.equal(opts.cancelId, 1);
-    assert.match(opts.detail, /https:\/\/other\.example\.com:8443\/guild/);
-  });
-
-  test('Cancel leaves everything as it was and rejects with a quiet "cancelled" error', async () => {
-    const { deps, calls, store } = fakeDeps(tmp);
-    deps.dialog.showMessageBox = async (...a) => { calls.push(['dialog.showMessageBox', ...a]); return { response: 1 }; };
-    store.set({ lastEventId: 55 });
-    const warnings = [];
-    const m = buildMethods(deps);
-    const res = await dispatch(m, 'settings.set', [{ serverUrl: 'https://evil.example.com', theme: 'dark' }], { log: { warn: (x) => warnings.push(x), error() {} } });
-    assert.equal(res.ok, false);
-    assert.equal(res.error.code, 'cancelled', 'the welcome and settings pages can ignore it');
-    assert.equal(store.get().serverUrl, 'https://wow.cjplumbing.co.za');
-    assert.equal(store.get().theme, 'system', 'nothing in that call is applied');
-    assert.equal(store.get().lastEventId, 55);
-    assert.deepEqual(names(calls), ['dialog.showMessageBox'], 'no sign-out, no checks');
-    assert.deepEqual(warnings, [], 'a cancel is not logged as a failure');
-  });
-
-  test('without a way to ask, the server is not changed; changes made by the app itself never ask', async () => {
-    const { deps, calls, store } = fakeDeps(tmp);
-    delete deps.dialog.showMessageBox;
-    const m = buildMethods(deps);
-    await assert.rejects(m['settings.set']({ serverUrl: 'https://evil.example.com' }), /kept the old one/);
-    assert.equal(store.get().serverUrl, 'https://wow.cjplumbing.co.za');
-    // Other settings from the page, and settings the app writes itself (folders), need no dialog.
-    await m['settings.set']({ theme: 'dark' });
-    await m['wow.addFolder'](tmp);
-    assert.equal(calls.filter((c) => c[0] === 'dialog.showMessageBox').length, 0);
+    const out = await m['settings.set']({ discordWebhook: ' https://discord.com/api/webhooks/9/abc ', bnetRegion: 'us' });
+    assert.equal(out.discordWebhook, 'https://discord.com/api/webhooks/9/abc');
+    assert.equal(out.bnetRegion, 'us');
+    await assert.rejects(m['settings.set']({ discordWebhook: 'https://example.com/hook' }), /isn't a Discord webhook address/);
+    await assert.rejects(m['settings.set']({ serverUrl: 'https://other.example.com' }), /not a setting/);
+    assert.equal(store.get().discordWebhook, 'https://discord.com/api/webhooks/9/abc', 'a refused value changes nothing');
+    assert.equal((await m['settings.set']({ discordWebhook: '' })).discordWebhook, null);
+    assert.ok(!names(calls).includes('auth.signOut'), 'nothing signs anyone out');
   });
 
   test('settings.set with no real change does nothing', async () => {
     const { deps, calls } = fakeDeps(tmp);
-    await buildMethods(deps)['settings.set']({ serverUrl: 'https://wow.cjplumbing.co.za/' });
+    await buildMethods(deps)['settings.set']({ theme: 'system', bnetRegion: 'eu' });
     assert.deepEqual(calls, []);
   });
 
-  test('api.request only allows /api/ paths, never sign-in endpoints, and passes the call on', async () => {
+  test('api.request only allows /api/ paths and passes the call on to the local core', async () => {
     const { deps, calls } = fakeDeps(tmp);
     const m = buildMethods(deps);
     assert.deepEqual(await m['api.request']('get', '/api/raids'), { m: 'GET', p: '/api/raids', b: undefined });
     await assert.rejects(m['api.request']('GET', '/updates/app/latest.yml'), /\/api\//);
     await assert.rejects(m['api.request']('GET', 'https://evil.example/api/x'), /\/api\//);
     await assert.rejects(m['api.request']('GET', '/api/../auth'), /\/api\//);
-    await assert.rejects(m['api.request']('POST', '/api/auth/dev', { battletag: 'X#1' }), /sign-in/);
     await assert.rejects(m['api.request']('TRACE', '/api/raids'), /GET, POST/);
     assert.equal(calls.filter((c) => c[0] === 'api.request').length, 1);
   });
@@ -473,43 +434,69 @@ describe('buildMethods', () => {
     ]) {
       await assert.rejects(m['api.request']('GET', bad), /\/api\//, bad);
     }
-    assert.equal(calls.filter((c) => c[0] === 'api.request').length, 4, 'none of those reached the server');
+    assert.equal(calls.filter((c) => c[0] === 'api.request').length, 4, 'none of those reached the core');
   });
 
-  test('api.request refuses sign-in endpoints in any spelling, and publishing (that goes through publisher.*)', async () => {
-    const { deps, calls } = fakeDeps(tmp);
-    const m = buildMethods(deps);
-    for (const p of ['/api/auth', '/api/auth/dev', '/api/AUTH/dev', '/api/Auth/dev/', '/api/%61uth/dev', '/api/auth?x=1', '/api/auth.json']) {
-      await assert.rejects(m['api.request']('POST', p, {}), /sign-in/, p);
-    }
-    for (const p of ['/api/publish/addon?force=1', '/api/publish/app/commit', '/api/PUBLISH/app/files/x.exe', '/api/publish']) {
-      await assert.rejects(m['api.request']('PUT', p, {}), /Releases page/, p);
-    }
-    await m['api.request']('GET', '/api/authors'); // only the auth route itself is off limits
-    await m['api.request']('GET', '/api/releases');
-    assert.equal(calls.filter((c) => c[0] === 'api.request').length, 2);
-  });
-
-  test('api.download uses the same path rules (plus /updates/)', async () => {
+  test('api.download uses the same path rules', async () => {
     const { checkDownloadPath, serverPathname } = ipc;
-    assert.equal(checkDownloadPath('/updates/addon/WowGuild-0.11.1.zip'), '/updates/addon/WowGuild-0.11.1.zip');
     assert.equal(checkDownloadPath('/api/admin/backups/latest?name=a..b'), '/api/admin/backups/latest');
-    assert.throws(() => checkDownloadPath('/updates/%2e%2e/api/auth/dev'), /\/api\/ or \/updates\//);
-    assert.throws(() => checkDownloadPath('/api/auth/dev'), /cannot be downloaded/);
-    assert.throws(() => checkDownloadPath('/api/publish/addon'), /cannot be downloaded/);
-    assert.throws(() => checkDownloadPath('/data/guild.db'), /\/api\/ or \/updates\//);
+    assert.throws(() => checkDownloadPath('/updates/addon/WowGuild-0.11.1.zip'), /\/api\//, 'nothing is served from /updates/ any more');
+    assert.throws(() => checkDownloadPath('/api/%2e%2e/x'), /\/api\//);
+    assert.throws(() => checkDownloadPath('/data/guild.db'), /\/api\//);
     assert.equal(serverPathname('/api/x?y=../..'), '/api/x');
     assert.equal(serverPathname('/api/a/../b'), null);
     assert.equal(serverPathname(42), null);
   });
 
-  test('api.request refreshes the session after guild/member changes', async () => {
+  test('api.request no longer refreshes anything itself: the core announces session changes', async () => {
     const { deps, calls } = fakeDeps(tmp);
     const m = buildMethods(deps);
-    await m['api.request']('POST', '/api/guild/join', { code: 'abc' });
-    assert.deepEqual(names(calls), ['api.request', 'auth.refresh']);
-    await m['api.request']('POST', '/api/raids', { title: 'MC' });
-    assert.deepEqual(names(calls), ['api.request', 'auth.refresh', 'api.request']);
+    await m['api.request']('PUT', '/api/guild/settings', { officer_rank_max: 2 });
+    assert.deepEqual(names(calls), ['api.request']);
+  });
+
+  test('calendar.export saves the .ics from the core with a save dialog', async () => {
+    const { deps, calls } = fakeDeps(tmp);
+    deps.dialog.showSaveDialog = async (win, opts) => { calls.push(['dialog.showSaveDialog', win, opts]); return { canceled: false, filePath: path.join(tmp, 'raids.ics') }; };
+    const m = buildMethods(deps);
+    const saved = await m['calendar.export']();
+    assert.equal(saved, path.join(tmp, 'raids.ics'));
+    assert.equal(fs.readFileSync(saved, 'utf8'), 'BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n');
+    const req = calls.find((c) => c[0] === 'api.request');
+    assert.deepEqual(req.slice(1), ['GET', '/api/calendar.ics', undefined, { raw: true }]);
+    const dlg = calls.find((c) => c[0] === 'dialog.showSaveDialog')[2];
+    assert.equal(dlg.defaultPath, path.join(tmp, 'Camp Fire raids.ics'), 'named after the guild');
+    assert.deepEqual(dlg.filters, [{ name: 'Calendar file', extensions: ['ics'] }]);
+    // Cancelled: nothing written.
+    deps.dialog.showSaveDialog = async () => ({ canceled: true });
+    assert.equal(await buildMethods(deps)['calendar.export'](), null);
+    // Not an iCalendar reply: a plain error.
+    deps.api.request = async () => '{"error":"x"}';
+    await assert.rejects(buildMethods(deps)['calendar.export'](), /couldn't make the calendar file/);
+  });
+
+  test('secrets: only the Anthropic key, set or cleared, never read back', async () => {
+    const { deps, store } = fakeDeps(tmp);
+    const m = buildMethods(deps);
+    assert.equal(await m['secrets.has']('anthropicKey'), false);
+    const r = await m['secrets.set']('anthropicKey', '  sk-ant-api03-abcdefghijklmnopqrstuvwxyz  ');
+    assert.equal(r.name, 'anthropicKey');
+    assert.equal(r.set, true);
+    assert.equal(typeof r.encrypted, 'boolean');
+    assert.ok(!JSON.stringify(r).includes('sk-ant'), 'the value is never sent back');
+    assert.equal(store.getSecret('anthropicKey'), 'sk-ant-api03-abcdefghijklmnopqrstuvwxyz');
+    assert.equal(await m['secrets.has']('anthropicKey'), true);
+    for (const bad of ['short', 'has spaces in the middle of it ok', 'x'.repeat(400), 42]) {
+      await assert.rejects(m['secrets.set']('anthropicKey', bad), (err) => err.status === 400, String(bad).slice(0, 20));
+    }
+    assert.equal(store.getSecret('anthropicKey'), 'sk-ant-api03-abcdefghijklmnopqrstuvwxyz', 'a refused value changes nothing');
+    for (const other of ['bnetToken', 'deviceToken', '__proto__', undefined]) {
+      await assert.rejects(m['secrets.set'](other, 'sk-ant-api03-abcdefghijklmnopqrstuvwxyz'), /doesn't keep that/);
+      await assert.rejects(Promise.resolve().then(() => m['secrets.has'](other)), /doesn't keep that/);
+    }
+    assert.deepEqual(await m['secrets.set']('anthropicKey', ''), { name: 'anthropicKey', set: false, encrypted: store.secretsEncrypted() });
+    assert.equal(store.getSecret('anthropicKey'), null);
+    assert.equal(await m['secrets.has']('anthropicKey'), false);
   });
 
   test('api.download asks where to save, then writes the file', async () => {
@@ -520,7 +507,7 @@ describe('buildMethods', () => {
     assert.equal(fs.readFileSync(saved, 'utf8'), 'backup-bytes');
     const dialogCall = calls.find((c) => c[0] === 'dialog.showSaveDialog');
     assert.equal(dialogCall[2].defaultPath, path.join(tmp, 'guild_backup_.db'));
-    await assert.rejects(m['api.download']('/etc/passwd'), /\/api\/ or \/updates\//);
+    await assert.rejects(m['api.download']('/etc/passwd'), /\/api\//);
   });
 
   test('api.download returns null when the dialog is cancelled', async () => {
@@ -576,13 +563,13 @@ describe('buildMethods', () => {
     assert.deepEqual(calls.find((c) => c[0] === 'sync.setEnabled'), ['sync.setEnabled', false]);
   });
 
-  test('publishing is owner only', async () => {
+  test('publishing goes straight to the publisher, which checks the gh CLI itself (guild rank plays no part)', async () => {
     const { deps, calls, auth } = fakeDeps(tmp);
     const m = buildMethods(deps);
+    auth.setGuild(null);
     assert.equal(await m['publisher.publishAddon']({ bump: 'patch', notes: 'x' }), 'ok');
-    auth.setRole('officer');
-    await assert.rejects(m['publisher.publishApp']({ bump: 'minor' }), (err) => err.status === 403 && /owner/.test(err.message));
-    assert.equal(calls.filter((c) => c[0] === 'publisher.publishApp').length, 0);
+    assert.equal(await m['publisher.publishApp']('not an object'), 'ok');
+    assert.deepEqual(calls.filter((c) => c[0].startsWith('publisher.')), [['publisher.publishAddon', { bump: 'patch', notes: 'x' }], ['publisher.publishApp', {}]]);
   });
 
   test('addon.openFolder only opens folders of known installs', async () => {
@@ -599,11 +586,12 @@ describe('buildMethods', () => {
     await m['addon.install']('D:\\WoW\\_forever_');
     await m['updater.check']();
     await m['notify.test']();
-    await m['auth.devSignIn']('Dev#1');
+    await m['auth.signIn']();
     await m['auth.state']({ refresh: true });
+    assert.equal(m['auth.state']().guild.name, 'Camp Fire');
     assert.deepEqual(m['log.recent']()[0].msg, 'hi');
     assert.deepEqual(m['app.rendererReady']({ routes: ['/'] }), { smoke: false });
-    assert.deepEqual(names(calls), ['addon.install', 'updater.check', 'notify.test', 'auth.devSignIn', 'auth.refresh', 'rendererReady']);
+    assert.deepEqual(names(calls), ['addon.install', 'updater.check', 'notify.test', 'auth.signIn', 'auth.refresh', 'rendererReady']);
   });
 });
 
@@ -621,7 +609,6 @@ describe('forwardEvents', () => {
     s.publisher.emit('log', 'building');
     s.log.emit('line', { msg: 'x' });
     s.store.emit('change', { theme: 'dark' }, ['theme']);
-    s.store.emit('change', { lastEventId: 3 }, ['lastEventId']);
     s.store.emit('change', { windowBounds: {} }, ['windowBounds']);
     assert.deepEqual(sent.map((x) => x[0]), ['auth', 'sync', 'addon', 'updater', 'publisher:log', 'log', 'settings']);
     off();
@@ -629,230 +616,17 @@ describe('forwardEvents', () => {
     assert.equal(sent.length, 7);
   });
 
-  test('membership results go to the membership channel; app-managed settings are not broadcast', () => {
+  test('app-managed settings are not broadcast; a membership source is ignored', () => {
     const sent = [];
     const membership = new EventEmitter();
     const store = new EventEmitter();
     const off = forwardEvents({ broadcast: (c, p) => sent.push([c, p]), membership, store });
-    const result = { status: 'no-match', guild: null, role: null, via: null, character: null, reason: 'Log in once.', detected: null };
-    membership.emit('change', result);
+    membership.emit('change', { status: 'joined' });
     store.emit('change', { startupDefaulted: true }, ['startupDefaulted']);
     store.emit('change', { addonOptOut: [] }, ['addonOptOut']);
     store.emit('change', { startWithWindows: true, startupDefaulted: true }, ['startWithWindows', 'startupDefaulted']);
-    assert.deepEqual(sent.map((x) => x[0]), ['membership', 'settings']);
-    assert.deepEqual(sent[0][1], result);
+    assert.deepEqual(sent.map((x) => x[0]), ['settings']);
     off();
-    membership.emit('change', result);
-    assert.equal(sent.length, 2);
-  });
-});
-
-// ---------------------------------------------------------------------------------------------
-describe('events poller', () => {
-  function setup(responses, { notifications = true, now } = {}) {
-    const store = createStore(tmp);
-    store.set({ notifications });
-    const requests = [];
-    const api = {
-      request: async (method, p) => {
-        requests.push(p);
-        const r = responses.shift();
-        if (r instanceof Error) throw r;
-        return r;
-      },
-    };
-    const shown = [];
-    const sent = [];
-    const warnings = [];
-    const events = createEvents({
-      api, store,
-      notify: { show: (ev) => shown.push(ev) },
-      broadcast: (c, p) => sent.push([c, p]),
-      log: { warn: (m) => warnings.push(m), info() {} },
-      now,
-    });
-    return { store, events, requests, shown, sent, warnings };
-  }
-
-  test('first poll only records the latest id (no replay of old news)', async () => {
-    const t = setup([{ events: [{ id: 3, kind: 'raid', title: 'Old' }], latestId: 7 }]);
-    assert.deepEqual(await t.events.poll(), []);
-    assert.deepEqual(t.requests, ['/api/events']);
-    assert.equal(t.store.get().lastEventId, 7);
-    assert.equal(t.shown.length, 0);
-    assert.equal(t.sent.length, 0);
-  });
-
-  test('later polls pass after=, broadcast server-event, notify and advance', async () => {
-    const t = setup([
-      { events: [], latestId: 7 },
-      { events: [{ id: 9, kind: 'cta', title: 'Call to arms', body: 'Onyxia', route: '/' }, { id: 8, kind: 'raid', title: 'New raid', route: '/raids/4' }], latestId: 9 },
-    ]);
-    await t.events.poll();
-    const fresh = await t.events.poll();
-    assert.deepEqual(t.requests, ['/api/events', '/api/events?after=7']);
-    assert.deepEqual(fresh.map((e) => e.id), [8, 9], 'delivered in id order');
-    assert.deepEqual(t.sent.map((s) => [s[0], s[1].id]), [['server-event', 8], ['server-event', 9]]);
-    assert.deepEqual(t.shown.map((e) => e.title), ['New raid', 'Call to arms']);
-    assert.equal(t.store.get().lastEventId, 9);
-  });
-
-  test('a feed at 0 (not in a guild yet) re-primes, so joining a guild does not replay its history', async () => {
-    const t = setup([
-      { events: [], latestId: 0 },
-      { events: [], latestId: 40 },
-      { events: [{ id: 41, kind: 'notice', title: 'Welcome' }], latestId: 41 },
-    ]);
-    t.store.set({ lastEventId: 12 }); // left over from a previous guild
-    await t.events.poll();
-    assert.equal(t.store.get().lastEventId, 0);
-    await t.events.poll();
-    await t.events.poll();
-    assert.deepEqual(t.requests, ['/api/events?after=12', '/api/events', '/api/events?after=40']);
-    assert.deepEqual(t.shown.map((e) => e.title), ['Welcome']);
-  });
-
-  test('adopts latestId even when it moved past events meant for other members', async () => {
-    const t = setup([{ events: [{ id: 11, kind: 'raid', title: 'Mine' }], latestId: 15 }, { events: [], latestId: 15 }]);
-    t.store.set({ lastEventId: 10 });
-    await t.events.poll();
-    assert.equal(t.store.get().lastEventId, 15);
-    await t.events.poll();
-    assert.deepEqual(t.requests, ['/api/events?after=10', '/api/events?after=15']);
-  });
-
-  test('a full page of 100 is followed by another call straight away', async () => {
-    const page = Array.from({ length: 100 }, (_, i) => ({ id: 101 + i, kind: 'request', title: `R${i}` }));
-    const t = setup([{ events: page, latestId: 200 }, { events: [{ id: 205, kind: 'raid', title: 'Last' }], latestId: 205 }]);
-    t.store.set({ lastEventId: 100 });
-    const fresh = await t.events.poll();
-    assert.equal(fresh.length, 101);
-    assert.deepEqual(t.requests, ['/api/events?after=100', '/api/events?after=200']);
-    assert.equal(t.store.get().lastEventId, 205);
-    assert.equal(t.shown.length, 4, 'one burst per poll: 3 popups + 1 summary');
-    assert.match(t.shown[3].body, /98 more updates/);
-    assert.equal(t.sent.length, 101);
-  });
-
-  test('a stored cursor is used straight away on the next start', async () => {
-    const t = setup([{ events: [{ id: 12, kind: 'bank', title: 'Bank request' }], latestId: 12 }]);
-    t.store.set({ lastEventId: 10 });
-    await t.events.poll();
-    assert.deepEqual(t.requests, ['/api/events?after=10']);
-    assert.equal(t.shown.length, 1);
-  });
-
-  test('no popups when notifications are off (events still reach the renderer)', async () => {
-    const t = setup([{ events: [{ id: 2, kind: 'raid', title: 'R' }], latestId: 2 }], { notifications: false });
-    t.store.set({ lastEventId: 1 });
-    await t.events.poll();
-    assert.equal(t.shown.length, 0);
-    assert.equal(t.sent.length, 1);
-  });
-
-  test('a burst shows at most 3 popups plus a summary', async () => {
-    const list = Array.from({ length: 6 }, (_, i) => ({ id: 20 + i, kind: 'request', title: `R${i}` }));
-    const t = setup([{ events: list, latestId: 25 }]);
-    t.store.set({ lastEventId: 19 });
-    await t.events.poll();
-    assert.deepEqual(t.shown.map((e) => e.title), ['R0', 'R1', 'R2', 'Guild Camp']);
-    assert.match(t.shown[3].body, /3 more updates/);
-    assert.equal(t.sent.length, 6);
-  });
-
-  test('old events (from while the app was closed) arrive without popups', async () => {
-    const now = () => Date.parse('2026-11-07T12:00:00Z');
-    const t = setup([{ events: [{ id: 5, kind: 'raid', title: 'Old', createdAt: '2026-11-06 01:00:00' }, { id: 6, kind: 'raid', title: 'New', createdAt: '2026-11-07 11:59:00' }], latestId: 6 }], { now });
-    t.store.set({ lastEventId: 4 });
-    await t.events.poll();
-    assert.deepEqual(t.shown.map((e) => e.title), ['New']);
-    assert.equal(t.sent.length, 2);
-  });
-
-  test('a server whose feed is behind our cursor (reset) moves the cursor back', async () => {
-    const t = setup([{ events: [], latestId: 3 }]);
-    t.store.set({ lastEventId: 50 });
-    await t.events.poll();
-    assert.equal(t.store.get().lastEventId, 3);
-  });
-
-  test('failures are logged once per outage and never throw', async () => {
-    const err = Object.assign(new Error("Can't reach the guild server"), { status: 0 });
-    const t = setup([err, err, { events: [], latestId: 1 }]);
-    t.store.set({ lastEventId: 1 });
-    assert.deepEqual(await t.events.poll(), []);
-    assert.deepEqual(await t.events.poll(), []);
-    await t.events.poll();
-    assert.equal(t.warnings.length, 1);
-  });
-
-  test('readFeed accepts a bare array too', () => {
-    assert.deepEqual(readFeed([{ id: '2' }, { id: 1 }, null, { nope: 1 }]), { events: [{ id: 1 }, { id: 2 }], maxId: 2, latestId: null });
-  });
-
-  test('start/stop manage the timer', () => {
-    const t = setup([{ events: [], latestId: 1 }]);
-    t.events.start();
-    assert.equal(t.events.running(), true);
-    t.events.start();
-    t.events.stop();
-    assert.equal(t.events.running(), false);
-  });
-
-  test('a new server address (without a sign-out) does not replay that server\'s last two weeks', async () => {
-    const replay = Array.from({ length: 5 }, (_, i) => ({ id: 100 + i, kind: 'raid', title: `Old ${i}` }));
-    const t = setup([{ events: [], latestId: 7 }, { events: replay, latestId: 104 }]);
-    await t.events.poll(); // primed on the old server
-    // ipc.js writes lastEventId 0 in the same change as the new address.
-    t.store.set({ serverUrl: 'https://other.example.com', lastEventId: 0 });
-    assert.deepEqual(await t.events.poll(), []);
-    assert.deepEqual(t.requests, ['/api/events', '/api/events'], 'a first look, not ?after=0');
-    assert.equal(t.shown.length, 0);
-    assert.equal(t.store.get().lastEventId, 104);
-  });
-
-  test('switching servers (sign-out, new address, sign-in) learns the new feed without notifications', async () => {
-    const replay = Array.from({ length: 5 }, (_, i) => ({ id: 100 + i, kind: 'raid', title: `Old ${i}` }));
-    const t = setup([
-      { events: [], latestId: 7 },
-      { events: replay, latestId: 104 }, // the new server's whole feed
-      { events: [{ id: 105, kind: 'cta', title: 'New' }], latestId: 105 },
-    ]);
-    t.events.start();
-    await new Promise((r) => setImmediate(r));
-    t.events.stop(); // signed out
-    t.store.set({ serverUrl: 'https://other.example.com', lastEventId: 0 });
-    t.events.start(); // signed in on the new server
-    await new Promise((r) => setImmediate(r));
-    t.events.stop();
-    await t.events.poll();
-    assert.deepEqual(t.requests, ['/api/events', '/api/events', '/api/events?after=104']);
-    assert.deepEqual(t.shown.map((e) => e.title), ['New'], 'no replay of the new server\'s history');
-  });
-
-  test('stop() forgets the feed position only when there is no stored cursor', async () => {
-    const t = setup([{ events: [], latestId: 0 }, { events: [], latestId: 30 }, { events: [], latestId: 30 }]);
-    await t.events.poll(); // not in a guild: not primed
-    t.store.set({ lastEventId: 0 });
-    await t.events.poll(); // first look → 30
-    t.events.stop();
-    await t.events.poll(); // a stored cursor resumes straight away
-    assert.deepEqual(t.requests, ['/api/events', '/api/events', '/api/events?after=30']);
-  });
-
-  test('an answer that arrives after the server changed is dropped', async () => {
-    const store = createStore(tmp);
-    store.set({ lastEventId: 10 });
-    let release;
-    const api = { request: () => new Promise((r) => { release = r; }) };
-    const shown = [];
-    const events = createEvents({ api, store, notify: { show: (ev) => shown.push(ev) }, broadcast() {}, log: { warn() {}, info() {} } });
-    const p = events.poll();
-    store.set({ serverUrl: 'https://other.example.com', lastEventId: 0 });
-    release({ events: [{ id: 11, kind: 'raid', title: 'From the old server' }], latestId: 11 });
-    assert.deepEqual(await p, []);
-    assert.equal(shown.length, 0);
-    assert.equal(store.get().lastEventId, 0, 'the old server\'s cursor is not written for the new one');
   });
 });
 
@@ -905,54 +679,22 @@ describe('app:// protocol paths', () => {
 });
 
 // ---------------------------------------------------------------------------------------------
-describe('sign-in URL handling', () => {
-  const server = 'https://guild.example.com';
-
-  test('builds the Battle.net start URL with device details', () => {
-    const url = new URL(signInUrl(`${server}/`, { device: "Calvin's PC", platform: 'win32', appVersion: '0.11.0' }));
-    assert.equal(url.origin + url.pathname, `${server}/auth/bnet`);
-    assert.equal(url.searchParams.get('device'), "Calvin's PC");
-    assert.equal(url.searchParams.get('platform'), 'win32');
-    assert.equal(url.searchParams.get('appVersion'), '0.11.0');
-  });
-
-  test('finds the token on the done page', () => {
-    assert.deepEqual(parseDoneUrl(`${server}/auth/app/done#token=gcd_abcDEF123_-xyz`, server), { token: 'gcd_abcDEF123_-xyz' });
-    assert.deepEqual(parseDoneUrl(`${server}/auth/app/done/#token=gcd_abcDEF123_-xyz&x=1`, server), { token: 'gcd_abcDEF123_-xyz' });
-  });
-
-  test('reports errors from the done page', () => {
-    assert.deepEqual(parseDoneUrl(`${server}/auth/app/done#error=Battle.net%20said%20no`, server), { error: 'Battle.net said no' });
-  });
-
-  test('ignores other pages, other servers and malformed tokens', () => {
-    assert.equal(parseDoneUrl('https://oauth.battle.net/authorize?x=1', server), null);
-    assert.equal(parseDoneUrl(`${server}/auth/app/done`, server), null);
-    assert.equal(parseDoneUrl(`${server}/auth/app/done#token=wowg_oldkey`, server), null);
-    assert.equal(parseDoneUrl('https://evil.example/auth/app/done#token=gcd_abcDEF123456', server), null);
-    assert.equal(parseDoneUrl('not a url', server), null);
-  });
-});
-
-// ---------------------------------------------------------------------------------------------
 describe('main.js helpers', () => {
   test('parseArgs reads flags in both --x=v and --x v forms', () => {
-    const a = parseArgs(['.', '--hidden', '--user-data', 'C:\\tmp\\gc', '--smoke', '--smoke-routes=/,/raids, /bank', '--smoke-login=Dev#1234', '--smoke-out=out']);
-    assert.deepEqual(a, { hidden: true, dev: false, smoke: true, smokeScan: false, userData: 'C:\\tmp\\gc', smokeLogin: 'Dev#1234', smokeRoutes: ['/', '/raids', '/bank'], smokeOut: 'out' });
-    assert.equal(parseArgs(['--user-data', 'guildcamp://join/x']).userData, null, 'a join link is never taken as a value');
+    const a = parseArgs(['.', '--hidden', '--user-data', 'C:\\tmp\\gc', '--smoke', '--smoke-seed', '--smoke-routes=/,/raids, /bank', '--smoke-login=Dev#1234', '--smoke-out=out', '--smoke-user-data=scratch']);
+    assert.deepEqual(a, { hidden: true, dev: false, smoke: true, smokeScan: false, smokeSeed: true, userData: 'C:\\tmp\\gc', smokeUserData: 'scratch', smokeRoutes: ['/', '/raids', '/bank'], smokeOut: 'out' });
+    assert.equal(parseArgs(['--user-data', 'guildcamp://raids/1']).userData, null, 'a link is never taken as a value');
+    assert.equal(parseArgs(['--smoke']).smokeSeed, false);
     assert.deepEqual(parseArgs([]).smokeRoutes, null);
   });
 
-  test('join links become the welcome route', () => {
-    assert.equal(deepLinkRoute('guildcamp://join/AbC123'), '/welcome?join=AbC123');
-    assert.equal(deepLinkRoute('guildcamp://join/AbC123/'), '/welcome?join=AbC123');
-    assert.equal(deepLinkRoute('GUILDCAMP://JOIN/xyz'), '/welcome?join=xyz');
-    assert.equal(deepLinkRoute('guildcamp://join/bad code!'), null);
-    assert.equal(deepLinkRoute('guildcamp://join/'), null);
+  test('links open read-only pages; join links are gone and just focus the app', () => {
+    assert.equal(deepLinkRoute('guildcamp://join/AbC123'), null);
+    assert.equal(deepLinkRoute('GUILDCAMP://JOIN/xyz'), null);
     assert.equal(deepLinkRoute('guildcamp://other/abc'), null);
     assert.equal(deepLinkRoute('https://join/abc'), null);
     assert.equal(deepLinkRoute(undefined), null);
-    // Read-only app pages open directly (server pages such as /raids/:id link here).
+    // Read-only app pages open directly.
     assert.equal(deepLinkRoute('guildcamp://raids/12'), '/raids/12');
     assert.equal(deepLinkRoute('guildcamp://raids/12/loot'), '/raids/12/loot');
     assert.equal(deepLinkRoute('guildcamp://characters/Zul%C3%A9'), '/characters/Zul%C3%A9');
@@ -963,7 +705,7 @@ describe('main.js helpers', () => {
   });
 
   test('finds the link among Windows launch arguments', () => {
-    assert.equal(findDeepLink(['C:\\GC\\Guild Camp.exe', '--allow-file-access-from-files', 'guildcamp://join/abc']), 'guildcamp://join/abc');
+    assert.equal(findDeepLink(['C:\\GC\\Guild Camp.exe', '--allow-file-access-from-files', 'guildcamp://raids/12']), 'guildcamp://raids/12');
     assert.equal(findDeepLink(['x', '--hidden']), null);
   });
 
@@ -971,24 +713,7 @@ describe('main.js helpers', () => {
     assert.equal(routeSlug('/'), 'home');
     assert.equal(routeSlug('/raids'), 'raids');
     assert.equal(routeSlug('/guild-settings'), 'guild-settings');
-    assert.equal(routeSlug('/welcome?join=abc'), 'welcome-join-abc');
-  });
-
-  test('throttle: the profile is re-read at most once per gap when the window is shown or focused', () => {
-    let t = 0;
-    let runs = 0;
-    const run = throttle(() => { runs += 1; }, 20000, () => t);
-    assert.equal(run(), true);
-    t = 5000;
-    assert.equal(run(), false, 'focus right after show');
-    t = 20000;
-    assert.equal(run(), true);
-    run.mark(); // the 5-minute timer just refreshed
-    t = 30000;
-    assert.equal(run(), false);
-    t = 40001;
-    assert.equal(run(), true);
-    assert.equal(runs, 3);
+    assert.equal(routeSlug('/welcome?step=game'), 'welcome-step-game');
   });
 });
 

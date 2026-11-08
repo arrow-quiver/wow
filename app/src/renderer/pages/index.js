@@ -1,6 +1,8 @@
 // The route table. Each page module: `export default function XPage({ params, query })`.
 // Fields: path (with :params), load (lazy import), title (top bar + window title), nav (sidebar section),
-// icon (components/Icon.js name), officer / owner (hidden and blocked for others), public + bare (no sign-in, no frame).
+// icon (components/Icon.js name), officer / owner (hidden and blocked for others; roles come from in-game ranks),
+// publisher (only in the sidebar on a PC that can publish releases: publisher.status().canPublish),
+// public + bare (shown before the guild is known, without the app frame).
 // Order matters: the first matching route wins.
 
 export const NAV_SECTIONS = ['Play', 'Guild', 'Officers', 'App'];
@@ -19,14 +21,15 @@ export const routes = [
   { path: '/prices', load: () => import('./prices.js'), title: 'Prices', nav: 'Guild', icon: 'prices' },
   { path: '/drives', load: () => import('./drives.js'), title: 'Drives', nav: 'Guild', icon: 'drives' },
   { path: '/loot', load: () => import('./loot.js'), title: 'Loot', nav: 'Guild', icon: 'loot' },
+  // Everyone: officer ranks (the Guild Master changes them), item tooltips, Coach AI, realm and members.
+  { path: '/guild-settings', load: () => import('./guild-settings.js'), title: 'Guild settings', nav: 'Guild', icon: 'banner' },
   // Officers
   { path: '/admin', load: () => import('./admin.js'), title: 'Officer tools', nav: 'Officers', icon: 'admin', officer: true },
-  { path: '/guild-settings', load: () => import('./guild-settings.js'), title: 'Guild settings', nav: 'Officers', icon: 'banner', officer: true },
   // App
   { path: '/addon', load: () => import('./addon.js'), title: 'Addon & sync', nav: 'App', icon: 'addon' },
   { path: '/settings', load: () => import('./settings.js'), title: 'Settings', nav: 'App', icon: 'settings' },
   { path: '/updates', load: () => import('./updates.js'), title: 'Updates', nav: 'App', icon: 'updates' },
-  { path: '/releases', load: () => import('./releases.js'), title: 'Releases', nav: 'App', icon: 'releases', owner: true },
+  { path: '/releases', load: () => import('./releases.js'), title: 'Releases', nav: 'App', icon: 'releases', publisher: true },
   // Not in the sidebar
   { path: '/raids/:id', load: () => import('./raid.js'), title: 'Raid', icon: 'raids' },
   { path: '/raids/:id/loot', load: () => import('./raid-loot.js'), title: 'Loot screen', icon: 'loot' },

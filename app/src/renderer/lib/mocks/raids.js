@@ -1,6 +1,7 @@
 // Preview sample data for the raids pages (used only when the renderer runs in a plain browser without window.gc).
-// Shapes match docs/api/raids.md. A small in-memory world so signing up, reserving, rolling and awarding work.
-import { addMockRoutes } from '../mock.js';
+// Shapes match docs/api/raids.md (the local core's routes/raids.js). A small in-memory world so signing up,
+// reserving, rolling and awarding work.
+import { addMockRoutes, httpError, needGuild, needOfficer, roleOf } from '../mock.js';
 
 const MIN = 60 * 1000;
 const HOUR = 60 * MIN;
@@ -8,12 +9,6 @@ const DAY = 24 * HOUR;
 const iso = (msFromNow) => new Date(Date.now() + msFromNow).toISOString();
 const sqlTime = (msAgo = 0) => new Date(Date.now() - msAgo).toISOString().replace('T', ' ').slice(0, 19);
 const nowSeconds = () => Math.floor(Date.now() / 1000);
-
-function httpError(status, message) {
-  const e = new Error(message);
-  e.status = status;
-  return e;
-}
 
 // People in the base mock (lib/mock.js MEMBERS) and their characters.
 const PEOPLE = {
@@ -111,9 +106,6 @@ addRaid({ id: 7, title: 'Molten Core', instance: 'Molten Core', starts_at: iso(-
 
 // ---------- helpers ----------
 
-const roleOf = (state) => (state.members.find((m) => m.id === state.userId) || {}).role || null;
-const needGuild = (state) => { if (!state.signedIn) throw httpError(401, 'Sign in first.'); if (!state.inGuild) throw httpError(403, 'Join a guild first.'); };
-const needOfficer = (state) => { needGuild(state); if (!['owner', 'officer'].includes(roleOf(state))) throw httpError(403, 'Officers only.'); };
 const raidOr404 = (id) => {
   const r = RAIDS.find((x) => String(x.id) === String(id));
   if (!r) throw httpError(404, 'That raid was not found. It may have been removed.');
@@ -205,7 +197,8 @@ addMockRoutes({
       duration_min: Number(body.duration_min) || 180, size: Math.min(40, Math.max(0, Number(body.size) || 0)) || null,
       sr_limit: kind === 'raid' ? sr : 0, notes: String(body.notes || '').trim().slice(0, 300) || null, created_by: state.userId, created_at: sqlTime(),
     });
-    return { raid: raidJson(raid), message: `${{ raid: 'Raid', pvp: 'PvP', event: 'Event' }[kind]} scheduled and posted to Discord.` };
+    // The Discord post goes out when the game confirms the raid went to the guild, so the core says just this.
+    return { raid: raidJson(raid), message: `${{ raid: 'Raid', pvp: 'PvP', event: 'Event' }[kind]} scheduled.` };
   },
   'GET /api/raids/:id': ({ params, state }) => {
     needGuild(state);
@@ -215,11 +208,14 @@ addMockRoutes({
     const items = itemsFor(r.instance).map((i) => ({ ...i, bonus: bonusOf(me, i.id), reserved: r.reserves.filter((x) => x.item_id === i.id).length,
       mine: r.reserves.some((x) => x.item_id === i.id && x.user_id === me) }));
     const creator = PEOPLE[r.created_by];
+    const mySignup = signups.find((s) => s.user_id === me) || null;
+    // Reserves travel on my sign-up, so they need one first (the core's needsSignup and canReserve).
+    const reservable = r.status === 'open' && r.kind === 'raid' && r.sr_limit > 0 && items.length > 0;
     return {
       raid: { ...raidJson(r), scheduledBy: creator ? shortName(creator.battletag) : null },
       signups,
       counts: countsOf(r.signups),
-      mySignup: signups.find((s) => s.user_id === me) || null,
+      mySignup,
       myCharacters: (PEOPLE[me] || { chars: [] }).chars,
       items,
       myReserves: myReserves(r, me),
@@ -227,7 +223,8 @@ addMockRoutes({
       loot: r.loot.slice().sort((a, b) => a.id - b.id).map(withWh),
       attended: r.attended,
       canSignUp: r.status === 'open' || r.status === 'locked',
-      canReserve: r.status === 'open' && r.kind === 'raid' && r.sr_limit > 0 && items.length > 0,
+      canReserve: reservable && Boolean(mySignup),
+      needsSignup: reservable && !mySignup,
       isOfficer: ['owner', 'officer'].includes(roleOf(state)),
     };
   },
@@ -253,6 +250,8 @@ addMockRoutes({
     if (ids.length > r.sr_limit) throw httpError(400, `You can reserve up to ${r.sr_limit} item${r.sr_limit === 1 ? '' : 's'}.`);
     const valid = new Set(itemsFor(r.instance).map((i) => i.id));
     if (ids.some((id) => !valid.has(id))) throw httpError(400, 'That item isn’t on this raid’s loot list.');
+    // My reserves travel on my sign-up record, so reserving needs a sign-up first (as in the core).
+    if (!r.signups.some((s) => s.user_id === state.userId)) throw httpError(409, 'Sign up for this raid first, then pick your reserves.');
     r.reserves = r.reserves.filter((x) => x.user_id !== state.userId).concat(ids.map((item_id) => ({ user_id: state.userId, item_id })));
     return { ok: true, myReserves: myReserves(r, state.userId), message: ids.length ? 'Reserves saved.' : 'Reserves cleared.' };
   },
