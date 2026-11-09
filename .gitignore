@@ -1,12 +1,12 @@
 node_modules/
-web/data/
+dist/
 *.db
 *.db-*
 .env
-companion/config.json
-companion/dist/
-companion/*.exe
-companion/*.zip
-web/downloads/
-companion.log
-companion.log.old
+.release.json
+server/data/
+app/dist/
+*.log
+.DS_Store
+# Battle.net client id and secret, written by scripts/release.js just before a build (never commit)
+app/src/main/bnet-credentials.json

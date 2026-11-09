@@ -1,0 +1,13 @@
+{
+  "name": "guild-camp-monorepo",
+  "private": true,
+  "version": "0.11.0",
+  "description": "Guild Camp: the desktop app and the WoW addon for a WoW: Forever guild",
+  "scripts": {
+    "postinstall": "npm --prefix app install",
+    "test": "npm run test:app",
+    "test:app": "node --test \"app/test/**/*.test.{js,mjs}\"",
+    "app": "npm --prefix app start",
+    "release": "node scripts/release.js"
+  }
+}

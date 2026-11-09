@@ -1,0 +1,87 @@
+/* Item and spell tooltips (lib/tooltip.js). The box follows the app theme; the content is Wowhead's
+   tooltip markup after sanitising, so only Wowhead's own class names appear inside it (q, q0-q7,
+   whtt-*, money*, indent). Quality colours use the app's theme-aware --q-N tokens. */
+
+.gc-tooltip {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 300; /* above modals (100) and toasts (200) */
+  max-width: min(340px, calc(100vw - 16px));
+  pointer-events: none;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-m);
+  box-shadow: var(--shadow-2);
+  padding: var(--s-2) var(--s-3);
+  font-family: var(--font-body);
+  font-size: var(--fs-s);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  will-change: transform;
+}
+.gc-tooltip[hidden] { display: none; }
+
+.gc-tooltip-inner { display: flex; gap: var(--s-2); align-items: flex-start; }
+.gc-tooltip-icon {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-s);
+  border: 1px solid var(--line-strong);
+  background: var(--surface-2);
+}
+.gc-tooltip-body { min-width: 0; flex: 1; }
+.gc-tooltip-name { font-weight: 700; font-size: var(--fs-m); }
+.gc-tooltip-loading { color: var(--text-3); font-size: var(--fs-xs); margin-top: 2px; }
+
+/* Wowhead's markup: tables for the two-column lines (slot / type, damage / speed). */
+.gc-tooltip-body table { border-collapse: collapse; border-spacing: 0; width: 100%; }
+.gc-tooltip-body td,
+.gc-tooltip-body th { padding: 0; vertical-align: top; text-align: left; font-weight: inherit; }
+.gc-tooltip-body th { text-align: right; padding-left: var(--s-3); white-space: nowrap; }
+.gc-tooltip-body table + table { margin-top: 2px; }
+.gc-tooltip-body b { font-weight: 700; }
+.gc-tooltip-body > table:first-child b:first-child,
+.gc-tooltip-body .whtt-name { font-size: var(--fs-m); }
+.gc-tooltip-body a { color: inherit; text-decoration: none; }
+.gc-tooltip-body small { font-size: var(--fs-xs); }
+.gc-tooltip-body .indent { padding-left: var(--s-3); }
+.gc-tooltip-body .whtt-sellprice,
+.gc-tooltip-body .whtt-maxstack { color: var(--text-2); }
+
+/* "q" is the in-game yellow (flavour text, "Item Level"); q0-q7 are item qualities. */
+.gc-tooltip .q { color: var(--accent-deep); }
+.gc-tooltip .q0 { color: var(--q-0); }
+.gc-tooltip .q1 { color: var(--q-1); }
+.gc-tooltip .q2 { color: var(--q-2); }
+.gc-tooltip .q3 { color: var(--q-3); }
+.gc-tooltip .q4 { color: var(--q-4); }
+.gc-tooltip .q5 { color: var(--q-5); }
+.gc-tooltip .q6 { color: var(--q-6); }
+.gc-tooltip .q7 { color: var(--q-7); }
+
+/* Coins in sell prices. */
+.gc-tooltip .moneygold,
+.gc-tooltip .moneysilver,
+.gc-tooltip .moneycopper { font-weight: 700; }
+.gc-tooltip .moneygold::after { content: "g"; }
+.gc-tooltip .moneysilver::after { content: "s"; }
+.gc-tooltip .moneycopper::after { content: "c"; }
+.gc-tooltip .moneygold { color: var(--coin-g); }
+.gc-tooltip .moneysilver { color: var(--coin-s); }
+.gc-tooltip .moneycopper { color: var(--coin-c); }
+.gc-tooltip .moneygold + .moneysilver,
+.gc-tooltip .moneysilver + .moneycopper,
+.gc-tooltip .moneygold + .moneycopper { margin-left: .3em; }
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .gc-tooltip .q { color: var(--accent); }
+}
+:root[data-theme="dark"] .gc-tooltip .q { color: var(--accent); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .gc-tooltip:not([hidden]) { animation: gc-tooltip-in var(--t-fast) var(--ease) both; }
+  @keyframes gc-tooltip-in { from { opacity: 0; } to { opacity: 1; } }
+}

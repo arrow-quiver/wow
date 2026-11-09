@@ -8,7 +8,8 @@ ns.OPTION_LIST = {
   { key = "updateNotice", label = "Tell me when a newer version of this addon is out" },
   { key = "autoGuide", label = "Open the skill-up guide with my profession window" },
   { key = "trackerOnLogin", label = "Show my shopping list on login when it has items" },
-  { key = "collectBank", label = "Share my bank and the guild bank with the guild site" },
+  { key = "collectBank", label = "Share my bank and the guild bank with the guild" },
+  { key = "dealsPanel", label = "Show the Deal hunter next to the auction house" },
   { key = "blizzardStyle", label = "Use Blizzard's window style instead of the guild's dark-and-gold look (reload to apply)" },
 }
 local OPTIONS = ns.OPTION_LIST
@@ -22,7 +23,7 @@ title:SetText("Guild Camp")
 local sub = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
 sub:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -8)
 sub:SetWidth(560); sub:SetJustifyH("LEFT")
-sub:SetText("The addon only reads information outside combat. It sends it to the guild site through the companion app when you log out or /reload.")
+sub:SetText("The addon reads information only outside combat. It shares guild data with guildmates in game. The Guild Camp app shows it after you log out or type /reload.")
 
 panel.boxes = {}
 for i, o in ipairs(OPTIONS) do
@@ -45,8 +46,8 @@ version:SetPoint("TOPLEFT", 16, -60 - #OPTIONS * 32 - 16)
 
 panel:SetScript("OnShow", function()
   for _, cb in ipairs(panel.boxes) do cb:SetChecked(ns.opt(cb.key) and true or false) end
-  local inbox = WowGuildInbox
-  version:SetText("Version " .. ns.addonVersion() .. (inbox and inbox.site and ("  ·  Guild site: " .. inbox.site) or ""))
+  local latest = ns.updateAvailable()
+  version:SetText("Version " .. ns.addonVersion() .. (latest and ("\n" .. latest .. " is available. " .. ns.UPDATE_HINT) or ""))
 end)
 
 local category

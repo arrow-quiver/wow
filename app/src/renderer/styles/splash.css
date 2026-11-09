@@ -1,0 +1,134 @@
+/* Startup splash (components/Splash.js), ported from the old site's intro.css. Everything is scoped to #splash.
+   Its artwork keeps the original fixed colours on purpose: it is the same scene in light and dark mode.
+   Fonts: the old Cinzel / Uncial Antiqua / Montserrat came from Google Fonts, which the CSP does not allow;
+   Alegreya and Alegreya Sans (vendored) stand in for them. */
+#splash {
+  position: fixed; inset: 0; z-index: 1000; overflow: hidden; isolation: isolate;
+  background: #090d16; color: #fff; cursor: pointer;
+  font-family: var(--font-body);
+  transition: opacity .9s ease, visibility .9s;
+  -webkit-app-region: no-drag; /* clicks skip the splash instead of dragging the window */
+  user-select: none;
+}
+#splash * { box-sizing: border-box; }
+#splash.exit { opacity: 0; visibility: hidden; pointer-events: none; }
+#splash .scene { position: absolute; inset: 0; overflow: hidden; }
+#splash .scene > svg.world { position: absolute; width: 100%; height: 100%; inset: 0; }
+#splash .sky {
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse at 70% 40%, #a14b3820, transparent 35%), linear-gradient(180deg, #0b1422 0%, #202536 45%, #392c30 70%, #080b10 100%);
+}
+#splash .clouds {
+  position: absolute; inset: -20%; opacity: .4;
+  background: radial-gradient(ellipse at 25% 38%, #8391a42b 0%, transparent 23%), radial-gradient(ellipse at 60% 45%, #a2a2a51e 0%, transparent 27%), radial-gradient(ellipse at 85% 27%, #9c81942a 0%, transparent 23%);
+  filter: blur(32px); animation: splash-cloudDrift 35s ease-in-out infinite alternate;
+}
+@keyframes splash-cloudDrift { from { transform: translateX(-3%) scale(1); } to { transform: translateX(4%) scale(1.08); } }
+#splash .moon {
+  position: absolute; top: 14%; right: 21%; width: clamp(90px, 11vw, 160px); aspect-ratio: 1; border-radius: 50%;
+  background: radial-gradient(circle at 35% 32%, #fff4d8, #d7c3a1 40%, #8d8990 76%, #5a5260);
+  box-shadow: 0 0 35px #e9d6ad55, 0 0 120px #b2b9cf33; opacity: .75;
+}
+#splash .moon::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle at 65% 70%, #4b4a5155, transparent 50%); }
+#splash .aurora {
+  position: absolute; top: 0; left: 15%; width: 70%; height: 55%;
+  background: linear-gradient(115deg, transparent, #3c716e10, #6d718c16, transparent);
+  filter: blur(40px); transform: rotate(-12deg); animation: splash-aurora 12s ease-in-out infinite alternate;
+}
+@keyframes splash-aurora { to { transform: translate(5%, -5%) rotate(-5deg); opacity: .5; } }
+#splash .world .back { transform-origin: center bottom; animation: splash-worldMove 25s ease-in-out infinite alternate; }
+@keyframes splash-worldMove { to { transform: scale(1.055) translate(-1%, 1%); } }
+#splash .haze { position: absolute; bottom: 12%; left: 0; width: 100%; height: 45%; background: linear-gradient(0deg, #080a0d 0%, transparent 100%); pointer-events: none; }
+#splash .castle-glow { position: absolute; left: 48%; top: 37%; width: 25%; height: 40%; background: radial-gradient(ellipse, #ba633222, transparent 68%); filter: blur(35px); }
+#splash .castle-light { animation: splash-torch 2.4s ease-in-out infinite alternate; transform-origin: center; }
+@keyframes splash-torch { to { opacity: .45; } }
+
+#splash .dragon { position: absolute; top: 17%; left: -30%; width: clamp(300px, 40vw, 620px); height: auto; filter: drop-shadow(0 12px 25px #0009); animation: splash-dragonFlight 12s linear infinite; }
+@keyframes splash-dragonFlight {
+  0% { transform: translate(-10vw, 15vh) scale(.65); opacity: 0; }
+  7% { opacity: .8; }
+  50% { transform: translate(60vw, -5vh) scale(1.05); }
+  90% { opacity: .65; }
+  100% { transform: translate(145vw, 9vh) scale(.85); opacity: 0; }
+}
+#splash .wing { transform-origin: 50% 20%; animation: splash-wing 1.8s ease-in-out infinite alternate; }
+@keyframes splash-wing { to { transform: scaleY(.65) rotate(-4deg); } }
+
+#splash .hero-party { position: absolute; z-index: 3; bottom: 3%; right: 12%; width: clamp(330px, 43vw, 650px); height: auto; overflow: visible; filter: drop-shadow(0 8px 18px #000); animation: splash-partyReveal 2s ease-out both; }
+#splash .hero { transform-box: fill-box; transform-origin: center bottom; animation: splash-heroIdle 5s ease-in-out infinite alternate; }
+#splash .hero:nth-child(2) { animation-delay: -1.7s; }
+#splash .hero:nth-child(3) { animation-delay: -3s; }
+#splash .orb { animation: splash-torch 1.6s ease-in-out infinite alternate; }
+@keyframes splash-heroIdle { from { transform: translateY(0); } to { transform: translateY(-3px); } }
+@keyframes splash-partyReveal { from { opacity: 0; transform: translateY(25px); } to { opacity: 1; transform: translateY(0); } }
+
+#splash .particles { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+#splash .overlays { position: absolute; inset: 0; pointer-events: none; }
+#splash .light-beam { position: absolute; top: -15%; left: 50%; width: 1px; height: 90%; background: linear-gradient(transparent, #e7c28b20, transparent); transform: rotate(18deg); filter: blur(8px); }
+#splash .vignette { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at center, transparent 38%, #0305099c 100%); }
+#splash .grain {
+  position: absolute; inset: -50%; pointer-events: none; opacity: .12;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.95' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.3'/%3E%3C/svg%3E");
+}
+
+/* Ornamental interface */
+#splash .frame { position: absolute; inset: 20px; border: 1px solid #d8b77730; pointer-events: none; }
+#splash .frame::before, #splash .frame::after { content: ""; position: absolute; width: 85px; height: 85px; border: 1px solid #d8b77799; }
+#splash .frame::before { top: -1px; left: -1px; border-right: 0; border-bottom: 0; }
+#splash .frame::after { bottom: -1px; right: -1px; border-left: 0; border-top: 0; }
+#splash .corner { position: absolute; width: 25px; height: 25px; border-color: #d8b77777; border-style: solid; }
+#splash .c1 { top: 48px; right: 24px; border-width: 1px 1px 0 0; } /* below the native window buttons */
+#splash .c2 { bottom: 24px; left: 24px; border-width: 0 0 1px 1px; }
+
+#splash .top { position: absolute; z-index: 4; top: 6%; left: 0; width: 100%; text-align: center; animation: splash-appear 1.4s both; }
+#splash .crest {
+  width: 58px; height: 68px; margin: auto; position: relative; display: grid; place-items: center;
+  clip-path: polygon(50% 0, 95% 15%, 87% 75%, 50% 100%, 13% 75%, 5% 15%);
+  background: linear-gradient(145deg, #e1c48a, #77512d 45%, #261b17); filter: drop-shadow(0 0 15px #b67a3b66);
+}
+#splash .crest-inner {
+  position: absolute; inset: 3px; display: grid; place-items: center;
+  clip-path: polygon(50% 0, 95% 15%, 87% 75%, 50% 100%, 13% 75%, 5% 15%);
+  background: linear-gradient(160deg, #452b26, #140f12);
+}
+#splash .crest-inner span { font-family: var(--font-head); font-weight: 800; font-size: 28px; color: #e5c68d; text-shadow: 0 0 15px #c18b4a; }
+#splash .guild-name {
+  font-family: var(--font-head); font-weight: 700; font-size: clamp(29px, 4.2vw, 58px); letter-spacing: .19em;
+  margin: 14px 0 5px; color: #e8d3ac; text-shadow: 0 3px 18px #000, 0 0 35px #c48d4b33;
+}
+#splash .subtitle { color: #c49b60; font-size: 10px; letter-spacing: .55em; text-transform: uppercase; }
+#splash .divider { display: flex; align-items: center; justify-content: center; gap: 15px; margin: 14px auto; color: #b68b53; font-size: 12px; }
+#splash .divider::before, #splash .divider::after { content: ""; width: 75px; height: 1px; background: linear-gradient(90deg, transparent, #b68b53); }
+#splash .divider::after { transform: scaleX(-1); }
+
+#splash .story { position: absolute; z-index: 4; left: 8%; bottom: 25%; width: min(440px, 43%); animation: splash-storyReveal 1.6s .2s both; }
+#splash .kicker { color: #d3ae71; font-family: var(--font-head); font-weight: 700; letter-spacing: .34em; font-size: 11px; }
+#splash .story h1 { font-family: var(--font-head); font-size: clamp(29px, 4.1vw, 57px); line-height: 1.22; font-weight: 500; margin: 19px 0 16px; color: #f1e5ce; text-shadow: 0 4px 25px #000; letter-spacing: .01em; }
+#splash .story p { font-size: 12px; line-height: 2.1; letter-spacing: .08em; color: #c0b9b0; max-width: 330px; margin: 0 0 1em; }
+#splash .story .ornament { width: 95px; height: 1px; background: #c09a60; margin: 23px 0; }
+#splash .quote { font-family: var(--font-head); font-weight: 700; font-size: 11px; color: #c2a778; letter-spacing: .17em; }
+#splash .right-mark { position: absolute; right: 7%; bottom: 26%; writing-mode: vertical-rl; color: #dfc18b66; font-family: var(--font-head); font-size: 10px; letter-spacing: .55em; text-transform: uppercase; }
+
+/* Loading bar */
+#splash .bottom { position: absolute; z-index: 4; bottom: 7%; left: 8%; width: min(370px, 55%); animation: splash-appear 1.6s .3s both; }
+#splash .load-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-family: var(--font-head); font-weight: 700; color: #d9bd8b; font-size: 10px; letter-spacing: .24em; }
+#splash .track { height: 2px; background: #ffffff20; width: 100%; position: relative; overflow: visible; }
+#splash .loadbar { height: 100%; width: 0%; background: linear-gradient(90deg, #63251f, #c47d43, #f4d49c); box-shadow: 0 0 12px #d39a5c; transition: width .2s ease; }
+#splash .loadbar::after { content: ""; float: right; width: 5px; height: 5px; border-radius: 50%; background: #ffe4ad; transform: translate(0, -2px); box-shadow: 0 0 10px #ffcc82; }
+#splash .load-meta { display: flex; justify-content: space-between; margin-top: 12px; color: #8a8b90; font-size: 9px; letter-spacing: .2em; }
+#splash .skip {
+  position: absolute; z-index: 5; top: 34px; left: 38px; background: none; border: 0; padding: 6px;
+  color: #8d8b88; font: 10px var(--font-body); letter-spacing: .25em; cursor: pointer;
+}
+#splash .skip:hover, #splash .skip:focus-visible { color: #e5c68d; outline: 1px solid #e5c68d66; outline-offset: 2px; }
+#splash .version { position: absolute; z-index: 4; right: 5%; bottom: 5%; color: #77787f; font-size: 9px; letter-spacing: .2em; }
+@keyframes splash-appear { from { opacity: 0; } to { opacity: 1; } }
+@keyframes splash-storyReveal { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: translateY(0); } }
+
+@media (max-width: 1100px) {
+  #splash .right-mark { display: none; }
+  #splash .story { width: min(420px, 48%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #splash, #splash *, #splash *::before, #splash *::after { animation: none !important; transition: none !important; }
+}

@@ -1,6 +1,6 @@
 -- Guild Camp: the Coach. Learns how you play (outside combat only), keeps your quiz answers,
--- reads talents and gear, and works out your next steps. The companion carries it to the
--- site, where Claude writes your build plan and answers questions; they come back in the inbox.
+-- reads talents and gear, and works out your next steps. The Guild Camp app reads it from your saved
+-- data on this computer, has Claude write your build plan and answer your questions, and puts them in the inbox.
 local ADDON, ns = ...
 local C = {}
 ns.coach = C
@@ -74,27 +74,46 @@ ns.on("QUEST_TURNED_IN", function() local o = C.char().obs; o.quests = (o.quests
 ns.on("PLAYER_LEVEL_UP", function() local o = C.char().obs; o.levelUps = (o.levelUps or 0) + 1 end)
 ns.on("TRAINER_SHOW", function() C.char().trainerLevel = UnitLevel("player") end)
 
--- Duels: "%1$s has defeated %2$s in a duel" (and the "fled" version).
+-- Duels: "%1$s has defeated %2$s in a duel" and "%2$s has fled from %1$s in a duel".
+-- The numbers say which name is which (1 = winner, 2 = loser), and the "fled" message puts
+-- the loser first, so remember the order the names appear in.
 local duelPatterns
 local function toPattern(fmt)
   if type(fmt) ~= "string" then return nil end
-  local p = fmt:gsub("%%%d?%$?s", "\001")
+  local order = {}
+  local p = fmt:gsub("%%(%d?)%$?s", function(i)
+    order[#order + 1] = tonumber(i) or (#order + 1)
+    return "\001"
+  end)
   p = p:gsub("([%(%)%.%%%+%-%*%?%[%]%^%$])", "%%%1")
   p = p:gsub("\001", "(.+)")
-  return "^" .. p .. "$"
+  return { pattern = "^" .. p .. "$", order = order }
+end
+-- Returns winner, loser when msg is a duel result.
+local function duelResult(msg)
+  if not duelPatterns then
+    duelPatterns = {}
+    for _, fmt in ipairs({ DUEL_WINNER_KNOCKOUT or false, DUEL_WINNER_RETREAT or false }) do
+      local p = toPattern(fmt)
+      if p then duelPatterns[#duelPatterns + 1] = p end
+    end
+  end
+  for _, p in ipairs(duelPatterns) do
+    local caps = { string.match(msg, p.pattern) }
+    if caps[1] then
+      local names = {}
+      for i, slot in ipairs(p.order) do names[slot] = caps[i] end
+      return names[1], names[2]
+    end
+  end
 end
 ns.on("CHAT_MSG_SYSTEM", function(msg)
   if type(msg) ~= "string" or secret(msg) then return end
-  duelPatterns = duelPatterns or { toPattern(DUEL_WINNER_KNOCKOUT), toPattern(DUEL_WINNER_RETREAT) }
+  local winner, loser = duelResult(msg)
+  if not winner then return end
   local me = UnitName("player")
-  for _, p in ipairs(duelPatterns) do
-    local winner, loser = string.match(msg, p)
-    if winner then
-      local o = C.char().obs
-      if winner == me then o.duelsWon = (o.duelsWon or 0) + 1 elseif loser == me then o.duelsLost = (o.duelsLost or 0) + 1 end
-      return
-    end
-  end
+  local o = C.char().obs
+  if winner == me then o.duelsWon = (o.duelsWon or 0) + 1 elseif loser == me then o.duelsLost = (o.duelsLost or 0) + 1 end
 end)
 
 function C.sample()
@@ -158,7 +177,8 @@ function C.readGear()
       local link = ns.try(GetInventoryItemLink, "player", slot)
       local id = link and tonumber(string.match(link, "item:(%d+)"))
       if id then
-        local name, _, quality, ilvl = ns.try(GetItemInfo, link)
+        -- Retail 12 only has C_Item.GetItemInfo; older clients only the global.
+        local name, _, quality, ilvl = ns.try((C_Item and C_Item.GetItemInfo) or GetItemInfo, link)
         g.items[#g.items + 1] = { slot = C.SLOTS[slot], id = id, name = name or string.match(link, "%[(.-)%]"), ilvl = ilvl, quality = quality }
       end
       local cur, max = ns.try(GetInventoryItemDurability, slot)
@@ -226,7 +246,7 @@ function C.stats(ch)
   }
 end
 
--- Refresh everything the site needs (called on login, every few minutes and at logout).
+-- Refresh everything the Guild Camp app needs (called on login, every few minutes and at logout).
 function C.refresh()
   if not ns.db or not safe() then return end
   local ch = C.char()
@@ -237,7 +257,7 @@ function C.refresh()
   ch.gear = C.readGear()
   ch.profile = C.profile(ch)
   ch.stats = C.stats(ch)
-  -- Forget questions the site has answered.
+  -- Forget questions the Coach has answered.
   local answered = {}
   for _, a in ipairs(C.answers()) do if a.qid then answered[a.qid] = true end end
   local keep = {}
@@ -256,7 +276,7 @@ ns.on("PLAYER_LOGOUT", function() C.refresh() end)
 ns.on("PLAYER_EQUIPMENT_CHANGED", function() if safe() then C.char().gear = C.readGear() end end)
 ns.on("CHARACTER_POINTS_CHANGED", function() if safe() then C.char().talents = C.readTalents() end end)
 
--- ---------- from the site ----------
+-- ---------- from the guild (via the Guild Camp app) ----------
 local function inbox() return (WowGuildInbox and WowGuildInbox.coach) or {} end
 function C.plan() return (inbox().plans or {})[ns.charKey()] end
 function C.answers() return inbox().answers or {} end
@@ -264,7 +284,7 @@ function C.aiEnabled() return inbox().enabled ~= false end
 
 function C.requestPlan()
   C.char().planRequest = ns.now()
-  ns.print("Asked the Coach for a fresh build plan. It's sent at your next /reload or logout (with the companion running).")
+  ns.print("Asked the Coach for a fresh build plan. It's sent at your next /reload or logout (with the Guild Camp app running).")
 end
 
 -- Ask a question: saved now, sent when the game next saves (reload or logout).
@@ -309,7 +329,7 @@ function C.nextSteps()
   end
   if not ch.quiz then add("Tell the Coach how you play", "Five quick questions. Press 'Tune my style'.", "quiz") end
   for _, r in ipairs((WowGuildInbox and WowGuildInbox.raids) or {}) do
-    if not r.signup and r.startsAt and r.startsAt > ns.now() then add("Sign up: " .. (r.title or "raid"), date("%a %d %b, %H:%M", r.startsAt) .. " on the website.", "raid"); break end
+    if not r.signup and r.startsAt and r.startsAt > ns.now() then add("Sign up: " .. (r.title or "raid"), date("%a %d %b, %H:%M", r.startsAt) .. " in the Guild Camp app.", "raid"); break end
   end
   for _, s in ipairs(plan and plan.next_steps or {}) do add(s.title, s.detail, "plan") end
   return steps

@@ -3,7 +3,7 @@
 --   Your characters: how many each of your other characters holds
 --   Guild bank: how many the guild bank (or bank characters) holds
 --   Guild price: latest guild auction scan (only when Auctionator isn't installed, as it shows its own)
--- Data comes from the site through the companion (the WowGuild_Inbox folder it writes), so it's as fresh as your last reload.
+-- Data comes from the guild through the Guild Camp app (the WowGuild_Inbox folder it writes), so it's as fresh as your last reload.
 local ADDON, ns = ...
 local T = {}
 ns.tooltip = T

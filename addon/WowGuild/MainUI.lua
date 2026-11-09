@@ -124,6 +124,8 @@ end
 
 -- ---------- pages ----------
 local pages = {}
+-- The window itself. Declared up here so page buttons (like "Open the Coach") can hide it.
+local win
 
 -- Camp: raids, notices, sync status.
 function pages.camp(page)
@@ -134,7 +136,7 @@ function pages.camp(page)
     ns.collectAll("button")
     StaticPopup_Show("WOWGUILD_RELOAD_NOW")
   end)
-  local hint = label(page, "Saves everything and reloads so the companion uploads it.", "GameFontDisableSmall")
+  local hint = label(page, "Saves everything and reloads so the Guild Camp app uploads it.", "GameFontDisableSmall")
   hint:SetPoint("LEFT", sync, "RIGHT", 10, 0)
   page.sync = sync
   page.refresh = function()
@@ -143,10 +145,16 @@ function pages.camp(page)
     local status = {}
     status[#status + 1] = "|cffe8a33d" .. ((inbox and inbox.guild) or "Guild") .. "|r"
     if inbox then
-      status[#status + 1] = "|cff999999News from the guild site " .. ns.ago(inbox.generatedAt) .. ".|r"
+      status[#status + 1] = "|cff999999Guild news from " .. ns.ago(inbox.generatedAt) .. ".|r"
     else
-      status[#status + 1] = "|cffe8a33dNo news from the guild site yet.|r Install the companion from the site's downloads page and keep it running while you play."
+      status[#status + 1] = "|cffe8a33dNo guild news yet.|r Install the Guild Camp app on this computer, sign in, and keep it running while you play."
     end
+    local latest = ns.updateAvailable()
+    if latest then
+      status[#status + 1] = "|cffe8a33dAddon version " .. latest .. " is out.|r " .. ns.UPDATE_HINT
+    end
+    local sharing = ns.Share and ns.try(ns.Share.statusLine)
+    if type(sharing) == "string" and sharing ~= "" then status[#status + 1] = "|cff999999" .. sharing .. "|r" end
     local recipes, profs = 0, 0
     for _, list in pairs(me.recipes or {}) do recipes = recipes + #list end
     profs = me.professions and #me.professions or 0
@@ -158,7 +166,7 @@ end
 
 -- Call to arms: a form instead of /wow cta.
 function pages.cta(page)
-  local intro = label(page, "Call guildies to a fight. It posts to the guild's Discord as soon as you reload (the button below does that for you).", "GameFontHighlight")
+  local intro = label(page, "Call guildies to a fight. Guildmates online with Guild Camp see it in chat right away.", "GameFontHighlight")
   intro:SetPoint("TOPLEFT", 0, 0); intro:SetWidth(WIDTH - 40)
 
   local zl = label(page, "Where", "GameFontNormal"); zl:SetPoint("TOPLEFT", 0, -44)
@@ -176,19 +184,21 @@ function pages.cta(page)
   local send = button(page, "Sound the horn", 150); send:SetPoint("TOPLEFT", 0, -210)
   local sent = label(page, "", "GameFontHighlightSmall"); sent:SetPoint("TOPLEFT", 0, -244); sent:SetWidth(WIDTH - 40)
   send:SetScript("OnClick", function()
-    ns.addCta(zone:GetText() or "", tonumber(needed:GetText() or ""), msg:GetText() or "")
-    msg:SetText("")
+    if ns.addCta(zone:GetText() or "", tonumber(needed:GetText() or ""), msg:GetText() or "") then msg:SetText("") end
     page.refresh()
   end)
   page.zone, page.needed, page.msg, page.send = zone, needed, msg, send
   page.refresh = function()
     if (zone:GetText() or "") == "" and GetZoneText then zone:SetText(GetZoneText() or "") end
-    local q = ns.db.ctaQueue or {}
+    local q = ns.ctaRecent or {}
     if #q == 0 then sent:SetText("") return end
-    local lines = { "|cffffd100Waiting to send|r (they go out on your next reload or logout):" }
-    for i = #q, math.max(1, #q - 4), -1 do
+    local lines = { "|cffffd100Calls to arms since you logged in|r" }
+    for i = #q, 1, -1 do
       local c = q[i]
-      lines[#lines + 1] = string.format("  %s%s %s |cff999999%s|r", c.zone, c.needed and (" (need " .. c.needed .. ")") or "", c.msg or "", ns.ago(c.at))
+      local need = c.needed and string.format(" (need %d)", c.needed) or ""
+      local msgText = (c.message and c.message ~= "") and (" " .. c.message) or ""
+      lines[#lines + 1] = string.format("  %s%s%s |cff999999%s, %s|r", c.zone or "", need, msgText,
+        c.mine and "you" or tostring(c.character or "?"), ns.ago(c.at))
     end
     sent:SetText(table.concat(lines, "\n"))
   end
@@ -281,7 +291,10 @@ function pages.guild(page)
   page.refresh = function() body.set(ns.textGuild()) end
 end
 
--- Settings: every option, the site address, versions.
+-- Where players get the Guild Camp app (its newest GitHub release).
+W.APP_URL = "https://github.com/arrow-quiver/wow/releases/latest"
+
+-- Settings: every option, the link to get the Guild Camp app, versions.
 function pages.settings(page)
   page.boxes = {}
   for i, o in ipairs(ns.OPTION_LIST or {}) do
@@ -297,7 +310,7 @@ function pages.settings(page)
     page.boxes[i] = cb
   end
   local y = -(#(ns.OPTION_LIST or {})) * 28 - 16
-  local sl = label(page, "Guild site (click, then Ctrl+C to copy):", "GameFontNormal"); sl:SetPoint("TOPLEFT", 0, y)
+  local sl = label(page, "Get the Guild Camp app (click, then Ctrl+C to copy the link):", "GameFontNormal"); sl:SetPoint("TOPLEFT", 0, y)
   local site = editbox(page, WIDTH - 60); site:SetPoint("TOPLEFT", 6, y - 18)
   site:SetScript("OnEditFocusGained", function(self) self:HighlightText() end)
   site:SetScript("OnTextChanged", function(self, user) if user then self:SetText(self.value or "") ; self:HighlightText() end end)
@@ -310,17 +323,14 @@ function pages.settings(page)
   page.site = site
   page.refresh = function()
     for _, cb in ipairs(page.boxes) do cb:SetChecked(ns.opt(cb.key) and true or false) end
-    local inbox = WowGuildInbox
-    site.value = (inbox and inbox.site) and (inbox.site .. "/get") or "Not known yet: sync once with the companion."
+    site.value = W.APP_URL
     site:SetText(site.value)
-    local latest = inbox and inbox.latestAddon
-    ver:SetText("Addon version " .. ns.addonVersion() .. ((latest and ns.versionLess(ns.addonVersion(), latest)) and ("  |cffe8a33d(" .. latest .. " is available)|r") or ""))
+    local latest = ns.updateAvailable()
+    ver:SetText("Addon version " .. ns.addonVersion() .. (latest and (".  |cffe8a33d" .. latest .. " is available.|r " .. ns.UPDATE_HINT) or ""))
   end
 end
 
 -- ---------- window ----------
-local win
-
 local function setTitle(f, text)
   if f.styled and f.title then f.title:SetText(text)
   elseif f.SetTitle then f:SetTitle(text)
@@ -428,6 +438,7 @@ end
 function W.show(key)
   local f = W.window()
   key = key or W.current or "camp"
+  if not f.pages[key] then key = "camp" end
   W.current = key
   for i, t in ipairs(TABS) do
     local page, tab = f.pages[t.key], f.tabs[t.key]

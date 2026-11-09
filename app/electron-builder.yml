@@ -1,0 +1,67 @@
+# electron-builder settings for the Guild Camp desktop app.
+# Build the Windows installer with `npm run dist` (in app/), or let scripts/release.js do it.
+# The output in dist/ (installer, .blockmap, latest.yml) is published as a GitHub release (tag v<version>)
+# by scripts/release.js with the GitHub CLI; electron-builder itself never publishes (--publish never).
+# The app then updates itself from GitHub releases (electron-updater, github provider, see "publish").
+# src/main/bnet-credentials.json (Battle.net client id and secret, gitignored) is written by the release
+# script just before the build and packed with src/**, then removed again.
+appId: com.arrowquiver.guildcamp
+productName: Guild Camp
+
+directories:
+  output: dist
+  buildResources: build
+
+files:
+  - src/**/*
+  - package.json
+  - "!**/*.test.js"
+
+# The addon ships inside the app, so a fresh install can set it up without a download.
+# At runtime it is at process.resourcesPath/addon/WowGuild.
+extraResources:
+  - from: ../addon/WowGuild
+    to: addon/WowGuild
+    filter:
+      - "**/*"
+
+asar: true
+# No native modules in the app, so there is nothing to rebuild.
+npmRebuild: false
+
+win:
+  target: nsis
+  icon: build/icon.png
+  artifactName: "Guild-Camp-Setup-${version}.${ext}"
+
+nsis:
+  oneClick: true
+  perMachine: false
+  deleteAppDataOnUninstall: false
+  shortcutName: Guild Camp
+
+# guildcamp:// links open the app (main.js handles them).
+protocols:
+  - name: Guild Camp
+    schemes:
+      - guildcamp
+
+# Always write latest.yml, even for a -beta.N version: without this electron-builder names the
+# manifest after the prerelease tag (beta.yml) and embeds `channel: beta` in app-update.yml, but
+# every app release carries one latest.yml and the updater reads only that one.
+detectUpdateChannel: false
+
+# Writes latest.yml next to the installer and app-update.yml (owner, repo, provider) into the app.
+# electron-updater reads app-update.yml and follows the release marked Latest on github.com/arrow-quiver/wow,
+# so the repository must be public for players to get updates. Releases are tagged v<version> (the default).
+publish:
+  - provider: github
+    owner: arrow-quiver
+    repo: wow
+    releaseType: release
+
+mac:
+  target:
+    - dmg
+    - zip
+  category: public.app-category.games

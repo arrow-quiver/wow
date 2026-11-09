@@ -1,0 +1,5104 @@
+{
+ "about": "Golden vectors from app/src/shared/sharing.js. Regenerate: node test/fixtures/make-sharing-vectors.js",
+ "K": {
+  "MAJOR": 1,
+  "MINOR": 1,
+  "PREFIX": "GuildCamp",
+  "FINAL_BASE": 2700000000000,
+  "FINAL_MIN": 1350000000000,
+  "HOUR": 3600,
+  "DAY": 86400,
+  "FUTURE_SLACK": 300,
+  "PARENT_FALLBACK_DAYS": 120,
+  "TOMB_NEVER_DAYS": 180,
+  "UNKNOWN_DAYS": 14,
+  "ID_MAX": 64,
+  "NAME_MAX": 48,
+  "RECORD_MAX": 8715,
+  "MEMBER_BUCKETS": 32,
+  "OFFICER_BUCKETS": 16,
+  "BUCKETS": 48,
+  "SHORT_MOD": 1679616,
+  "DIGEST_MOD": 1679615,
+  "INT_MAX_CHARS": 10,
+  "MSG_MAX": 255,
+  "HELLO_MAX": 210,
+  "HELLO_VERSION_MAX": 11,
+  "INV_PER_PAGE": 20,
+  "INV_MAX": 250,
+  "INV_PAGES_MAX": 35,
+  "GET_MAX_IDS": 55,
+  "R_SINGLE_MAX": 253,
+  "M_DATA_MAX": 249,
+  "M_PARTS_MAX": 35,
+  "MID_MOD": 1296,
+  "AUTHOR_MAX_RECORDS": 300,
+  "AUTHOR_MAX_BYTES": 65536,
+  "AUTHOR_MAX_RC_BYTES": 32768,
+  "STORE_MAX_RECORDS": 4000,
+  "STORE_MAX_BYTES": 614400,
+  "UNKNOWN_MAX_RECORDS": 200,
+  "UNKNOWN_MAX_BYTES": 32768,
+  "BONUS_STEP": 10,
+  "LY_EVERY_DAYS": 14,
+  "LY_FOLD_DAYS": 30,
+  "SHRINK_ROUNDS": 16
+ },
+ "typesDump": "{AN={code=s2:AN;expiry={days=n60};fields=[{k=s4:text;max=n500;n=s4:body}];key=[s5:b36x6];max=n600;space=s7:officer};BC={code=s2:BC;expiry={never=T};fields=[{k=s4:list;maxItems=n50;n=s5:names;of={k=s4:text;max=n48}}];key=[s3:one];max=n700;space=s7:officer};BH={code=s2:BH;expiry={parent=s2:bq;seg=n1};fields=[{k=s4:enum;n=s5:state;values=s2:sd}];key=[s5:b36x6];max=n40;space=s7:officer};CFG={code=s3:CFG;expiry={never=T};fields=[{k=s3:int;n=s14:officerRankMax},{dash=T;k=s3:int;n=s12:relayRankMax}];key=[s3:one];max=n40;rank=s2:gm;space=s7:officer};DR={code=s2:DR;expiry={days=n180;finalDays=n60};fields=[{k=s4:text;max=n80;n=s5:title},{k=s4:text;max=n40;n=s4:unit},{k=s3:int;n=s4:goal},{k=s4:text;max=n300;n=s5:notes},{k=s4:enum;n=s5:state;values=s2:oc}];final={field=s5:state;values=s1:c};key=[s5:b36x6];max=n500;space=s7:officer};LA={code=s2:LA;expiry={days=n180};fields=[{k=s4:text;max=n8;n=s4:raid},{k=s4:text;max=n8;n=s8:instance},{k=s4:text;max=n12;n=s4:item},{k=s4:text;max=n100;n=s8:itemName},{k=s4:text;max=n48;n=s9:character},{k=s4:text;max=n64;n=s3:pid},{k=s4:enum;n=s4:kind;values=s4:smof},{k=s3:int;n=s4:roll},{k=s3:int;n=s5:bonus}];fold={};key=[s5:b36x6];max=n300;space=s7:officer};LL={code=s2:LL;expiry={never=T};fields=[{k=s4:text;max=n60;n=s4:name},{k=s4:list;maxItems=n40;n=s6:bosses;of={k=s4:text;max=n60}},{k=s4:list;maxItems=n150;n=s5:items;parts=[{k=s4:text;max=n12;n=s4:item},{k=s3:int;n=s4:boss},{k=s4:text;max=n100;n=s4:name}]}];key=[s5:b36x6];max=n8192;space=s7:officer};LY={code=s2:LY;expiry={never=T};fields=[{k=s3:int;n=s4:upto},{k=s4:list;maxItems=n200;n=s7:bonuses;parts=[{k=s4:text;max=n64;n=s3:pid},{k=s4:text;max=n12;n=s4:item},{k=s3:int;n=s5:bonus}]}];key=[s5:b36x6];max=n3072;space=s7:officer};RD={code=s2:RD;expiry={days=n45;field=s8:startsAt};fields=[{k=s4:enum;n=s4:kind;values=s3:rpe},{k=s4:text;max=n60;n=s5:title},{k=s4:text;max=n60;n=s8:instance},{k=s3:int;n=s8:startsAt},{k=s3:int;n=s7:minutes},{k=s3:int;n=s4:size},{k=s3:int;n=s7:srLimit},{k=s4:text;max=n300;n=s5:notes}];key=[s5:b36x6];max=n600;space=s7:officer};RT={code=s2:RT;expiry={parent=s2:RD;seg=n1};fields=[{k=s4:enum;n=s6:status;values=s4:olxd},{k=s3:int;n=s8:lockedAt},{k=s4:enum;n=s4:kind;values=s3:rpe},{k=s4:text;max=n8;n=s8:instance},{k=s3:int;n=s8:closedAt},{k=s4:list;maxItems=n60;n=s9:attendees;parts=[{k=s4:text;max=n64;n=s3:pid}];rest={k=s4:text;max=n12;maxItems=n20;n=s5:items}},{k=s4:list;maxItems=n60;n=s7:noShows;of={k=s4:text;max=n64}}];final={field=s6:status;values=s2:xd};fold={field=s6:status;kind=s1:r;kindField=s4:kind;value=s1:d};key=[s5:b36x6];max=n2048;space=s7:officer};WH={channel=s7:OFFICER;code=s2:WH;expiry={never=T};fields=[{k=s4:text;max=n250;n=s3:url}];firstHand=T;key=[s3:one];max=n300;noBucket=T;space=s7:officer};bk={author=s3:key;code=s2:bk;expiry={days=n30};fields=[{k=s4:list;maxItems=n200;n=s4:bags;parts=[{k=s3:int;n=s2:id},{k=s3:int;n=s5:count}]},{k=s4:list;maxItems=n300;n=s4:bank;parts=[{k=s3:int;n=s2:id},{k=s3:int;n=s5:count}]}];key=[s4:name];max=n2048;space=s6:member};bq={code=s2:bq;expiry={days=n30};fields=[{k=s4:text;max=n64;n=s3:pid},{k=s4:text;max=n100;n=s4:item},{k=s3:int;n=s5:count},{k=s4:text;max=n200;n=s4:note},{k=s4:enum;n=s5:state;values=s2:ox}];final={field=s5:state;values=s1:x};key=[s5:b36x6];max=n400;space=s6:member};ca={code=s2:ca;expiry={days=n1};fields=[{k=s4:text;max=n48;n=s9:character},{k=s4:text;max=n60;n=s4:zone},{k=s3:int;n=s6:needed},{k=s4:text;max=n200;n=s7:message}];key=[s5:b36x6];max=n300;space=s6:member};ch={author=s3:key;code=s2:ch;expiry={days=n60};fields=[{k=s4:text;max=n64;n=s3:pid},{k=s4:text;max=n32;n=s9:battletag},{k=s4:flag;n=s4:main},{k=s4:list;maxItems=n20;n=s4:alts;of={k=s4:text;max=n48}},{k=s4:text;max=n20;n=s5:class},{k=s4:text;max=n20;n=s4:race},{k=s3:int;n=s5:level},{k=s4:text;max=n12;n=s7:faction},{k=s3:int;n=s4:ilvl},{k=s3:int;n=s6:repair},{k=s5:tuple;n=s11:consumables;parts=[{k=s3:int;n=s5:flask},{k=s3:int;n=s6:elixir},{k=s3:int;n=s6:potion},{k=s3:int;n=s4:food},{k=s3:int;n=s7:bandage}]},{k=s4:list;maxItems=n12;n=s11:professions;parts=[{k=s3:int;n=s5:skill},{k=s3:int;n=s4:rank},{k=s3:int;n=s3:max}]},{k=s5:tuple;n=s3:pvp;parts=[{k=s3:int;n=s4:rank},{k=s3:int;n=s2:hk}]},{k=s4:text;max=n16;n=s5:addon}];key=[s4:name];max=n400;space=s6:member};cl={code=s2:cl;expiry={parent=s2:cr;seg=n1};fields=[{k=s4:enum;n=s5:state;values=s3:cdw},{k=s3:int;n=s9:claimedAt}];key=[s5:b36x6,s3:pid];max=n60;space=s6:member};cr={code=s2:cr;expiry={days=n30;finalDays=n7};fields=[{k=s4:text;max=n64;n=s3:pid},{k=s4:text;max=n100;n=s4:item},{k=s4:text;max=n200;n=s5:notes},{k=s4:enum;n=s5:state;values=s3:oxd}];final={field=s5:state;values=s2:xd};key=[s5:b36x6];max=n400;space=s6:member};dc={code=s2:dc;expiry={field=s5:drive;parent=s2:DR};fields=[{k=s4:text;max=n64;n=s3:pid},{k=s4:text;max=n8;n=s5:drive},{k=s4:text;max=n48;n=s9:character},{k=s3:int;n=s6:amount},{k=s4:text;max=n120;n=s4:note}];key=[s5:b36x6];max=n250;space=s6:member};gb={code=s2:gb;expiry={days=n30};fields=[{k=s4:list;maxItems=n98;n=s5:items;parts=[{k=s3:int;n=s2:id},{k=s3:int;n=s5:count}]}];key=[s3:tab];max=n1536;space=s6:member;variants={0=[{k=s3:int;n=s9:scannedAt},{k=s3:int;n=s5:money},{k=s4:list;maxItems=n8;n=s4:tabs;of={k=s4:text;max=n32}},{k=s4:list;maxItems=n25;n=s3:log;parts=[{k=s3:int;n=s2:at},{k=s4:text;max=n12;n=s4:kind},{k=s4:text;max=n48;n=s3:who},{k=s3:int;n=s4:item},{k=s3:int;n=s5:count},{k=s3:int;n=s6:amount}]}]}};lp={code=s2:lp;expiry={days=n3};fields=[{k=s4:text;max=n48;n=s9:character},{k=s3:int;n=s5:level},{k=s4:text;max=n60;n=s4:zone},{k=s4:text;max=n60;n=s4:when},{k=s4:text;max=n140;n=s4:note}];key=[s3:pid,s4:name];max=n400;space=s6:member};pr={code=s2:pr;expiry={days=n14};fields=[{k=s3:int;n=s3:day},{k=s4:list;maxItems=n60;n=s6:prices;parts=[{k=s3:int;n=s2:id},{k=s3:int;n=s6:copper}]}];key=[s3:pid];max=n800;space=s6:member};rc={author=s3:key;code=s2:rc;expiry={days=n60;newerOf=s2:ch};fields=[{k=s4:enum;n=s4:kind;values=s3:sin},{k=s3:int;n=s5:count},{cases={n={k=s4:list;maxItems=n500;of={k=s4:text;max=n100}}};default={k=s3:ids;maxItems=n2000};k=s6:switch;n=s4:list;on=s4:kind}];key=[s4:name,s3:int];max=n2048;maxIf={field=s4:kind;max=n6144;value=s1:n};space=s6:member};sh={code=s2:sh;expiry={days=n30};fields=[{k=s4:list;maxItems=n20;n=s5:items;parts=[{k=s4:text;max=n100;n=s4:name},{k=s3:int;n=s3:qty},{k=s3:int;n=s5:skill}]}];key=[s3:pid];max=n1024;space=s6:member};su={code=s2:su;expiry={parent=s2:RD;seg=n1};fields=[{k=s4:text;max=n48;n=s9:character},{k=s4:enum;n=s4:role;values=s3:thd},{k=s4:enum;n=s6:status;values=s4:ytnb},{k=s4:text;max=n120;n=s4:note},{k=s4:list;maxItems=n10;n=s8:reserves;of={k=s4:text;max=n12}},{k=s3:int;n=s10:reservesAt},{k=s4:list;maxItems=n10;n=s4:prev;of={k=s4:text;max=n12}},{k=s3:int;n=s6:prevAt}];key=[s5:b36x6,s3:pid];max=n400;space=s6:member}}",
+ "hashes": [
+  {
+   "s": "",
+   "h": 5381
+  },
+  {
+   "s": "a",
+   "h": 177670
+  },
+  {
+   "s": "Grommash",
+   "h": 1413668931
+  },
+  {
+   "s": "Thrallia",
+   "h": 1476019478
+  },
+  {
+   "s": "RD:k3f9a2",
+   "h": 1905448773
+  },
+  {
+   "s": "RD:k3f9a2#",
+   "h": 2750267400
+  },
+  {
+   "s": "Zulé Ærøn 東京 😀",
+   "h": 843323509
+  },
+  {
+   "s": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+   "h": 2856006437
+  },
+  {
+   "s": "\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\b\t\n\u000b\f\r\u000e\u000f\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001a\u001b\u001c\u001d\u001e\u001f~^;,#|",
+   "h": 831221302
+  }
+ ],
+ "b36": [
+  {
+   "n": 0,
+   "s": "0",
+   "width": 8,
+   "pad": "00000000"
+  },
+  {
+   "n": 1,
+   "s": "1",
+   "width": 8,
+   "pad": "00000001"
+  },
+  {
+   "n": 35,
+   "s": "z",
+   "width": 8,
+   "pad": "0000000z"
+  },
+  {
+   "n": 36,
+   "s": "10",
+   "width": 8,
+   "pad": "00000010"
+  },
+  {
+   "n": 1295,
+   "s": "zz",
+   "width": 8,
+   "pad": "000000zz"
+  },
+  {
+   "n": 1296,
+   "s": "100",
+   "width": 8,
+   "pad": "00000100"
+  },
+  {
+   "n": 17102,
+   "s": "d72",
+   "width": 8,
+   "pad": "00000d72"
+  },
+  {
+   "n": 1794066000,
+   "s": "to526o",
+   "width": 8,
+   "pad": "00to526o"
+  },
+  {
+   "n": 114820224003,
+   "s": "1gqwzvur",
+   "width": 8,
+   "pad": "1gqwzvur"
+  },
+  {
+   "n": 2585160115203,
+   "s": "wzltl343",
+   "width": 8,
+   "pad": "wzltl343"
+  },
+  {
+   "n": 2821109907455,
+   "s": "zzzzzzzz",
+   "width": 8,
+   "pad": "zzzzzzzz"
+  },
+  {
+   "n": 3656158440062975,
+   "s": "zzzzzzzzzz",
+   "width": 8,
+   "pad": "zzzzzzzz"
+  },
+  {
+   "n": 1,
+   "s": "1",
+   "width": 8,
+   "pad": "00000001"
+  },
+  {
+   "n": 7.9,
+   "s": "7",
+   "width": 8,
+   "pad": "00000007"
+  },
+  {
+   "n": -1,
+   "s": "",
+   "width": 8,
+   "pad": "00000000"
+  },
+  {
+   "n": 3656158440062976,
+   "s": "",
+   "width": 8,
+   "pad": "00000000"
+  },
+  {
+   "n": 46656,
+   "s": "1000",
+   "width": 3,
+   "pad": "000"
+  }
+ ],
+ "fromB36": [
+  {
+   "s": "0",
+   "n": 0
+  },
+  {
+   "s": "z",
+   "n": 35
+  },
+  {
+   "s": "10",
+   "n": 36
+  },
+  {
+   "s": "d72",
+   "n": 17102
+  },
+  {
+   "s": "1gqwzvur",
+   "n": 114820224003
+  },
+  {
+   "s": "wzltl343",
+   "n": 2585160115203
+  },
+  {
+   "s": "zzzzzzzzzz",
+   "n": 3656158440062975
+  },
+  {
+   "s": "zzzzzzzzzzz",
+   "n": null
+  },
+  {
+   "s": "",
+   "n": null
+  },
+  {
+   "s": "A",
+   "n": null
+  },
+  {
+   "s": "-1",
+   "n": null
+  },
+  {
+   "s": " 1",
+   "n": null
+  },
+  {
+   "s": "1.5",
+   "n": null
+  }
+ ],
+ "cuts": [
+  {
+   "s": "abcdef",
+   "max": 3,
+   "out": "abc"
+  },
+  {
+   "s": "abé",
+   "max": 3,
+   "out": "ab"
+  },
+  {
+   "s": "abé",
+   "max": 4,
+   "out": "abé"
+  },
+  {
+   "s": "é",
+   "max": 1,
+   "out": ""
+  },
+  {
+   "s": "😀x",
+   "max": 2,
+   "out": ""
+  },
+  {
+   "s": "😀x",
+   "max": 4,
+   "out": "😀"
+  },
+  {
+   "s": "😀x",
+   "max": 5,
+   "out": "😀x"
+  },
+  {
+   "s": "",
+   "max": 5,
+   "out": ""
+  },
+  {
+   "s": "abc",
+   "max": 0,
+   "out": ""
+  }
+ ],
+ "escCuts": [
+  {
+   "s": "a~3Bb",
+   "max": 1,
+   "out": "a"
+  },
+  {
+   "s": "a~3Bb",
+   "max": 2,
+   "out": "a"
+  },
+  {
+   "s": "a~3Bb",
+   "max": 3,
+   "out": "a"
+  },
+  {
+   "s": "a~3Bb",
+   "max": 4,
+   "out": "a~3B"
+  },
+  {
+   "s": "a~3Bb",
+   "max": 5,
+   "out": "a~3Bb"
+  },
+  {
+   "s": "é~2C",
+   "max": 1,
+   "out": ""
+  },
+  {
+   "s": "é~2C",
+   "max": 3,
+   "out": "é"
+  },
+  {
+   "s": "~7E~7E",
+   "max": 4,
+   "out": "~7E"
+  },
+  {
+   "s": "abc",
+   "max": 9,
+   "out": "abc"
+  },
+  {
+   "s": "",
+   "max": 0,
+   "out": ""
+  }
+ ],
+ "escapes": [
+  {
+   "s": "\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\b\t\n\u000b\f\r\u000e\u000f\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001a\u001b\u001c\u001d\u001e\u001f~^;,#|",
+   "max": null,
+   "escaped": "~00~01~02~03~04~05~06~07~08~09~0A~0B~0C~0D~0E~0F~10~11~12~13~14~15~16~17~18~19~1A~1B~1C~1D~1E~1F~7F~7E~5E~3B~2C~23~7C",
+   "unescaped": "\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\b\t\n\u000b\f\r\u000e\u000f\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001a\u001b\u001c\u001d\u001e\u001f~^;,#|"
+  },
+  {
+   "s": "Zulé Ærøn 東京 😀",
+   "max": null,
+   "escaped": "Zulé Ærøn 東京 😀",
+   "unescaped": "Zulé Ærøn 東京 😀"
+  },
+  {
+   "s": "plain text",
+   "max": null,
+   "escaped": "plain text",
+   "unescaped": "plain text"
+  },
+  {
+   "s": "~7E is not unescaped twice",
+   "max": null,
+   "escaped": "~7E7E is not unescaped twice",
+   "unescaped": "~7E is not unescaped twice"
+  },
+  {
+   "s": "aaaaaaaaaa~",
+   "max": 10,
+   "escaped": "aaaaaaaaaa",
+   "unescaped": "aaaaaaaaaa"
+  },
+  {
+   "s": "é~",
+   "max": 2,
+   "escaped": "é",
+   "unescaped": "é"
+  },
+  {
+   "s": "~~~~",
+   "max": 2,
+   "escaped": "~7E~7E",
+   "unescaped": "~~"
+  },
+  {
+   "s": "ab;cd",
+   "max": 4,
+   "escaped": "ab~3Bc",
+   "unescaped": "ab;c"
+  },
+  {
+   "s": "",
+   "max": null,
+   "escaped": "",
+   "unescaped": ""
+  }
+ ],
+ "unescapeBad": [
+  "~",
+  "~7",
+  "~7e",
+  "~G0",
+  "~41",
+  "a,b",
+  "a;b",
+  "a^b",
+  "a#b",
+  "a|b",
+  "a\u0001b",
+  "~C3~A9"
+ ],
+ "varints": [
+  {
+   "ids": [],
+   "maxItems": null,
+   "s": "",
+   "decoded": "{}"
+  },
+  {
+   "ids": [
+    0
+   ],
+   "maxItems": null,
+   "s": "0",
+   "decoded": "[n0]"
+  },
+  {
+   "ids": [
+    31
+   ],
+   "maxItems": null,
+   "s": "V",
+   "decoded": "[n31]"
+  },
+  {
+   "ids": [
+    32
+   ],
+   "maxItems": null,
+   "s": "X0",
+   "decoded": "[n32]"
+  },
+  {
+   "ids": [
+    1023,
+    1024
+   ],
+   "maxItems": null,
+   "s": "_V1",
+   "decoded": "[n1023,n1024]"
+  },
+  {
+   "ids": [
+    2660,
+    2661,
+    2662,
+    2663,
+    3115,
+    9811,
+    2660
+   ],
+   "maxItems": null,
+   "s": "Yp4111k4cn8",
+   "decoded": "[n2660,n2661,n2662,n2663,n3115,n9811]"
+  },
+  {
+   "ids": [
+    30000,
+    5,
+    5,
+    7,
+    -3,
+    1.5
+   ],
+   "maxItems": null,
+   "s": "142zf9",
+   "decoded": "[n1,n5,n7,n30000]"
+  },
+  {
+   "ids": [
+    1099511627775
+   ],
+   "maxItems": null,
+   "s": "_______V",
+   "decoded": "[n1099511627775]"
+  },
+  {
+   "ids": [
+    9,
+    8,
+    7,
+    6,
+    5,
+    4,
+    3,
+    2,
+    1
+   ],
+   "maxItems": 4,
+   "s": "1111",
+   "decoded": "[n1,n2,n3,n4]"
+  }
+ ],
+ "varintBad": [
+  "W",
+  "a",
+  "!",
+  "WWWWWWWWWWW0",
+  "0 1"
+ ],
+ "ids": [
+  {
+   "id": "RD:k3f9a2",
+   "v": "1gqx1j43",
+   "bucket": 37,
+   "shortId": "frwo",
+   "term": 1404475366,
+   "memberMayServe": false
+  },
+  {
+   "id": "RT:k3f9a2",
+   "v": "1gqx1j5v",
+   "bucket": 37,
+   "shortId": "ek9k",
+   "term": 2169813082,
+   "memberMayServe": false
+  },
+  {
+   "id": "ca:x8k2pq",
+   "v": "1gqx1j7n",
+   "bucket": 17,
+   "shortId": "77ro",
+   "term": 1039868304,
+   "memberMayServe": true
+  },
+  {
+   "id": "ch:Zulé",
+   "v": "1gqx1j9f",
+   "bucket": 17,
+   "shortId": "i2hg",
+   "term": 1051961802,
+   "memberMayServe": true
+  },
+  {
+   "id": "WH:1",
+   "v": "1gqx1jb7",
+   "bucket": null,
+   "shortId": "vlgy",
+   "term": 787051586,
+   "memberMayServe": false
+  },
+  {
+   "id": "CFG:1",
+   "v": "1gqx1jcz",
+   "bucket": 32,
+   "shortId": "pvlv",
+   "term": 3655348087,
+   "memberMayServe": false
+  },
+  {
+   "id": "zz:any",
+   "v": "1gqx1jer",
+   "bucket": 27,
+   "shortId": "m6ri",
+   "term": 1803994156,
+   "memberMayServe": true
+  },
+  {
+   "id": "ZZ:any",
+   "v": "1gqx1jgj",
+   "bucket": 43,
+   "shortId": "4eim",
+   "term": 2593249318,
+   "memberMayServe": false
+  },
+  {
+   "id": "bad",
+   "v": "1gqx1jib",
+   "bucket": null,
+   "shortId": "e6vj",
+   "term": 959884337,
+   "memberMayServe": false
+  },
+  {
+   "id": "Ab:x",
+   "v": "1gqx1jk3",
+   "bucket": null,
+   "shortId": "wgv1",
+   "term": 1952735314,
+   "memberMayServe": false
+  }
+ ],
+ "digests": [
+  {
+   "entries": [],
+   "removed": [],
+   "sum": 0,
+   "count": 0,
+   "value": 0,
+   "str": "0000"
+  },
+  {
+   "entries": [
+    {
+     "id": "RD:k3f9a2",
+     "v": "1gqwzvur"
+    }
+   ],
+   "removed": [],
+   "sum": 1405928122,
+   "count": 1,
+   "value": 90368,
+   "str": "1xq8"
+  },
+  {
+   "entries": [
+    {
+     "id": "RD:k3f9a2",
+     "v": "1gqwzvur"
+    },
+    {
+     "id": "RT:k3f9a2",
+     "v": "wzltl343"
+    },
+    {
+     "id": "ca:x8k2pq",
+     "v": "1gqx36dy"
+    },
+    {
+     "id": "ch:Thrallia",
+     "v": "1gqx1g5y"
+    },
+    {
+     "id": "ch:Zuljinne",
+     "v": "1gqx1g6s"
+    },
+    {
+     "id": "ch:Zulé",
+     "v": "1gqx1g5o"
+    },
+    {
+     "id": "ch:Thrallia",
+     "v": "1gqx1g5y"
+    },
+    {
+     "id": "rc:Thrallia:4k",
+     "v": "1gqx1g5y"
+    },
+    {
+     "id": "rc:Thrallia:4k",
+     "v": "1gqx1g5y"
+    },
+    {
+     "id": "rc:Thrallia:5h",
+     "v": "1gqx1g5y"
+    },
+    {
+     "id": "rc:Thrallia:5h",
+     "v": "1gqx1g5y"
+    },
+    {
+     "id": "su:k3f9a2:Thrallia.p4m7",
+     "v": "1gqx1g5y"
+    },
+    {
+     "id": "su:k3f9a2:Thrallia.p4m7",
+     "v": "1gqx2cra"
+    },
+    {
+     "id": "su:k3f9a2:Zuljin.a8x2",
+     "v": "1gqx1g69"
+    },
+    {
+     "id": "cr:r1r1r1",
+     "v": "1gqx1g5y"
+    },
+    {
+     "id": "cr:r1r1r1",
+     "v": "wzm58vpy"
+    },
+    {
+     "id": "cr:r1r1r1",
+     "v": "wzm58vpy"
+    },
+    {
+     "id": "cl:r1r1r1:Zuljin.a8x2",
+     "v": "1gqx1g69"
+    },
+    {
+     "id": "lp:Thrallia.p4m7:Zuljinne",
+     "v": "1gqx1g6s"
+    },
+    {
+     "id": "dc:h4nd1n",
+     "v": "1gqx1g5y"
+    },
+    {
+     "id": "bq:b4nkrq",
+     "v": "1gqx1g5y"
+    },
+    {
+     "id": "bq:b4nkrq",
+     "v": "wzm58vpy"
+    },
+    {
+     "id": "gb:0",
+     "v": "1gqx1g6s"
+    },
+    {
+     "id": "gb:3",
+     "v": "1gqx1g6s"
+    },
+    {
+     "id": "bk:Bankalt",
+     "v": "1gqx1g6a"
+    },
+    {
+     "id": "sh:Thrallia.p4m7",
+     "v": "1gqx1g5y"
+    },
+    {
+     "id": "pr:Thrallia.p4m7",
+     "v": "1gqx1g5y"
+    },
+    {
+     "id": "RD:pvp001",
+     "v": "1gqx1g6g"
+    },
+    {
+     "id": "RT:k3f9a2",
+     "v": "1gr80lc3"
+    },
+    {
+     "id": "RT:k3f9a2",
+     "v": "1gqx1hns"
+    },
+    {
+     "id": "RT:k3f9a2",
+     "v": "wzm58vqg"
+    },
+    {
+     "id": "LA:aw4rd1",
+     "v": "1gqx1g5f"
+    },
+    {
+     "id": "LL:2dv8n1",
+     "v": "1gqx1g5f"
+    },
+    {
+     "id": "LY:2dv8n1",
+     "v": "1gqx1g5f"
+    },
+    {
+     "id": "AN:q2w8zz",
+     "v": "1gqx1g5f"
+    },
+    {
+     "id": "AN:q2w8zz",
+     "v": "1gqx1g5f"
+    },
+    {
+     "id": "AN:q2w8zz",
+     "v": "1gqx1hns"
+    },
+    {
+     "id": "DR:dr1v3x",
+     "v": "1gqx1g5f"
+    },
+    {
+     "id": "DR:dr1v3x",
+     "v": "wzm58vpf"
+    },
+    {
+     "id": "BH:b4nkrq",
+     "v": "1gqx1g6g"
+    },
+    {
+     "id": "BC:1",
+     "v": "1gqx1g5f"
+    },
+    {
+     "id": "CFG:1",
+     "v": "1gqx1g5f"
+    },
+    {
+     "id": "CFG:1",
+     "v": "1gqx1g5f"
+    },
+    {
+     "id": "WH:1",
+     "v": "1gqx1g6g"
+    },
+    {
+     "id": "ca:big001",
+     "v": "1gqx1g5y"
+    },
+    {
+     "id": "ca:big002",
+     "v": "1gqx1g5o"
+    },
+    {
+     "id": "zz:any:thing",
+     "v": "1gqx1g5y"
+    },
+    {
+     "id": "ZQ:1",
+     "v": "1gqx1g6g"
+    },
+    {
+     "id": "ca:old001",
+     "v": "1gqn5z4m"
+    },
+    {
+     "id": "ca:fut001",
+     "v": "1gqx6gwm"
+    },
+    {
+     "id": "gb:0",
+     "v": "1gqx1g6s"
+    },
+    {
+     "id": "gb:0",
+     "v": "1gqx1g6s"
+    }
+   ],
+   "removed": [],
+   "sum": 101010618629,
+   "count": 52,
+   "value": 252145,
+   "str": "5ek1"
+  },
+  {
+   "entries": [
+    {
+     "id": "RD:k3f9a2",
+     "v": "1gqwzvur"
+    },
+    {
+     "id": "RT:k3f9a2",
+     "v": "wzltl343"
+    },
+    {
+     "id": "ca:x8k2pq",
+     "v": "1gqx36dy"
+    },
+    {
+     "id": "ch:Thrallia",
+     "v": "1gqx1g5y"
+    },
+    {
+     "id": "ch:Zuljinne",
+     "v": "1gqx1g6s"
+    },
+    {
+     "id": "ch:Zulé",
+     "v": "1gqx1g5o"
+    },
+    {
+     "id": "ch:Thrallia",
+     "v": "1gqx1g5y"
+    },
+    {
+     "id": "rc:Thrallia:4k",
+     "v": "1gqx1g5y"
+    },
+    {
+     "id": "rc:Thrallia:4k",
+     "v": "1gqx1g5y"
+    },
+    {
+     "id": "rc:Thrallia:5h",
+     "v": "1gqx1g5y"
+    },
+    {
+     "id": "rc:Thrallia:5h",
+     "v": "1gqx1g5y"
+    },
+    {
+     "id": "su:k3f9a2:Thrallia.p4m7",
+     "v": "1gqx1g5y"
+    },
+    {
+     "id": "su:k3f9a2:Thrallia.p4m7",
+     "v": "1gqx2cra"
+    },
+    {
+     "id": "su:k3f9a2:Zuljin.a8x2",
+     "v": "1gqx1g69"
+    },
+    {
+     "id": "cr:r1r1r1",
+     "v": "1gqx1g5y"
+    },
+    {
+     "id": "cr:r1r1r1",
+     "v": "wzm58vpy"
+    },
+    {
+     "id": "cr:r1r1r1",
+     "v": "wzm58vpy"
+    },
+    {
+     "id": "cl:r1r1r1:Zuljin.a8x2",
+     "v": "1gqx1g69"
+    },
+    {
+     "id": "lp:Thrallia.p4m7:Zuljinne",
+     "v": "1gqx1g6s"
+    },
+    {
+     "id": "dc:h4nd1n",
+     "v": "1gqx1g5y"
+    },
+    {
+     "id": "bq:b4nkrq",
+     "v": "1gqx1g5y"
+    },
+    {
+     "id": "bq:b4nkrq",
+     "v": "wzm58vpy"
+    },
+    {
+     "id": "gb:0",
+     "v": "1gqx1g6s"
+    },
+    {
+     "id": "gb:3",
+     "v": "1gqx1g6s"
+    },
+    {
+     "id": "bk:Bankalt",
+     "v": "1gqx1g6a"
+    },
+    {
+     "id": "sh:Thrallia.p4m7",
+     "v": "1gqx1g5y"
+    },
+    {
+     "id": "pr:Thrallia.p4m7",
+     "v": "1gqx1g5y"
+    },
+    {
+     "id": "RD:pvp001",
+     "v": "1gqx1g6g"
+    },
+    {
+     "id": "RT:k3f9a2",
+     "v": "1gr80lc3"
+    },
+    {
+     "id": "RT:k3f9a2",
+     "v": "1gqx1hns"
+    },
+    {
+     "id": "RT:k3f9a2",
+     "v": "wzm58vqg"
+    },
+    {
+     "id": "LA:aw4rd1",
+     "v": "1gqx1g5f"
+    },
+    {
+     "id": "LL:2dv8n1",
+     "v": "1gqx1g5f"
+    },
+    {
+     "id": "LY:2dv8n1",
+     "v": "1gqx1g5f"
+    },
+    {
+     "id": "AN:q2w8zz",
+     "v": "1gqx1g5f"
+    },
+    {
+     "id": "AN:q2w8zz",
+     "v": "1gqx1g5f"
+    },
+    {
+     "id": "AN:q2w8zz",
+     "v": "1gqx1hns"
+    },
+    {
+     "id": "DR:dr1v3x",
+     "v": "1gqx1g5f"
+    },
+    {
+     "id": "DR:dr1v3x",
+     "v": "wzm58vpf"
+    },
+    {
+     "id": "BH:b4nkrq",
+     "v": "1gqx1g6g"
+    },
+    {
+     "id": "BC:1",
+     "v": "1gqx1g5f"
+    },
+    {
+     "id": "CFG:1",
+     "v": "1gqx1g5f"
+    },
+    {
+     "id": "CFG:1",
+     "v": "1gqx1g5f"
+    },
+    {
+     "id": "WH:1",
+     "v": "1gqx1g6g"
+    },
+    {
+     "id": "ca:big001",
+     "v": "1gqx1g5y"
+    },
+    {
+     "id": "ca:big002",
+     "v": "1gqx1g5o"
+    },
+    {
+     "id": "zz:any:thing",
+     "v": "1gqx1g5y"
+    },
+    {
+     "id": "ZQ:1",
+     "v": "1gqx1g6g"
+    },
+    {
+     "id": "ca:old001",
+     "v": "1gqn5z4m"
+    },
+    {
+     "id": "ca:fut001",
+     "v": "1gqx6gwm"
+    },
+    {
+     "id": "gb:0",
+     "v": "1gqx1g6s"
+    },
+    {
+     "id": "gb:0",
+     "v": "1gqx1g6s"
+    }
+   ],
+   "removed": [
+    {
+     "id": "ch:Thrallia",
+     "v": "1gqx1g5y"
+    },
+    {
+     "id": "ch:Zuljinne",
+     "v": "1gqx1g6s"
+    },
+    {
+     "id": "ch:Zulé",
+     "v": "1gqx1g5o"
+    },
+    {
+     "id": "ch:Thrallia",
+     "v": "1gqx1g5y"
+    },
+    {
+     "id": "rc:Thrallia:4k",
+     "v": "1gqx1g5y"
+    },
+    {
+     "id": "rc:Thrallia:4k",
+     "v": "1gqx1g5y"
+    }
+   ],
+   "sum": 89553747834,
+   "count": 46,
+   "value": 35265,
+   "str": "0r7l"
+  },
+  {
+   "entries": [
+    {
+     "id": "RD:k3f9a2",
+     "v": "1gqwzvur"
+    },
+    {
+     "id": "RT:k3f9a2",
+     "v": "wzltl343"
+    }
+   ],
+   "removed": [
+    {
+     "id": "RD:k3f9a2",
+     "v": "1gqwzvur"
+    },
+    {
+     "id": "RT:k3f9a2",
+     "v": "wzltl343"
+    }
+   ],
+   "sum": 0,
+   "count": 0,
+   "value": 0,
+   "str": "0000"
+  }
+ ],
+ "versions": [
+  {
+   "t": 1794066000,
+   "author": "Grommash",
+   "final": false,
+   "v": "1gqwzvur",
+   "tBack": 1794066000,
+   "isFinal": false
+  },
+  {
+   "t": 1794373200,
+   "author": "Grommash",
+   "final": true,
+   "v": "wzltl343",
+   "tBack": 1794373200,
+   "isFinal": true
+  },
+  {
+   "t": 0,
+   "author": "a",
+   "final": false,
+   "v": "00000006",
+   "tBack": 0,
+   "isFinal": false
+  },
+  {
+   "t": 0,
+   "author": "a",
+   "final": true,
+   "v": "ygd2adc6",
+   "tBack": 0,
+   "isFinal": true
+  },
+  {
+   "t": 1794068400,
+   "author": "Thrallia",
+   "final": false,
+   "v": "1gqx36dy",
+   "tBack": 1794068400,
+   "isFinal": false
+  },
+  {
+   "t": 1794068400.7,
+   "author": "Zulé",
+   "final": false,
+   "v": "1gqx36do",
+   "tBack": 1794068400,
+   "isFinal": false
+  },
+  {
+   "t": 4102444800,
+   "author": "Zuljin",
+   "final": true,
+   "v": "v3quy2ox",
+   "tBack": 4102444800,
+   "isFinal": true
+  },
+  {
+   "t": 4102444800,
+   "author": "Zuljin",
+   "final": false,
+   "v": "3cm7caox",
+   "tBack": 4102444800,
+   "isFinal": false
+  }
+ ],
+ "nextT": [
+  {
+   "t": 100,
+   "tOld": 50,
+   "out": 100
+  },
+  {
+   "t": 100,
+   "tOld": 100,
+   "out": 101
+  },
+  {
+   "t": 100,
+   "tOld": 150,
+   "out": 151
+  },
+  {
+   "t": 100,
+   "tOld": null,
+   "out": 100
+  },
+  {
+   "t": 7.5,
+   "tOld": 7,
+   "out": 8
+  }
+ ],
+ "compare": [
+  {
+   "a": "RD:k3f9a2^1gqwzvur^Grommash^^r^Molten Core Thursday^Molten Core^tobc40^50^14^2^Bring fire resist",
+   "b": "RD:k3f9a2^1gqwzvur^Grommash^^r^Molten Core Thursday^Molten Core^tobc40^50^14^2^Bring fire resist",
+   "out": 0
+  },
+  {
+   "a": "AN:q2w8zz^1gqx1j43^Grommash^^a",
+   "b": "AN:q2w8zz^1gqx1j2b^Grommash^^z",
+   "out": 1
+  },
+  {
+   "a": "AN:q2w8zz^1gqx1j43^Grommash^^a",
+   "b": "AN:q2w8zz^1gqx1j43^Grommash^^b",
+   "out": -1
+  },
+  {
+   "a": "AN:q2w8zz^1gqx1j43^Grommash^^é",
+   "b": "AN:q2w8zz^1gqx1j43^Grommash^^￿",
+   "out": -1
+  },
+  {
+   "a": "AN:q2w8zz^1gqx1j43^Grommash^^😀",
+   "b": "AN:q2w8zz^1gqx1j43^Grommash^^￿",
+   "out": 1
+  },
+  {
+   "a": "RT:k3f9a2^wzm58vqg^Varok^^x",
+   "b": "RT:k3f9a2^1gqx1hns^Varok^^o",
+   "out": 1
+  },
+  {
+   "a": "RT:k3f9a2^wzm58z6w^Varok^^x",
+   "b": "RT:k3f9a2^wzm58u83^Grommash^^d",
+   "out": 1
+  }
+ ],
+ "keys": [
+  {
+   "kind": "item",
+   "input": 17102,
+   "out": "d72"
+  },
+  {
+   "kind": "item",
+   "input": "Cloak of the Shrouded Mists",
+   "out": "h80e4z"
+  },
+  {
+   "kind": "item",
+   "input": "  cloak OF the shrouded mists ",
+   "out": "h80e4z"
+  },
+  {
+   "kind": "item",
+   "input": "Ränge",
+   "out": "huzybc"
+  },
+  {
+   "kind": "item",
+   "input": "",
+   "out": ""
+  },
+  {
+   "kind": "item",
+   "input": 0,
+   "out": ""
+  },
+  {
+   "kind": "instance",
+   "input": "Molten Core",
+   "out": "2dv8n1"
+  },
+  {
+   "kind": "instance",
+   "input": " molten core\t",
+   "out": "2dv8n1"
+  },
+  {
+   "kind": "instance",
+   "input": "Zul'Gurub",
+   "out": "kyzij0"
+  },
+  {
+   "kind": "instance",
+   "input": "",
+   "out": ""
+  }
+ ],
+ "records": [
+  {
+   "name": "spec RD example",
+   "input": {
+    "type": "RD",
+    "key": "k3f9a2",
+    "v": "1gqwzvur",
+    "author": "Grommash",
+    "del": false,
+    "fields": {
+     "kind": "r",
+     "title": "Molten Core Thursday",
+     "instance": "Molten Core",
+     "startsAt": 1794358800,
+     "minutes": 180,
+     "size": 40,
+     "srLimit": 2,
+     "notes": "Bring fire resist"
+    }
+   },
+   "record": "RD:k3f9a2^1gqwzvur^Grommash^^r^Molten Core Thursday^Molten Core^tobc40^50^14^2^Bring fire resist",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s8:Grommash;del=F;fields={instance=s11:Molten Core;kind=s1:r;minutes=n180;notes=s17:Bring fire resist;size=n40;srLimit=n2;startsAt=n1794358800;title=s20:Molten Core Thursday};id=s9:RD:k3f9a2;key=s6:k3f9a2;t=n1794066000;type=s2:RD;v=s8:1gqwzvur}",
+   "reencode": "RD:k3f9a2^1gqwzvur^Grommash^^r^Molten Core Thursday^Molten Core^tobc40^50^14^2^Bring fire resist",
+   "check": null,
+   "parseDump": "{author=s8:Grommash;del=F;id=s9:RD:k3f9a2;key=s6:k3f9a2;raw=[s1:r,s20:Molten Core Thursday,s11:Molten Core,s6:tobc40,s2:50,s2:14,s1:2,s17:Bring fire resist];t=n1794066000;type=s2:RD;v=s8:1gqwzvur}",
+   "final": false
+  },
+  {
+   "name": "spec RT close example",
+   "input": {
+    "type": "RT",
+    "key": "k3f9a2",
+    "v": "wzltl343",
+    "author": "Grommash",
+    "fields": {
+     "status": "d",
+     "lockedAt": 1794355200,
+     "kind": "r",
+     "instance": "4kq1zm",
+     "closedAt": 1794373200,
+     "attendees": [
+      {
+       "pid": "Thrallia.p4m7",
+       "items": [
+        "d72",
+        "eim"
+       ]
+      },
+      {
+       "pid": "Zuljin.a8x2",
+       "items": [
+        "eim"
+       ]
+      }
+     ],
+     "noShows": [
+      "Varok.7tq3"
+     ]
+    }
+   },
+   "record": "RT:k3f9a2^wzltl343^Grommash^^d^tob9c0^r^4kq1zm^tobn80^Thrallia.p4m7,d72,eim;Zuljin.a8x2,eim^Varok.7tq3",
+   "now": 1794373300,
+   "lookup": null,
+   "dump": "{author=s8:Grommash;del=F;fields={attendees=[{items=[s3:d72,s3:eim];pid=s13:Thrallia.p4m7},{items=[s3:eim];pid=s11:Zuljin.a8x2}];closedAt=n1794373200;instance=s6:4kq1zm;kind=s1:r;lockedAt=n1794355200;noShows=[s10:Varok.7tq3];status=s1:d};id=s9:RT:k3f9a2;key=s6:k3f9a2;t=n1794373200;type=s2:RT;v=s8:wzltl343}",
+   "reencode": "RT:k3f9a2^wzltl343^Grommash^^d^tob9c0^r^4kq1zm^tobn80^Thrallia.p4m7,d72,eim;Zuljin.a8x2,eim^Varok.7tq3",
+   "check": null,
+   "parseDump": "{author=s8:Grommash;del=F;id=s9:RT:k3f9a2;key=s6:k3f9a2;raw=[s1:d,s6:tob9c0,s1:r,s6:4kq1zm,s6:tobn80,s37:Thrallia.p4m7,d72,eim;Zuljin.a8x2,eim,s10:Varok.7tq3];t=n1794373200;type=s2:RT;v=s8:wzltl343}",
+   "final": true
+  },
+  {
+   "name": "spec ca example",
+   "input": {
+    "type": "ca",
+    "key": "x8k2pq",
+    "v": "1gqx36dy",
+    "author": "Thrallia",
+    "del": false,
+    "fields": {
+     "character": "Thrallia",
+     "zone": "Crossroads",
+     "needed": 5,
+     "message": "Alliance at the flight master"
+    }
+   },
+   "record": "ca:x8k2pq^1gqx36dy^Thrallia^^Thrallia^Crossroads^5^Alliance at the flight master",
+   "now": 1794068400,
+   "lookup": null,
+   "dump": "{author=s8:Thrallia;del=F;fields={character=s8:Thrallia;message=s29:Alliance at the flight master;needed=n5;zone=s10:Crossroads};id=s9:ca:x8k2pq;key=s6:x8k2pq;t=n1794068400;type=s2:ca;v=s8:1gqx36dy}",
+   "reencode": "ca:x8k2pq^1gqx36dy^Thrallia^^Thrallia^Crossroads^5^Alliance at the flight master",
+   "check": null,
+   "parseDump": "{author=s8:Thrallia;del=F;id=s9:ca:x8k2pq;key=s6:x8k2pq;raw=[s8:Thrallia,s10:Crossroads,s1:5,s29:Alliance at the flight master];t=n1794068400;type=s2:ca;v=s8:1gqx36dy}",
+   "final": false
+  },
+  {
+   "name": "ch full",
+   "input": {
+    "type": "ch",
+    "key": "Thrallia",
+    "v": "1gqx1g5y",
+    "author": "Thrallia",
+    "del": false,
+    "fields": {
+     "pid": "Thrallia.p4m7",
+     "battletag": "Calvin#1234",
+     "main": true,
+     "alts": [
+      "Thrallia",
+      "Zuljinne",
+      "Zulé"
+     ],
+     "class": "Shaman",
+     "race": "Orc",
+     "level": 60,
+     "faction": "Horde",
+     "ilvl": 62,
+     "repair": 87,
+     "consumables": {
+      "flask": 2,
+      "elixir": 0,
+      "potion": 12,
+      "food": 20,
+      "bandage": 0
+     },
+     "professions": [
+      {
+       "skill": 164,
+       "rank": 300,
+       "max": 300
+      },
+      {
+       "skill": 186,
+       "rank": 275,
+       "max": 300
+      }
+     ],
+     "pvp": {
+      "rank": 7,
+      "hk": 1234
+     },
+     "addon": "0.12.0"
+    }
+   },
+   "record": "ch:Thrallia^1gqx1g5y^Thrallia^^Thrallia.p4m7^Calvin~231234^1^Thrallia;Zuljinne;Zulé^Shaman^Orc^1o^Horde^1q^2f^2,0,c,k,0^4k,8c,8c;56,7n,8c^7,ya^0.12.0",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s8:Thrallia;del=F;fields={addon=s6:0.12.0;alts=[s8:Thrallia,s8:Zuljinne,s5:Zulé];battletag=s11:Calvin#1234;class=s6:Shaman;consumables={bandage=n0;elixir=n0;flask=n2;food=n20;potion=n12};faction=s5:Horde;ilvl=n62;level=n60;main=T;pid=s13:Thrallia.p4m7;professions=[{max=n300;rank=n300;skill=n164},{max=n300;rank=n275;skill=n186}];pvp={hk=n1234;rank=n7};race=s3:Orc;repair=n87};id=s11:ch:Thrallia;key=s8:Thrallia;t=n1794067140;type=s2:ch;v=s8:1gqx1g5y}",
+   "reencode": "ch:Thrallia^1gqx1g5y^Thrallia^^Thrallia.p4m7^Calvin~231234^1^Thrallia;Zuljinne;Zulé^Shaman^Orc^1o^Horde^1q^2f^2,0,c,k,0^4k,8c,8c;56,7n,8c^7,ya^0.12.0",
+   "check": null,
+   "parseDump": "{author=s8:Thrallia;del=F;id=s11:ch:Thrallia;key=s8:Thrallia;raw=[s13:Thrallia.p4m7,s13:Calvin~231234,s1:1,s23:Thrallia;Zuljinne;Zulé,s6:Shaman,s3:Orc,s2:1o,s5:Horde,s2:1q,s2:2f,s9:2,0,c,k,0,s17:4k,8c,8c;56,7n,8c,s4:7,ya,s6:0.12.0];t=n1794067140;type=s2:ch;v=s8:1gqx1g5y}",
+   "final": false
+  },
+  {
+   "name": "ch alt, sparse",
+   "input": {
+    "type": "ch",
+    "key": "Zuljinne",
+    "v": "1gqx1g6s",
+    "author": "Zuljinne",
+    "del": false,
+    "fields": {
+     "pid": "Thrallia.p4m7",
+     "level": 12,
+     "consumables": {
+      "potion": 3
+     },
+     "pvp": {}
+    }
+   },
+   "record": "ch:Zuljinne^1gqx1g6s^Zuljinne^^Thrallia.p4m7^^^^^^c^^^^,,3",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s8:Zuljinne;del=F;fields={addon=s0:;alts={};battletag=s0:;class=s0:;consumables={potion=n3};faction=s0:;level=n12;main=F;pid=s13:Thrallia.p4m7;professions={};pvp={};race=s0:};id=s11:ch:Zuljinne;key=s8:Zuljinne;t=n1794067140;type=s2:ch;v=s8:1gqx1g6s}",
+   "reencode": "ch:Zuljinne^1gqx1g6s^Zuljinne^^Thrallia.p4m7^^^^^^c^^^^,,3",
+   "check": null,
+   "parseDump": "{author=s8:Zuljinne;del=F;id=s11:ch:Zuljinne;key=s8:Zuljinne;raw=[s13:Thrallia.p4m7,s0:,s0:,s0:,s0:,s0:,s1:c,s0:,s0:,s0:,s3:,,3];t=n1794067140;type=s2:ch;v=s8:1gqx1g6s}",
+   "final": false
+  },
+  {
+   "name": "ch non-ASCII name",
+   "input": {
+    "type": "ch",
+    "key": "Zulé",
+    "v": "1gqx1g5o",
+    "author": "Zulé",
+    "del": false,
+    "fields": {
+     "pid": "Thrallia.p4m7",
+     "class": "Mage",
+     "level": 60
+    }
+   },
+   "record": "ch:Zulé^1gqx1g5o^Zulé^^Thrallia.p4m7^^^^Mage^^1o",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s5:Zulé;del=F;fields={addon=s0:;alts={};battletag=s0:;class=s4:Mage;consumables={};faction=s0:;level=n60;main=F;pid=s13:Thrallia.p4m7;professions={};pvp={};race=s0:};id=s8:ch:Zulé;key=s5:Zulé;t=n1794067140;type=s2:ch;v=s8:1gqx1g5o}",
+   "reencode": "ch:Zulé^1gqx1g5o^Zulé^^Thrallia.p4m7^^^^Mage^^1o",
+   "check": null,
+   "parseDump": "{author=s5:Zulé;del=F;id=s8:ch:Zulé;key=s5:Zulé;raw=[s13:Thrallia.p4m7,s0:,s0:,s0:,s4:Mage,s0:,s2:1o];t=n1794067140;type=s2:ch;v=s8:1gqx1g5o}",
+   "final": false
+  },
+  {
+   "name": "ch over the list limit",
+   "input": {
+    "type": "ch",
+    "key": "Thrallia",
+    "v": "1gqx1g5y",
+    "author": "Thrallia",
+    "del": false,
+    "fields": {
+     "pid": "Thrallia.p4m7",
+     "alts": [
+      "Alt0",
+      "Alt1",
+      "Alt2",
+      "Alt3",
+      "Alt4",
+      "Alt5",
+      "Alt6",
+      "Alt7",
+      "Alt8",
+      "Alt9",
+      "Alt10",
+      "Alt11",
+      "Alt12",
+      "Alt13",
+      "Alt14",
+      "Alt15",
+      "Alt16",
+      "Alt17",
+      "Alt18",
+      "Alt19",
+      "Alt20",
+      "Alt21",
+      "Alt22",
+      "Alt23",
+      "Alt24",
+      "Alt25",
+      "Alt26",
+      "Alt27",
+      "Alt28",
+      "Alt29"
+     ]
+    }
+   },
+   "record": "ch:Thrallia^1gqx1g5y^Thrallia^^Thrallia.p4m7^^^Alt0;Alt1;Alt2;Alt3;Alt4;Alt5;Alt6;Alt7;Alt8;Alt9;Alt10;Alt11;Alt12;Alt13;Alt14;Alt15;Alt16;Alt17;Alt18;Alt19",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s8:Thrallia;del=F;fields={addon=s0:;alts=[s4:Alt0,s4:Alt1,s4:Alt2,s4:Alt3,s4:Alt4,s4:Alt5,s4:Alt6,s4:Alt7,s4:Alt8,s4:Alt9,s5:Alt10,s5:Alt11,s5:Alt12,s5:Alt13,s5:Alt14,s5:Alt15,s5:Alt16,s5:Alt17,s5:Alt18,s5:Alt19];battletag=s0:;class=s0:;consumables={};faction=s0:;main=F;pid=s13:Thrallia.p4m7;professions={};pvp={};race=s0:};id=s11:ch:Thrallia;key=s8:Thrallia;t=n1794067140;type=s2:ch;v=s8:1gqx1g5y}",
+   "reencode": "ch:Thrallia^1gqx1g5y^Thrallia^^Thrallia.p4m7^^^Alt0;Alt1;Alt2;Alt3;Alt4;Alt5;Alt6;Alt7;Alt8;Alt9;Alt10;Alt11;Alt12;Alt13;Alt14;Alt15;Alt16;Alt17;Alt18;Alt19",
+   "check": null,
+   "parseDump": "{author=s8:Thrallia;del=F;id=s11:ch:Thrallia;key=s8:Thrallia;raw=[s13:Thrallia.p4m7,s0:,s0:,s109:Alt0;Alt1;Alt2;Alt3;Alt4;Alt5;Alt6;Alt7;Alt8;Alt9;Alt10;Alt11;Alt12;Alt13;Alt14;Alt15;Alt16;Alt17;Alt18;Alt19];t=n1794067140;type=s2:ch;v=s8:1gqx1g5y}",
+   "final": false
+  },
+  {
+   "name": "rc spell ids",
+   "input": {
+    "type": "rc",
+    "key": "Thrallia:4k",
+    "v": "1gqx1g5y",
+    "author": "Thrallia",
+    "del": false,
+    "fields": {
+     "kind": "s",
+     "count": 6,
+     "list": [
+      2660,
+      2661,
+      2662,
+      2663,
+      3115,
+      9811,
+      2660
+     ]
+    }
+   },
+   "record": "rc:Thrallia:4k^1gqx1g5y^Thrallia^^s^6^Yp4111k4cn8",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s8:Thrallia;del=F;fields={count=n6;kind=s1:s;list=[n2660,n2661,n2662,n2663,n3115,n9811]};id=s14:rc:Thrallia:4k;key=s11:Thrallia:4k;t=n1794067140;type=s2:rc;v=s8:1gqx1g5y}",
+   "reencode": "rc:Thrallia:4k^1gqx1g5y^Thrallia^^s^6^Yp4111k4cn8",
+   "check": null,
+   "parseDump": "{author=s8:Thrallia;del=F;id=s14:rc:Thrallia:4k;key=s11:Thrallia:4k;raw=[s1:s,s1:6,s11:Yp4111k4cn8];t=n1794067140;type=s2:rc;v=s8:1gqx1g5y}",
+   "final": false
+  },
+  {
+   "name": "rc item ids",
+   "input": {
+    "type": "rc",
+    "key": "Thrallia:4k",
+    "v": "1gqx1g5y",
+    "author": "Thrallia",
+    "del": false,
+    "fields": {
+     "kind": "i",
+     "count": 3,
+     "list": [
+      17102,
+      2589,
+      0
+     ]
+    }
+   },
+   "record": "rc:Thrallia:4k^1gqx1g5y^Thrallia^^i^3^0YmTkbH",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s8:Thrallia;del=F;fields={count=n3;kind=s1:i;list=[n0,n2589,n17102]};id=s14:rc:Thrallia:4k;key=s11:Thrallia:4k;t=n1794067140;type=s2:rc;v=s8:1gqx1g5y}",
+   "reencode": "rc:Thrallia:4k^1gqx1g5y^Thrallia^^i^3^0YmTkbH",
+   "check": null,
+   "parseDump": "{author=s8:Thrallia;del=F;id=s14:rc:Thrallia:4k;key=s11:Thrallia:4k;raw=[s1:i,s1:3,s7:0YmTkbH];t=n1794067140;type=s2:rc;v=s8:1gqx1g5y}",
+   "final": false
+  },
+  {
+   "name": "rc names",
+   "input": {
+    "type": "rc",
+    "key": "Thrallia:5h",
+    "v": "1gqx1g5y",
+    "author": "Thrallia",
+    "del": false,
+    "fields": {
+     "kind": "n",
+     "count": 3,
+     "list": [
+      "Linen Bandage",
+      "Heavy Silk; Bandage",
+      "Æther, cloth"
+     ]
+    }
+   },
+   "record": "rc:Thrallia:5h^1gqx1g5y^Thrallia^^n^3^Linen Bandage;Heavy Silk~3B Bandage;Æther~2C cloth",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s8:Thrallia;del=F;fields={count=n3;kind=s1:n;list=[s13:Linen Bandage,s19:Heavy Silk; Bandage,s13:Æther, cloth]};id=s14:rc:Thrallia:5h;key=s11:Thrallia:5h;t=n1794067140;type=s2:rc;v=s8:1gqx1g5y}",
+   "reencode": "rc:Thrallia:5h^1gqx1g5y^Thrallia^^n^3^Linen Bandage;Heavy Silk~3B Bandage;Æther~2C cloth",
+   "check": null,
+   "parseDump": "{author=s8:Thrallia;del=F;id=s14:rc:Thrallia:5h;key=s11:Thrallia:5h;raw=[s1:n,s1:3,s51:Linen Bandage;Heavy Silk~3B Bandage;Æther~2C cloth];t=n1794067140;type=s2:rc;v=s8:1gqx1g5y}",
+   "final": false
+  },
+  {
+   "name": "rc empty",
+   "input": {
+    "type": "rc",
+    "key": "Thrallia:5h",
+    "v": "1gqx1g5y",
+    "author": "Thrallia",
+    "del": false,
+    "fields": {
+     "kind": "s",
+     "count": 0,
+     "list": []
+    }
+   },
+   "record": "rc:Thrallia:5h^1gqx1g5y^Thrallia^^s^0",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s8:Thrallia;del=F;fields={count=n0;kind=s1:s;list={}};id=s14:rc:Thrallia:5h;key=s11:Thrallia:5h;t=n1794067140;type=s2:rc;v=s8:1gqx1g5y}",
+   "reencode": "rc:Thrallia:5h^1gqx1g5y^Thrallia^^s^0",
+   "check": null,
+   "parseDump": "{author=s8:Thrallia;del=F;id=s14:rc:Thrallia:5h;key=s11:Thrallia:5h;raw=[s1:s,s1:0];t=n1794067140;type=s2:rc;v=s8:1gqx1g5y}",
+   "final": false
+  },
+  {
+   "name": "su with reserves",
+   "input": {
+    "type": "su",
+    "key": "k3f9a2:Thrallia.p4m7",
+    "v": "1gqx1g5y",
+    "author": "Thrallia",
+    "del": false,
+    "fields": {
+     "character": "Thrallia",
+     "role": "h",
+     "status": "y",
+     "note": "late 10 min",
+     "reserves": [
+      "d72",
+      "eim"
+     ],
+     "reservesAt": 1794067080,
+     "prev": [
+      "d72"
+     ],
+     "prevAt": 1794063600
+    }
+   },
+   "record": "su:k3f9a2:Thrallia.p4m7^1gqx1g5y^Thrallia^^Thrallia^h^y^late 10 min^d72;eim^to530o^d72^to50c0",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s8:Thrallia;del=F;fields={character=s8:Thrallia;note=s11:late 10 min;prev=[s3:d72];prevAt=n1794063600;reserves=[s3:d72,s3:eim];reservesAt=n1794067080;role=s1:h;status=s1:y};id=s23:su:k3f9a2:Thrallia.p4m7;key=s20:k3f9a2:Thrallia.p4m7;t=n1794067140;type=s2:su;v=s8:1gqx1g5y}",
+   "reencode": "su:k3f9a2:Thrallia.p4m7^1gqx1g5y^Thrallia^^Thrallia^h^y^late 10 min^d72;eim^to530o^d72^to50c0",
+   "check": null,
+   "parseDump": "{author=s8:Thrallia;del=F;id=s23:su:k3f9a2:Thrallia.p4m7;key=s20:k3f9a2:Thrallia.p4m7;raw=[s8:Thrallia,s1:h,s1:y,s11:late 10 min,s7:d72;eim,s6:to530o,s3:d72,s6:to50c0];t=n1794067140;type=s2:su;v=s8:1gqx1g5y}",
+   "final": false
+  },
+  {
+   "name": "su from the outbox example",
+   "input": {
+    "type": "su",
+    "key": "k3f9a2:Thrallia.p4m7",
+    "v": "1gqx2cra",
+    "author": "Thrallia",
+    "del": false,
+    "fields": {
+     "character": "Thrallia",
+     "role": "h",
+     "status": "y",
+     "note": "late 10 min",
+     "reserves": [
+      "d72",
+      "eim"
+     ],
+     "reservesAt": 1794067800
+    }
+   },
+   "record": "su:k3f9a2:Thrallia.p4m7^1gqx2cra^Thrallia^^Thrallia^h^y^late 10 min^d72;eim^to53ko",
+   "now": 1794067800,
+   "lookup": null,
+   "dump": "{author=s8:Thrallia;del=F;fields={character=s8:Thrallia;note=s11:late 10 min;prev={};reserves=[s3:d72,s3:eim];reservesAt=n1794067800;role=s1:h;status=s1:y};id=s23:su:k3f9a2:Thrallia.p4m7;key=s20:k3f9a2:Thrallia.p4m7;t=n1794067800;type=s2:su;v=s8:1gqx2cra}",
+   "reencode": "su:k3f9a2:Thrallia.p4m7^1gqx2cra^Thrallia^^Thrallia^h^y^late 10 min^d72;eim^to53ko",
+   "check": null,
+   "parseDump": "{author=s8:Thrallia;del=F;id=s23:su:k3f9a2:Thrallia.p4m7;key=s20:k3f9a2:Thrallia.p4m7;raw=[s8:Thrallia,s1:h,s1:y,s11:late 10 min,s7:d72;eim,s6:to53ko];t=n1794067800;type=s2:su;v=s8:1gqx2cra}",
+   "final": false
+  },
+  {
+   "name": "su bench, no reserves",
+   "input": {
+    "type": "su",
+    "key": "k3f9a2:Zuljin.a8x2",
+    "v": "1gqx1g69",
+    "author": "Zuljin",
+    "del": false,
+    "fields": {
+     "character": "Zuljin",
+     "role": "d",
+     "status": "b"
+    }
+   },
+   "record": "su:k3f9a2:Zuljin.a8x2^1gqx1g69^Zuljin^^Zuljin^d^b",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s6:Zuljin;del=F;fields={character=s6:Zuljin;note=s0:;prev={};reserves={};role=s1:d;status=s1:b};id=s21:su:k3f9a2:Zuljin.a8x2;key=s18:k3f9a2:Zuljin.a8x2;t=n1794067140;type=s2:su;v=s8:1gqx1g69}",
+   "reencode": "su:k3f9a2:Zuljin.a8x2^1gqx1g69^Zuljin^^Zuljin^d^b",
+   "check": null,
+   "parseDump": "{author=s6:Zuljin;del=F;id=s21:su:k3f9a2:Zuljin.a8x2;key=s18:k3f9a2:Zuljin.a8x2;raw=[s6:Zuljin,s1:d,s1:b];t=n1794067140;type=s2:su;v=s8:1gqx1g69}",
+   "final": false
+  },
+  {
+   "name": "cr open",
+   "input": {
+    "type": "cr",
+    "key": "r1r1r1",
+    "v": "1gqx1g5y",
+    "author": "Thrallia",
+    "del": false,
+    "fields": {
+     "pid": "Thrallia.p4m7",
+     "item": "Robe of the Archmage",
+     "notes": "I bring the mats",
+     "state": "o"
+    }
+   },
+   "record": "cr:r1r1r1^1gqx1g5y^Thrallia^^Thrallia.p4m7^Robe of the Archmage^I bring the mats^o",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s8:Thrallia;del=F;fields={item=s20:Robe of the Archmage;notes=s16:I bring the mats;pid=s13:Thrallia.p4m7;state=s1:o};id=s9:cr:r1r1r1;key=s6:r1r1r1;t=n1794067140;type=s2:cr;v=s8:1gqx1g5y}",
+   "reencode": "cr:r1r1r1^1gqx1g5y^Thrallia^^Thrallia.p4m7^Robe of the Archmage^I bring the mats^o",
+   "check": null,
+   "parseDump": "{author=s8:Thrallia;del=F;id=s9:cr:r1r1r1;key=s6:r1r1r1;raw=[s13:Thrallia.p4m7,s20:Robe of the Archmage,s16:I bring the mats,s1:o];t=n1794067140;type=s2:cr;v=s8:1gqx1g5y}",
+   "final": false
+  },
+  {
+   "name": "cr cancelled (final)",
+   "input": {
+    "type": "cr",
+    "key": "r1r1r1",
+    "v": "wzm58vpy",
+    "author": "Thrallia",
+    "del": false,
+    "fields": {
+     "pid": "Thrallia.p4m7",
+     "item": "Robe of the Archmage",
+     "state": "x"
+    }
+   },
+   "record": "cr:r1r1r1^wzm58vpy^Thrallia^^Thrallia.p4m7^Robe of the Archmage^^x",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s8:Thrallia;del=F;fields={item=s20:Robe of the Archmage;notes=s0:;pid=s13:Thrallia.p4m7;state=s1:x};id=s9:cr:r1r1r1;key=s6:r1r1r1;t=n1794067170;type=s2:cr;v=s8:wzm58vpy}",
+   "reencode": "cr:r1r1r1^wzm58vpy^Thrallia^^Thrallia.p4m7^Robe of the Archmage^^x",
+   "check": null,
+   "parseDump": "{author=s8:Thrallia;del=F;id=s9:cr:r1r1r1;key=s6:r1r1r1;raw=[s13:Thrallia.p4m7,s20:Robe of the Archmage,s0:,s1:x];t=n1794067170;type=s2:cr;v=s8:wzm58vpy}",
+   "final": true
+  },
+  {
+   "name": "cr done (final)",
+   "input": {
+    "type": "cr",
+    "key": "r1r1r1",
+    "v": "wzm58vpy",
+    "author": "Thrallia",
+    "del": false,
+    "fields": {
+     "pid": "Thrallia.p4m7",
+     "item": "Robe of the Archmage",
+     "state": "d"
+    }
+   },
+   "record": "cr:r1r1r1^wzm58vpy^Thrallia^^Thrallia.p4m7^Robe of the Archmage^^d",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s8:Thrallia;del=F;fields={item=s20:Robe of the Archmage;notes=s0:;pid=s13:Thrallia.p4m7;state=s1:d};id=s9:cr:r1r1r1;key=s6:r1r1r1;t=n1794067170;type=s2:cr;v=s8:wzm58vpy}",
+   "reencode": "cr:r1r1r1^wzm58vpy^Thrallia^^Thrallia.p4m7^Robe of the Archmage^^d",
+   "check": null,
+   "parseDump": "{author=s8:Thrallia;del=F;id=s9:cr:r1r1r1;key=s6:r1r1r1;raw=[s13:Thrallia.p4m7,s20:Robe of the Archmage,s0:,s1:d];t=n1794067170;type=s2:cr;v=s8:wzm58vpy}",
+   "final": true
+  },
+  {
+   "name": "cl claim",
+   "input": {
+    "type": "cl",
+    "key": "r1r1r1:Zuljin.a8x2",
+    "v": "1gqx1g69",
+    "author": "Zuljin",
+    "del": false,
+    "fields": {
+     "state": "c",
+     "claimedAt": 1794067140
+    }
+   },
+   "record": "cl:r1r1r1:Zuljin.a8x2^1gqx1g69^Zuljin^^c^to532c",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s6:Zuljin;del=F;fields={claimedAt=n1794067140;state=s1:c};id=s21:cl:r1r1r1:Zuljin.a8x2;key=s18:r1r1r1:Zuljin.a8x2;t=n1794067140;type=s2:cl;v=s8:1gqx1g69}",
+   "reencode": "cl:r1r1r1:Zuljin.a8x2^1gqx1g69^Zuljin^^c^to532c",
+   "check": null,
+   "parseDump": "{author=s6:Zuljin;del=F;id=s21:cl:r1r1r1:Zuljin.a8x2;key=s18:r1r1r1:Zuljin.a8x2;raw=[s1:c,s6:to532c];t=n1794067140;type=s2:cl;v=s8:1gqx1g69}",
+   "final": false
+  },
+  {
+   "name": "lp partner post",
+   "input": {
+    "type": "lp",
+    "key": "Thrallia.p4m7:Zuljinne",
+    "v": "1gqx1g6s",
+    "author": "Zuljinne",
+    "del": false,
+    "fields": {
+     "character": "Zuljinne",
+     "level": 24,
+     "zone": "Stranglethorn Vale",
+     "when": "tonight 8pm",
+     "note": "questing; anyone?"
+    }
+   },
+   "record": "lp:Thrallia.p4m7:Zuljinne^1gqx1g6s^Zuljinne^^Zuljinne^o^Stranglethorn Vale^tonight 8pm^questing~3B anyone?",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s8:Zuljinne;del=F;fields={character=s8:Zuljinne;level=n24;note=s17:questing; anyone?;when=s11:tonight 8pm;zone=s18:Stranglethorn Vale};id=s25:lp:Thrallia.p4m7:Zuljinne;key=s22:Thrallia.p4m7:Zuljinne;t=n1794067140;type=s2:lp;v=s8:1gqx1g6s}",
+   "reencode": "lp:Thrallia.p4m7:Zuljinne^1gqx1g6s^Zuljinne^^Zuljinne^o^Stranglethorn Vale^tonight 8pm^questing~3B anyone?",
+   "check": null,
+   "parseDump": "{author=s8:Zuljinne;del=F;id=s25:lp:Thrallia.p4m7:Zuljinne;key=s22:Thrallia.p4m7:Zuljinne;raw=[s8:Zuljinne,s1:o,s18:Stranglethorn Vale,s11:tonight 8pm,s19:questing~3B anyone?];t=n1794067140;type=s2:lp;v=s8:1gqx1g6s}",
+   "final": false
+  },
+  {
+   "name": "dc hand-in",
+   "input": {
+    "type": "dc",
+    "key": "h4nd1n",
+    "v": "1gqx1g5y",
+    "author": "Thrallia",
+    "del": false,
+    "fields": {
+     "pid": "Thrallia.p4m7",
+     "drive": "dr1v3x",
+     "character": "Thrallia",
+     "amount": 40,
+     "note": "Linen"
+    }
+   },
+   "record": "dc:h4nd1n^1gqx1g5y^Thrallia^^Thrallia.p4m7^dr1v3x^Thrallia^14^Linen",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s8:Thrallia;del=F;fields={amount=n40;character=s8:Thrallia;drive=s6:dr1v3x;note=s5:Linen;pid=s13:Thrallia.p4m7};id=s9:dc:h4nd1n;key=s6:h4nd1n;t=n1794067140;type=s2:dc;v=s8:1gqx1g5y}",
+   "reencode": "dc:h4nd1n^1gqx1g5y^Thrallia^^Thrallia.p4m7^dr1v3x^Thrallia^14^Linen",
+   "check": null,
+   "parseDump": "{author=s8:Thrallia;del=F;id=s9:dc:h4nd1n;key=s6:h4nd1n;raw=[s13:Thrallia.p4m7,s6:dr1v3x,s8:Thrallia,s2:14,s5:Linen];t=n1794067140;type=s2:dc;v=s8:1gqx1g5y}",
+   "final": false
+  },
+  {
+   "name": "bq open",
+   "input": {
+    "type": "bq",
+    "key": "b4nkrq",
+    "v": "1gqx1g5y",
+    "author": "Thrallia",
+    "del": false,
+    "fields": {
+     "pid": "Thrallia.p4m7",
+     "item": "Runecloth",
+     "count": 20,
+     "note": "for bandages",
+     "state": "o"
+    }
+   },
+   "record": "bq:b4nkrq^1gqx1g5y^Thrallia^^Thrallia.p4m7^Runecloth^k^for bandages^o",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s8:Thrallia;del=F;fields={count=n20;item=s9:Runecloth;note=s12:for bandages;pid=s13:Thrallia.p4m7;state=s1:o};id=s9:bq:b4nkrq;key=s6:b4nkrq;t=n1794067140;type=s2:bq;v=s8:1gqx1g5y}",
+   "reencode": "bq:b4nkrq^1gqx1g5y^Thrallia^^Thrallia.p4m7^Runecloth^k^for bandages^o",
+   "check": null,
+   "parseDump": "{author=s8:Thrallia;del=F;id=s9:bq:b4nkrq;key=s6:b4nkrq;raw=[s13:Thrallia.p4m7,s9:Runecloth,s1:k,s12:for bandages,s1:o];t=n1794067140;type=s2:bq;v=s8:1gqx1g5y}",
+   "final": false
+  },
+  {
+   "name": "bq cancelled (final)",
+   "input": {
+    "type": "bq",
+    "key": "b4nkrq",
+    "v": "wzm58vpy",
+    "author": "Thrallia",
+    "del": false,
+    "fields": {
+     "pid": "Thrallia.p4m7",
+     "item": "Runecloth",
+     "count": 20,
+     "state": "x"
+    }
+   },
+   "record": "bq:b4nkrq^wzm58vpy^Thrallia^^Thrallia.p4m7^Runecloth^k^^x",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s8:Thrallia;del=F;fields={count=n20;item=s9:Runecloth;note=s0:;pid=s13:Thrallia.p4m7;state=s1:x};id=s9:bq:b4nkrq;key=s6:b4nkrq;t=n1794067170;type=s2:bq;v=s8:wzm58vpy}",
+   "reencode": "bq:b4nkrq^wzm58vpy^Thrallia^^Thrallia.p4m7^Runecloth^k^^x",
+   "check": null,
+   "parseDump": "{author=s8:Thrallia;del=F;id=s9:bq:b4nkrq;key=s6:b4nkrq;raw=[s13:Thrallia.p4m7,s9:Runecloth,s1:k,s0:,s1:x];t=n1794067170;type=s2:bq;v=s8:wzm58vpy}",
+   "final": true
+  },
+  {
+   "name": "gb tab 0",
+   "input": {
+    "type": "gb",
+    "key": "0",
+    "v": "1gqx1g6s",
+    "author": "Zuljinne",
+    "del": false,
+    "fields": {
+     "scannedAt": 1794067140,
+     "money": 123456789,
+     "tabs": [
+      "Mats",
+      "Gear; misc",
+      "Ränge"
+     ],
+     "log": [
+      {
+       "at": 1794060000,
+       "kind": "deposit",
+       "who": "Thrallia",
+       "item": 2589,
+       "count": 20
+      },
+      {
+       "at": 1794063600,
+       "kind": "withdraw",
+       "who": "Zulé",
+       "amount": 5000
+      }
+     ]
+    }
+   },
+   "record": "gb:0^1gqx1g6s^Zuljinne^^to532c^21i3v9^Mats;Gear~3B misc;Ränge^to4xk0,deposit,Thrallia,1zx,k;to50c0,withdraw,Zulé,,,3uw",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s8:Zuljinne;del=F;fields={log=[{at=n1794060000;count=n20;item=n2589;kind=s7:deposit;who=s8:Thrallia},{amount=n5000;at=n1794063600;kind=s8:withdraw;who=s5:Zulé}];money=n123456789;scannedAt=n1794067140;tabs=[s4:Mats,s10:Gear; misc,s6:Ränge]};id=s4:gb:0;key=s1:0;t=n1794067140;type=s2:gb;v=s8:1gqx1g6s}",
+   "reencode": "gb:0^1gqx1g6s^Zuljinne^^to532c^21i3v9^Mats;Gear~3B misc;Ränge^to4xk0,deposit,Thrallia,1zx,k;to50c0,withdraw,Zulé,,,3uw",
+   "check": null,
+   "parseDump": "{author=s8:Zuljinne;del=F;id=s4:gb:0;key=s1:0;raw=[s6:to532c,s6:21i3v9,s24:Mats;Gear~3B misc;Ränge,s57:to4xk0,deposit,Thrallia,1zx,k;to50c0,withdraw,Zulé,,,3uw];t=n1794067140;type=s2:gb;v=s8:1gqx1g6s}",
+   "final": false
+  },
+  {
+   "name": "gb tab 3",
+   "input": {
+    "type": "gb",
+    "key": "3",
+    "v": "1gqx1g6s",
+    "author": "Zuljinne",
+    "del": false,
+    "fields": {
+     "items": [
+      {
+       "id": 2589,
+       "count": 200
+      },
+      {
+       "id": 4306,
+       "count": 40
+      },
+      {
+       "id": 0,
+       "count": 5
+      }
+     ]
+    }
+   },
+   "record": "gb:3^1gqx1g6s^Zuljinne^^1zx,5k;3bm,14;0,5",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s8:Zuljinne;del=F;fields={items=[{count=n200;id=n2589},{count=n40;id=n4306},{count=n5;id=n0}]};id=s4:gb:3;key=s1:3;t=n1794067140;type=s2:gb;v=s8:1gqx1g6s}",
+   "reencode": "gb:3^1gqx1g6s^Zuljinne^^1zx,5k;3bm,14;0,5",
+   "check": null,
+   "parseDump": "{author=s8:Zuljinne;del=F;id=s4:gb:3;key=s1:3;raw=[s17:1zx,5k;3bm,14;0,5];t=n1794067140;type=s2:gb;v=s8:1gqx1g6s}",
+   "final": false
+  },
+  {
+   "name": "bk bank character",
+   "input": {
+    "type": "bk",
+    "key": "Bankalt",
+    "v": "1gqx1g6a",
+    "author": "Bankalt",
+    "del": false,
+    "fields": {
+     "bags": [
+      {
+       "id": 2589,
+       "count": 20
+      }
+     ],
+     "bank": [
+      {
+       "id": 14047,
+       "count": 100
+      },
+      {
+       "id": 4338,
+       "count": 60
+      }
+     ]
+    }
+   },
+   "record": "bk:Bankalt^1gqx1g6a^Bankalt^^1zx,k^au7,2s;3ci,1o",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s7:Bankalt;del=F;fields={bags=[{count=n20;id=n2589}];bank=[{count=n100;id=n14047},{count=n60;id=n4338}]};id=s10:bk:Bankalt;key=s7:Bankalt;t=n1794067140;type=s2:bk;v=s8:1gqx1g6a}",
+   "reencode": "bk:Bankalt^1gqx1g6a^Bankalt^^1zx,k^au7,2s;3ci,1o",
+   "check": null,
+   "parseDump": "{author=s7:Bankalt;del=F;id=s10:bk:Bankalt;key=s7:Bankalt;raw=[s5:1zx,k,s13:au7,2s;3ci,1o];t=n1794067140;type=s2:bk;v=s8:1gqx1g6a}",
+   "final": false
+  },
+  {
+   "name": "sh shopping list",
+   "input": {
+    "type": "sh",
+    "key": "Thrallia.p4m7",
+    "v": "1gqx1g5y",
+    "author": "Thrallia",
+    "del": false,
+    "fields": {
+     "items": [
+      {
+       "name": "Bolt of Silk Cloth",
+       "qty": 4,
+       "skill": 197
+      },
+      {
+       "name": "Iron Bar",
+       "qty": 10,
+       "skill": 164
+      }
+     ]
+    }
+   },
+   "record": "sh:Thrallia.p4m7^1gqx1g5y^Thrallia^^Bolt of Silk Cloth,4,5h;Iron Bar,a,4k",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s8:Thrallia;del=F;fields={items=[{name=s18:Bolt of Silk Cloth;qty=n4;skill=n197},{name=s8:Iron Bar;qty=n10;skill=n164}]};id=s16:sh:Thrallia.p4m7;key=s13:Thrallia.p4m7;t=n1794067140;type=s2:sh;v=s8:1gqx1g5y}",
+   "reencode": "sh:Thrallia.p4m7^1gqx1g5y^Thrallia^^Bolt of Silk Cloth,4,5h;Iron Bar,a,4k",
+   "check": null,
+   "parseDump": "{author=s8:Thrallia;del=F;id=s16:sh:Thrallia.p4m7;key=s13:Thrallia.p4m7;raw=[s37:Bolt of Silk Cloth,4,5h;Iron Bar,a,4k];t=n1794067140;type=s2:sh;v=s8:1gqx1g5y}",
+   "final": false
+  },
+  {
+   "name": "pr prices",
+   "input": {
+    "type": "pr",
+    "key": "Thrallia.p4m7",
+    "v": "1gqx1g5y",
+    "author": "Thrallia",
+    "del": false,
+    "fields": {
+     "day": 20765,
+     "prices": [
+      {
+       "id": 2589,
+       "copper": 150
+      },
+      {
+       "id": 14047,
+       "copper": 2400
+      }
+     ]
+    }
+   },
+   "record": "pr:Thrallia.p4m7^1gqx1g5y^Thrallia^^g0t^1zx,46;au7,1uo",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s8:Thrallia;del=F;fields={day=n20765;prices=[{copper=n150;id=n2589},{copper=n2400;id=n14047}]};id=s16:pr:Thrallia.p4m7;key=s13:Thrallia.p4m7;t=n1794067140;type=s2:pr;v=s8:1gqx1g5y}",
+   "reencode": "pr:Thrallia.p4m7^1gqx1g5y^Thrallia^^g0t^1zx,46;au7,1uo",
+   "check": null,
+   "parseDump": "{author=s8:Thrallia;del=F;id=s16:pr:Thrallia.p4m7;key=s13:Thrallia.p4m7;raw=[s3:g0t,s14:1zx,46;au7,1uo];t=n1794067140;type=s2:pr;v=s8:1gqx1g5y}",
+   "final": false
+  },
+  {
+   "name": "RD pvp, no notes",
+   "input": {
+    "type": "RD",
+    "key": "pvp001",
+    "v": "1gqx1g6g",
+    "author": "Varok",
+    "del": false,
+    "fields": {
+     "kind": "p",
+     "title": "Warsong Friday",
+     "instance": "Warsong Gulch",
+     "startsAt": 1794326400,
+     "minutes": 120,
+     "size": 10,
+     "srLimit": 0
+    }
+   },
+   "record": "RD:pvp001^1gqx1g6g^Varok^^p^Warsong Friday^Warsong Gulch^toan40^3c^a^0",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s5:Varok;del=F;fields={instance=s13:Warsong Gulch;kind=s1:p;minutes=n120;notes=s0:;size=n10;srLimit=n0;startsAt=n1794326400;title=s14:Warsong Friday};id=s9:RD:pvp001;key=s6:pvp001;t=n1794067140;type=s2:RD;v=s8:1gqx1g6g}",
+   "reencode": "RD:pvp001^1gqx1g6g^Varok^^p^Warsong Friday^Warsong Gulch^toan40^3c^a^0",
+   "check": null,
+   "parseDump": "{author=s5:Varok;del=F;id=s9:RD:pvp001;key=s6:pvp001;raw=[s1:p,s14:Warsong Friday,s13:Warsong Gulch,s6:toan40,s2:3c,s1:a,s1:0];t=n1794067140;type=s2:RD;v=s8:1gqx1g6g}",
+   "final": false
+  },
+  {
+   "name": "RT locked (spec outbox body)",
+   "input": {
+    "type": "RT",
+    "key": "k3f9a2",
+    "v": "1gr80lc3",
+    "author": "Grommash",
+    "del": false,
+    "fields": {
+     "status": "l",
+     "lockedAt": 1794355200
+    }
+   },
+   "record": "RT:k3f9a2^1gr80lc3^Grommash^^l^tob9c0",
+   "now": 1794355200,
+   "lookup": null,
+   "dump": "{author=s8:Grommash;del=F;fields={attendees={};instance=s0:;kind=s0:;lockedAt=n1794355200;noShows={};status=s1:l};id=s9:RT:k3f9a2;key=s6:k3f9a2;t=n1794355200;type=s2:RT;v=s8:1gr80lc3}",
+   "reencode": "RT:k3f9a2^1gr80lc3^Grommash^^l^tob9c0",
+   "check": null,
+   "parseDump": "{author=s8:Grommash;del=F;id=s9:RT:k3f9a2;key=s6:k3f9a2;raw=[s1:l,s6:tob9c0];t=n1794355200;type=s2:RT;v=s8:1gr80lc3}",
+   "final": false
+  },
+  {
+   "name": "RT open again",
+   "input": {
+    "type": "RT",
+    "key": "k3f9a2",
+    "v": "1gqx1hns",
+    "author": "Varok",
+    "del": false,
+    "fields": {
+     "status": "o"
+    }
+   },
+   "record": "RT:k3f9a2^1gqx1hns^Varok^^o",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s5:Varok;del=F;fields={attendees={};instance=s0:;kind=s0:;noShows={};status=s1:o};id=s9:RT:k3f9a2;key=s6:k3f9a2;t=n1794067170;type=s2:RT;v=s8:1gqx1hns}",
+   "reencode": "RT:k3f9a2^1gqx1hns^Varok^^o",
+   "check": null,
+   "parseDump": "{author=s5:Varok;del=F;id=s9:RT:k3f9a2;key=s6:k3f9a2;raw=[s1:o];t=n1794067170;type=s2:RT;v=s8:1gqx1hns}",
+   "final": false
+  },
+  {
+   "name": "RT cancelled (final)",
+   "input": {
+    "type": "RT",
+    "key": "k3f9a2",
+    "v": "wzm58vqg",
+    "author": "Varok",
+    "del": false,
+    "fields": {
+     "status": "x"
+    }
+   },
+   "record": "RT:k3f9a2^wzm58vqg^Varok^^x",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s5:Varok;del=F;fields={attendees={};instance=s0:;kind=s0:;noShows={};status=s1:x};id=s9:RT:k3f9a2;key=s6:k3f9a2;t=n1794067170;type=s2:RT;v=s8:wzm58vqg}",
+   "reencode": "RT:k3f9a2^wzm58vqg^Varok^^x",
+   "check": null,
+   "parseDump": "{author=s5:Varok;del=F;id=s9:RT:k3f9a2;key=s6:k3f9a2;raw=[s1:x];t=n1794067170;type=s2:RT;v=s8:wzm58vqg}",
+   "final": true
+  },
+  {
+   "name": "LA award",
+   "input": {
+    "type": "LA",
+    "key": "aw4rd1",
+    "v": "1gqx1g5f",
+    "author": "Grommash",
+    "del": false,
+    "fields": {
+     "raid": "k3f9a2",
+     "instance": "2dv8n1",
+     "item": "d72",
+     "itemName": "Cloak of the Shrouded Mists",
+     "character": "Thrallia",
+     "pid": "Thrallia.p4m7",
+     "kind": "s",
+     "roll": 87,
+     "bonus": 20
+    }
+   },
+   "record": "LA:aw4rd1^1gqx1g5f^Grommash^^k3f9a2^2dv8n1^d72^Cloak of the Shrouded Mists^Thrallia^Thrallia.p4m7^s^2f^k",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s8:Grommash;del=F;fields={bonus=n20;character=s8:Thrallia;instance=s6:2dv8n1;item=s3:d72;itemName=s27:Cloak of the Shrouded Mists;kind=s1:s;pid=s13:Thrallia.p4m7;raid=s6:k3f9a2;roll=n87};id=s9:LA:aw4rd1;key=s6:aw4rd1;t=n1794067140;type=s2:LA;v=s8:1gqx1g5f}",
+   "reencode": "LA:aw4rd1^1gqx1g5f^Grommash^^k3f9a2^2dv8n1^d72^Cloak of the Shrouded Mists^Thrallia^Thrallia.p4m7^s^2f^k",
+   "check": null,
+   "parseDump": "{author=s8:Grommash;del=F;id=s9:LA:aw4rd1;key=s6:aw4rd1;raw=[s6:k3f9a2,s6:2dv8n1,s3:d72,s27:Cloak of the Shrouded Mists,s8:Thrallia,s13:Thrallia.p4m7,s1:s,s2:2f,s1:k];t=n1794067140;type=s2:LA;v=s8:1gqx1g5f}",
+   "final": false
+  },
+  {
+   "name": "LL loot list",
+   "input": {
+    "type": "LL",
+    "key": "2dv8n1",
+    "v": "1gqx1g5f",
+    "author": "Grommash",
+    "del": false,
+    "fields": {
+     "name": "Molten Core",
+     "bosses": [
+      "Lucifron",
+      "Magmadar",
+      "Gehennas"
+     ],
+     "items": [
+      {
+       "item": "d72",
+       "boss": 1,
+       "name": "Cloak of the Shrouded Mists"
+      },
+      {
+       "item": "h0abcd",
+       "boss": 0,
+       "name": "Trash, drop; any"
+      }
+     ]
+    }
+   },
+   "record": "LL:2dv8n1^1gqx1g5f^Grommash^^Molten Core^Lucifron;Magmadar;Gehennas^d72,1,Cloak of the Shrouded Mists;h0abcd,0,Trash~2C drop~3B any",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s8:Grommash;del=F;fields={bosses=[s8:Lucifron,s8:Magmadar,s8:Gehennas];items=[{boss=n1;item=s3:d72;name=s27:Cloak of the Shrouded Mists},{boss=n0;item=s6:h0abcd;name=s16:Trash, drop; any}];name=s11:Molten Core};id=s9:LL:2dv8n1;key=s6:2dv8n1;t=n1794067140;type=s2:LL;v=s8:1gqx1g5f}",
+   "reencode": "LL:2dv8n1^1gqx1g5f^Grommash^^Molten Core^Lucifron;Magmadar;Gehennas^d72,1,Cloak of the Shrouded Mists;h0abcd,0,Trash~2C drop~3B any",
+   "check": null,
+   "parseDump": "{author=s8:Grommash;del=F;id=s9:LL:2dv8n1;key=s6:2dv8n1;raw=[s11:Molten Core,s26:Lucifron;Magmadar;Gehennas,s63:d72,1,Cloak of the Shrouded Mists;h0abcd,0,Trash~2C drop~3B any];t=n1794067140;type=s2:LL;v=s8:1gqx1g5f}",
+   "final": false
+  },
+  {
+   "name": "LY checkpoint",
+   "input": {
+    "type": "LY",
+    "key": "2dv8n1",
+    "v": "1gqx1g5f",
+    "author": "Grommash",
+    "del": false,
+    "fields": {
+     "upto": 1791475200,
+     "bonuses": [
+      {
+       "pid": "Thrallia.p4m7",
+       "item": "d72",
+       "bonus": 30
+      },
+      {
+       "pid": "Zuljin.a8x2",
+       "item": "eim",
+       "bonus": 10
+      }
+     ]
+    }
+   },
+   "record": "LY:2dv8n1^1gqx1g5f^Grommash^^tmlj40^Thrallia.p4m7,d72,u;Zuljin.a8x2,eim,a",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s8:Grommash;del=F;fields={bonuses=[{bonus=n30;item=s3:d72;pid=s13:Thrallia.p4m7},{bonus=n10;item=s3:eim;pid=s11:Zuljin.a8x2}];upto=n1791475200};id=s9:LY:2dv8n1;key=s6:2dv8n1;t=n1794067140;type=s2:LY;v=s8:1gqx1g5f}",
+   "reencode": "LY:2dv8n1^1gqx1g5f^Grommash^^tmlj40^Thrallia.p4m7,d72,u;Zuljin.a8x2,eim,a",
+   "check": null,
+   "parseDump": "{author=s8:Grommash;del=F;id=s9:LY:2dv8n1;key=s6:2dv8n1;raw=[s6:tmlj40,s37:Thrallia.p4m7,d72,u;Zuljin.a8x2,eim,a];t=n1794067140;type=s2:LY;v=s8:1gqx1g5f}",
+   "final": false
+  },
+  {
+   "name": "AN notice with every escape",
+   "input": {
+    "type": "AN",
+    "key": "q2w8zz",
+    "v": "1gqx1g5f",
+    "author": "Grommash",
+    "del": false,
+    "fields": {
+     "body": "Raid \u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\b\t\n\u000b\f\r\u000e\u000f\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001a\u001b\u001c\u001d\u001e\u001f~^;,#| done Zulé Ærøn 東京 😀"
+    }
+   },
+   "record": "AN:q2w8zz^1gqx1g5f^Grommash^^Raid ~00~01~02~03~04~05~06~07~08~09~0A~0B~0C~0D~0E~0F~10~11~12~13~14~15~16~17~18~19~1A~1B~1C~1D~1E~1F~7F~7E~5E~3B~2C~23~7C done Zulé Ærøn 東京 😀",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s8:Grommash;del=F;fields={body=s74:Raid \u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\b\t\n\u000b\f\r\u000e\u000f\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001a\u001b\u001c\u001d\u001e\u001f~^;,#| done Zulé Ærøn 東京 😀};id=s9:AN:q2w8zz;key=s6:q2w8zz;t=n1794067140;type=s2:AN;v=s8:1gqx1g5f}",
+   "reencode": "AN:q2w8zz^1gqx1g5f^Grommash^^Raid ~00~01~02~03~04~05~06~07~08~09~0A~0B~0C~0D~0E~0F~10~11~12~13~14~15~16~17~18~19~1A~1B~1C~1D~1E~1F~7F~7E~5E~3B~2C~23~7C done Zulé Ærøn 東京 😀",
+   "check": null,
+   "parseDump": "{author=s8:Grommash;del=F;id=s9:AN:q2w8zz;key=s6:q2w8zz;raw=[s152:Raid ~00~01~02~03~04~05~06~07~08~09~0A~0B~0C~0D~0E~0F~10~11~12~13~14~15~16~17~18~19~1A~1B~1C~1D~1E~1F~7F~7E~5E~3B~2C~23~7C done Zulé Ærøn 東京 😀];t=n1794067140;type=s2:AN;v=s8:1gqx1g5f}",
+   "final": false
+  },
+  {
+   "name": "AN notice cut on a UTF-8 boundary",
+   "input": {
+    "type": "AN",
+    "key": "q2w8zz",
+    "v": "1gqx1g5f",
+    "author": "Grommash",
+    "del": false,
+    "fields": {
+     "body": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaéb"
+    }
+   },
+   "record": "AN:q2w8zz^1gqx1g5f^Grommash^^aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s8:Grommash;del=F;fields={body=s499:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa};id=s9:AN:q2w8zz;key=s6:q2w8zz;t=n1794067140;type=s2:AN;v=s8:1gqx1g5f}",
+   "reencode": "AN:q2w8zz^1gqx1g5f^Grommash^^aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "check": null,
+   "parseDump": "{author=s8:Grommash;del=F;id=s9:AN:q2w8zz;key=s6:q2w8zz;raw=[s499:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa];t=n1794067140;type=s2:AN;v=s8:1gqx1g5f}",
+   "final": false
+  },
+  {
+   "name": "AN notice tombstone",
+   "input": {
+    "type": "AN",
+    "key": "q2w8zz",
+    "v": "1gqx1hns",
+    "author": "Varok",
+    "del": true,
+    "fields": null
+   },
+   "record": "AN:q2w8zz^1gqx1hns^Varok^d",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s5:Varok;del=T;fields={};id=s9:AN:q2w8zz;key=s6:q2w8zz;t=n1794067170;type=s2:AN;v=s8:1gqx1hns}",
+   "reencode": "AN:q2w8zz^1gqx1hns^Varok^d",
+   "check": null,
+   "parseDump": "{author=s5:Varok;del=T;id=s9:AN:q2w8zz;key=s6:q2w8zz;raw={};t=n1794067170;type=s2:AN;v=s8:1gqx1hns}",
+   "final": false
+  },
+  {
+   "name": "DR open",
+   "input": {
+    "type": "DR",
+    "key": "dr1v3x",
+    "v": "1gqx1g5f",
+    "author": "Grommash",
+    "del": false,
+    "fields": {
+     "title": "Bandages for Naxx",
+     "unit": "Runecloth",
+     "goal": 2000,
+     "notes": "Bank it with Bankalt",
+     "state": "o"
+    }
+   },
+   "record": "DR:dr1v3x^1gqx1g5f^Grommash^^Bandages for Naxx^Runecloth^1jk^Bank it with Bankalt^o",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s8:Grommash;del=F;fields={goal=n2000;notes=s20:Bank it with Bankalt;state=s1:o;title=s17:Bandages for Naxx;unit=s9:Runecloth};id=s9:DR:dr1v3x;key=s6:dr1v3x;t=n1794067140;type=s2:DR;v=s8:1gqx1g5f}",
+   "reencode": "DR:dr1v3x^1gqx1g5f^Grommash^^Bandages for Naxx^Runecloth^1jk^Bank it with Bankalt^o",
+   "check": null,
+   "parseDump": "{author=s8:Grommash;del=F;id=s9:DR:dr1v3x;key=s6:dr1v3x;raw=[s17:Bandages for Naxx,s9:Runecloth,s3:1jk,s20:Bank it with Bankalt,s1:o];t=n1794067140;type=s2:DR;v=s8:1gqx1g5f}",
+   "final": false
+  },
+  {
+   "name": "DR closed (final)",
+   "input": {
+    "type": "DR",
+    "key": "dr1v3x",
+    "v": "wzm58vpf",
+    "author": "Grommash",
+    "del": false,
+    "fields": {
+     "title": "Bandages for Naxx",
+     "unit": "Runecloth",
+     "goal": 2000,
+     "state": "c"
+    }
+   },
+   "record": "DR:dr1v3x^wzm58vpf^Grommash^^Bandages for Naxx^Runecloth^1jk^^c",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s8:Grommash;del=F;fields={goal=n2000;notes=s0:;state=s1:c;title=s17:Bandages for Naxx;unit=s9:Runecloth};id=s9:DR:dr1v3x;key=s6:dr1v3x;t=n1794067170;type=s2:DR;v=s8:wzm58vpf}",
+   "reencode": "DR:dr1v3x^wzm58vpf^Grommash^^Bandages for Naxx^Runecloth^1jk^^c",
+   "check": null,
+   "parseDump": "{author=s8:Grommash;del=F;id=s9:DR:dr1v3x;key=s6:dr1v3x;raw=[s17:Bandages for Naxx,s9:Runecloth,s3:1jk,s0:,s1:c];t=n1794067170;type=s2:DR;v=s8:wzm58vpf}",
+   "final": true
+  },
+  {
+   "name": "BH sent",
+   "input": {
+    "type": "BH",
+    "key": "b4nkrq",
+    "v": "1gqx1g6g",
+    "author": "Varok",
+    "del": false,
+    "fields": {
+     "state": "s"
+    }
+   },
+   "record": "BH:b4nkrq^1gqx1g6g^Varok^^s",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s5:Varok;del=F;fields={state=s1:s};id=s9:BH:b4nkrq;key=s6:b4nkrq;t=n1794067140;type=s2:BH;v=s8:1gqx1g6g}",
+   "reencode": "BH:b4nkrq^1gqx1g6g^Varok^^s",
+   "check": null,
+   "parseDump": "{author=s5:Varok;del=F;id=s9:BH:b4nkrq;key=s6:b4nkrq;raw=[s1:s];t=n1794067140;type=s2:BH;v=s8:1gqx1g6g}",
+   "final": false
+  },
+  {
+   "name": "BC bank characters",
+   "input": {
+    "type": "BC",
+    "key": "1",
+    "v": "1gqx1g5f",
+    "author": "Grommash",
+    "del": false,
+    "fields": {
+     "names": [
+      "Bankalt",
+      "Bänkalt"
+     ]
+    }
+   },
+   "record": "BC:1^1gqx1g5f^Grommash^^Bankalt;Bänkalt",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s8:Grommash;del=F;fields={names=[s7:Bankalt,s8:Bänkalt]};id=s4:BC:1;key=s1:1;t=n1794067140;type=s2:BC;v=s8:1gqx1g5f}",
+   "reencode": "BC:1^1gqx1g5f^Grommash^^Bankalt;Bänkalt",
+   "check": null,
+   "parseDump": "{author=s8:Grommash;del=F;id=s4:BC:1;key=s1:1;raw=[s16:Bankalt;Bänkalt];t=n1794067140;type=s2:BC;v=s8:1gqx1g5f}",
+   "final": false
+  },
+  {
+   "name": "CFG no relay ranks",
+   "input": {
+    "type": "CFG",
+    "key": "1",
+    "v": "1gqx1g5f",
+    "author": "Grommash",
+    "del": false,
+    "fields": {
+     "officerRankMax": 1,
+     "relayRankMax": null
+    }
+   },
+   "record": "CFG:1^1gqx1g5f^Grommash^^1^-",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s8:Grommash;del=F;fields={officerRankMax=n1};id=s5:CFG:1;key=s1:1;t=n1794067140;type=s3:CFG;v=s8:1gqx1g5f}",
+   "reencode": "CFG:1^1gqx1g5f^Grommash^^1^-",
+   "check": null,
+   "parseDump": "{author=s8:Grommash;del=F;id=s5:CFG:1;key=s1:1;raw=[s1:1,s1:-];t=n1794067140;type=s3:CFG;v=s8:1gqx1g5f}",
+   "final": false
+  },
+  {
+   "name": "CFG relay rank 2",
+   "input": {
+    "type": "CFG",
+    "key": "1",
+    "v": "1gqx1g5f",
+    "author": "Grommash",
+    "del": false,
+    "fields": {
+     "officerRankMax": 1,
+     "relayRankMax": 2
+    }
+   },
+   "record": "CFG:1^1gqx1g5f^Grommash^^1^2",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s8:Grommash;del=F;fields={officerRankMax=n1;relayRankMax=n2};id=s5:CFG:1;key=s1:1;t=n1794067140;type=s3:CFG;v=s8:1gqx1g5f}",
+   "reencode": "CFG:1^1gqx1g5f^Grommash^^1^2",
+   "check": null,
+   "parseDump": "{author=s8:Grommash;del=F;id=s5:CFG:1;key=s1:1;raw=[s1:1,s1:2];t=n1794067140;type=s3:CFG;v=s8:1gqx1g5f}",
+   "final": false
+  },
+  {
+   "name": "WH webhook",
+   "input": {
+    "type": "WH",
+    "key": "1",
+    "v": "1gqx1g6g",
+    "author": "Varok",
+    "del": false,
+    "fields": {
+     "url": "https://discord.com/api/webhooks/123/abc_DEF-ghi"
+    }
+   },
+   "record": "WH:1^1gqx1g6g^Varok^^https://discord.com/api/webhooks/123/abc_DEF-ghi",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s5:Varok;del=F;fields={url=s48:https://discord.com/api/webhooks/123/abc_DEF-ghi};id=s4:WH:1;key=s1:1;t=n1794067140;type=s2:WH;v=s8:1gqx1g6g}",
+   "reencode": "WH:1^1gqx1g6g^Varok^^https://discord.com/api/webhooks/123/abc_DEF-ghi",
+   "check": null,
+   "parseDump": "{author=s5:Varok;del=F;id=s4:WH:1;key=s1:1;raw=[s48:https://discord.com/api/webhooks/123/abc_DEF-ghi];t=n1794067140;type=s2:WH;v=s8:1gqx1g6g}",
+   "final": false
+  },
+  {
+   "name": "ca shrunk to fit 300 bytes",
+   "input": {
+    "type": "ca",
+    "key": "big001",
+    "v": "1gqx1g5y",
+    "author": "Thrallia",
+    "del": false,
+    "fields": {
+     "character": "Thrallia",
+     "zone": "ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ",
+     "needed": 5,
+     "message": "mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;"
+    }
+   },
+   "record": "ca:big001^1gqx1g5y^Thrallia^^Thrallia^ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ^5^mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm~3B~3B~3B~3B~3B~3B~3B~3B~3B~3B~3B~3B~3B~3B~3B~3B",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s8:Thrallia;del=F;fields={character=s8:Thrallia;message=s166:mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm;;;;;;;;;;;;;;;;;needed=n5;zone=s60:ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ};id=s9:ca:big001;key=s6:big001;t=n1794067140;type=s2:ca;v=s8:1gqx1g5y}",
+   "reencode": "ca:big001^1gqx1g5y^Thrallia^^Thrallia^ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ^5^mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm~3B~3B~3B~3B~3B~3B~3B~3B~3B~3B~3B~3B~3B~3B~3B~3B",
+   "check": null,
+   "parseDump": "{author=s8:Thrallia;del=F;id=s9:ca:big001;key=s6:big001;raw=[s8:Thrallia,s60:ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ,s1:5,s198:mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm~3B~3B~3B~3B~3B~3B~3B~3B~3B~3B~3B~3B~3B~3B~3B~3B];t=n1794067140;type=s2:ca;v=s8:1gqx1g5y}",
+   "final": false
+  },
+  {
+   "name": "ca shrunk, UTF-8",
+   "input": {
+    "type": "ca",
+    "key": "big002",
+    "v": "1gqx1g5o",
+    "author": "Zulé",
+    "del": false,
+    "fields": {
+     "character": "Zulé",
+     "zone": "ÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜ",
+     "needed": 1,
+     "message": "東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東"
+    }
+   },
+   "record": "ca:big002^1gqx1g5o^Zulé^^Zulé^ÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜ^1^東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s5:Zulé;del=F;fields={character=s5:Zulé;message=s198:東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東;needed=n1;zone=s60:ÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜ};id=s9:ca:big002;key=s6:big002;t=n1794067140;type=s2:ca;v=s8:1gqx1g5o}",
+   "reencode": "ca:big002^1gqx1g5o^Zulé^^Zulé^ÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜ^1^東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東",
+   "check": null,
+   "parseDump": "{author=s5:Zulé;del=F;id=s9:ca:big002;key=s6:big002;raw=[s5:Zulé,s60:ÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜ,s1:1,s198:東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東];t=n1794067140;type=s2:ca;v=s8:1gqx1g5o}",
+   "final": false
+  },
+  {
+   "name": "unknown member type kept raw",
+   "input": {
+    "type": "zz",
+    "key": "any:thing",
+    "v": "1gqx1g5y",
+    "author": "Thrallia",
+    "raw": [
+     "1",
+     "",
+     "x~2Cy",
+     ""
+    ]
+   },
+   "record": "zz:any:thing^1gqx1g5y^Thrallia^^1^^x~2Cy",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s8:Thrallia;del=F;id=s12:zz:any:thing;key=s9:any:thing;raw=[s1:1,s0:,s5:x~2Cy];t=n1794067140;type=s2:zz;v=s8:1gqx1g5y}",
+   "reencode": "zz:any:thing^1gqx1g5y^Thrallia^^1^^x~2Cy",
+   "check": null,
+   "parseDump": "{author=s8:Thrallia;del=F;id=s12:zz:any:thing;key=s9:any:thing;raw=[s1:1,s0:,s5:x~2Cy];t=n1794067140;type=s2:zz;v=s8:1gqx1g5y}",
+   "final": false
+  },
+  {
+   "name": "unknown officer type tombstone",
+   "input": {
+    "type": "ZQ",
+    "key": "1",
+    "v": "1gqx1g6g",
+    "author": "Varok",
+    "del": true
+   },
+   "record": "ZQ:1^1gqx1g6g^Varok^d",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s5:Varok;del=T;id=s4:ZQ:1;key=s1:1;raw={};t=n1794067140;type=s2:ZQ;v=s8:1gqx1g6g}",
+   "reencode": "ZQ:1^1gqx1g6g^Varok^d",
+   "check": null,
+   "parseDump": "{author=s5:Varok;del=T;id=s4:ZQ:1;key=s1:1;raw={};t=n1794067140;type=s2:ZQ;v=s8:1gqx1g6g}",
+   "final": false
+  },
+  {
+   "name": "expired call to arms",
+   "input": {
+    "type": "ca",
+    "key": "old001",
+    "v": "1gqn5z4m",
+    "author": "Thrallia",
+    "del": false,
+    "fields": {
+     "zone": "Crossroads"
+    }
+   },
+   "record": "ca:old001^1gqn5z4m^Thrallia^^^Crossroads",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s8:Thrallia;del=F;fields={character=s0:;message=s0:;zone=s10:Crossroads};id=s9:ca:old001;key=s6:old001;t=n1793808000;type=s2:ca;v=s8:1gqn5z4m}",
+   "reencode": "ca:old001^1gqn5z4m^Thrallia^^^Crossroads",
+   "check": "expired",
+   "parseDump": "{author=s8:Thrallia;del=F;id=s9:ca:old001;key=s6:old001;raw=[s0:,s10:Crossroads];t=n1793808000;type=s2:ca;v=s8:1gqn5z4m}",
+   "final": false
+  },
+  {
+   "name": "future call to arms",
+   "input": {
+    "type": "ca",
+    "key": "fut001",
+    "v": "1gqx6gwm",
+    "author": "Thrallia",
+    "del": false,
+    "fields": {
+     "zone": "Crossroads"
+    }
+   },
+   "record": "ca:fut001^1gqx6gwm^Thrallia^^^Crossroads",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s8:Thrallia;del=F;fields={character=s0:;message=s0:;zone=s10:Crossroads};id=s9:ca:fut001;key=s6:fut001;t=n1794070800;type=s2:ca;v=s8:1gqx6gwm}",
+   "reencode": "ca:fut001^1gqx6gwm^Thrallia^^^Crossroads",
+   "check": "future",
+   "parseDump": "{author=s8:Thrallia;del=F;id=s9:ca:fut001;key=s6:fut001;raw=[s0:,s10:Crossroads];t=n1794070800;type=s2:ca;v=s8:1gqx6gwm}",
+   "final": false
+  },
+  {
+   "name": "ints: zero and big",
+   "input": {
+    "type": "gb",
+    "key": "0",
+    "v": "1gqx1g6s",
+    "author": "Zuljinne",
+    "del": false,
+    "fields": {
+     "scannedAt": 0,
+     "money": 3656158440062975
+    }
+   },
+   "record": "gb:0^1gqx1g6s^Zuljinne^^0^zzzzzzzzzz",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s8:Zuljinne;del=F;fields={log={};money=n3656158440062975;scannedAt=n0;tabs={}};id=s4:gb:0;key=s1:0;t=n1794067140;type=s2:gb;v=s8:1gqx1g6s}",
+   "reencode": "gb:0^1gqx1g6s^Zuljinne^^0^zzzzzzzzzz",
+   "check": null,
+   "parseDump": "{author=s8:Zuljinne;del=F;id=s4:gb:0;key=s1:0;raw=[s1:0,s10:zzzzzzzzzz];t=n1794067140;type=s2:gb;v=s8:1gqx1g6s}",
+   "final": false
+  },
+  {
+   "name": "ints: bad values written empty",
+   "input": {
+    "type": "gb",
+    "key": "0",
+    "v": "1gqx1g6s",
+    "author": "Zuljinne",
+    "del": false,
+    "fields": {
+     "scannedAt": -5,
+     "money": 3656158440062976,
+     "tabs": [
+      "x"
+     ]
+    }
+   },
+   "record": "gb:0^1gqx1g6s^Zuljinne^^^^x",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s8:Zuljinne;del=F;fields={log={};tabs=[s1:x]};id=s4:gb:0;key=s1:0;t=n1794067140;type=s2:gb;v=s8:1gqx1g6s}",
+   "reencode": "gb:0^1gqx1g6s^Zuljinne^^^^x",
+   "check": null,
+   "parseDump": "{author=s8:Zuljinne;del=F;id=s4:gb:0;key=s1:0;raw=[s0:,s0:,s1:x];t=n1794067140;type=s2:gb;v=s8:1gqx1g6s}",
+   "final": false
+  }
+ ],
+ "bodies": [
+  {
+   "type": "su",
+   "key": "k3f9a2:Thrallia.p4m7",
+   "fields": {
+    "character": "Thrallia",
+    "role": "h",
+    "status": "y",
+    "note": "late 10 min",
+    "reserves": [
+     "d72",
+     "eim"
+    ],
+    "reservesAt": 1794067800
+   },
+   "author": null,
+   "body": "Thrallia^h^y^late 10 min^d72;eim^to53ko"
+  },
+  {
+   "type": "RT",
+   "key": "k3f9a2",
+   "fields": {
+    "status": "l",
+    "lockedAt": 1794355200
+   },
+   "author": null,
+   "body": "l^tob9c0"
+  },
+  {
+   "type": "ca",
+   "key": "big001",
+   "fields": {
+    "character": "Thrallia",
+    "zone": "ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ",
+    "needed": 5,
+    "message": "mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm"
+   },
+   "author": null,
+   "body": "Thrallia^ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ^5^mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm"
+  },
+  {
+   "type": "ca",
+   "key": "big001",
+   "fields": {
+    "character": "Thrallia",
+    "zone": "ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ",
+    "needed": 5,
+    "message": "mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm"
+   },
+   "author": "Thrallia",
+   "body": "Thrallia^ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ^5^mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm"
+  },
+  {
+   "type": "AN",
+   "key": "q2w8zz",
+   "fields": {
+    "body": "\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\b\t\n\u000b\f\r\u000e\u000f\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001a\u001b\u001c\u001d\u001e\u001f~^;,#|\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\b\t\n\u000b\f\r\u000e\u000f\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001a\u001b\u001c\u001d\u001e\u001f~^;,#|\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\b\t\n\u000b\f\r\u000e\u000f\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001a\u001b\u001c\u001d\u001e\u001f~^;,#|\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\b\t\n\u000b\f\r\u000e\u000f\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001a\u001b\u001c\u001d\u001e\u001f~^;,#|\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\b\t\n\u000b\f\r\u000e\u000f\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001a\u001b\u001c\u001d\u001e\u001f~^;,#|\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\b\t\n\u000b\f\r\u000e\u000f\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001a\u001b\u001c\u001d\u001e\u001f~^;,#|\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\b\t\n\u000b\f\r\u000e\u000f\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001a\u001b\u001c\u001d\u001e\u001f~^;,#|\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\b\t\n\u000b\f\r\u000e\u000f\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001a\u001b\u001c\u001d\u001e\u001f~^;,#|\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\b\t\n\u000b\f\r\u000e\u000f\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001a\u001b\u001c\u001d\u001e\u001f~^;,#|\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\b\t\n\u000b\f\r\u000e\u000f\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001a\u001b\u001c\u001d\u001e\u001f~^;,#|\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\b\t\n\u000b\f\r\u000e\u000f\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001a\u001b\u001c\u001d\u001e\u001f~^;,#|\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\b\t\n\u000b\f\r\u000e\u000f\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001a\u001b\u001c\u001d\u001e\u001f~^;,#|\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\b\t\n\u000b\f\r\u000e\u000f\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001a\u001b\u001c\u001d\u001e\u001f~^;,#|\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\b\t\n\u000b\f\r\u000e\u000f\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001a\u001b\u001c\u001d\u001e\u001f~^;,#|\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\b\t\n\u000b\f\r\u000e\u000f\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001a\u001b\u001c\u001d\u001e\u001f~^;,#|\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\b\t\n\u000b\f\r\u000e\u000f\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001a\u001b\u001c\u001d\u001e\u001f~^;,#|\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\b\t\n\u000b\f\r\u000e\u000f\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001a\u001b\u001c\u001d\u001e\u001f~^;,#|\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\b\t\n\u000b\f\r\u000e\u000f\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001a\u001b\u001c\u001d\u001e\u001f~^;,#|\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\b\t\n\u000b\f\r\u000e\u000f\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001a\u001b\u001c\u001d\u001e\u001f~^;,#|\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\b\t\n\u000b\f\r\u000e\u000f\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001a\u001b\u001c\u001d\u001e\u001f~^;,#|"
+   },
+   "author": "Grommash",
+   "body": "~00~01~02~03~04~05~06~07~08~09~0A~0B~0C~0D~0E~0F~10~11~12~13~14~15~16~17~18~19~1A~1B~1C~1D~1E~1F~7F~7E~5E~3B~2C~23~7C~00~01~02~03~04~05~06~07~08~09~0A~0B~0C~0D~0E~0F~10~11~12~13~14~15~16~17~18~19~1A~1B~1C~1D~1E~1F~7F~7E~5E~3B~2C~23~7C~00~01~02~03~04~05~06~07~08~09~0A~0B~0C~0D~0E~0F~10~11~12~13~14~15~16~17~18~19~1A~1B~1C~1D~1E~1F~7F~7E~5E~3B~2C~23~7C~00~01~02~03~04~05~06~07~08~09~0A~0B~0C~0D~0E~0F~10~11~12~13~14~15~16~17~18~19~1A~1B~1C~1D~1E~1F~7F~7E~5E~3B~2C~23~7C~00~01~02~03~04~05~06~07~08~09~0A~0B~0C~0D~0E~0F~10~11~12~13~14~15~16~17~18~19~1A~1B~1C~1D~1E~1F~7F~7E"
+  },
+  {
+   "type": "WH",
+   "key": "1",
+   "fields": {
+    "url": "https://discord.com/api/webhooks/1/x"
+   },
+   "author": null,
+   "body": "https://discord.com/api/webhooks/1/x"
+  },
+  {
+   "type": "zz",
+   "key": "any",
+   "fields": {
+    "x": 1
+   },
+   "author": null,
+   "body": ""
+  }
+ ],
+ "expiry": [
+  {
+   "name": "ch 60 days",
+   "record": "ch:Thrallia^1gq04cgm^Thrallia^^Thrallia.p4m7",
+   "lookup": null,
+   "hour": 1794067200,
+   "at": 1798387200,
+   "expired": false
+  },
+  {
+   "name": "rc newer of itself and its ch",
+   "record": "rc:Thrallia:4k^1gkil8gm^Thrallia^^s^^1",
+   "lookup": {
+    "ch:Thrallia": "ch:Thrallia^1gqgkxsm^Thrallia^^Thrallia.p4m7"
+   },
+   "hour": 1794067200,
+   "at": 1798819200,
+   "expired": false
+  },
+  {
+   "name": "rc without its ch",
+   "record": "rc:Thrallia:4k^1gkil8gm^Thrallia^^s^^1",
+   "lookup": null,
+   "hour": 1794067200,
+   "at": 1793203200,
+   "expired": true
+  },
+  {
+   "name": "su with the raid",
+   "record": "su:k3f9a2:Thrallia.p4m7^1gqqghsm^Thrallia^^Thrallia",
+   "lookup": {
+    "RD:k3f9a2": "RD:k3f9a2^1gq04cg3^Grommash^^r^MC^^tlkhs0"
+   },
+   "hour": 1794067200,
+   "at": 1793635200,
+   "expired": true
+  },
+  {
+   "name": "su raid unknown (120 days)",
+   "record": "su:k3f9a2:Thrallia.p4m7^1gqqghsm^Thrallia^^Thrallia",
+   "lookup": null,
+   "hour": 1794067200,
+   "at": 1804262400,
+   "expired": false
+  },
+  {
+   "name": "cl with the request",
+   "record": "cl:r1r1r1:Zuljin.a8x2^1gqtr0gx^Zuljin^^c",
+   "lookup": {
+    "cr:r1r1r1": "cr:r1r1r1^wzmvkzkm^Thrallia^^Thrallia.p4m7^x^^d"
+   },
+   "hour": 1794067200,
+   "at": 1793980800,
+   "expired": true
+  },
+  {
+   "name": "dc with the drive (field)",
+   "record": "dc:h4nd1n^1gqtr0gm^Thrallia^^Thrallia.p4m7^dr1v3x^^1",
+   "lookup": {
+    "DR:dr1v3x": "DR:dr1v3x^wzrq2gw3^Grommash^^x^^^^c"
+   },
+   "hour": 1794067200,
+   "at": 1793980800,
+   "expired": true
+  },
+  {
+   "name": "dc tombstone, drive unknown",
+   "record": "dc:h4nd1n^1gqtr0gm^Thrallia^d",
+   "lookup": null,
+   "hour": 1794067200,
+   "at": 1804348800,
+   "expired": false
+  },
+  {
+   "name": "BH with the bank request",
+   "record": "BH:b4nkrq^1gqtr0h4^Varok^^d",
+   "lookup": {
+    "bq:b4nkrq": "bq:b4nkrq^1go2zggm^Thrallia^^Thrallia.p4m7^x^^^o"
+   },
+   "hour": 1794067200,
+   "at": 1793980800,
+   "expired": true
+  },
+  {
+   "name": "RT as RD",
+   "record": "RT:k3f9a2^1gqtr0g3^Grommash^^l^to38g0",
+   "lookup": {
+    "RD:k3f9a2": "RD:k3f9a2^1gq04cg3^Grommash^^r^MC^^to6xs0"
+   },
+   "hour": 1794067200,
+   "at": 1798041600,
+   "expired": false
+  },
+  {
+   "name": "RT close unfolded",
+   "record": "RT:k3f9a2^x0dkwe83^Grommash^^d^^r^2dv8n1",
+   "lookup": {
+    "RD:k3f9a2": "RD:k3f9a2^1fykgsg3^Grommash^^r^MC^^t8pj40"
+   },
+   "hour": 1794067200,
+   "at": 1772035200,
+   "expired": false
+  },
+  {
+   "name": "RT close folded",
+   "record": "RT:k3f9a2^x0dkwe83^Grommash^^d^^r^2dv8n1",
+   "lookup": {
+    "RD:k3f9a2": "RD:k3f9a2^1fykgsg3^Grommash^^r^MC^^t8pj40",
+    "LY:2dv8n1": "LY:2dv8n1^1gqtr0g3^Grommash^^tmjog0"
+   },
+   "hour": 1794067200,
+   "at": 1772035200,
+   "expired": true
+  },
+  {
+   "name": "RT pvp close is not kept",
+   "record": "RT:k3f9a2^x0dkwe83^Grommash^^d^^p^2dv8n1",
+   "lookup": null,
+   "hour": 1794067200,
+   "at": 1778515200,
+   "expired": true
+  },
+  {
+   "name": "LA unfolded",
+   "record": "LA:aw4rd1^1g8mlts3^Grommash^^^2dv8n1^d72^^^Thrallia.p4m7^s",
+   "lookup": null,
+   "hour": 1794067200,
+   "at": 1792339200,
+   "expired": false
+  },
+  {
+   "name": "LA folded",
+   "record": "LA:aw4rd1^1g8mlts3^Grommash^^^2dv8n1^d72^^^Thrallia.p4m7^s",
+   "lookup": {
+    "LY:2dv8n1": "LY:2dv8n1^1gqtr0g3^Grommash^^tmjog0"
+   },
+   "hour": 1794067200,
+   "at": 1792339200,
+   "expired": true
+  },
+  {
+   "name": "LL never",
+   "record": "LL:2dv8n1^1e7k5j43^Grommash^^MC",
+   "lookup": null,
+   "hour": 1794067200,
+   "at": null,
+   "expired": false
+  },
+  {
+   "name": "LL tombstone 180 days",
+   "record": "LL:2dv8n1^1ghrtog3^Grommash^d",
+   "lookup": null,
+   "hour": 1794067200,
+   "at": 1800979200,
+   "expired": false
+  },
+  {
+   "name": "cr open 30 days",
+   "record": "cr:r1r1r1^1go9khsm^Thrallia^^Thrallia.p4m7^x^^o",
+   "lookup": null,
+   "hour": 1794067200,
+   "at": 1794153600,
+   "expired": false
+  },
+  {
+   "name": "cr final 7 days",
+   "record": "cr:r1r1r1^wzmozy8m^Thrallia^^Thrallia.p4m7^x^^x",
+   "lookup": null,
+   "hour": 1794067200,
+   "at": 1794153600,
+   "expired": false
+  },
+  {
+   "name": "DR open 180 days",
+   "record": "DR:dr1v3x^1gq04cg3^Grommash^^x^^^^o",
+   "lookup": null,
+   "hour": 1794067200,
+   "at": 1808755200,
+   "expired": false
+  },
+  {
+   "name": "DR closed 60 days",
+   "record": "DR:dr1v3x^wzn260w3^Grommash^^x^^^^c",
+   "lookup": null,
+   "hour": 1794067200,
+   "at": 1798387200,
+   "expired": false
+  },
+  {
+   "name": "RD startsAt + 45 days",
+   "record": "RD:k3f9a2^1ghrtog3^Grommash^^r^MC^^tlvls0",
+   "lookup": null,
+   "hour": 1794067200,
+   "at": 1794153600,
+   "expired": false
+  },
+  {
+   "name": "lp 3 days",
+   "record": "lp:Thrallia.p4m7:Zuljinne^1gqn5zn8^Zuljinne^^Zuljinne",
+   "lookup": null,
+   "hour": 1794067200,
+   "at": 1794067210,
+   "expired": false
+  },
+  {
+   "name": "unknown type 14 days",
+   "record": "zz:a^1gq04cgm^Thrallia^^1",
+   "lookup": null,
+   "hour": 1794067200,
+   "at": 1794412800,
+   "expired": false
+  },
+  {
+   "name": "unknown type gone after 14 days",
+   "record": "zz:b^1gpjnr4m^Thrallia^^1",
+   "lookup": null,
+   "hour": 1794067200,
+   "at": 1793980800,
+   "expired": true
+  }
+ ],
+ "accept": [
+  {
+   "name": "member record first-hand",
+   "record": "ca:x8k2pq^1gqx1g5y^Thrallia^^Thrallia^Crossroads^5^help",
+   "now": 1794067200,
+   "env": {
+    "me": "Me",
+    "sender": "Thrallia",
+    "channel": "GUILD",
+    "ranks": {
+     "Grommash": 0,
+     "Varok": 1,
+     "Thrallia": 3,
+     "Zuljinne": 3,
+     "Relayer": 2
+    },
+    "officerRankMax": 1,
+    "relayRankMax": null
+   },
+   "expect": "d"
+  },
+  {
+   "name": "member record relayed by a member",
+   "record": "ca:x8k2pq^1gqx1g5y^Thrallia^^Thrallia^Crossroads",
+   "now": 1794067200,
+   "env": {
+    "me": "Me",
+    "sender": "Zuljinne",
+    "channel": "GUILD",
+    "ranks": {
+     "Grommash": 0,
+     "Varok": 1,
+     "Thrallia": 3,
+     "Zuljinne": 3,
+     "Relayer": 2
+    },
+    "officerRankMax": 1,
+    "relayRankMax": null
+   },
+   "expect": "m"
+  },
+  {
+   "name": "my own message echoed back",
+   "record": "ca:x8k2pq^1gqx1g5z^Me^^^Crossroads",
+   "now": 1794067200,
+   "env": {
+    "me": "Me",
+    "sender": "Me",
+    "channel": "GUILD",
+    "ranks": {
+     "Grommash": 0,
+     "Varok": 1,
+     "Thrallia": 3,
+     "Zuljinne": 3,
+     "Relayer": 2
+    },
+    "officerRankMax": 1,
+    "relayRankMax": null
+   },
+   "expect": "self"
+  },
+  {
+   "name": "sender not in my roster yet",
+   "record": "ca:x8k2pq^1gqx1g5n^Stranger^^^Crossroads",
+   "now": 1794067200,
+   "env": {
+    "me": "Me",
+    "sender": "Stranger",
+    "channel": "GUILD",
+    "ranks": {
+     "Grommash": 0,
+     "Varok": 1,
+     "Thrallia": 3,
+     "Zuljinne": 3,
+     "Relayer": 2
+    },
+    "officerRankMax": 1,
+    "relayRankMax": null
+   },
+   "expect": "unknown"
+  },
+  {
+   "name": "officer record from an officer author",
+   "record": "RD:k3f9a2^1gqtr0g3^Grommash^^r^Molten Core^Molten Core^to6xs0^50^14^2",
+   "now": 1794067200,
+   "env": {
+    "me": "Me",
+    "sender": "Grommash",
+    "channel": "GUILD",
+    "ranks": {
+     "Grommash": 0,
+     "Varok": 1,
+     "Thrallia": 3,
+     "Zuljinne": 3,
+     "Relayer": 2
+    },
+    "officerRankMax": 1,
+    "relayRankMax": null
+   },
+   "expect": "d"
+  },
+  {
+   "name": "officer record first-hand from a member",
+   "record": "RT:k3f9a2^1gqx1g5y^Thrallia^^l^to532c",
+   "now": 1794067200,
+   "env": {
+    "me": "Me",
+    "sender": "Thrallia",
+    "channel": "GUILD",
+    "ranks": {
+     "Grommash": 0,
+     "Varok": 1,
+     "Thrallia": 3,
+     "Zuljinne": 3,
+     "Relayer": 2
+    },
+    "officerRankMax": 1,
+    "relayRankMax": null
+   },
+   "expect": "rank"
+  },
+  {
+   "name": "officer record relayed by a member",
+   "record": "RD:k3f9a2^1gqtr0g3^Grommash^^r^Molten Core^Molten Core^to6xs0^50^14^2",
+   "now": 1794067200,
+   "env": {
+    "me": "Me",
+    "sender": "Thrallia",
+    "channel": "GUILD",
+    "ranks": {
+     "Grommash": 0,
+     "Varok": 1,
+     "Thrallia": 3,
+     "Zuljinne": 3,
+     "Relayer": 2
+    },
+    "officerRankMax": 1,
+    "relayRankMax": null
+   },
+   "expect": "rank"
+  },
+  {
+   "name": "officer record relayed by an officer",
+   "record": "RD:k3f9a2^1gqtr0g3^Grommash^^r^Molten Core^Molten Core^to6xs0^50^14^2",
+   "now": 1794067200,
+   "env": {
+    "me": "Me",
+    "sender": "Varok",
+    "channel": "GUILD",
+    "ranks": {
+     "Grommash": 0,
+     "Varok": 1,
+     "Thrallia": 3,
+     "Zuljinne": 3,
+     "Relayer": 2
+    },
+    "officerRankMax": 1,
+    "relayRankMax": null
+   },
+   "expect": "t"
+  },
+  {
+   "name": "officer record relayed by a relay rank",
+   "record": "RD:k3f9a2^1gqtr0g3^Grommash^^r^Molten Core^Molten Core^to6xs0^50^14^2",
+   "now": 1794067200,
+   "env": {
+    "me": "Me",
+    "sender": "Relayer",
+    "channel": "GUILD",
+    "ranks": {
+     "Grommash": 0,
+     "Varok": 1,
+     "Thrallia": 3,
+     "Zuljinne": 3,
+     "Relayer": 2
+    },
+    "officerRankMax": 1,
+    "relayRankMax": 2
+   },
+   "expect": "t"
+  },
+  {
+   "name": "relay rank cannot author officer records",
+   "record": "AN:q2w8zz^1gqx1g61^Relayer^^hi",
+   "now": 1794067200,
+   "env": {
+    "me": "Me",
+    "sender": "Relayer",
+    "channel": "GUILD",
+    "ranks": {
+     "Grommash": 0,
+     "Varok": 1,
+     "Thrallia": 3,
+     "Zuljinne": 3,
+     "Relayer": 2
+    },
+    "officerRankMax": 1,
+    "relayRankMax": 2
+   },
+   "expect": "rank"
+  },
+  {
+   "name": "officer rank max raised to 3",
+   "record": "AN:q2w8zz^1gqx1g5y^Thrallia^^hi",
+   "now": 1794067200,
+   "env": {
+    "me": "Me",
+    "sender": "Thrallia",
+    "channel": "GUILD",
+    "ranks": {
+     "Grommash": 0,
+     "Varok": 1,
+     "Thrallia": 3,
+     "Zuljinne": 3,
+     "Relayer": 2
+    },
+    "officerRankMax": 3,
+    "relayRankMax": null
+   },
+   "expect": "d"
+  },
+  {
+   "name": "guild settings from the Guild Master",
+   "record": "CFG:1^1gqx1g5f^Grommash^^2^-",
+   "now": 1794067200,
+   "env": {
+    "me": "Me",
+    "sender": "Grommash",
+    "channel": "GUILD",
+    "ranks": {
+     "Grommash": 0,
+     "Varok": 1,
+     "Thrallia": 3,
+     "Zuljinne": 3,
+     "Relayer": 2
+    },
+    "officerRankMax": 1,
+    "relayRankMax": null
+   },
+   "expect": "d"
+  },
+  {
+   "name": "guild settings from an officer",
+   "record": "CFG:1^1gqx1g6g^Varok^^2^-",
+   "now": 1794067200,
+   "env": {
+    "me": "Me",
+    "sender": "Varok",
+    "channel": "GUILD",
+    "ranks": {
+     "Grommash": 0,
+     "Varok": 1,
+     "Thrallia": 3,
+     "Zuljinne": 3,
+     "Relayer": 2
+    },
+    "officerRankMax": 1,
+    "relayRankMax": null
+   },
+   "expect": "rank"
+  },
+  {
+   "name": "webhook on the OFFICER channel",
+   "record": "WH:1^1gqx1g6g^Varok^^https://discord.com/api/webhooks/1/x",
+   "now": 1794067200,
+   "env": {
+    "me": "Me",
+    "sender": "Varok",
+    "channel": "OFFICER",
+    "ranks": {
+     "Grommash": 0,
+     "Varok": 1,
+     "Thrallia": 3,
+     "Zuljinne": 3,
+     "Relayer": 2
+    },
+    "officerRankMax": 1,
+    "relayRankMax": null
+   },
+   "expect": "d"
+  },
+  {
+   "name": "webhook on the GUILD channel",
+   "record": "WH:1^1gqx1g6g^Varok^^https://discord.com/api/webhooks/1/x",
+   "now": 1794067200,
+   "env": {
+    "me": "Me",
+    "sender": "Varok",
+    "channel": "GUILD",
+    "ranks": {
+     "Grommash": 0,
+     "Varok": 1,
+     "Thrallia": 3,
+     "Zuljinne": 3,
+     "Relayer": 2
+    },
+    "officerRankMax": 1,
+    "relayRankMax": null
+   },
+   "expect": "channel"
+  },
+  {
+   "name": "webhook relayed (first-hand only)",
+   "record": "WH:1^1gqx1g6g^Varok^^https://discord.com/api/webhooks/1/x",
+   "now": 1794067200,
+   "env": {
+    "me": "Me",
+    "sender": "Grommash",
+    "channel": "OFFICER",
+    "ranks": {
+     "Grommash": 0,
+     "Varok": 1,
+     "Thrallia": 3,
+     "Zuljinne": 3,
+     "Relayer": 2
+    },
+    "officerRankMax": 1,
+    "relayRankMax": null
+   },
+   "expect": "rank"
+  },
+  {
+   "name": "other records on the OFFICER channel",
+   "record": "RD:k3f9a2^1gqtr0g3^Grommash^^r^Molten Core^Molten Core^to6xs0^50^14^2",
+   "now": 1794067200,
+   "env": {
+    "me": "Me",
+    "sender": "Grommash",
+    "channel": "OFFICER",
+    "ranks": {
+     "Grommash": 0,
+     "Varok": 1,
+     "Thrallia": 3,
+     "Zuljinne": 3,
+     "Relayer": 2
+    },
+    "officerRankMax": 1,
+    "relayRankMax": null
+   },
+   "expect": "channel"
+  },
+  {
+   "name": "character record by that character",
+   "record": "ch:Thrallia^1gqx1g5y^Thrallia^^Thrallia.p4m7^^^^^^1o",
+   "now": 1794067200,
+   "expect": "ok"
+  },
+  {
+   "name": "character record by someone else",
+   "record": "ch:Thrallia^1gqx1g6s^Zuljinne^^Zuljinne.a8x2",
+   "now": 1794067200,
+   "env": {
+    "me": "Me",
+    "sender": "Zuljinne",
+    "channel": "GUILD",
+    "ranks": {
+     "Grommash": 0,
+     "Varok": 1,
+     "Thrallia": 3,
+     "Zuljinne": 3,
+     "Relayer": 2
+    },
+    "officerRankMax": 1,
+    "relayRankMax": null
+   },
+   "expect": "author"
+  },
+  {
+   "name": "recipes by someone else",
+   "record": "rc:Thrallia:4k^1gqx1g6s^Zuljinne^^s^1^Yp4",
+   "now": 1794067200,
+   "expect": "author"
+  },
+  {
+   "name": "bank stock by someone else",
+   "record": "bk:Bankalt^1gqx1g5y^Thrallia^^1zx,k",
+   "now": 1794067200,
+   "expect": "author"
+  },
+  {
+   "name": "up to 300 s in the future",
+   "record": "ca:x8k2pq^1gqx1xxy^Thrallia^^^Crossroads",
+   "now": 1794067200,
+   "expect": "ok"
+  },
+  {
+   "name": "more than 300 s in the future",
+   "record": "ca:x8k2pq^1gqx1xzq^Thrallia^^^Crossroads",
+   "now": 1794067200,
+   "expect": "future"
+  },
+  {
+   "name": "call to arms a day old (expired at the hour start)",
+   "record": "ca:x8k2pq^1gqtr0gm^Thrallia^^^Crossroads",
+   "now": 1794067200,
+   "expect": "expired"
+  },
+  {
+   "name": "call to arms just under a day old at the hour start",
+   "record": "ca:x8k2pq^1gqtr0ie^Thrallia^^^Crossroads",
+   "now": 1794067200,
+   "expect": "ok"
+  },
+  {
+   "name": "sign-up expires with its raid",
+   "record": "su:k3f9a2:Thrallia.p4m7^1gmcflsm^Thrallia^^Thrallia^h^y",
+   "now": 1794067200,
+   "lookup": {
+    "RD:k3f9a2": "RD:k3f9a2^1ghrtog3^Grommash^^r^Old^^tlrwg0"
+   },
+   "expect": "expired"
+  },
+  {
+   "name": "sign-up for an unknown raid lives 120 days",
+   "record": "su:k3f9a2:Thrallia.p4m7^1gg19tsm^Thrallia^^Thrallia^h^y",
+   "now": 1794067200,
+   "expect": "ok"
+  },
+  {
+   "name": "sign-up for an unknown raid after 120 days",
+   "record": "su:k3f9a2:Thrallia.p4m7^1gfuosgm^Thrallia^^Thrallia^h^y",
+   "now": 1794067200,
+   "expect": "expired"
+  },
+  {
+   "name": "unfolded raid close never expires",
+   "record": "RT:k3f9a2^x0mq48w3^Grommash^^d^^r^abc123^t3kcg0",
+   "now": 1794067200,
+   "expect": "ok"
+  },
+  {
+   "name": "folded raid close past its raid expires",
+   "record": "RT:k3f9a2^x0mq48w3^Grommash^^d^^r^abc123^t3kcg0",
+   "now": 1794067200,
+   "lookup": {
+    "LY:abc123": "LY:abc123^1gq04cg3^Grommash^^tm30g0"
+   },
+   "expect": "expired"
+  },
+  {
+   "name": "loot list never expires",
+   "record": "LL:abc123^1egm2v43^Grommash^^Molten Core",
+   "now": 1794067200,
+   "expect": "ok"
+  },
+  {
+   "name": "tombstone of a never-expiring type after 180 days",
+   "record": "LL:abc123^1gad5og3^Grommash^d",
+   "now": 1794067200,
+   "expect": "expired"
+  },
+  {
+   "name": "closed craft request lives 7 days",
+   "record": "cr:r1r1r1^wzmvkzkm^Thrallia^^Thrallia.p4m7^Robe^^x",
+   "now": 1794067200,
+   "expect": "expired"
+  },
+  {
+   "name": "open craft request lives 30 days",
+   "record": "cr:r1r1r1^1gq6pdsm^Thrallia^^Thrallia.p4m7^Robe^^o",
+   "now": 1794067200,
+   "expect": "ok"
+  },
+  {
+   "name": "final state with a normal version",
+   "record": "cr:r1r1r1^1gqx1g5y^Thrallia^^Thrallia.p4m7^Robe^^x",
+   "now": 1794067200,
+   "expect": "malformed"
+  },
+  {
+   "name": "normal state with a final version",
+   "record": "cr:r1r1r1^wzm58x7a^Thrallia^^Thrallia.p4m7^Robe^^o",
+   "now": 1794067200,
+   "expect": "malformed"
+  },
+  {
+   "name": "version slot does not match the author",
+   "record": "ca:x8k2pq^1gqx1g5y^Zuljinne^^Thrallia^Crossroads",
+   "now": 1794067200,
+   "expect": "malformed"
+  },
+  {
+   "name": "bad escape",
+   "record": "AN:q2w8zz^1gqx1g5f^Grommash^^a~zzb",
+   "now": 1794067200,
+   "expect": "malformed"
+  },
+  {
+   "name": "raw separator inside a text field",
+   "record": "AN:q2w8zz^1gqx1g5f^Grommash^^a,b",
+   "now": 1794067200,
+   "expect": "malformed"
+  },
+  {
+   "name": "pipe character on the wire",
+   "record": "AN:q2w8zz^1gqx1g5f^Grommash^^a|b",
+   "now": 1794067200,
+   "expect": "malformed"
+  },
+  {
+   "name": "bad enum value",
+   "record": "cl:r1r1r1:Thrallia.p4m7^1gqx1g6s^Zuljinne^^q",
+   "now": 1794067200,
+   "expect": "malformed"
+  },
+  {
+   "name": "bad key for the type",
+   "record": "RD:toolongkey^1gqx1g5f^Grommash^^r",
+   "now": 1794067200,
+   "expect": "malformed"
+  },
+  {
+   "name": "tombstone with fields",
+   "record": "AN:q2w8zz^1gqx1g5f^Grommash^d^x",
+   "now": 1794067200,
+   "expect": "malformed"
+  },
+  {
+   "name": "mixed-case type",
+   "record": "Ab:q2w8zz^1gqx1g5f^Grommash^^x",
+   "now": 1794067200,
+   "expect": "malformed"
+  },
+  {
+   "name": "oversize for its type",
+   "record": "BH:r1r1r1^1gqx1g5f^Grommash^^s^xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+   "now": 1794067200,
+   "expect": "oversize"
+  },
+  {
+   "name": "unknown member type is kept",
+   "record": "zz:anything^1gqx1g5y^Thrallia^^1^2^3",
+   "now": 1794067200,
+   "env": {
+    "me": "Me",
+    "sender": "Zuljinne",
+    "channel": "GUILD",
+    "ranks": {
+     "Grommash": 0,
+     "Varok": 1,
+     "Thrallia": 3,
+     "Zuljinne": 3,
+     "Relayer": 2
+    },
+    "officerRankMax": 1,
+    "relayRankMax": null
+   },
+   "expect": "m"
+  },
+  {
+   "name": "unknown officer type from a member",
+   "record": "ZZ:anything^1gqx1g5y^Thrallia^^1",
+   "now": 1794067200,
+   "env": {
+    "me": "Me",
+    "sender": "Thrallia",
+    "channel": "GUILD",
+    "ranks": {
+     "Grommash": 0,
+     "Varok": 1,
+     "Thrallia": 3,
+     "Zuljinne": 3,
+     "Relayer": 2
+    },
+    "officerRankMax": 1,
+    "relayRankMax": null
+   },
+   "expect": "rank"
+  },
+  {
+   "name": "unknown officer type from an officer",
+   "record": "ZZ:anything^1gqx1g6g^Varok^^1",
+   "now": 1794067200,
+   "env": {
+    "me": "Me",
+    "sender": "Varok",
+    "channel": "GUILD",
+    "ranks": {
+     "Grommash": 0,
+     "Varok": 1,
+     "Thrallia": 3,
+     "Zuljinne": 3,
+     "Relayer": 2
+    },
+    "officerRankMax": 1,
+    "relayRankMax": null
+   },
+   "expect": "d"
+  },
+  {
+   "name": "unknown type expires after 120 days",
+   "record": "zz:anything^1gfuosgm^Thrallia^^1",
+   "now": 1794067200,
+   "expect": "expired"
+  }
+ ],
+ "caps": [
+  {
+   "usage": {
+    "count": 299,
+    "bytes": 100,
+    "rcBytes": 0
+   },
+   "type": "ca",
+   "bytes": 100,
+   "over": false
+  },
+  {
+   "usage": {
+    "count": 300,
+    "bytes": 100,
+    "rcBytes": 0
+   },
+   "type": "ca",
+   "bytes": 100,
+   "over": true
+  },
+  {
+   "usage": {
+    "count": 10,
+    "bytes": 65000,
+    "rcBytes": 0
+   },
+   "type": "ch",
+   "bytes": 400,
+   "over": false
+  },
+  {
+   "usage": {
+    "count": 10,
+    "bytes": 65000,
+    "rcBytes": 0
+   },
+   "type": "rc",
+   "bytes": 2000,
+   "over": false
+  },
+  {
+   "usage": {
+    "count": 10,
+    "bytes": 0,
+    "rcBytes": 31000
+   },
+   "type": "rc",
+   "bytes": 2000,
+   "over": true
+  },
+  {
+   "usage": {
+    "count": 999,
+    "bytes": 999999
+   },
+   "type": "RD",
+   "bytes": 500,
+   "over": false
+  },
+  {
+   "usage": {},
+   "type": "su",
+   "bytes": 300,
+   "over": false
+  },
+  {
+   "usage": {
+    "count": 300,
+    "bytes": 65000,
+    "rcBytes": 0
+   },
+   "type": "zz",
+   "bytes": 100,
+   "over": false
+  },
+  {
+   "usage": {
+    "count": 300,
+    "bytes": 100,
+    "rcBytes": 0
+   },
+   "type": "ZQ",
+   "bytes": 100,
+   "over": false
+  }
+ ],
+ "messages": {
+  "hello": [
+   {
+    "input": {
+     "minor": 1,
+     "count": 1370,
+     "digests": [
+      0,
+      104730,
+      209459,
+      314188,
+      418917,
+      0,
+      628375,
+      733104,
+      837833,
+      942562,
+      0,
+      1152020,
+      1256749,
+      1361478,
+      1466207,
+      0,
+      1675665,
+      100779,
+      205508,
+      310237,
+      0,
+      519695,
+      624424,
+      729153,
+      833882,
+      0,
+      1043340,
+      1148069,
+      1252798,
+      1357527,
+      0,
+      1566985,
+      1671714,
+      96828,
+      201557,
+      0,
+      411015,
+      1676156,
+      620473,
+      725202,
+      0,
+      934660,
+      1039389,
+      1144118,
+      1248847,
+      0,
+      1458305,
+      1563034
+     ],
+     "addon": "0.12.0"
+    },
+    "msg": "1H1122000028t64hmb6qfg8z8l0000dguvfpo0hyh5k7aa0000oowkqxppt6iuvfbz0000zwy925rf4ekk6ndp0000b4zzddt4fmm9hvfe0000md1oolutqunyt3h30000xl3dztwi22po4bit00008t53zxbwdardfjki0000k16sm9zxoit2qrm70000v98hxi1m^0.12.0",
+    "parsed": "{addon=s6:0.12.0;count=n1370;digests=[n0,n104730,n209459,n314188,n418917,n0,n628375,n733104,n837833,n942562,n0,n1152020,n1256749,n1361478,n1466207,n0,n1675665,n100779,n205508,n310237,n0,n519695,n624424,n729153,n833882,n0,n1043340,n1148069,n1252798,n1357527,n0,n1566985,n1671714,n96828,n201557,n0,n411015,n1676156,n620473,n725202,n0,n934660,n1039389,n1144118,n1248847,n0,n1458305,n1563034];minor=n1}"
+   },
+   {
+    "input": {
+     "minor": 1,
+     "count": 0,
+     "digests": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "addon": ""
+    },
+    "msg": "1H1000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000^",
+    "parsed": "{addon=s0:;count=n0;digests=[n0,n0,n0,n0,n0,n0,n0,n0,n0,n0,n0,n0,n0,n0,n0,n0,n0,n0,n0,n0,n0,n0,n0,n0,n0,n0,n0,n0,n0,n0,n0,n0,n0,n0,n0,n0,n0,n0,n0,n0,n0,n0,n0,n0,n0,n0,n0,n0];minor=n1}"
+   },
+   {
+    "input": {
+     "minor": 1,
+     "count": 99999,
+     "digests": [
+      0,
+      104730,
+      209459,
+      314188,
+      418917,
+      0,
+      628375,
+      733104,
+      837833,
+      942562,
+      0,
+      1152020,
+      1256749,
+      1361478,
+      1466207,
+      0,
+      1675665,
+      100779,
+      205508,
+      310237,
+      0,
+      519695,
+      624424,
+      729153,
+      833882,
+      0,
+      1043340,
+      1148069,
+      1252798,
+      1357527,
+      0,
+      1566985,
+      1671714,
+      96828,
+      201557,
+      0,
+      411015,
+      1676156,
+      620473,
+      725202,
+      0,
+      934660,
+      1039389,
+      1144118,
+      1248847,
+      0,
+      1458305,
+      1563034
+     ],
+     "addon": "0.12.0-beta.123456"
+    },
+    "msg": "1H1zzz000028t64hmb6qfg8z8l0000dguvfpo0hyh5k7aa0000oowkqxppt6iuvfbz0000zwy925rf4ekk6ndp0000b4zzddt4fmm9hvfe0000md1oolutqunyt3h30000xl3dztwi22po4bit00008t53zxbwdardfjki0000k16sm9zxoit2qrm70000v98hxi1m^0.12.0-beta",
+    "parsed": "{addon=s11:0.12.0-beta;count=n46655;digests=[n0,n104730,n209459,n314188,n418917,n0,n628375,n733104,n837833,n942562,n0,n1152020,n1256749,n1361478,n1466207,n0,n1675665,n100779,n205508,n310237,n0,n519695,n624424,n729153,n833882,n0,n1043340,n1148069,n1252798,n1357527,n0,n1566985,n1671714,n96828,n201557,n0,n411015,n1676156,n620473,n725202,n0,n934660,n1039389,n1144118,n1248847,n0,n1458305,n1563034];minor=n1}"
+   },
+   {
+    "input": {
+     "minor": 1,
+     "count": 3,
+     "digests": [
+      0,
+      104730,
+      209459,
+      314188,
+      418917,
+      0,
+      628375,
+      733104,
+      837833,
+      942562,
+      0,
+      1152020,
+      1256749,
+      1361478,
+      1466207,
+      0,
+      1675665,
+      100779,
+      205508,
+      310237,
+      0,
+      519695,
+      624424,
+      729153,
+      833882,
+      0,
+      1043340,
+      1148069,
+      1252798,
+      1357527,
+      0,
+      1566985,
+      1671714,
+      96828,
+      201557,
+      0,
+      411015,
+      1676156,
+      620473,
+      725202,
+      0,
+      934660,
+      1039389,
+      1144118,
+      1248847,
+      0,
+      1458305,
+      1563034
+     ],
+     "addon": "bad version^"
+    },
+    "msg": "1H1003000028t64hmb6qfg8z8l0000dguvfpo0hyh5k7aa0000oowkqxppt6iuvfbz0000zwy925rf4ekk6ndp0000b4zzddt4fmm9hvfe0000md1oolutqunyt3h30000xl3dztwi22po4bit00008t53zxbwdardfjki0000k16sm9zxoit2qrm70000v98hxi1m^",
+    "parsed": "{addon=s0:;count=n3;digests=[n0,n104730,n209459,n314188,n418917,n0,n628375,n733104,n837833,n942562,n0,n1152020,n1256749,n1361478,n1466207,n0,n1675665,n100779,n205508,n310237,n0,n519695,n624424,n729153,n833882,n0,n1043340,n1148069,n1252798,n1357527,n0,n1566985,n1671714,n96828,n201557,n0,n411015,n1676156,n620473,n725202,n0,n934660,n1039389,n1144118,n1248847,n0,n1458305,n1563034];minor=n1}"
+   },
+   {
+    "input": {
+     "minor": 1,
+     "count": 3,
+     "digests": [
+      0,
+      104730,
+      209459,
+      314188,
+      418917,
+      0,
+      628375,
+      733104,
+      837833,
+      942562,
+      0,
+      1152020,
+      1256749,
+      1361478,
+      1466207,
+      0,
+      1675665,
+      100779,
+      205508,
+      310237,
+      0,
+      519695,
+      624424,
+      729153,
+      833882,
+      0,
+      1043340,
+      1148069,
+      1252798,
+      1357527,
+      0,
+      1566985,
+      1671714,
+      96828,
+      201557,
+      0,
+      411015,
+      1676156,
+      620473,
+      725202,
+      0,
+      934660,
+      1039389,
+      1144118,
+      1248847,
+      0,
+      1458305
+     ],
+     "addon": "1"
+    },
+    "msg": "",
+    "parsed": "nil"
+   }
+  ],
+  "inventory": [
+   {
+    "input": {
+     "bucket": 37,
+     "digest": 1676156,
+     "page": 1,
+     "pages": 1,
+     "entries": [
+      {
+       "shortId": "frwo",
+       "v": "1gqwzvur"
+      },
+      {
+       "shortId": "ek9k",
+       "v": "1gr80lc3"
+      }
+     ]
+    },
+    "msg": "1I11zxbw11frwo1gqwzvurek9k1gr80lc3",
+    "parsed": "{bucket=n37;digest=n1676156;entries=[{shortId=s4:frwo;v=s8:1gqwzvur},{shortId=s4:ek9k;v=s8:1gr80lc3}];page=n1;pages=n1}"
+   },
+   {
+    "input": {
+     "bucket": 0,
+     "digest": 0,
+     "page": 1,
+     "pages": 1,
+     "entries": []
+    },
+    "msg": "1I00000011",
+    "parsed": "{bucket=n0;digest=n0;entries={};page=n1;pages=n1}"
+   },
+   {
+    "input": {
+     "bucket": 5,
+     "digest": 77,
+     "page": 2,
+     "pages": 3,
+     "entries": [
+      {
+       "shortId": "pvs1",
+       "v": "1gqx1j4m"
+      },
+      {
+       "shortId": "pvsy",
+       "v": "1gqx1j2u"
+      },
+      {
+       "shortId": "pvtv",
+       "v": "1gqx1j12"
+      },
+      {
+       "shortId": "pvus",
+       "v": "1gqx1iza"
+      },
+      {
+       "shortId": "pvvp",
+       "v": "1gqx1ixi"
+      },
+      {
+       "shortId": "pvwm",
+       "v": "1gqx1ivq"
+      },
+      {
+       "shortId": "pvxj",
+       "v": "1gqx1ity"
+      },
+      {
+       "shortId": "pvyg",
+       "v": "1gqx1is6"
+      },
+      {
+       "shortId": "pvzd",
+       "v": "1gqx1iqe"
+      },
+      {
+       "shortId": "pw0a",
+       "v": "1gqx1iom"
+      },
+      {
+       "shortId": "pwma",
+       "v": "1gqx1imu"
+      },
+      {
+       "shortId": "pwn7",
+       "v": "1gqx1il2"
+      },
+      {
+       "shortId": "pwo4",
+       "v": "1gqx1ija"
+      },
+      {
+       "shortId": "pwp1",
+       "v": "1gqx1ihi"
+      },
+      {
+       "shortId": "pwpy",
+       "v": "1gqx1ifq"
+      },
+      {
+       "shortId": "pwqv",
+       "v": "1gqx1idy"
+      },
+      {
+       "shortId": "pwrs",
+       "v": "1gqx1ic6"
+      },
+      {
+       "shortId": "pwsp",
+       "v": "1gqx1iae"
+      },
+      {
+       "shortId": "pwtm",
+       "v": "1gqx1i8m"
+      },
+      {
+       "shortId": "pwuj",
+       "v": "1gqx1i6u"
+      }
+     ]
+    },
+    "msg": "1I05002523pvs11gqx1j4mpvsy1gqx1j2upvtv1gqx1j12pvus1gqx1izapvvp1gqx1ixipvwm1gqx1ivqpvxj1gqx1itypvyg1gqx1is6pvzd1gqx1iqepw0a1gqx1iompwma1gqx1imupwn71gqx1il2pwo41gqx1ijapwp11gqx1ihipwpy1gqx1ifqpwqv1gqx1idypwrs1gqx1ic6pwsp1gqx1iaepwtm1gqx1i8mpwuj1gqx1i6u",
+    "parsed": "{bucket=n5;digest=n77;entries=[{shortId=s4:pvs1;v=s8:1gqx1j4m},{shortId=s4:pvsy;v=s8:1gqx1j2u},{shortId=s4:pvtv;v=s8:1gqx1j12},{shortId=s4:pvus;v=s8:1gqx1iza},{shortId=s4:pvvp;v=s8:1gqx1ixi},{shortId=s4:pvwm;v=s8:1gqx1ivq},{shortId=s4:pvxj;v=s8:1gqx1ity},{shortId=s4:pvyg;v=s8:1gqx1is6},{shortId=s4:pvzd;v=s8:1gqx1iqe},{shortId=s4:pw0a;v=s8:1gqx1iom},{shortId=s4:pwma;v=s8:1gqx1imu},{shortId=s4:pwn7;v=s8:1gqx1il2},{shortId=s4:pwo4;v=s8:1gqx1ija},{shortId=s4:pwp1;v=s8:1gqx1ihi},{shortId=s4:pwpy;v=s8:1gqx1ifq},{shortId=s4:pwqv;v=s8:1gqx1idy},{shortId=s4:pwrs;v=s8:1gqx1ic6},{shortId=s4:pwsp;v=s8:1gqx1iae},{shortId=s4:pwtm;v=s8:1gqx1i8m},{shortId=s4:pwuj;v=s8:1gqx1i6u}];page=n2;pages=n3}"
+   },
+   {
+    "input": {
+     "bucket": 48,
+     "digest": 1,
+     "page": 1,
+     "pages": 1,
+     "entries": []
+    },
+    "msg": "",
+    "parsed": "nil"
+   },
+   {
+    "input": {
+     "bucket": 1,
+     "digest": 1,
+     "page": 2,
+     "pages": 1,
+     "entries": []
+    },
+    "msg": "",
+    "parsed": "nil"
+   },
+   {
+    "input": {
+     "bucket": 1,
+     "digest": 1,
+     "page": 1,
+     "pages": 1,
+     "entries": [
+      {
+       "shortId": "pvs1",
+       "v": "1gqx1j4m"
+      },
+      {
+       "shortId": "pvsy",
+       "v": "1gqx1j2u"
+      },
+      {
+       "shortId": "pvtv",
+       "v": "1gqx1j12"
+      },
+      {
+       "shortId": "pvus",
+       "v": "1gqx1iza"
+      },
+      {
+       "shortId": "pvvp",
+       "v": "1gqx1ixi"
+      },
+      {
+       "shortId": "pvwm",
+       "v": "1gqx1ivq"
+      },
+      {
+       "shortId": "pvxj",
+       "v": "1gqx1ity"
+      },
+      {
+       "shortId": "pvyg",
+       "v": "1gqx1is6"
+      },
+      {
+       "shortId": "pvzd",
+       "v": "1gqx1iqe"
+      },
+      {
+       "shortId": "pw0a",
+       "v": "1gqx1iom"
+      },
+      {
+       "shortId": "pwma",
+       "v": "1gqx1imu"
+      },
+      {
+       "shortId": "pwn7",
+       "v": "1gqx1il2"
+      },
+      {
+       "shortId": "pwo4",
+       "v": "1gqx1ija"
+      },
+      {
+       "shortId": "pwp1",
+       "v": "1gqx1ihi"
+      },
+      {
+       "shortId": "pwpy",
+       "v": "1gqx1ifq"
+      },
+      {
+       "shortId": "pwqv",
+       "v": "1gqx1idy"
+      },
+      {
+       "shortId": "pwrs",
+       "v": "1gqx1ic6"
+      },
+      {
+       "shortId": "pwsp",
+       "v": "1gqx1iae"
+      },
+      {
+       "shortId": "pwtm",
+       "v": "1gqx1i8m"
+      },
+      {
+       "shortId": "pwuj",
+       "v": "1gqx1i6u"
+      },
+      {
+       "shortId": "pxgj",
+       "v": "1gqx1i52"
+      }
+     ]
+    },
+    "msg": "",
+    "parsed": "nil"
+   }
+  ],
+  "pages": [
+   {
+    "bucket": 3,
+    "digest": 12345,
+    "entries": [
+     {
+      "shortId": "pvs1",
+      "v": "1gqx1j4m"
+     },
+     {
+      "shortId": "pvsy",
+      "v": "1gqx1j2u"
+     },
+     {
+      "shortId": "pvtv",
+      "v": "1gqx1j12"
+     },
+     {
+      "shortId": "pvus",
+      "v": "1gqx1iza"
+     },
+     {
+      "shortId": "pvvp",
+      "v": "1gqx1ixi"
+     },
+     {
+      "shortId": "pvwm",
+      "v": "1gqx1ivq"
+     },
+     {
+      "shortId": "pvxj",
+      "v": "1gqx1ity"
+     },
+     {
+      "shortId": "pvyg",
+      "v": "1gqx1is6"
+     },
+     {
+      "shortId": "pvzd",
+      "v": "1gqx1iqe"
+     },
+     {
+      "shortId": "pw0a",
+      "v": "1gqx1iom"
+     },
+     {
+      "shortId": "pwma",
+      "v": "1gqx1imu"
+     },
+     {
+      "shortId": "pwn7",
+      "v": "1gqx1il2"
+     },
+     {
+      "shortId": "pwo4",
+      "v": "1gqx1ija"
+     },
+     {
+      "shortId": "pwp1",
+      "v": "1gqx1ihi"
+     },
+     {
+      "shortId": "pwpy",
+      "v": "1gqx1ifq"
+     },
+     {
+      "shortId": "pwqv",
+      "v": "1gqx1idy"
+     },
+     {
+      "shortId": "pwrs",
+      "v": "1gqx1ic6"
+     },
+     {
+      "shortId": "pwsp",
+      "v": "1gqx1iae"
+     },
+     {
+      "shortId": "pwtm",
+      "v": "1gqx1i8m"
+     },
+     {
+      "shortId": "pwuj",
+      "v": "1gqx1i6u"
+     },
+     {
+      "shortId": "pxgj",
+      "v": "1gqx1i52"
+     },
+     {
+      "shortId": "pxhg",
+      "v": "1gqx1i3a"
+     },
+     {
+      "shortId": "pxid",
+      "v": "1gqx1i1i"
+     },
+     {
+      "shortId": "pxja",
+      "v": "1gqx1hzq"
+     },
+     {
+      "shortId": "pxk7",
+      "v": "1gqx1hxy"
+     },
+     {
+      "shortId": "pxl4",
+      "v": "1gqx1hw6"
+     },
+     {
+      "shortId": "pxm1",
+      "v": "1gqx1hue"
+     },
+     {
+      "shortId": "pxmy",
+      "v": "1gqx1hsm"
+     },
+     {
+      "shortId": "pxnv",
+      "v": "1gqx1hqu"
+     },
+     {
+      "shortId": "pxos",
+      "v": "1gqx1hp2"
+     },
+     {
+      "shortId": "pyas",
+      "v": "1gqx1hna"
+     },
+     {
+      "shortId": "pybp",
+      "v": "1gqx1hli"
+     },
+     {
+      "shortId": "pycm",
+      "v": "1gqx1hjq"
+     },
+     {
+      "shortId": "pydj",
+      "v": "1gqx1hhy"
+     },
+     {
+      "shortId": "pyeg",
+      "v": "1gqx1hg6"
+     },
+     {
+      "shortId": "pyfd",
+      "v": "1gqx1hee"
+     },
+     {
+      "shortId": "pyga",
+      "v": "1gqx1hcm"
+     },
+     {
+      "shortId": "pyh7",
+      "v": "1gqx1hau"
+     },
+     {
+      "shortId": "pyi4",
+      "v": "1gqx1h92"
+     },
+     {
+      "shortId": "pyj1",
+      "v": "1gqx1h7a"
+     },
+     {
+      "shortId": "pz51",
+      "v": "1gqx1h5i"
+     },
+     {
+      "shortId": "pz5y",
+      "v": "1gqx1h3q"
+     },
+     {
+      "shortId": "pz6v",
+      "v": "1gqx1h1y"
+     },
+     {
+      "shortId": "pz7s",
+      "v": "1gqx1h06"
+     },
+     {
+      "shortId": "pz8p",
+      "v": "1gqx1gye"
+     }
+    ],
+    "msgs": "[s250:1I0309ix13pvs11gqx1j4mpvsy1gqx1j2upvtv1gqx1j12pvus1gqx1izapvvp1gqx1ixipvwm1gqx1ivqpvxj1gqx1itypvyg1gqx1is6pvzd1gqx1iqepw0a1gqx1iompwma1gqx1imupwn71gqx1il2pwo41gqx1ijapwp11gqx1ihipwpy1gqx1ifqpwqv1gqx1idypwrs1gqx1ic6pwsp1gqx1iaepwtm1gqx1i8mpwuj1gqx1i6u,s250:1I0309ix23pxgj1gqx1i52pxhg1gqx1i3apxid1gqx1i1ipxja1gqx1hzqpxk71gqx1hxypxl41gqx1hw6pxm11gqx1huepxmy1gqx1hsmpxnv1gqx1hqupxos1gqx1hp2pyas1gqx1hnapybp1gqx1hlipycm1gqx1hjqpydj1gqx1hhypyeg1gqx1hg6pyfd1gqx1heepyga1gqx1hcmpyh71gqx1haupyi41gqx1h92pyj11gqx1h7a,s70:1I0309ix33pz511gqx1h5ipz5y1gqx1h3qpz6v1gqx1h1ypz7s1gqx1h06pz8p1gqx1gye]"
+   },
+   {
+    "bucket": 40,
+    "digest": 0,
+    "entries": [],
+    "msgs": "[s10:1I14000011]"
+   },
+   {
+    "bucket": 9,
+    "digest": 5,
+    "entries": [
+     {
+      "shortId": "zzzz",
+      "v": "00000001"
+     },
+     {
+      "shortId": "aaaa",
+      "v": "00000002"
+     },
+     {
+      "shortId": "aaaa",
+      "v": "00000001"
+     },
+     {
+      "shortId": "bad",
+      "v": "x"
+     }
+    ],
+    "msgs": "[s46:1I09000511aaaa00000001aaaa00000002zzzz00000001]"
+   }
+  ],
+  "get": [
+   {
+    "target": "Grommash",
+    "ids": [
+     "frwo",
+     "ek9k"
+    ],
+    "msgs": "[s19:1GGrommash^frwoek9k]",
+    "parsed": [
+     {
+      "msg": "1GGrommash^frwoek9k",
+      "dump": "{shortIds=[s4:frwo,s4:ek9k];target=s8:Grommash}"
+     }
+    ]
+   },
+   {
+    "target": "Thrallia",
+    "ids": [
+     "pvs1",
+     "pvsy",
+     "pvtv",
+     "pvus",
+     "pvvp",
+     "pvwm",
+     "pvxj",
+     "pvyg",
+     "pvzd",
+     "pw0a",
+     "pwma",
+     "pwn7",
+     "pwo4",
+     "pwp1",
+     "pwpy",
+     "pwqv",
+     "pwrs",
+     "pwsp",
+     "pwtm",
+     "pwuj",
+     "pxgj",
+     "pxhg",
+     "pxid",
+     "pxja",
+     "pxk7",
+     "pxl4",
+     "pxm1",
+     "pxmy",
+     "pxnv",
+     "pxos",
+     "pyas",
+     "pybp",
+     "pycm",
+     "pydj",
+     "pyeg",
+     "pyfd",
+     "pyga",
+     "pyh7",
+     "pyi4",
+     "pyj1",
+     "pz51",
+     "pz5y",
+     "pz6v",
+     "pz7s",
+     "pz8p",
+     "pz9m",
+     "pzaj",
+     "pzbg",
+     "pzcd",
+     "pzda",
+     "pzza",
+     "q007",
+     "q014",
+     "q021",
+     "q02y",
+     "q03v",
+     "q04s",
+     "q05p",
+     "q06m",
+     "q07j",
+     "q0tj",
+     "q0ug",
+     "q0vd",
+     "q0wa",
+     "q0x7",
+     "q0y4",
+     "q0z1",
+     "q0zy",
+     "q10v",
+     "q11s"
+    ],
+    "msgs": "[s231:1GThrallia^pvs1pvsypvtvpvuspvvppvwmpvxjpvygpvzdpw0apwmapwn7pwo4pwp1pwpypwqvpwrspwsppwtmpwujpxgjpxhgpxidpxjapxk7pxl4pxm1pxmypxnvpxospyaspybppycmpydjpyegpyfdpygapyh7pyi4pyj1pz51pz5ypz6vpz7spz8ppz9mpzajpzbgpzcdpzdapzzaq007q014q021q02y,s71:1GThrallia^q03vq04sq05pq06mq07jq0tjq0ugq0vdq0waq0x7q0y4q0z1q0zyq10vq11s]",
+    "parsed": [
+     {
+      "msg": "1GThrallia^pvs1pvsypvtvpvuspvvppvwmpvxjpvygpvzdpw0apwmapwn7pwo4pwp1pwpypwqvpwrspwsppwtmpwujpxgjpxhgpxidpxjapxk7pxl4pxm1pxmypxnvpxospyaspybppycmpydjpyegpyfdpygapyh7pyi4pyj1pz51pz5ypz6vpz7spz8ppz9mpzajpzbgpzcdpzdapzzaq007q014q021q02y",
+      "dump": "{shortIds=[s4:pvs1,s4:pvsy,s4:pvtv,s4:pvus,s4:pvvp,s4:pvwm,s4:pvxj,s4:pvyg,s4:pvzd,s4:pw0a,s4:pwma,s4:pwn7,s4:pwo4,s4:pwp1,s4:pwpy,s4:pwqv,s4:pwrs,s4:pwsp,s4:pwtm,s4:pwuj,s4:pxgj,s4:pxhg,s4:pxid,s4:pxja,s4:pxk7,s4:pxl4,s4:pxm1,s4:pxmy,s4:pxnv,s4:pxos,s4:pyas,s4:pybp,s4:pycm,s4:pydj,s4:pyeg,s4:pyfd,s4:pyga,s4:pyh7,s4:pyi4,s4:pyj1,s4:pz51,s4:pz5y,s4:pz6v,s4:pz7s,s4:pz8p,s4:pz9m,s4:pzaj,s4:pzbg,s4:pzcd,s4:pzda,s4:pzza,s4:q007,s4:q014,s4:q021,s4:q02y];target=s8:Thrallia}"
+     },
+     {
+      "msg": "1GThrallia^q03vq04sq05pq06mq07jq0tjq0ugq0vdq0waq0x7q0y4q0z1q0zyq10vq11s",
+      "dump": "{shortIds=[s4:q03v,s4:q04s,s4:q05p,s4:q06m,s4:q07j,s4:q0tj,s4:q0ug,s4:q0vd,s4:q0wa,s4:q0x7,s4:q0y4,s4:q0z1,s4:q0zy,s4:q10v,s4:q11s];target=s8:Thrallia}"
+     }
+    ]
+   },
+   {
+    "target": "Averyveryverylongname-Argent Dawn",
+    "ids": [
+     "pvs1",
+     "pvsy",
+     "pvtv",
+     "pvus",
+     "pvvp",
+     "pvwm",
+     "pvxj",
+     "pvyg",
+     "pvzd",
+     "pw0a",
+     "pwma",
+     "pwn7",
+     "pwo4",
+     "pwp1",
+     "pwpy",
+     "pwqv",
+     "pwrs",
+     "pwsp",
+     "pwtm",
+     "pwuj",
+     "pxgj",
+     "pxhg",
+     "pxid",
+     "pxja",
+     "pxk7",
+     "pxl4",
+     "pxm1",
+     "pxmy",
+     "pxnv",
+     "pxos",
+     "pyas",
+     "pybp",
+     "pycm",
+     "pydj",
+     "pyeg",
+     "pyfd",
+     "pyga",
+     "pyh7",
+     "pyi4",
+     "pyj1",
+     "pz51",
+     "pz5y",
+     "pz6v",
+     "pz7s",
+     "pz8p",
+     "pz9m",
+     "pzaj",
+     "pzbg",
+     "pzcd",
+     "pzda",
+     "pzza",
+     "q007",
+     "q014",
+     "q021",
+     "q02y",
+     "q03v",
+     "q04s",
+     "q05p",
+     "q06m",
+     "q07j"
+    ],
+    "msgs": "{}",
+    "parsed": []
+   },
+   {
+    "target": "Bad^Name",
+    "ids": [
+     "frwo"
+    ],
+    "msgs": "{}",
+    "parsed": []
+   },
+   {
+    "target": "Grommash",
+    "ids": [
+     "bad",
+     "frwo"
+    ],
+    "msgs": "[s15:1GGrommash^frwo]",
+    "parsed": [
+     {
+      "msg": "1GGrommash^frwo",
+      "dump": "{shortIds=[s4:frwo];target=s8:Grommash}"
+     }
+    ]
+   }
+  ],
+  "pack": [
+   {
+    "records": [
+     "RD:k3f9a2^1gqwzvur^Grommash^^r^Molten Core Thursday^Molten Core^tobc40^50^14^2^Bring fire resist",
+     "RT:k3f9a2^wzltl343^Grommash^^d^tob9c0^r^4kq1zm^tobn80^Thrallia.p4m7,d72,eim;Zuljin.a8x2,eim^Varok.7tq3",
+     "ca:x8k2pq^1gqx36dy^Thrallia^^Thrallia^Crossroads^5^Alliance at the flight master"
+    ],
+    "msgs": "[s201:1RRD:k3f9a2^1gqwzvur^Grommash^^r^Molten Core Thursday^Molten Core^tobc40^50^14^2^Bring fire resist#RT:k3f9a2^wzltl343^Grommash^^d^tob9c0^r^4kq1zm^tobn80^Thrallia.p4m7,d72,eim;Zuljin.a8x2,eim^Varok.7tq3,s82:1Rca:x8k2pq^1gqx36dy^Thrallia^^Thrallia^Crossroads^5^Alliance at the flight master]",
+    "parsed": [
+     {
+      "msg": "1RRD:k3f9a2^1gqwzvur^Grommash^^r^Molten Core Thursday^Molten Core^tobc40^50^14^2^Bring fire resist#RT:k3f9a2^wzltl343^Grommash^^d^tob9c0^r^4kq1zm^tobn80^Thrallia.p4m7,d72,eim;Zuljin.a8x2,eim^Varok.7tq3",
+      "dump": "[s96:RD:k3f9a2^1gqwzvur^Grommash^^r^Molten Core Thursday^Molten Core^tobc40^50^14^2^Bring fire resist,s102:RT:k3f9a2^wzltl343^Grommash^^d^tob9c0^r^4kq1zm^tobn80^Thrallia.p4m7,d72,eim;Zuljin.a8x2,eim^Varok.7tq3]"
+     },
+     {
+      "msg": "1Rca:x8k2pq^1gqx36dy^Thrallia^^Thrallia^Crossroads^5^Alliance at the flight master",
+      "dump": "[s80:ca:x8k2pq^1gqx36dy^Thrallia^^Thrallia^Crossroads^5^Alliance at the flight master]"
+     }
+    ]
+   },
+   {
+    "records": [
+     "RD:k3f9a2^1gqwzvur^Grommash^^r^Molten Core Thursday^Molten Core^tobc40^50^14^2^Bring fire resist",
+     "RT:k3f9a2^wzltl343^Grommash^^d^tob9c0^r^4kq1zm^tobn80^Thrallia.p4m7,d72,eim;Zuljin.a8x2,eim^Varok.7tq3",
+     "ca:x8k2pq^1gqx36dy^Thrallia^^Thrallia^Crossroads^5^Alliance at the flight master",
+     "ch:Thrallia^1gqx1g5y^Thrallia^^Thrallia.p4m7^Calvin~231234^1^Thrallia;Zuljinne;Zulé^Shaman^Orc^1o^Horde^1q^2f^2,0,c,k,0^4k,8c,8c;56,7n,8c^7,ya^0.12.0",
+     "ch:Zuljinne^1gqx1g6s^Zuljinne^^Thrallia.p4m7^^^^^^c^^^^,,3",
+     "ch:Zulé^1gqx1g5o^Zulé^^Thrallia.p4m7^^^^Mage^^1o",
+     "ch:Thrallia^1gqx1g5y^Thrallia^^Thrallia.p4m7^^^Alt0;Alt1;Alt2;Alt3;Alt4;Alt5;Alt6;Alt7;Alt8;Alt9;Alt10;Alt11;Alt12;Alt13;Alt14;Alt15;Alt16;Alt17;Alt18;Alt19",
+     "rc:Thrallia:4k^1gqx1g5y^Thrallia^^s^6^Yp4111k4cn8",
+     "rc:Thrallia:4k^1gqx1g5y^Thrallia^^i^3^0YmTkbH",
+     "rc:Thrallia:5h^1gqx1g5y^Thrallia^^n^3^Linen Bandage;Heavy Silk~3B Bandage;Æther~2C cloth",
+     "rc:Thrallia:5h^1gqx1g5y^Thrallia^^s^0",
+     "su:k3f9a2:Thrallia.p4m7^1gqx1g5y^Thrallia^^Thrallia^h^y^late 10 min^d72;eim^to530o^d72^to50c0",
+     "su:k3f9a2:Thrallia.p4m7^1gqx2cra^Thrallia^^Thrallia^h^y^late 10 min^d72;eim^to53ko",
+     "su:k3f9a2:Zuljin.a8x2^1gqx1g69^Zuljin^^Zuljin^d^b",
+     "cr:r1r1r1^1gqx1g5y^Thrallia^^Thrallia.p4m7^Robe of the Archmage^I bring the mats^o",
+     "cr:r1r1r1^wzm58vpy^Thrallia^^Thrallia.p4m7^Robe of the Archmage^^x",
+     "cr:r1r1r1^wzm58vpy^Thrallia^^Thrallia.p4m7^Robe of the Archmage^^d",
+     "cl:r1r1r1:Zuljin.a8x2^1gqx1g69^Zuljin^^c^to532c",
+     "lp:Thrallia.p4m7:Zuljinne^1gqx1g6s^Zuljinne^^Zuljinne^o^Stranglethorn Vale^tonight 8pm^questing~3B anyone?",
+     "dc:h4nd1n^1gqx1g5y^Thrallia^^Thrallia.p4m7^dr1v3x^Thrallia^14^Linen",
+     "bq:b4nkrq^1gqx1g5y^Thrallia^^Thrallia.p4m7^Runecloth^k^for bandages^o",
+     "bq:b4nkrq^wzm58vpy^Thrallia^^Thrallia.p4m7^Runecloth^k^^x",
+     "gb:0^1gqx1g6s^Zuljinne^^to532c^21i3v9^Mats;Gear~3B misc;Ränge^to4xk0,deposit,Thrallia,1zx,k;to50c0,withdraw,Zulé,,,3uw",
+     "gb:3^1gqx1g6s^Zuljinne^^1zx,5k;3bm,14;0,5",
+     "bk:Bankalt^1gqx1g6a^Bankalt^^1zx,k^au7,2s;3ci,1o",
+     "sh:Thrallia.p4m7^1gqx1g5y^Thrallia^^Bolt of Silk Cloth,4,5h;Iron Bar,a,4k",
+     "pr:Thrallia.p4m7^1gqx1g5y^Thrallia^^g0t^1zx,46;au7,1uo",
+     "RD:pvp001^1gqx1g6g^Varok^^p^Warsong Friday^Warsong Gulch^toan40^3c^a^0",
+     "RT:k3f9a2^1gr80lc3^Grommash^^l^tob9c0",
+     "RT:k3f9a2^1gqx1hns^Varok^^o",
+     "RT:k3f9a2^wzm58vqg^Varok^^x",
+     "LA:aw4rd1^1gqx1g5f^Grommash^^k3f9a2^2dv8n1^d72^Cloak of the Shrouded Mists^Thrallia^Thrallia.p4m7^s^2f^k",
+     "LL:2dv8n1^1gqx1g5f^Grommash^^Molten Core^Lucifron;Magmadar;Gehennas^d72,1,Cloak of the Shrouded Mists;h0abcd,0,Trash~2C drop~3B any",
+     "LY:2dv8n1^1gqx1g5f^Grommash^^tmlj40^Thrallia.p4m7,d72,u;Zuljin.a8x2,eim,a",
+     "AN:q2w8zz^1gqx1g5f^Grommash^^Raid ~00~01~02~03~04~05~06~07~08~09~0A~0B~0C~0D~0E~0F~10~11~12~13~14~15~16~17~18~19~1A~1B~1C~1D~1E~1F~7F~7E~5E~3B~2C~23~7C done Zulé Ærøn 東京 😀",
+     "AN:q2w8zz^1gqx1hns^Varok^d",
+     "DR:dr1v3x^1gqx1g5f^Grommash^^Bandages for Naxx^Runecloth^1jk^Bank it with Bankalt^o",
+     "DR:dr1v3x^wzm58vpf^Grommash^^Bandages for Naxx^Runecloth^1jk^^c",
+     "BH:b4nkrq^1gqx1g6g^Varok^^s",
+     "BC:1^1gqx1g5f^Grommash^^Bankalt;Bänkalt",
+     "CFG:1^1gqx1g5f^Grommash^^1^-",
+     "CFG:1^1gqx1g5f^Grommash^^1^2",
+     "WH:1^1gqx1g6g^Varok^^https://discord.com/api/webhooks/123/abc_DEF-ghi",
+     "zz:any:thing^1gqx1g5y^Thrallia^^1^^x~2Cy",
+     "ZQ:1^1gqx1g6g^Varok^d",
+     "ca:old001^1gqn5z4m^Thrallia^^^Crossroads",
+     "ca:fut001^1gqx6gwm^Thrallia^^^Crossroads",
+     "gb:0^1gqx1g6s^Zuljinne^^0^zzzzzzzzzz",
+     "gb:0^1gqx1g6s^Zuljinne^^^^x"
+    ],
+    "msgs": "[s201:1RRD:k3f9a2^1gqwzvur^Grommash^^r^Molten Core Thursday^Molten Core^tobc40^50^14^2^Bring fire resist#RT:k3f9a2^wzltl343^Grommash^^d^tob9c0^r^4kq1zm^tobn80^Thrallia.p4m7,d72,eim;Zuljin.a8x2,eim^Varok.7tq3,s233:1Rca:x8k2pq^1gqx36dy^Thrallia^^Thrallia^Crossroads^5^Alliance at the flight master#ch:Thrallia^1gqx1g5y^Thrallia^^Thrallia.p4m7^Calvin~231234^1^Thrallia;Zuljinne;Zulé^Shaman^Orc^1o^Horde^1q^2f^2,0,c,k,0^4k,8c,8c;56,7n,8c^7,ya^0.12.0,s111:1Rch:Zuljinne^1gqx1g6s^Zuljinne^^Thrallia.p4m7^^^^^^c^^^^,,3#ch:Zulé^1gqx1g5o^Zulé^^Thrallia.p4m7^^^^Mage^^1o,s254:1Rch:Thrallia^1gqx1g5y^Thrallia^^Thrallia.p4m7^^^Alt0;Alt1;Alt2;Alt3;Alt4;Alt5;Alt6;Alt7;Alt8;Alt9;Alt10;Alt11;Alt12;Alt13;Alt14;Alt15;Alt16;Alt17;Alt18;Alt19#rc:Thrallia:4k^1gqx1g5y^Thrallia^^s^6^Yp4111k4cn8#rc:Thrallia:4k^1gqx1g5y^Thrallia^^i^3^0YmTkbH,s223:1Rrc:Thrallia:5h^1gqx1g5y^Thrallia^^n^3^Linen Bandage;Heavy Silk~3B Bandage;Æther~2C cloth#rc:Thrallia:5h^1gqx1g5y^Thrallia^^s^0#su:k3f9a2:Thrallia.p4m7^1gqx1g5y^Thrallia^^Thrallia^h^y^late 10 min^d72;eim^to530o^d72^to50c0,s217:1Rsu:k3f9a2:Thrallia.p4m7^1gqx2cra^Thrallia^^Thrallia^h^y^late 10 min^d72;eim^to53ko#su:k3f9a2:Zuljin.a8x2^1gqx1g69^Zuljin^^Zuljin^d^b#cr:r1r1r1^1gqx1g5y^Thrallia^^Thrallia.p4m7^Robe of the Archmage^I bring the mats^o,s183:1Rcr:r1r1r1^wzm58vpy^Thrallia^^Thrallia.p4m7^Robe of the Archmage^^x#cr:r1r1r1^wzm58vpy^Thrallia^^Thrallia.p4m7^Robe of the Archmage^^d#cl:r1r1r1:Zuljin.a8x2^1gqx1g69^Zuljin^^c^to532c,s246:1Rlp:Thrallia.p4m7:Zuljinne^1gqx1g6s^Zuljinne^^Zuljinne^o^Stranglethorn Vale^tonight 8pm^questing~3B anyone?#dc:h4nd1n^1gqx1g5y^Thrallia^^Thrallia.p4m7^dr1v3x^Thrallia^14^Linen#bq:b4nkrq^1gqx1g5y^Thrallia^^Thrallia.p4m7^Runecloth^k^for bandages^o,s222:1Rbq:b4nkrq^wzm58vpy^Thrallia^^Thrallia.p4m7^Runecloth^k^^x#gb:0^1gqx1g6s^Zuljinne^^to532c^21i3v9^Mats;Gear~3B misc;Ränge^to4xk0,deposit,Thrallia,1zx,k;to50c0,withdraw,Zulé,,,3uw#gb:3^1gqx1g6s^Zuljinne^^1zx,5k;3bm,14;0,5,s250:1Rbk:Bankalt^1gqx1g6a^Bankalt^^1zx,k^au7,2s;3ci,1o#sh:Thrallia.p4m7^1gqx1g5y^Thrallia^^Bolt of Silk Cloth,4,5h;Iron Bar,a,4k#pr:Thrallia.p4m7^1gqx1g5y^Thrallia^^g0t^1zx,46;au7,1uo#RD:pvp001^1gqx1g6g^Varok^^p^Warsong Friday^Warsong Gulch^toan40^3c^a^0,s200:1RRT:k3f9a2^1gr80lc3^Grommash^^l^tob9c0#RT:k3f9a2^1gqx1hns^Varok^^o#RT:k3f9a2^wzm58vqg^Varok^^x#LA:aw4rd1^1gqx1g5f^Grommash^^k3f9a2^2dv8n1^d72^Cloak of the Shrouded Mists^Thrallia^Thrallia.p4m7^s^2f^k,s207:1RLL:2dv8n1^1gqx1g5f^Grommash^^Molten Core^Lucifron;Magmadar;Gehennas^d72,1,Cloak of the Shrouded Mists;h0abcd,0,Trash~2C drop~3B any#LY:2dv8n1^1gqx1g5f^Grommash^^tmlj40^Thrallia.p4m7,d72,u;Zuljin.a8x2,eim,a,s210:1RAN:q2w8zz^1gqx1g5f^Grommash^^Raid ~00~01~02~03~04~05~06~07~08~09~0A~0B~0C~0D~0E~0F~10~11~12~13~14~15~16~17~18~19~1A~1B~1C~1D~1E~1F~7F~7E~5E~3B~2C~23~7C done Zulé Ærøn 東京 😀#AN:q2w8zz^1gqx1hns^Varok^d,s247:1RDR:dr1v3x^1gqx1g5f^Grommash^^Bandages for Naxx^Runecloth^1jk^Bank it with Bankalt^o#DR:dr1v3x^wzm58vpf^Grommash^^Bandages for Naxx^Runecloth^1jk^^c#BH:b4nkrq^1gqx1g6g^Varok^^s#BC:1^1gqx1g5f^Grommash^^Bankalt;Bänkalt#CFG:1^1gqx1g5f^Grommash^^1^-,s245:1RCFG:1^1gqx1g5f^Grommash^^1^2#WH:1^1gqx1g6g^Varok^^https://discord.com/api/webhooks/123/abc_DEF-ghi#zz:any:thing^1gqx1g5y^Thrallia^^1^^x~2Cy#ZQ:1^1gqx1g6g^Varok^d#ca:old001^1gqn5z4m^Thrallia^^^Crossroads#ca:fut001^1gqx6gwm^Thrallia^^^Crossroads,s66:1Rgb:0^1gqx1g6s^Zuljinne^^0^zzzzzzzzzz#gb:0^1gqx1g6s^Zuljinne^^^^x]",
+    "parsed": [
+     {
+      "msg": "1RRD:k3f9a2^1gqwzvur^Grommash^^r^Molten Core Thursday^Molten Core^tobc40^50^14^2^Bring fire resist#RT:k3f9a2^wzltl343^Grommash^^d^tob9c0^r^4kq1zm^tobn80^Thrallia.p4m7,d72,eim;Zuljin.a8x2,eim^Varok.7tq3",
+      "dump": "[s96:RD:k3f9a2^1gqwzvur^Grommash^^r^Molten Core Thursday^Molten Core^tobc40^50^14^2^Bring fire resist,s102:RT:k3f9a2^wzltl343^Grommash^^d^tob9c0^r^4kq1zm^tobn80^Thrallia.p4m7,d72,eim;Zuljin.a8x2,eim^Varok.7tq3]"
+     },
+     {
+      "msg": "1Rca:x8k2pq^1gqx36dy^Thrallia^^Thrallia^Crossroads^5^Alliance at the flight master#ch:Thrallia^1gqx1g5y^Thrallia^^Thrallia.p4m7^Calvin~231234^1^Thrallia;Zuljinne;Zulé^Shaman^Orc^1o^Horde^1q^2f^2,0,c,k,0^4k,8c,8c;56,7n,8c^7,ya^0.12.0",
+      "dump": "[s80:ca:x8k2pq^1gqx36dy^Thrallia^^Thrallia^Crossroads^5^Alliance at the flight master,s150:ch:Thrallia^1gqx1g5y^Thrallia^^Thrallia.p4m7^Calvin~231234^1^Thrallia;Zuljinne;Zulé^Shaman^Orc^1o^Horde^1q^2f^2,0,c,k,0^4k,8c,8c;56,7n,8c^7,ya^0.12.0]"
+     },
+     {
+      "msg": "1Rch:Zuljinne^1gqx1g6s^Zuljinne^^Thrallia.p4m7^^^^^^c^^^^,,3#ch:Zulé^1gqx1g5o^Zulé^^Thrallia.p4m7^^^^Mage^^1o",
+      "dump": "[s58:ch:Zuljinne^1gqx1g6s^Zuljinne^^Thrallia.p4m7^^^^^^c^^^^,,3,s50:ch:Zulé^1gqx1g5o^Zulé^^Thrallia.p4m7^^^^Mage^^1o]"
+     },
+     {
+      "msg": "1Rch:Thrallia^1gqx1g5y^Thrallia^^Thrallia.p4m7^^^Alt0;Alt1;Alt2;Alt3;Alt4;Alt5;Alt6;Alt7;Alt8;Alt9;Alt10;Alt11;Alt12;Alt13;Alt14;Alt15;Alt16;Alt17;Alt18;Alt19#rc:Thrallia:4k^1gqx1g5y^Thrallia^^s^6^Yp4111k4cn8#rc:Thrallia:4k^1gqx1g5y^Thrallia^^i^3^0YmTkbH",
+      "dump": "[s156:ch:Thrallia^1gqx1g5y^Thrallia^^Thrallia.p4m7^^^Alt0;Alt1;Alt2;Alt3;Alt4;Alt5;Alt6;Alt7;Alt8;Alt9;Alt10;Alt11;Alt12;Alt13;Alt14;Alt15;Alt16;Alt17;Alt18;Alt19,s49:rc:Thrallia:4k^1gqx1g5y^Thrallia^^s^6^Yp4111k4cn8,s45:rc:Thrallia:4k^1gqx1g5y^Thrallia^^i^3^0YmTkbH]"
+     },
+     {
+      "msg": "1Rrc:Thrallia:5h^1gqx1g5y^Thrallia^^n^3^Linen Bandage;Heavy Silk~3B Bandage;Æther~2C cloth#rc:Thrallia:5h^1gqx1g5y^Thrallia^^s^0#su:k3f9a2:Thrallia.p4m7^1gqx1g5y^Thrallia^^Thrallia^h^y^late 10 min^d72;eim^to530o^d72^to50c0",
+      "dump": "[s89:rc:Thrallia:5h^1gqx1g5y^Thrallia^^n^3^Linen Bandage;Heavy Silk~3B Bandage;Æther~2C cloth,s37:rc:Thrallia:5h^1gqx1g5y^Thrallia^^s^0,s93:su:k3f9a2:Thrallia.p4m7^1gqx1g5y^Thrallia^^Thrallia^h^y^late 10 min^d72;eim^to530o^d72^to50c0]"
+     },
+     {
+      "msg": "1Rsu:k3f9a2:Thrallia.p4m7^1gqx2cra^Thrallia^^Thrallia^h^y^late 10 min^d72;eim^to53ko#su:k3f9a2:Zuljin.a8x2^1gqx1g69^Zuljin^^Zuljin^d^b#cr:r1r1r1^1gqx1g5y^Thrallia^^Thrallia.p4m7^Robe of the Archmage^I bring the mats^o",
+      "dump": "[s82:su:k3f9a2:Thrallia.p4m7^1gqx2cra^Thrallia^^Thrallia^h^y^late 10 min^d72;eim^to53ko,s49:su:k3f9a2:Zuljin.a8x2^1gqx1g69^Zuljin^^Zuljin^d^b,s82:cr:r1r1r1^1gqx1g5y^Thrallia^^Thrallia.p4m7^Robe of the Archmage^I bring the mats^o]"
+     },
+     {
+      "msg": "1Rcr:r1r1r1^wzm58vpy^Thrallia^^Thrallia.p4m7^Robe of the Archmage^^x#cr:r1r1r1^wzm58vpy^Thrallia^^Thrallia.p4m7^Robe of the Archmage^^d#cl:r1r1r1:Zuljin.a8x2^1gqx1g69^Zuljin^^c^to532c",
+      "dump": "[s66:cr:r1r1r1^wzm58vpy^Thrallia^^Thrallia.p4m7^Robe of the Archmage^^x,s66:cr:r1r1r1^wzm58vpy^Thrallia^^Thrallia.p4m7^Robe of the Archmage^^d,s47:cl:r1r1r1:Zuljin.a8x2^1gqx1g69^Zuljin^^c^to532c]"
+     },
+     {
+      "msg": "1Rlp:Thrallia.p4m7:Zuljinne^1gqx1g6s^Zuljinne^^Zuljinne^o^Stranglethorn Vale^tonight 8pm^questing~3B anyone?#dc:h4nd1n^1gqx1g5y^Thrallia^^Thrallia.p4m7^dr1v3x^Thrallia^14^Linen#bq:b4nkrq^1gqx1g5y^Thrallia^^Thrallia.p4m7^Runecloth^k^for bandages^o",
+      "dump": "[s106:lp:Thrallia.p4m7:Zuljinne^1gqx1g6s^Zuljinne^^Zuljinne^o^Stranglethorn Vale^tonight 8pm^questing~3B anyone?,s67:dc:h4nd1n^1gqx1g5y^Thrallia^^Thrallia.p4m7^dr1v3x^Thrallia^14^Linen,s69:bq:b4nkrq^1gqx1g5y^Thrallia^^Thrallia.p4m7^Runecloth^k^for bandages^o]"
+     },
+     {
+      "msg": "1Rbq:b4nkrq^wzm58vpy^Thrallia^^Thrallia.p4m7^Runecloth^k^^x#gb:0^1gqx1g6s^Zuljinne^^to532c^21i3v9^Mats;Gear~3B misc;Ränge^to4xk0,deposit,Thrallia,1zx,k;to50c0,withdraw,Zulé,,,3uw#gb:3^1gqx1g6s^Zuljinne^^1zx,5k;3bm,14;0,5",
+      "dump": "[s57:bq:b4nkrq^wzm58vpy^Thrallia^^Thrallia.p4m7^Runecloth^k^^x,s120:gb:0^1gqx1g6s^Zuljinne^^to532c^21i3v9^Mats;Gear~3B misc;Ränge^to4xk0,deposit,Thrallia,1zx,k;to50c0,withdraw,Zulé,,,3uw,s41:gb:3^1gqx1g6s^Zuljinne^^1zx,5k;3bm,14;0,5]"
+     },
+     {
+      "msg": "1Rbk:Bankalt^1gqx1g6a^Bankalt^^1zx,k^au7,2s;3ci,1o#sh:Thrallia.p4m7^1gqx1g5y^Thrallia^^Bolt of Silk Cloth,4,5h;Iron Bar,a,4k#pr:Thrallia.p4m7^1gqx1g5y^Thrallia^^g0t^1zx,46;au7,1uo#RD:pvp001^1gqx1g6g^Varok^^p^Warsong Friday^Warsong Gulch^toan40^3c^a^0",
+      "dump": "[s48:bk:Bankalt^1gqx1g6a^Bankalt^^1zx,k^au7,2s;3ci,1o,s73:sh:Thrallia.p4m7^1gqx1g5y^Thrallia^^Bolt of Silk Cloth,4,5h;Iron Bar,a,4k,s54:pr:Thrallia.p4m7^1gqx1g5y^Thrallia^^g0t^1zx,46;au7,1uo,s70:RD:pvp001^1gqx1g6g^Varok^^p^Warsong Friday^Warsong Gulch^toan40^3c^a^0]"
+     },
+     {
+      "msg": "1RRT:k3f9a2^1gr80lc3^Grommash^^l^tob9c0#RT:k3f9a2^1gqx1hns^Varok^^o#RT:k3f9a2^wzm58vqg^Varok^^x#LA:aw4rd1^1gqx1g5f^Grommash^^k3f9a2^2dv8n1^d72^Cloak of the Shrouded Mists^Thrallia^Thrallia.p4m7^s^2f^k",
+      "dump": "[s37:RT:k3f9a2^1gr80lc3^Grommash^^l^tob9c0,s27:RT:k3f9a2^1gqx1hns^Varok^^o,s27:RT:k3f9a2^wzm58vqg^Varok^^x,s104:LA:aw4rd1^1gqx1g5f^Grommash^^k3f9a2^2dv8n1^d72^Cloak of the Shrouded Mists^Thrallia^Thrallia.p4m7^s^2f^k]"
+     },
+     {
+      "msg": "1RLL:2dv8n1^1gqx1g5f^Grommash^^Molten Core^Lucifron;Magmadar;Gehennas^d72,1,Cloak of the Shrouded Mists;h0abcd,0,Trash~2C drop~3B any#LY:2dv8n1^1gqx1g5f^Grommash^^tmlj40^Thrallia.p4m7,d72,u;Zuljin.a8x2,eim,a",
+      "dump": "[s131:LL:2dv8n1^1gqx1g5f^Grommash^^Molten Core^Lucifron;Magmadar;Gehennas^d72,1,Cloak of the Shrouded Mists;h0abcd,0,Trash~2C drop~3B any,s73:LY:2dv8n1^1gqx1g5f^Grommash^^tmlj40^Thrallia.p4m7,d72,u;Zuljin.a8x2,eim,a]"
+     },
+     {
+      "msg": "1RAN:q2w8zz^1gqx1g5f^Grommash^^Raid ~00~01~02~03~04~05~06~07~08~09~0A~0B~0C~0D~0E~0F~10~11~12~13~14~15~16~17~18~19~1A~1B~1C~1D~1E~1F~7F~7E~5E~3B~2C~23~7C done Zulé Ærøn 東京 😀#AN:q2w8zz^1gqx1hns^Varok^d",
+      "dump": "[s181:AN:q2w8zz^1gqx1g5f^Grommash^^Raid ~00~01~02~03~04~05~06~07~08~09~0A~0B~0C~0D~0E~0F~10~11~12~13~14~15~16~17~18~19~1A~1B~1C~1D~1E~1F~7F~7E~5E~3B~2C~23~7C done Zulé Ærøn 東京 😀,s26:AN:q2w8zz^1gqx1hns^Varok^d]"
+     },
+     {
+      "msg": "1RDR:dr1v3x^1gqx1g5f^Grommash^^Bandages for Naxx^Runecloth^1jk^Bank it with Bankalt^o#DR:dr1v3x^wzm58vpf^Grommash^^Bandages for Naxx^Runecloth^1jk^^c#BH:b4nkrq^1gqx1g6g^Varok^^s#BC:1^1gqx1g5f^Grommash^^Bankalt;Bänkalt#CFG:1^1gqx1g5f^Grommash^^1^-",
+      "dump": "[s83:DR:dr1v3x^1gqx1g5f^Grommash^^Bandages for Naxx^Runecloth^1jk^Bank it with Bankalt^o,s63:DR:dr1v3x^wzm58vpf^Grommash^^Bandages for Naxx^Runecloth^1jk^^c,s27:BH:b4nkrq^1gqx1g6g^Varok^^s,s40:BC:1^1gqx1g5f^Grommash^^Bankalt;Bänkalt,s28:CFG:1^1gqx1g5f^Grommash^^1^-]"
+     },
+     {
+      "msg": "1RCFG:1^1gqx1g5f^Grommash^^1^2#WH:1^1gqx1g6g^Varok^^https://discord.com/api/webhooks/123/abc_DEF-ghi#zz:any:thing^1gqx1g5y^Thrallia^^1^^x~2Cy#ZQ:1^1gqx1g6g^Varok^d#ca:old001^1gqn5z4m^Thrallia^^^Crossroads#ca:fut001^1gqx6gwm^Thrallia^^^Crossroads",
+      "dump": "[s28:CFG:1^1gqx1g5f^Grommash^^1^2,s69:WH:1^1gqx1g6g^Varok^^https://discord.com/api/webhooks/123/abc_DEF-ghi,s40:zz:any:thing^1gqx1g5y^Thrallia^^1^^x~2Cy,s21:ZQ:1^1gqx1g6g^Varok^d,s40:ca:old001^1gqn5z4m^Thrallia^^^Crossroads,s40:ca:fut001^1gqx6gwm^Thrallia^^^Crossroads]"
+     },
+     {
+      "msg": "1Rgb:0^1gqx1g6s^Zuljinne^^0^zzzzzzzzzz#gb:0^1gqx1g6s^Zuljinne^^^^x",
+      "dump": "[s36:gb:0^1gqx1g6s^Zuljinne^^0^zzzzzzzzzz,s27:gb:0^1gqx1g6s^Zuljinne^^^^x]"
+     }
+    ]
+   },
+   {
+    "records": [
+     "AN:q2w8zz^1gqx1g5f^Grommash^^aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "RD:k3f9a2^1gqwzvur^Grommash^^r^Molten Core Thursday^Molten Core^tobc40^50^14^2^Bring fire resist"
+    ],
+    "msgs": "[s98:1RRD:k3f9a2^1gqwzvur^Grommash^^r^Molten Core Thursday^Molten Core^tobc40^50^14^2^Bring fire resist]",
+    "parsed": [
+     {
+      "msg": "1RRD:k3f9a2^1gqwzvur^Grommash^^r^Molten Core Thursday^Molten Core^tobc40^50^14^2^Bring fire resist",
+      "dump": "[s96:RD:k3f9a2^1gqwzvur^Grommash^^r^Molten Core Thursday^Molten Core^tobc40^50^14^2^Bring fire resist]"
+     }
+    ]
+   },
+   {
+    "records": [],
+    "msgs": "{}",
+    "parsed": []
+   }
+  ],
+  "split": [
+   {
+    "record": "AN:q2w8zz^1gqx1g5f^Grommash^^aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "mid": 0,
+    "msgs": "[s255:1M0013AN:q2w8zz^1gqx1g5f^Grommash^^aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,s255:1M0023aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,s36:1M0033aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa]",
+    "parsed": [
+     "{data=s249:AN:q2w8zz^1gqx1g5f^Grommash^^aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa;mid=n0;part=n1;parts=n3}",
+     "{data=s249:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa;mid=n0;part=n2;parts=n3}",
+     "{data=s30:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa;mid=n0;part=n3;parts=n3}"
+    ]
+   },
+   {
+    "record": "ca:big002^1gqx1g5o^Zulé^^Zulé^ÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜ^1^東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東",
+    "mid": 1295,
+    "msgs": "[s254:1Mzz12ca:big002^1gqx1g5o^Zulé^^Zulé^ÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜ^1^東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東,s51:1Mzz22東東東東東東東東東東東東東東東]",
+    "parsed": [
+     "{data=s248:ca:big002^1gqx1g5o^Zulé^^Zulé^ÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜÜ^1^東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東東;mid=n1295;part=n1;parts=n2}",
+     "{data=s45:東東東東東東東東東東東東東東東;mid=n1295;part=n2;parts=n2}"
+    ]
+   },
+   {
+    "record": "LL:2dv8n1^1gqx1g5f^Grommash^^Molten Core^Lucifron;Magmadar;Gehennas;Garr;Shazzrah;Baron Geddon;Golemagg;Sulfuron;Majordomo;Ragnaros^cyo,1,Item 0 of the Molten Ćore;cyp,2,Item 1 of the Molten Ćore;cyq,3,Item 2 of the Molten Ćore;cyr,4,Item 3 of the Molten Ćore;cys,5,Item 4 of the Molten Ćore;cyt,6,Item 5 of the Molten Ćore;cyu,7,Item 6 of the Molten Ćore;cyv,8,Item 7 of the Molten Ćore;cyw,9,Item 8 of the Molten Ćore;cyx,a,Item 9 of the Molten Ćore;cyy,1,Item 10 of the Molten Ćore;cyz,2,Item 11 of the Molten Ćore;cz0,3,Item 12 of the Molten Ćore;cz1,4,Item 13 of the Molten Ćore;cz2,5,Item 14 of the Molten Ćore;cz3,6,Item 15 of the Molten Ćore;cz4,7,Item 16 of the Molten Ćore;cz5,8,Item 17 of the Molten Ćore;cz6,9,Item 18 of the Molten Ćore;cz7,a,Item 19 of the Molten Ćore;cz8,1,Item 20 of the Molten Ćore;cz9,2,Item 21 of the Molten Ćore;cza,3,Item 22 of the Molten Ćore;czb,4,Item 23 of the Molten Ćore;czc,5,Item 24 of the Molten Ćore;czd,6,Item 25 of the Molten Ćore;cze,7,Item 26 of the Molten Ćore;czf,8,Item 27 of the Molten Ćore;czg,9,Item 28 of the Molten Ćore;czh,a,Item 29 of the Molten Ćore;czi,1,Item 30 of the Molten Ćore;czj,2,Item 31 of the Molten Ćore;czk,3,Item 32 of the Molten Ćore;czl,4,Item 33 of the Molten Ćore;czm,5,Item 34 of the Molten Ćore;czn,6,Item 35 of the Molten Ćore;czo,7,Item 36 of the Molten Ćore;czp,8,Item 37 of the Molten Ćore;czq,9,Item 38 of the Molten Ćore;czr,a,Item 39 of the Molten Ćore;czs,1,Item 40 of the Molten Ćore;czt,2,Item 41 of the Molten Ćore;czu,3,Item 42 of the Molten Ćore;czv,4,Item 43 of the Molten Ćore;czw,5,Item 44 of the Molten Ćore;czx,6,Item 45 of the Molten Ćore;czy,7,Item 46 of the Molten Ćore;czz,8,Item 47 of the Molten Ćore;d00,9,Item 48 of the Molten Ćore;d01,a,Item 49 of the Molten Ćore;d02,1,Item 50 of the Molten Ćore;d03,2,Item 51 of the Molten Ćore;d04,3,Item 52 of the Molten Ćore;d05,4,Item 53 of the Molten Ćore;d06,5,Item 54 of the Molten Ćore;d07,6,Item 55 of the Molten Ćore;d08,7,Item 56 of the Molten Ćore;d09,8,Item 57 of the Molten Ćore;d0a,9,Item 58 of the Molten Ćore;d0b,a,Item 59 of the Molten Ćore;d0c,1,Item 60 of the Molten Ćore;d0d,2,Item 61 of the Molten Ćore;d0e,3,Item 62 of the Molten Ćore;d0f,4,Item 63 of the Molten Ćore;d0g,5,Item 64 of the Molten Ćore;d0h,6,Item 65 of the Molten Ćore;d0i,7,Item 66 of the Molten Ćore;d0j,8,Item 67 of the Molten Ćore;d0k,9,Item 68 of the Molten Ćore;d0l,a,Item 69 of the Molten Ćore;d0m,1,Item 70 of the Molten Ćore;d0n,2,Item 71 of the Molten Ćore;d0o,3,Item 72 of the Molten Ćore;d0p,4,Item 73 of the Molten Ćore;d0q,5,Item 74 of the Molten Ćore;d0r,6,Item 75 of the Molten Ćore;d0s,7,Item 76 of the Molten Ćore;d0t,8,Item 77 of the Molten Ćore;d0u,9,Item 78 of the Molten Ćore;d0v,a,Item 79 of the Molten Ćore;d0w,1,Item 80 of the Molten Ćore;d0x,2,Item 81 of the Molten Ćore;d0y,3,Item 82 of the Molten Ćore;d0z,4,Item 83 of the Molten Ćore;d10,5,Item 84 of the Molten Ćore;d11,6,Item 85 of the Molten Ćore;d12,7,Item 86 of the Molten Ćore;d13,8,Item 87 of the Molten Ćore;d14,9,Item 88 of the Molten Ćore;d15,a,Item 89 of the Molten Ćore;d16,1,Item 90 of the Molten Ćore;d17,2,Item 91 of the Molten Ćore;d18,3,Item 92 of the Molten Ćore;d19,4,Item 93 of the Molten Ćore;d1a,5,Item 94 of the Molten Ćore;d1b,6,Item 95 of the Molten Ćore;d1c,7,Item 96 of the Molten Ćore;d1d,8,Item 97 of the Molten Ćore;d1e,9,Item 98 of the Molten Ćore;d1f,a,Item 99 of the Molten Ćore;d1g,1,Item 100 of the Molten Ćore;d1h,2,Item 101 of the Molten Ćore;d1i,3,Item 102 of the Molten Ćore;d1j,4,Item 103 of the Molten Ćore;d1k,5,Item 104 of the Molten Ćore;d1l,6,Item 105 of the Molten Ćore;d1m,7,Item 106 of the Molten Ćore;d1n,8,Item 107 of the Molten Ćore;d1o,9,Item 108 of the Molten Ćore;d1p,a,Item 109 of the Molten Ćore;d1q,1,Item 110 of the Molten Ćore;d1r,2,Item 111 of the Molten Ćore;d1s,3,Item 112 of the Molten Ćore;d1t,4,Item 113 of the Molten Ćore;d1u,5,Item 114 of the Molten Ćore;d1v,6,Item 115 of the Molten Ćore;d1w,7,Item 116 of the Molten Ćore;d1x,8,Item 117 of the Molten Ćore;d1y,9,Item 118 of the Molten Ćore;d1z,a,Item 119 of the Molten Ćore;d20,1,Item 120 of the Molten Ćore;d21,2,Item 121 of the Molten Ćore;d22,3,Item 122 of the Molten Ćore;d23,4,Item 123 of the Molten Ćore;d24,5,Item 124 of the Molten Ćore;d25,6,Item 125 of the Molten Ćore;d26,7,Item 126 of the Molten Ćore;d27,8,Item 127 of the Molten Ćore;d28,9,Item 128 of the Molten Ćore;d29,a,Item 129 of the Molten Ćore;d2a,1,Item 130 of the Molten Ćore;d2b,2,Item 131 of the Molten Ćore;d2c,3,Item 132 of the Molten Ćore;d2d,4,Item 133 of the Molten Ćore;d2e,5,Item 134 of the Molten Ćore;d2f,6,Item 135 of the Molten Ćore;d2g,7,Item 136 of the Molten Ćore;d2h,8,Item 137 of the Molten Ćore;d2i,9,Item 138 of the Molten Ćore;d2j,a,Item 139 of the Molten Ćore;d2k,1,Item 140 of the Molten Ćore;d2l,2,Item 141 of the Molten Ćore;d2m,3,Item 142 of the Molten Ćore;d2n,4,Item 143 of the Molten Ćore;d2o,5,Item 144 of the Molten Ćore;d2p,6,Item 145 of the Molten Ćore;d2q,7,Item 146 of the Molten Ćore;d2r,8,Item 147 of the Molten Ćore;d2s,9,Item 148 of the Molten Ćore;d2t,a,Item 149 of the Molten Ćore",
+    "mid": 1307,
+    "msgs": "[s255:1M0b1mLL:2dv8n1^1gqx1g5f^Grommash^^Molten Core^Lucifron;Magmadar;Gehennas;Garr;Shazzrah;Baron Geddon;Golemagg;Sulfuron;Majordomo;Ragnaros^cyo,1,Item 0 of the Molten Ćore;cyp,2,Item 1 of the Molten Ćore;cyq,3,Item 2 of the Molten Ćore;cyr,4,Item 3 of th,s255:1M0b2me Molten Ćore;cys,5,Item 4 of the Molten Ćore;cyt,6,Item 5 of the Molten Ćore;cyu,7,Item 6 of the Molten Ćore;cyv,8,Item 7 of the Molten Ćore;cyw,9,Item 8 of the Molten Ćore;cyx,a,Item 9 of the Molten Ćore;cyy,1,Item 10 of the Molten Ćore;cy,s255:1M0b3mz,2,Item 11 of the Molten Ćore;cz0,3,Item 12 of the Molten Ćore;cz1,4,Item 13 of the Molten Ćore;cz2,5,Item 14 of the Molten Ćore;cz3,6,Item 15 of the Molten Ćore;cz4,7,Item 16 of the Molten Ćore;cz5,8,Item 17 of the Molten Ćore;cz6,9,Item 18,s255:1M0b4m of the Molten Ćore;cz7,a,Item 19 of the Molten Ćore;cz8,1,Item 20 of the Molten Ćore;cz9,2,Item 21 of the Molten Ćore;cza,3,Item 22 of the Molten Ćore;czb,4,Item 23 of the Molten Ćore;czc,5,Item 24 of the Molten Ćore;czd,6,Item 25 of the Mol,s255:1M0b5mten Ćore;cze,7,Item 26 of the Molten Ćore;czf,8,Item 27 of the Molten Ćore;czg,9,Item 28 of the Molten Ćore;czh,a,Item 29 of the Molten Ćore;czi,1,Item 30 of the Molten Ćore;czj,2,Item 31 of the Molten Ćore;czk,3,Item 32 of the Molten Ćore;c,s255:1M0b6mzl,4,Item 33 of the Molten Ćore;czm,5,Item 34 of the Molten Ćore;czn,6,Item 35 of the Molten Ćore;czo,7,Item 36 of the Molten Ćore;czp,8,Item 37 of the Molten Ćore;czq,9,Item 38 of the Molten Ćore;czr,a,Item 39 of the Molten Ćore;czs,1,Item 4,s255:1M0b7m0 of the Molten Ćore;czt,2,Item 41 of the Molten Ćore;czu,3,Item 42 of the Molten Ćore;czv,4,Item 43 of the Molten Ćore;czw,5,Item 44 of the Molten Ćore;czx,6,Item 45 of the Molten Ćore;czy,7,Item 46 of the Molten Ćore;czz,8,Item 47 of the Mo,s255:1M0b8mlten Ćore;d00,9,Item 48 of the Molten Ćore;d01,a,Item 49 of the Molten Ćore;d02,1,Item 50 of the Molten Ćore;d03,2,Item 51 of the Molten Ćore;d04,3,Item 52 of the Molten Ćore;d05,4,Item 53 of the Molten Ćore;d06,5,Item 54 of the Molten Ćore;,s255:1M0b9md07,6,Item 55 of the Molten Ćore;d08,7,Item 56 of the Molten Ćore;d09,8,Item 57 of the Molten Ćore;d0a,9,Item 58 of the Molten Ćore;d0b,a,Item 59 of the Molten Ćore;d0c,1,Item 60 of the Molten Ćore;d0d,2,Item 61 of the Molten Ćore;d0e,3,Item ,s255:1M0bam62 of the Molten Ćore;d0f,4,Item 63 of the Molten Ćore;d0g,5,Item 64 of the Molten Ćore;d0h,6,Item 65 of the Molten Ćore;d0i,7,Item 66 of the Molten Ćore;d0j,8,Item 67 of the Molten Ćore;d0k,9,Item 68 of the Molten Ćore;d0l,a,Item 69 of the M,s255:1M0bbmolten Ćore;d0m,1,Item 70 of the Molten Ćore;d0n,2,Item 71 of the Molten Ćore;d0o,3,Item 72 of the Molten Ćore;d0p,4,Item 73 of the Molten Ćore;d0q,5,Item 74 of the Molten Ćore;d0r,6,Item 75 of the Molten Ćore;d0s,7,Item 76 of the Molten Ćore,s255:1M0bcm;d0t,8,Item 77 of the Molten Ćore;d0u,9,Item 78 of the Molten Ćore;d0v,a,Item 79 of the Molten Ćore;d0w,1,Item 80 of the Molten Ćore;d0x,2,Item 81 of the Molten Ćore;d0y,3,Item 82 of the Molten Ćore;d0z,4,Item 83 of the Molten Ćore;d10,5,Item,s255:1M0bdm 84 of the Molten Ćore;d11,6,Item 85 of the Molten Ćore;d12,7,Item 86 of the Molten Ćore;d13,8,Item 87 of the Molten Ćore;d14,9,Item 88 of the Molten Ćore;d15,a,Item 89 of the Molten Ćore;d16,1,Item 90 of the Molten Ćore;d17,2,Item 91 of the ,s255:1M0bemMolten Ćore;d18,3,Item 92 of the Molten Ćore;d19,4,Item 93 of the Molten Ćore;d1a,5,Item 94 of the Molten Ćore;d1b,6,Item 95 of the Molten Ćore;d1c,7,Item 96 of the Molten Ćore;d1d,8,Item 97 of the Molten Ćore;d1e,9,Item 98 of the Molten Ćor,s255:1M0bfme;d1f,a,Item 99 of the Molten Ćore;d1g,1,Item 100 of the Molten Ćore;d1h,2,Item 101 of the Molten Ćore;d1i,3,Item 102 of the Molten Ćore;d1j,4,Item 103 of the Molten Ćore;d1k,5,Item 104 of the Molten Ćore;d1l,6,Item 105 of the Molten Ćore;d1m,s255:1M0bgm,7,Item 106 of the Molten Ćore;d1n,8,Item 107 of the Molten Ćore;d1o,9,Item 108 of the Molten Ćore;d1p,a,Item 109 of the Molten Ćore;d1q,1,Item 110 of the Molten Ćore;d1r,2,Item 111 of the Molten Ćore;d1s,3,Item 112 of the Molten Ćore;d1t,4,I,s255:1M0bhmtem 113 of the Molten Ćore;d1u,5,Item 114 of the Molten Ćore;d1v,6,Item 115 of the Molten Ćore;d1w,7,Item 116 of the Molten Ćore;d1x,8,Item 117 of the Molten Ćore;d1y,9,Item 118 of the Molten Ćore;d1z,a,Item 119 of the Molten Ćore;d20,1,Item ,s255:1M0bim120 of the Molten Ćore;d21,2,Item 121 of the Molten Ćore;d22,3,Item 122 of the Molten Ćore;d23,4,Item 123 of the Molten Ćore;d24,5,Item 124 of the Molten Ćore;d25,6,Item 125 of the Molten Ćore;d26,7,Item 126 of the Molten Ćore;d27,8,Item 127 ,s255:1M0bjmof the Molten Ćore;d28,9,Item 128 of the Molten Ćore;d29,a,Item 129 of the Molten Ćore;d2a,1,Item 130 of the Molten Ćore;d2b,2,Item 131 of the Molten Ćore;d2c,3,Item 132 of the Molten Ćore;d2d,4,Item 133 of the Molten Ćore;d2e,5,Item 134 of t,s255:1M0bkmhe Molten Ćore;d2f,6,Item 135 of the Molten Ćore;d2g,7,Item 136 of the Molten Ćore;d2h,8,Item 137 of the Molten Ćore;d2i,9,Item 138 of the Molten Ćore;d2j,a,Item 139 of the Molten Ćore;d2k,1,Item 140 of the Molten Ćore;d2l,2,Item 141 of the M,s255:1M0blmolten Ćore;d2m,3,Item 142 of the Molten Ćore;d2n,4,Item 143 of the Molten Ćore;d2o,5,Item 144 of the Molten Ćore;d2p,6,Item 145 of the Molten Ćore;d2q,7,Item 146 of the Molten Ćore;d2r,8,Item 147 of the Molten Ćore;d2s,9,Item 148 of the Molte,s48:1M0bmmn Ćore;d2t,a,Item 149 of the Molten Ćore]",
+    "parsed": [
+     "{data=s249:LL:2dv8n1^1gqx1g5f^Grommash^^Molten Core^Lucifron;Magmadar;Gehennas;Garr;Shazzrah;Baron Geddon;Golemagg;Sulfuron;Majordomo;Ragnaros^cyo,1,Item 0 of the Molten Ćore;cyp,2,Item 1 of the Molten Ćore;cyq,3,Item 2 of the Molten Ćore;cyr,4,Item 3 of th;mid=n11;part=n1;parts=n22}",
+     "{data=s249:e Molten Ćore;cys,5,Item 4 of the Molten Ćore;cyt,6,Item 5 of the Molten Ćore;cyu,7,Item 6 of the Molten Ćore;cyv,8,Item 7 of the Molten Ćore;cyw,9,Item 8 of the Molten Ćore;cyx,a,Item 9 of the Molten Ćore;cyy,1,Item 10 of the Molten Ćore;cy;mid=n11;part=n2;parts=n22}",
+     "{data=s249:z,2,Item 11 of the Molten Ćore;cz0,3,Item 12 of the Molten Ćore;cz1,4,Item 13 of the Molten Ćore;cz2,5,Item 14 of the Molten Ćore;cz3,6,Item 15 of the Molten Ćore;cz4,7,Item 16 of the Molten Ćore;cz5,8,Item 17 of the Molten Ćore;cz6,9,Item 18;mid=n11;part=n3;parts=n22}",
+     "{data=s249: of the Molten Ćore;cz7,a,Item 19 of the Molten Ćore;cz8,1,Item 20 of the Molten Ćore;cz9,2,Item 21 of the Molten Ćore;cza,3,Item 22 of the Molten Ćore;czb,4,Item 23 of the Molten Ćore;czc,5,Item 24 of the Molten Ćore;czd,6,Item 25 of the Mol;mid=n11;part=n4;parts=n22}",
+     "{data=s249:ten Ćore;cze,7,Item 26 of the Molten Ćore;czf,8,Item 27 of the Molten Ćore;czg,9,Item 28 of the Molten Ćore;czh,a,Item 29 of the Molten Ćore;czi,1,Item 30 of the Molten Ćore;czj,2,Item 31 of the Molten Ćore;czk,3,Item 32 of the Molten Ćore;c;mid=n11;part=n5;parts=n22}",
+     "{data=s249:zl,4,Item 33 of the Molten Ćore;czm,5,Item 34 of the Molten Ćore;czn,6,Item 35 of the Molten Ćore;czo,7,Item 36 of the Molten Ćore;czp,8,Item 37 of the Molten Ćore;czq,9,Item 38 of the Molten Ćore;czr,a,Item 39 of the Molten Ćore;czs,1,Item 4;mid=n11;part=n6;parts=n22}",
+     "{data=s249:0 of the Molten Ćore;czt,2,Item 41 of the Molten Ćore;czu,3,Item 42 of the Molten Ćore;czv,4,Item 43 of the Molten Ćore;czw,5,Item 44 of the Molten Ćore;czx,6,Item 45 of the Molten Ćore;czy,7,Item 46 of the Molten Ćore;czz,8,Item 47 of the Mo;mid=n11;part=n7;parts=n22}",
+     "{data=s249:lten Ćore;d00,9,Item 48 of the Molten Ćore;d01,a,Item 49 of the Molten Ćore;d02,1,Item 50 of the Molten Ćore;d03,2,Item 51 of the Molten Ćore;d04,3,Item 52 of the Molten Ćore;d05,4,Item 53 of the Molten Ćore;d06,5,Item 54 of the Molten Ćore;;mid=n11;part=n8;parts=n22}",
+     "{data=s249:d07,6,Item 55 of the Molten Ćore;d08,7,Item 56 of the Molten Ćore;d09,8,Item 57 of the Molten Ćore;d0a,9,Item 58 of the Molten Ćore;d0b,a,Item 59 of the Molten Ćore;d0c,1,Item 60 of the Molten Ćore;d0d,2,Item 61 of the Molten Ćore;d0e,3,Item ;mid=n11;part=n9;parts=n22}",
+     "{data=s249:62 of the Molten Ćore;d0f,4,Item 63 of the Molten Ćore;d0g,5,Item 64 of the Molten Ćore;d0h,6,Item 65 of the Molten Ćore;d0i,7,Item 66 of the Molten Ćore;d0j,8,Item 67 of the Molten Ćore;d0k,9,Item 68 of the Molten Ćore;d0l,a,Item 69 of the M;mid=n11;part=n10;parts=n22}",
+     "{data=s249:olten Ćore;d0m,1,Item 70 of the Molten Ćore;d0n,2,Item 71 of the Molten Ćore;d0o,3,Item 72 of the Molten Ćore;d0p,4,Item 73 of the Molten Ćore;d0q,5,Item 74 of the Molten Ćore;d0r,6,Item 75 of the Molten Ćore;d0s,7,Item 76 of the Molten Ćore;mid=n11;part=n11;parts=n22}",
+     "{data=s249:;d0t,8,Item 77 of the Molten Ćore;d0u,9,Item 78 of the Molten Ćore;d0v,a,Item 79 of the Molten Ćore;d0w,1,Item 80 of the Molten Ćore;d0x,2,Item 81 of the Molten Ćore;d0y,3,Item 82 of the Molten Ćore;d0z,4,Item 83 of the Molten Ćore;d10,5,Item;mid=n11;part=n12;parts=n22}",
+     "{data=s249: 84 of the Molten Ćore;d11,6,Item 85 of the Molten Ćore;d12,7,Item 86 of the Molten Ćore;d13,8,Item 87 of the Molten Ćore;d14,9,Item 88 of the Molten Ćore;d15,a,Item 89 of the Molten Ćore;d16,1,Item 90 of the Molten Ćore;d17,2,Item 91 of the ;mid=n11;part=n13;parts=n22}",
+     "{data=s249:Molten Ćore;d18,3,Item 92 of the Molten Ćore;d19,4,Item 93 of the Molten Ćore;d1a,5,Item 94 of the Molten Ćore;d1b,6,Item 95 of the Molten Ćore;d1c,7,Item 96 of the Molten Ćore;d1d,8,Item 97 of the Molten Ćore;d1e,9,Item 98 of the Molten Ćor;mid=n11;part=n14;parts=n22}",
+     "{data=s249:e;d1f,a,Item 99 of the Molten Ćore;d1g,1,Item 100 of the Molten Ćore;d1h,2,Item 101 of the Molten Ćore;d1i,3,Item 102 of the Molten Ćore;d1j,4,Item 103 of the Molten Ćore;d1k,5,Item 104 of the Molten Ćore;d1l,6,Item 105 of the Molten Ćore;d1m;mid=n11;part=n15;parts=n22}",
+     "{data=s249:,7,Item 106 of the Molten Ćore;d1n,8,Item 107 of the Molten Ćore;d1o,9,Item 108 of the Molten Ćore;d1p,a,Item 109 of the Molten Ćore;d1q,1,Item 110 of the Molten Ćore;d1r,2,Item 111 of the Molten Ćore;d1s,3,Item 112 of the Molten Ćore;d1t,4,I;mid=n11;part=n16;parts=n22}",
+     "{data=s249:tem 113 of the Molten Ćore;d1u,5,Item 114 of the Molten Ćore;d1v,6,Item 115 of the Molten Ćore;d1w,7,Item 116 of the Molten Ćore;d1x,8,Item 117 of the Molten Ćore;d1y,9,Item 118 of the Molten Ćore;d1z,a,Item 119 of the Molten Ćore;d20,1,Item ;mid=n11;part=n17;parts=n22}",
+     "{data=s249:120 of the Molten Ćore;d21,2,Item 121 of the Molten Ćore;d22,3,Item 122 of the Molten Ćore;d23,4,Item 123 of the Molten Ćore;d24,5,Item 124 of the Molten Ćore;d25,6,Item 125 of the Molten Ćore;d26,7,Item 126 of the Molten Ćore;d27,8,Item 127 ;mid=n11;part=n18;parts=n22}",
+     "{data=s249:of the Molten Ćore;d28,9,Item 128 of the Molten Ćore;d29,a,Item 129 of the Molten Ćore;d2a,1,Item 130 of the Molten Ćore;d2b,2,Item 131 of the Molten Ćore;d2c,3,Item 132 of the Molten Ćore;d2d,4,Item 133 of the Molten Ćore;d2e,5,Item 134 of t;mid=n11;part=n19;parts=n22}",
+     "{data=s249:he Molten Ćore;d2f,6,Item 135 of the Molten Ćore;d2g,7,Item 136 of the Molten Ćore;d2h,8,Item 137 of the Molten Ćore;d2i,9,Item 138 of the Molten Ćore;d2j,a,Item 139 of the Molten Ćore;d2k,1,Item 140 of the Molten Ćore;d2l,2,Item 141 of the M;mid=n11;part=n20;parts=n22}",
+     "{data=s249:olten Ćore;d2m,3,Item 142 of the Molten Ćore;d2n,4,Item 143 of the Molten Ćore;d2o,5,Item 144 of the Molten Ćore;d2p,6,Item 145 of the Molten Ćore;d2q,7,Item 146 of the Molten Ćore;d2r,8,Item 147 of the Molten Ćore;d2s,9,Item 148 of the Molte;mid=n11;part=n21;parts=n22}",
+     "{data=s42:n Ćore;d2t,a,Item 149 of the Molten Ćore;mid=n11;part=n22;parts=n22}"
+    ]
+   },
+   {
+    "record": "RD:k3f9a2^1gqwzvur^Grommash^^r^Molten Core Thursday^Molten Core^tobc40^50^14^2^Bring fire resist",
+    "mid": 3,
+    "msgs": "[s102:1M0311RD:k3f9a2^1gqwzvur^Grommash^^r^Molten Core Thursday^Molten Core^tobc40^50^14^2^Bring fire resist]",
+    "parsed": [
+     "{data=s96:RD:k3f9a2^1gqwzvur^Grommash^^r^Molten Core Thursday^Molten Core^tobc40^50^14^2^Bring fire resist;mid=n3;part=n1;parts=n1}"
+    ]
+   },
+   {
+    "record": "ZZ:x^1gqx1j54^Varok^^éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé",
+    "mid": 1,
+    "msgs": "{}",
+    "parsed": []
+   }
+  ],
+  "kinds": [
+   {
+    "msg": "1H",
+    "dump": "{major=n1;type=s1:H}"
+   },
+   {
+    "msg": "1Rxx",
+    "dump": "{major=n1;type=s1:R}"
+   },
+   {
+    "msg": "2Hzz",
+    "dump": "{major=n2;type=s1:H}"
+   },
+   {
+    "msg": "xH",
+    "dump": "nil"
+   },
+   {
+    "msg": "1h",
+    "dump": "nil"
+   },
+   {
+    "msg": "",
+    "dump": "nil"
+   },
+   {
+    "msg": "9Z",
+    "dump": "{major=n9;type=s1:Z}"
+   }
+  ],
+  "bad": [
+   {
+    "fn": "parseHello",
+    "msg": "1H000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000^"
+   },
+   {
+    "fn": "parseHello",
+    "msg": "1H100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000^0.1"
+   },
+   {
+    "fn": "parseHello",
+    "msg": "1H1000ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ^"
+   },
+   {
+    "fn": "parseHello",
+    "msg": "1H1122000028t64hmb6qfg8z8l0000dguvfpo0hyh5k7aa0000oowkqxppt6iuvfbz0000zwy925rf4ekk6ndp0000b4zzddt4fmm9hvfe0000md1oolutqunyt3h30000xl3dztwi22po4bit00008t53zxbwdardfjki0000k16sm9zxoit2qrm70000v98hxi1mx0.12.0"
+   },
+   {
+    "fn": "parseInventory",
+    "msg": "1I0z00001100"
+   },
+   {
+    "fn": "parseInventory",
+    "msg": "1I00000010"
+   },
+   {
+    "fn": "parseInventory",
+    "msg": "1I0000001100000000000"
+   },
+   {
+    "fn": "parseInventory",
+    "msg": "1I1c0000110000"
+   },
+   {
+    "fn": "parseGet",
+    "msg": "1G^frwo"
+   },
+   {
+    "fn": "parseGet",
+    "msg": "1GGrommash^"
+   },
+   {
+    "fn": "parseGet",
+    "msg": "1GGrommash^frw"
+   },
+   {
+    "fn": "parseGet",
+    "msg": "1GGrom,mash^frwo"
+   },
+   {
+    "fn": "parseGet",
+    "msg": "1GGrommash^FRWO"
+   },
+   {
+    "fn": "parseRecords",
+    "msg": "1R"
+   },
+   {
+    "fn": "parseRecords",
+    "msg": "1Ra##b"
+   },
+   {
+    "fn": "parseRecords",
+    "msg": "1Ra#"
+   },
+   {
+    "fn": "parseRecords",
+    "msg": "1Rxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "fn": "parseParts",
+    "msg": "1M0011"
+   },
+   {
+    "fn": "parseParts",
+    "msg": "1M0021x"
+   },
+   {
+    "fn": "parseParts",
+    "msg": "1M0010x"
+   },
+   {
+    "fn": "parseParts",
+    "msg": "1M0011xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "fn": "parseParts",
+    "msg": "1M!!11x"
+   }
+  ]
+ },
+ "fold": [
+  {
+   "name": "week 1: attendees grow, the no-show resets",
+   "instance": "w3d6nw",
+   "records": [
+    "LY:w3d6nw^1ghrtogk^Grim^^tizwg0^Charlie.c4c4,ntw,u",
+    "RT:w1w1w1^wzvagjys^Grim^^d^^r^w3d6nw^tizwis^Mokra.m0k1,ntj;Velanne.v1v1,ntj^Charlie.c4c4"
+   ],
+   "expect": {
+    "Mokra.m0k1": {
+     "ntj": 10
+    },
+    "Velanne.v1v1": {
+     "ntj": 10
+    }
+   }
+  },
+  {
+   "name": "week 2: the winner resets, I grow to 20",
+   "instance": "w3d6nw",
+   "records": [
+    "RT:w2w2w2^wzvaga38^Grim^^d^^r^w3d6nw^tizwoc^Mokra.m0k1;Velanne.v1v1,ntj",
+    "LA:aw0005^1ghru88e^Velanne^^w2w2w2^w3d6nw^hp2pn0^Late find^Mokra^Mokra.m0k1^o",
+    "LA:aw0004^1ghrtzu6^Velanne^^w2w2w2^w3d6nw^ntw^Night Cloak^Mokra^Mokra.m0k1^m",
+    "LY:w3d6nw^1ghrtogk^Grim^^tizwg0^Charlie.c4c4,ntw,u",
+    "LA:aw0003^1ghrtzce^Velanne^^w2w2w2^w3d6nw^h7syo8^Loose Trinket^Pugsy^^f",
+    "RT:w1w1w1^wzvagjys^Grim^^d^^r^w3d6nw^tizwis^Mokra.m0k1,ntj;Velanne.v1v1,ntj^Charlie.c4c4",
+    "LA:aw0002^1ghrtyum^Velanne^^w2w2w2^w3d6nw^hpztyu^random ring^Velanne^Velanne.v1v1^o",
+    "LA:aw0001^1ghrtycu^Velanne^^w2w2w2^w3d6nw^ntj^Frost Greaves^Mokra^Mokra.m0k1^s"
+   ],
+   "expect": {
+    "Velanne.v1v1": {
+     "ntj": 20
+    }
+   }
+  },
+  {
+   "name": "an award recorded late (t before the close) still counts first",
+   "instance": "w3d6nw",
+   "records": [
+    "LY:w3d6nw^1ghrtogk^Grim^^tizwg0^Charlie.c4c4,ntw,u",
+    "RT:w1w1w1^wzvagjys^Grim^^d^^r^w3d6nw^tizwis^Mokra.m0k1,ntj;Velanne.v1v1,ntj^Charlie.c4c4",
+    "RT:w2w2w2^wzvaga38^Grim^^d^^r^w3d6nw^tizwoc^Mokra.m0k1;Velanne.v1v1,ntj",
+    "LA:aw0001^1ghrtycu^Velanne^^w2w2w2^w3d6nw^ntj^Frost Greaves^Mokra^Mokra.m0k1^s"
+   ],
+   "expect": {
+    "Velanne.v1v1": {
+     "ntj": 20
+    }
+   }
+  },
+  {
+   "name": "PvP and event closes leave loyalty alone",
+   "instance": "w3d6nw",
+   "records": [
+    "LY:w3d6nw^1ghrtogk^Grim^^tizwg0^Mokra.m0k1,ntj,u;Velanne.v1v1,ntw,k",
+    "RT:pvp001^wzvagjys^Grim^^d^^p^w3d6nw^tizwis^Mokra.m0k1^Velanne.v1v1",
+    "RT:evt001^wzvagf10^Grim^^d^^e^w3d6nw^tizwlk^Mokra.m0k1;Velanne.v1v1"
+   ],
+   "expect": {
+    "Mokra.m0k1": {
+     "ntj": 30
+    },
+    "Velanne.v1v1": {
+     "ntw": 20
+    }
+   }
+  },
+  {
+   "name": "switched reserve: the old streak ends",
+   "instance": "w3d6nw",
+   "records": [
+    "LY:w3d6nw^1ghrtogk^Grim^^tizwg0^Mokra.m0k1,ntj,u",
+    "RT:w3w3w3^wzvagjys^Grim^^d^^r^w3d6nw^tizwis^Mokra.m0k1,ntw,ntw"
+   ],
+   "expect": {
+    "Mokra.m0k1": {
+     "ntw": 10
+    }
+   }
+  },
+  {
+   "name": "records of another instance are ignored",
+   "instance": "w3d6nw",
+   "records": [
+    "LY:w3d6nw^1ghrtogk^Grim^^tizwg0^Charlie.c4c4,ntw,u",
+    "RT:w1w1w1^wzvagjys^Grim^^d^^r^w3d6nw^tizwis^Mokra.m0k1,ntj;Velanne.v1v1,ntj^Charlie.c4c4",
+    "RT:mc0001^wzvaghhw^Grim^^d^^r^2dv8n1^tizwk6^Velanne.v1v1^Charlie.c4c4;Mokra.m0k1",
+    "LA:aw0009^1ghrtwdq^Velanne^^w2w2w2^2dv8n1^ntj^Frost Greaves^Velanne^Velanne.v1v1^s"
+   ],
+   "expect": {
+    "Mokra.m0k1": {
+     "ntj": 10
+    },
+    "Velanne.v1v1": {
+     "ntj": 10
+    }
+   }
+  },
+  {
+   "name": "closes and awards the checkpoint covers are not applied twice",
+   "instance": "w3d6nw",
+   "records": [
+    "LY:w3d6nw^1ghrtvv8^Grim^^tizwk6^Mokra.m0k1,ntj,a;Velanne.v1v1,ntj,a",
+    "RT:w1w1w1^wzvagjys^Grim^^d^^r^w3d6nw^tizwis^Mokra.m0k1,ntj;Velanne.v1v1,ntj^Charlie.c4c4",
+    "LA:aw0001^1ghrtycu^Velanne^^w2w2w2^w3d6nw^ntj^Frost Greaves^Mokra^Mokra.m0k1^s",
+    "RT:w2w2w2^wzvaga38^Grim^^d^^r^w3d6nw^tizwoc^Mokra.m0k1;Velanne.v1v1,ntj"
+   ],
+   "expect": {
+    "Velanne.v1v1": {
+     "ntj": 20
+    }
+   }
+  },
+  {
+   "name": "no checkpoint: start from nothing; attending without a reserve ends a streak",
+   "instance": "w3d6nw",
+   "records": [
+    "RT:w1w1w1^wzvagjys^Grim^^d^^r^w3d6nw^tizwis^Mokra.m0k1,ntj;Velanne.v1v1,ntj^Charlie.c4c4",
+    "RT:w2w2w2^wzvaga38^Grim^^d^^r^w3d6nw^tizwoc^Mokra.m0k1;Velanne.v1v1,ntj"
+   ],
+   "expect": {
+    "Velanne.v1v1": {
+     "ntj": 20
+    }
+   }
+  },
+  {
+   "name": "an attendee also listed as a no-show keeps the bonus",
+   "instance": "w3d6nw",
+   "records": [
+    "RT:w4w4w4^wzvagjys^Grim^^d^^r^w3d6nw^tizwis^Velanne.v1v1,ntj^Velanne.v1v1"
+   ],
+   "expect": {
+    "Velanne.v1v1": {
+     "ntj": 10
+    }
+   }
+  }
+ ]
+}

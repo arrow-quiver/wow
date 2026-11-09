@@ -1,233 +1,208 @@
-# wow: guild website + addon
+<p align="center">
+  <img src="app/src/renderer/assets/icon-192.png" width="96" alt="Guild Camp campfire logo">
+</p>
 
-Phase 1 of the guild platform for **World of Warcraft: Forever** (PvP ruleset). Retail comes later.
+<h1 align="center">Guild Camp</h1>
 
-```
-web/         the website (Node + SQLite), deploys to Coolify with the Dockerfile
-addon/       WowGuild, the in-game addon, listed as "Guild Camp" (Forever interface 16001, Retail 120105)
-companion/   the desktop app that carries data between the game and the site
-```
+<p align="center">
+  <b>Your guild's campfire for World of Warcraft: Forever.</b><br>
+  Raids, soft reserves, crafters, the guild bank and a personal coach, in a desktop app and an in-game addon.
+</p>
 
-## How the pieces talk
+<p align="center">
+  <a href="https://github.com/arrow-quiver/wow/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/arrow-quiver/wow?label=download&color=e8a33a"></a>
+  <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-2d6cb5">
+  <img alt="WoW Forever and Retail" src="https://img.shields.io/badge/game-WoW%20Forever%20%C2%B7%20Retail-8a5a2b">
+  <img alt="No server needed" src="https://img.shields.io/badge/server-none%20needed-3a8f5c">
+</p>
 
-1. **The addon** saves data out of combat into WoW's SavedVariables file: your character, professions, learned recipes, the guild roster with who's online, and any `/wow cta` calls.
-2. WoW writes that file when you **log out or `/reload`**. Addons can't send data any other way, and can't talk to other players inside dungeons or raids.
-3. **The companion** sees the file change, uploads it to `/api/sync`, then downloads news and writes it to `Interface\AddOns\WowGuild_Inbox`. That's a small addon of its own, which WowGuild loads first as an optional dependency. Keeping it separate means the `WowGuild` folder stays exactly as shipped, because CurseForge replaces that folder on every update. News covers notices, crafting requests you can make, and leveling partners. Addon 0.8 and older read `WowGuild\Data\Inbox.lua` instead: companion 0.6.0 still writes that file for them, and removes it once the addon is updated.
-4. On the next reload, the addon shows that news (`/wow` opens the panel).
+<p align="center">
+  <img src="docs/screenshots/home.png" alt="The Camp page: who's online around the fire, calls to arms and upcoming raids" width="900">
+</p>
 
-## What's in Phase 1
+---
 
-- **Camp:** who's online around the fire, call to arms (posts to Discord), notices, activity.
-- **Roster:** every guild member from in-game roster scans, plus characters linked to players.
-- **Crafters:** search any recipe to see who in the guild can make it, plus a summary of everyone's professions.
-- **Crafting requests:** post, claim, mark delivered. Crafters see requests they can fill in game.
-- **Leveling partners:** post where and when you're questing.
-- **Settings:** sync keys, invite link, Discord webhook, members and officers.
+## Why Guild Camp?
 
-## What's in Phase 2
+- **No website, no server, no subscription.** Every player runs the app on their own PC. Guild data travels
+  between guildmates inside the game, through the addon.
+- **One place for the whole guild.** Sign-ups, soft reserves, loot, crafters, bank requests and supply drives,
+  instead of a dozen Discord channels and spreadsheets.
+- **Works while you play.** The addon brings guild news, raid reminders and smarter tooltips into the game.
+- **Installs and updates itself.** The app finds your game folders, installs the addon and keeps both up to date.
 
-- **Raids:** officers schedule raids (times shown in everyone's own time zone). Members sign up with a character, role and note. Discord gets a post when a raid is scheduled and a reminder an hour before.
-- **Soft reserves with loyalty bonus (SR+):** each raider reserves up to N items. When an item drops, reservers in the raid roll 1–100 plus their bonus. Bonus: +10 per raid attended with the same item reserved. It resets when you win the item, switch reserves, or sign up "Coming" and don't show.
-- **Loot screen (phone):** `/raids/<id>/loot` for the raid leader. Roll, give, and record off-reserve loot. Everything goes to the loot history and Discord.
-- **Loot lists:** officers paste `Boss | Item` lines per instance on the Loot page.
-- **Readiness:** the addon records item level, repair % and consumables at each reload. Sign-ups show it, and flag low repair or no consumables.
-- **In game:** `/wow` shows upcoming raids, whether you're signed up, and your reserves. Login reminds you if you haven't signed up for the next raid.
+## Features
 
-## What's in Phase 3
+### 🔥 Camp
 
-- **Discord slash commands:** `/online`, `/raids`, `/craft`, `/price`, `/cta`, `/signup` and `/link`. Discord calls the site directly (`/discord/interactions`, signature-checked), so no bot process runs. Members link their Discord once from Settings.
-- **Bank:** guild bank contents, gold and log (read when anyone opens the guild bank), plus "bank characters" for guilds without one. Includes request → sent/declined, and a search across your own alts' bags and banks.
-- **Prices:** a guild price index built from members' Auctionator scans (the companion reads `Auctionator.lua`). Shows a 2-week trend and values the bank stock.
-- **Supply drives:** a goal and a unit (crates, mats, gold), members log contributions, with a progress bar and leaderboard. Discord posts when a drive starts and when it hits its goal.
-- **Event types:** schedule PvP premades and guild events alongside raids (no reserves for those).
+See who's online around the fire, where they are and what level they've reached. Sound a **call to arms** when
+the Alliance hits the Crossroads, read guild notices and see what's coming up next.
 
-### Discord setup (once)
-1. discord.com/developers/applications → **New Application**.
-2. **General Information**: copy the *Application ID* and *Public Key*. Set *Interactions Endpoint URL* to `<BASE_URL>/discord/interactions`.
-3. **Bot** → *Reset Token* → copy it (only needed to register the commands).
-4. Set `DISCORD_APP_ID`, `DISCORD_PUBLIC_KEY` and `DISCORD_BOT_TOKEN` on the server and redeploy.
-5. Site → Settings → *invite the app* to your server → **Register slash commands** → **Link Discord**, then run `/link CODE` in the server.
+### ⚔️ Raids, soft reserves and loot
 
-## Profession helper (addon 0.4.0)
+<img src="docs/screenshots/raids.png" alt="Raids page with upcoming raids, PvP premades and events" width="900">
 
-Built into the guild addon. It only reads profession and bag data, out of combat.
+- Schedule raids, PvP premades and guild events. Times show in each player's own time zone, and you can export
+  them to your calendar.
+- Sign up with a character and role, and see tanks, healers and damage at a glance.
+- **Soft reserves with an SR+ loyalty bonus** for players who keep reserving the same item.
+- Officers get a loot screen for handing out items; everyone sees the loot lists and the full loot history.
 
-- **Skill-up guide:** opens beside the profession window. Lists the recipes that still give skill points, ranked by cost per expected point. Orange counts as 1 point, yellow ¾, green ¼, and grey is skipped. Recipes you can make from your bags come first. Prices come from Auctionator (live, if installed) or the guild price index. Click **+5 list** to add a recipe to your shopping list.
-- **Shopping list:** a small movable tracker shows each mat as `have / need`. It also notes how many are on your alts or in the guild bank (from the site). It ticks off as you loot and tells you when everything's ready. The list also appears on the site's Crafters page, with a total cost.
-- Commands: `/wow guide` (show/hide the guide), `/wow list` (show/hide the tracker), `/wow list clear`.
+<img src="docs/screenshots/loot.png" alt="Loot lists per instance, reserve bonuses and loot history" width="900">
 
-## Running it safely
+### 🧭 Coach
 
-- **Backups:** the server snapshots the database every day into `/data/backups` and keeps the last 14. Officers can make one on demand under **Officer tools**, and the owner can download them.
-- **Officer tools** (`/admin`):
-  - **Sync health:** last sync and addon/companion version per member. Outdated versions show in red. Grey rows haven't synced for a week.
-  - **Backups.**
-  - **Audit log:** promotions, removals, webhook changes, raids scheduled or closed, loot given, bank requests handled, drives, invite link changes.
-- **Members:** officers can promote and remove members. Only the owner can demote or remove officers. Removing someone also kills their sync keys. **Replace invite link** makes a new one if the old link leaks.
-- **Security:**
-  - Content-Security-Policy and HSTS headers.
-  - Rate limits: 40 uploads a minute per sync key, 20 sign-in attempts a minute per IP, 120 Discord calls a minute.
-  - Sync keys only work while their owner is still in the guild.
-- **Version notices:** the addon tells players in chat when a newer version is on `/get`, and so does the companion window.
-- **Onboarding:** Camp shows each new member a short checklist until they've finished setup:
-  1. Synced
-  2. Professions opened
-  3. Main chosen
-  4. Discord linked
-  5. Signed up for the next raid
+<img src="docs/screenshots/coach.png" alt="Coach page with play-style scores, a build plan and next steps" width="900">
 
-### Companion options
-| Command | What it does |
-|---|---|
-| `wow-companion.exe` | Run normally (watch and upload) |
-| `wow-companion.exe --install-startup` | Start automatically with Windows (minimised) |
-| `wow-companion.exe --uninstall-startup` | Stop starting with Windows |
-| `wow-companion.exe --check` | Show which game folders it found and test the sync key |
+The Coach learns how you play from a short quiz and from what you do in game, then scores your play style
+(aggression, risk taking, social, PvP focus and pace). It suggests a build plan and a list of next steps: unspent
+talent points, repairs, bag space, trainer visits, raid sign-ups and more. Ask it questions with your own
+Anthropic API key; everything else works without one.
 
-It writes `companion.log` next to itself. Send that file when something isn't syncing. If the site is unreachable, it retries with growing waits (5 seconds up to 5 minutes) instead of hammering it.
+### 🛠️ Crafters, requests and partners
 
-### Addon options
-`/wow options` (or Settings → AddOns → Guild Camp):
-- login news
-- update notices
-- auto-open the skill-up guide
-- show the shopping list on login
-- share bank data
+<img src="docs/screenshots/crafters.png" alt="Crafters page with guild professions and a shopping list" width="900">
 
-The addon also records PvP rank and honor, reputations and currencies (for example Merchant's Favor), and shows them on each character's page.
+- Search any recipe and find who in the guild can make it.
+- Post **crafting requests** and find **leveling partners**.
+- Your in-game shopping list shows up here too, with what your alts already carry, what the guild bank holds and
+  what it will cost.
 
-## Deploy on Coolify
+### 🏦 Bank, prices and drives
 
-1. Push this folder to a GitHub repo.
-2. In Coolify: **New resource → your repo → Build pack: Dockerfile**, base directory `/`, Dockerfile location `/web/Dockerfile`, port `3000`. Each build also compiles `wow-companion.exe` and zips the addon. Both are served at `/get` (public download page) and `/downloads/...`.
-3. Add a **persistent storage** volume mounted at `/data`. This holds the database: without it, data is lost on redeploy.
-4. Set the environment variables from `web/.env.example`:
-   - `BASE_URL`: the domain you give it in Coolify, e.g. `https://wow.cjplumbing.co.za`
-   - `SESSION_SECRET`: a long random string (`openssl rand -base64 48`)
-   - `BNET_CLIENT_ID` / `BNET_CLIENT_SECRET`: create a client at <https://develop.battle.net/access/clients>, with redirect URL `<BASE_URL>/auth/bnet/callback`
-5. Deploy, open the site, sign in with Battle.net, and create the guild. **The first person to create it becomes the owner.**
-6. Settings → copy the invite link for guildies, and paste a Discord webhook URL.
+<img src="docs/screenshots/bank.png" alt="Guild bank page with gold, stock value, tabs and items" width="900">
 
-## Install for each player
+- Browse the guild bank by tab, valued at guild auction prices, and see what your own alts carry.
+- **Ask the bank** for items; officers handle requests in one place.
+- **Guild prices** come from the Auctionator scans guildmates share.
+- **Deal hunter**: finds items listed well under their usual price in your own Auctionator scans, with the profit
+  after the auction house cut, how sure it is, vendor flips, and what to buy with a budget. In game it sits beside
+  the auction house and searches each deal with one click.
+- Run **supply drives** (fire resistance potions for Molten Core, thorium for the guild blacksmith) and track
+  every hand-in.
 
-1. Install **Guild Camp** from CurseForge once it's listed, or copy `addon/WowGuild` into the game's `Interface\AddOns` folder. For Forever that's probably `World of Warcraft\_forever_\Interface\AddOns` (check which `_xxx_` folder Forever uses).
-2. Put `wow-companion.exe` anywhere and run it once. It creates `config.json` next to itself.
-3. On the site: Settings → **Create sync key**. In `config.json`, set `syncKey` and `siteUrl`. If the companion can't find the game, set `wowFolder` to the folder that contains `Interface` and `WTF`.
-4. Run the companion and leave it open while playing.
-5. In game: open each profession window once so its recipes get saved, then `/reload`.
+### 🎮 In the game
 
-Windows may show a SmartScreen warning the first time, because the exe isn't code-signed. Choose "More info → Run anyway".
+The addon works on its own, and does much more with the app:
 
-## Releasing the addon on CurseForge
-
-The addon is listed as **Guild Camp**. CurseForge rejects names that contain "WoW" or other generic terms. The folder, SavedVariables and slash commands keep the `WowGuild` / `/wow` names, so existing installs carry on working. Addon 0.9.0 needs companion 0.6.0 or newer, because that's the version that writes the news into `WowGuild_Inbox`.
-
-**First time:**
-1. On CurseForge's author site, create a project: World of Warcraft → Addons. The name, summary, description and categories are in `addon/CURSEFORGE.md`.
-2. Run `node web/scripts/curseforge.js --dry-run`. It builds `WowGuild-<version>.zip` in your temp folder. Upload that zip as the first file, tagged **WoW Forever** and **Retail**.
-3. Wait for CurseForge to approve the project.
-4. Copy the project ID from the About Project box and add `## X-Curse-Project-ID: <id>` to `addon/WowGuild/WowGuild.toc`.
-5. In the CurseForge author dashboard, create an API token. Add it to the GitHub repo as the secret `CF_API_TOKEN` (Settings → Secrets and variables → Actions).
-
-**Each release:**
-1. Bump `## Version:` in `WowGuild.toc` and commit. The site's `/get` page and update notices read the same line.
-2. Tag the commit and push the tag:
-   ```
-   git tag addon-v0.9.1
-   git push origin addon-v0.9.1
-   ```
-   `.github/workflows/curseforge.yml` uploads the zip, with a changelog built from commits that touched `addon/WowGuild` since the last `addon-v*` tag. Tags containing `beta` or `alpha` upload as beta or alpha files.
-
-The upload script tags each file with the game versions in `## Interface:`, matching 16001 → Forever 1.60.1 and 120105 → Retail 12.1.5. If CurseForge doesn't list that exact version yet, it uses the newest one below it and prints a warning.
-
-## Look and setup (addon 0.10.0, companion 0.7.0)
-
-- **One look everywhere:** the website and every addon window use the same dark-and-gold style as the loading screen. The shared addon style is `Skin.lua`. Players who prefer Blizzard's style can switch in the addon options.
-- **First login:** a welcome shows the guild window, the Coach quiz and whether the website is connected. After an update, a short "what's new" appears once (`Welcome.lua`, `WEL.NEWS`).
-- **The companion installs the addon:**
-  - It finds WoW (the Battle.net registry entry, the usual folders, or `wowFolder`), installs WowGuild into `_forever_` and updates every copy already installed. It checks at start and every 30 minutes.
-  - The site's `/api/addon` gives the version and SHA-256, and a download that doesn't match is refused.
-  - Guild news lives in its own `WowGuild_Inbox` folder, so updating the addon never touches it.
-  - If you install from CurseForge, set `"autoUpdateAddon": false` so the CurseForge app is the only thing that updates the addon folder.
-  - Settings in `config.json`: `"autoUpdateAddon": false` turns this off, and `"installAddonTo": ["_forever_", "_retail_"]` picks the game versions.
-
-## Coach (addon 0.8.0+, companion 0.5.0+)
-
-- **In game:** `/wow coach`, the Coach tab, or a key binding opens the Coach window. It shows your play style, your build plan, your next steps, and lets you ask questions.
-  - **Play style:** five scores (aggression, risk taking, social, PvP focus, pace) and an archetype. They come from a short quiz plus what the addon sees outside combat: fights started, deaths, time flagged or grouped, battlegrounds, honour kills, duels, quests.
-  - **Build plan:** talents in order (already-taken ones are ticked), stat priority, gear and tips.
-  - **Next steps:** worked out locally: unspent talent points, repairs, bag space, class trainer, professions behind your level, raid sign-ups, plus the plan's own steps.
-- **Website:** `/coach` shows the same information and answers questions instantly.
-- **How in-game questions travel:** a question asked in game is saved, sent at the next /reload (the Coach has a "Send now" button), and answered on the site. The companion keeps checking for up to two minutes and saves the answer, so one more /reload shows it. It also arrives as a phone notification.
-- **Claude API:**
-  - Set `ANTHROPIC_API_KEY` on the server.
-  - Plans use `COACH_MODEL` (default `claude-sonnet-5-5`) and answers use `COACH_FAST_MODEL` (default `claude-haiku-5-5`). Both use Claude's web search, limited to Wowhead, warcraft.wiki.gg, Blizzard, Icy Veins and Reddit, so advice about WoW: Forever can be checked against current sources.
-  - Every call is metered. Officers set a monthly budget (default $15) and can switch the AI off in Settings. Each member gets 30 questions and 5 plans a day.
-- **Without a key:** play-style tracking and next steps still work.
-
-## Free services built in
-
-- **Calendar feed.** Settings → "Raids in your calendar" gives each member a private iCalendar link (Google, Apple, Outlook). Raids update by themselves with a 30-minute reminder. "Replace calendar link" kills the old one.
-- **Phone and desktop notifications.** Standard web push (VAPID keys are made once and kept in the database). Sent for calls to arms, new or cancelled raids, the one-hour reminder, guild notices, crafting requests (only to members who know the recipe) and bank requests (officers). Each member picks which kinds they want. On iPhone the site must be added to the Home Screen first; the site ships a web app manifest and service worker for that.
-- **Discord Events.** If the Discord app is invited as a bot with Manage Events (the invite link in Settings asks for it), new raids also appear in the server's Events list and are removed when cancelled.
-- **Blizzard Game Data API.** Uses the same Battle.net app as sign-in (`BNET_REGION`, default `eu`). The server checks daily whether a WoW: Forever namespace exists yet and reads the Retail WoW Token price; officers see the result in Officer tools.
-- **Wowhead tooltips** on every item and spell (see Addon polish).
-- **Official game data** (`src/gamedata.js`). Item names and details for every item the guild has seen, from Blizzard's API (Classic Era item data until WoW: Forever is in the API, then Forever's own). Once Forever is there: realm status on the camp page every 5 minutes, with a "realm is back up" notification after downtime, and Blizzard's official guild list merged into the roster twice a day. The addon (0.7.2+) reports the realm and in-game guild name; officers can correct them in Settings → "Realm and official Blizzard data".
-
-## Addon polish (0.7.0)
-
-- **Looks like the game:** the window uses Blizzard's own frame and bottom tabs where the client has them, and falls back to its own look where it doesn't.
-- **Item rows:** mats on the Professions tab and recipes in the skill-up guide show icons and quality colours, with the real item tooltip on hover. Shift-click links an item in chat.
-- **Guide actions:**
-  - click a recipe to open it in the profession window
-  - **Make** crafts one when you have the mats
-  - **+5 list** adds it to the shopping list
-- **Auction house:** with Auctionator installed, **Search auction house** searches every missing mat, and **Auctionator list** saves them as an Auctionator shopping list.
-- **Item tooltips:** guild crafters who can make the item, how many your other characters hold, and the guild bank count. The guild auction price also shows when Auctionator isn't installed. You can switch this off in Settings.
-- **Plays well with other addons:** if LibDataBroker or LibDBIcon is loaded (Titan Panel, ElvUI, Bazooka, minimap button collectors…), the addon registers there instead of adding its own minimap button.
-
-## In-game window (addon 0.6.0)
-
-No typing needed. Click the **campfire button on the minimap**. Right-click it for settings, or drag it to move it. In Retail it's also in the addon drawer, and you can set a key under Key Bindings → AddOns → Guild Camp.
-
-| Tab | What's there |
-|---|---|
-| **Camp** | Upcoming raids and your sign-up status, guild notices, what's been saved, and **Sync now** (saves and reloads so the companion uploads) |
-| **Call to arms** | Where (with *Use my zone*), how many, what's happening, then **Sound the horn**. Shows calls waiting to send |
-| **Professions** | Your skill levels, buttons for the skill-up guide and the on-screen shopping list, each recipe on the list with −1 / +1 / Remove, mats still needed, and **Clear list** |
-| **Guild** | Crafting requests you can make, your own requests, leveling partners |
-| **Settings** | Every option as a tick box (including the minimap button), the guild site address to copy, version and update notice |
-
-## In-game commands (optional)
+- **Skill-up guide**: ranks the recipes you know by cost per skill point, so you level professions cheaply.
+- **Shopping list**: works out the materials you still need and ticks them off as you loot. With Auctionator it
+  can search the auction house for you.
+- **Item tooltips**: who in the guild can craft it, how many your alts hold and what's in the guild bank.
+- **Guild news**: notices, raid reminders, crafting requests and calls to arms, right in game.
+- A minimap button (or a Titan Panel / ElvUI broker), the Retail addon drawer and key bindings.
 
 | Command | What it does |
-|---|---|
-| `/wow` | Open the guild panel (notices, requests you can craft, leveling partners) |
-| `/wow cta Crossroads 8 Alliance at the FP` | Call to arms. Zone, then how many you need, then a message. Leave out the zone to use your current one. Offers a reload so it sends immediately. |
-| `/wow sync` | Save everything now (then reload) |
-| `/wow status` | What's been saved, and when news last arrived |
-| `/wow guide` | Show or hide the skill-up guide next to your profession window |
-| `/wow list` | Show or hide your shopping list tracker (`/wow list clear` empties it) |
-| `/wow options` | Addon settings |
+| --- | --- |
+| `/wow` or `/guildcamp` | Open the Guild Camp window |
+| `/wow coach` | Open the Coach |
+| `/wow guide` | Open the skill-up guide |
+| `/wow list` | Open the shopping list |
+| `/wow deals` | Open the Deal hunter (it also opens with the auction house) |
+| `/wow cta <where> <need> <what>` | Sound a call to arms, e.g. `/wow cta Crossroads 5 need help` |
+| `/wow status` | Show what's been saved and when guild news last arrived |
+| `/wow options` | Open the settings |
 
-## Development
+Everything runs outside combat and only reads what the game shows freely.
 
+## Install
+
+1. Download **`Guild-Camp-Setup-<version>.exe`** from the
+   [latest release](https://github.com/arrow-quiver/wow/releases/latest) and run it. The installer isn't
+   code-signed yet, so Windows SmartScreen asks once: **More info → Run anyway**.
+2. Open Guild Camp. Sign in with Battle.net, or continue without it. Guild Camp finds your game folders and
+   installs the addon. If your game is somewhere unusual, pick the folder with `_forever_` or `_retail_` inside.
+3. Log in to the game on a character in your guild, then log out or type `/reload`. Guild Camp picks up your
+   guild from there.
+
+<img src="docs/screenshots/welcome.png" alt="The first-run welcome screen" width="900">
+
+The app updates itself and the addon from GitHub. It starts with Windows and stays in the tray, so your guild
+stays in sync. You can turn that off in Settings.
+
+## How it works
+
+<img src="docs/screenshots/addon.png" alt="Addon and sync page with sync settings and the sharing queue" width="900">
+
+
+1. The addon saves what the game shows. WoW writes it to disk when you log out or type `/reload`.
+2. The app reads that file and shows it. Changes you make in the app (a sign-up, a request) go to the addon,
+   which sends them to your guild the next time you log in or type `/reload`.
+3. Guildmates who are online pass guild data on to each other, so it reaches you even when the person who made
+   it has logged off. New guild data shows in the app after you log out or type `/reload` in game.
+4. Your role comes from your in-game rank. The Guild Master decides which ranks count as officers.
+
+## FAQ
+
+**Does the whole guild need the app?**
+No. The more guildmates run it, the faster data spreads, but the addon passes guild data along in game on its
+own. Players without the app still get the skill-up guide, shopping list and Coach.
+
+**Does it touch the game?**
+No. The addon uses the normal addon API, runs outside combat and reads only what the game shows you. The app
+only reads and writes the addon's saved files.
+
+**Where does my data go?**
+It stays on your PC and in your guild. There is no Guild Camp server. The Coach's AI answers go to Anthropic
+only if you add your own API key.
+
+**Why don't I see new guild data?**
+WoW writes addon data to disk only when you log out or type `/reload`. Do one of those, and check that sync is
+on under **Addon & sync**.
+
+**Do I need CurseForge?**
+No. The app installs and updates the addon for you.
+
+---
+
+## For developers
+
+You need Node.js 24 (the tests use its built-in `node:sqlite`, as the app does inside Electron) and Git.
+Windows is the main target.
+
+```bash
+npm install                    # at the repo root; also installs app/
+GUILDCAMP_NO_SCAN=1 npm test   # every test: node --test "app/test/**/*.test.{js,mjs}"
 ```
-cd web && npm install
-npm test                                   # end-to-end: simulated game → companion → site → back into the game
-DB_FILE=data/demo.db npm run demo          # sample guild data
-DEV_LOGIN=1 DB_FILE=data/demo.db npm start # http://localhost:3000, sign in as J#1001
-cd ../companion && npm run build:exe       # rebuilds dist/wow-companion.exe
+
+Run the app from `app/`, always with a scratch profile and without scanning your real game folders:
+
+```bash
+cd app
+GUILDCAMP_NO_SCAN=1 npx electron . --user-data ./dist/dev-profile
 ```
 
-The tests run the real addon Lua against a mocked WoW client (`web/test/wowsim.js`), so addon changes are covered too.
+Without those two settings a dev app finds your real World of Warcraft folders and installs, updates or syncs
+the addon there, exactly like the installed app does. To try it with game data, add a fake game folder under
+Addon & sync in the scratch profile.
 
-## Known unknowns (check after Forever launches on 4 Nov)
+Screenshots of every page with a demo guild (safe by default; nothing touches your game or settings):
 
-- The addon uses the modern API first and falls back to the classic API for professions and recipes, because Forever's exact profession API isn't documented. Run `/wow status` after opening a profession window to confirm recipes are being saved.
-- The Forever install folder name (`_forever_`?). The companion searches every `_xxx_` folder that contains the addon.
-- Blizzard hasn't published a web API namespace for Forever. When it does, we can add armory data such as gear.
+```bash
+cd app
+npx electron . --smoke --smoke-seed      # pictures and a report in app/dist/smoke
+```
 
-## Multi-guild later
+Heavy simulations of many players run only with `GUILDCAMP_SIM_HEAVY=1`. Tests never touch the network, a real
+game folder or the real GitHub CLI.
 
-Every guild-owned table already has `guild_id`. To open the site to other guilds, lift the single-guild check in `POST /guild/create` and add guild selection.
+Read these next:
+
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): how the app, its local core, the addon and GitHub fit together,
+  the safety rules for development, and the test layout.
+- [docs/SHARING.md](docs/SHARING.md): how the addon shares guild data in game.
+- [docs/api/](docs/api/): every endpoint of the app's local core.
+
+## Releasing
+
+App and addon releases are GitHub releases on this repository, published with the GitHub CLI (`gh`):
+
+```bash
+node scripts/release.js addon --bump patch --notes "What changed"
+node scripts/release.js app --bump minor --notes-from-git
+```
+
+Add `--dry-run` to build and zip without publishing. Pushing a `v<version>` or `addon-v<version>` tag publishes
+from GitHub Actions instead, and the app's **Releases** page can publish from a PC that has the source code and
+`gh` signed in. First-time setup (making the repository public, `gh auth login`, the Battle.net client id and
+secret that are built into the installer) and every step are in [docs/RELEASING.md](docs/RELEASING.md).

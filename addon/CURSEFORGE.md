@@ -1,12 +1,14 @@
 # CurseForge listing text
 
 Paste these into the project form. Keep this file outside `addon/WowGuild` so it isn't packaged.
+CurseForge is optional: the Guild Camp desktop app installs and updates the addon by itself. List it there only if you
+want players without the app to find it.
 
 **Name:** Guild Camp
 
 **Summary:**
 
-Profession skill-up guide and shopping list, a Coach with play-style tracking and next steps, and an optional link to your guild's website.
+Profession skill-up guide and shopping list, a Coach with play-style tracking and next steps, and a link to your guild through the Guild Camp app.
 
 **Categories:** Professions (main), Guild, Data Export
 
@@ -16,7 +18,7 @@ Profession skill-up guide and shopping list, a Coach with play-style tracking an
 
 ## Description
 
-Guild Camp is a profession helper and personal coach. Guilds that run the Guild Camp website get a lot more on top.
+Guild Camp is a profession helper and personal coach. Guilds that use the Guild Camp desktop app get a lot more on top.
 
 ### Works on its own
 
@@ -27,9 +29,9 @@ Guild Camp is a profession helper and personal coach. Guilds that run the Guild 
 
 Everything runs outside combat and only reads what the game shows freely.
 
-### With your guild's website
+### With the Guild Camp app
 
-If your guild runs the Guild Camp website, the companion app syncs your characters, professions and the guild roster to the site after each `/reload` or logout, and brings guild news back into the game:
+If your guild uses Guild Camp, the desktop app syncs your characters, professions and the guild roster with your guild after each `/reload` or logout, and brings guild news back into the game:
 
 - Guild notices, raid sign-ups and soft reserves, and reminders for the next raid
 - Crafting requests you can make, and leveling partners
@@ -37,11 +39,12 @@ If your guild runs the Guild Camp website, the companion app syncs your characte
 - Calls to arms (`/wow cta`) that post to the guild's Discord
 - Coach build plans and answers to your questions
 
-The companion app comes from your guild's website, not from CurseForge. Addons can't reach the internet themselves, so it copies the addon's saved data to the site, and copies the news back into a small `WowGuild_Inbox` folder next to the addon.
+The app also installs this addon and keeps it up to date (Addon & sync page), so you don't need CurseForge for updates. Addons can't reach the internet themselves, so the app copies the addon's saved data to your guild, and copies the news back into a small `WowGuild_Inbox` folder next to the addon.
 
 ### Commands
 
 - `/wow` opens the window. `/guildcamp` works too.
 - `/wow coach` opens the Coach.
 - `/wow guide` opens the skill-up guide, and `/wow list` opens the shopping list.
+- `/wow status` shows what's been saved and when the last guild news arrived.
 - `/wow options` opens the settings.

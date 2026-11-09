@@ -1,8 +1,8 @@
 ## Interface: 16001, 120105
 ## Title: Guild Camp
-## Notes: Profession skill-up guide and shopping list, and a Coach with play-style tracking and next steps. With the companion app, it syncs your characters, professions and guild roster with your guild's website and brings guild news, raids and build plans back into the game.
+## Notes: Profession skill-up guide, shopping list and a play-style Coach. The Guild Camp desktop app syncs it with your guild: roster, raids, news and build plans.
 ## Author: Calvin
-## Version: 0.10.0
+## Version: 0.11.0
 ## SavedVariables: WowGuildDB
 ## OptionalDeps: Auctionator, WowGuild_Inbox
 ## IconTexture: Interface\Icons\Spell_Fire_Fire
@@ -10,11 +10,15 @@
 
 Core.lua
 Skin.lua
+ShareCodec.lua
+Share.lua
+ShareSync.lua
 Items.lua
 Collect.lua
 UI.lua
 Professions.lua
 ProfUI.lua
+Deals.lua
 Options.lua
 Coach.lua
 CoachUI.lua

@@ -7,9 +7,9 @@ ns.welcome = WEL
 -- Shown once after updating to a version listed here.
 WEL.NEWS = {
   ["0.10.0"] = {
-    "A new dark-and-gold look for every window, matching the guild website. Prefer Blizzard's style? It's in the options.",
+    "A new dark-and-gold look for every window. Prefer Blizzard's style? It's in the options.",
     "The Coach: your play style, a build plan from Claude, next steps, and questions (/wow coach).",
-    "The companion can now install and update this addon for you.",
+    "The Guild Camp app can install and update this addon for you.",
   },
 }
 
@@ -72,11 +72,11 @@ function WEL.showWelcome()
     "Tell it how you play. It plans your talents and gear and tells you what to do next.", "Take the quiz", function() f:Hide(); ns.coachUI.show(); ns.coachUI.showQuiz() end)
   local inbox = WowGuildInbox
   if inbox and inbox.generatedAt then
-    row(f.rows[3], "Interface\\RaidFrame\\ReadyCheck-Ready", "Connected to the website",
+    row(f.rows[3], "Interface\\RaidFrame\\ReadyCheck-Ready", "Connected to Guild Camp",
       "Your guild sees your characters, and the Coach can answer you. Last update " .. ago(inbox.generatedAt) .. ".")
   else
-    row(f.rows[3], "Interface\\Icons\\INV_Misc_Note_02", "Connect to the website",
-      "Run the companion app from the website's Get page. It sends your progress and brings back guild news.", "How?", function() f:Hide(); ns.ui.show("settings") end)
+    row(f.rows[3], "Interface\\Icons\\INV_Misc_Note_02", "Get the Guild Camp app",
+      "The desktop app syncs your progress with the guild and brings back guild news.", "How?", function() f:Hide(); ns.ui.show("settings") end)
   end
   f.done:SetText("Let's go")
   f:Show()

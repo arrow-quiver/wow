@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!-- The sha256 below allows the inline import map; scripts/vendor.js recomputes it if the map changes.
+     No third-party script runs in this window (it has the window.gc bridge): Wowhead tooltips are drawn by
+     lib/tooltip.js from Wowhead's tooltip data (connect-src) and icons (img-src). -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-ofC7JGLT3ca9BoaxMPv5R1I7dFqy3SgYCV099EAcqlk='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://wow.zamimg.com; font-src 'self'; connect-src 'self' https://nether.wowhead.com; object-src 'none'; base-uri 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Guild Camp</title>
+<link rel="icon" href="./assets/logo.svg" type="image/svg+xml">
+<link rel="preload" href="./vendor/fonts/alegreya-sans-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="./vendor/fonts/alegreya-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="./styles/tokens.css">
+<link rel="stylesheet" href="./styles/app.css">
+<link rel="stylesheet" href="./styles/splash.css">
+<link rel="stylesheet" href="./styles/tooltip.css">
+<script type="importmap">{"imports":{"preact":"./vendor/preact.module.js","preact/hooks":"./vendor/hooks.module.js","htm":"./vendor/htm.module.js"}}</script>
+<link rel="modulepreload" href="./vendor/preact.module.js">
+<link rel="modulepreload" href="./vendor/hooks.module.js">
+<link rel="modulepreload" href="./vendor/htm.module.js">
+<script type="module" src="./main.js"></script>
+</head>
+<body>
+<div id="app"><div class="boot" role="status" aria-label="Starting Guild Camp"><img src="./assets/logo.svg" alt=""></div></div>
+</body>
+</html>

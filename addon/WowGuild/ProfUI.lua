@@ -138,7 +138,7 @@ function P.refreshGuide()
       local bits = {}
       if r.fromBags > 0 then bits[#bits + 1] = "|cff40bf40can make " .. r.fromBags .. " now|r" end
       bits[#bits + 1] = r.unknown and "some prices unknown" or (money(r.perPoint) .. " per point")
-      if r.points < 1 then bits[#bits + 1] = string.format("%d%% chance", r.points * 100 / (r.recipe.skillUps or 1)) end
+      if r.points < 1 then bits[#bits + 1] = string.format("%d%% chance", math.floor(r.points * 100 / (r.recipe.skillUps or 1) + 0.5)) end
       row.info:SetText(table.concat(bits, "  ·  "))
       row.add.recipe = r.recipe
       row.make.recipe = r.recipe

@@ -343,12 +343,12 @@ local function buildView(f, c)
   if not plan or plan.error then
     c.text("big", "No build plan yet", GOLD, 0, 8)
     if not ns.coach.aiEnabled() then
-      c.text("body", "The guild's Coach AI is switched off on the website.", GREY)
+      c.text("body", "Your guild has switched the Coach AI off.", GREY)
     elseif plan and plan.error then
-      c.text("body", "The last attempt didn't work: " .. plan.error, { 1, 0.5, 0.4 })
+      c.text("body", "The last attempt didn't work: " .. tostring(plan.error), { 1, 0.5, 0.4 })
     else
-      c.text("body", "The Coach writes your plan on the website from your class, level, talents, gear and play style. "
-        .. "With the companion running it arrives a minute or so after your next /reload or logout.", { 0.85, 0.85, 0.85 })
+      c.text("body", "The Coach writes your plan from your class, level, talents, gear and play style. "
+        .. "With the Guild Camp app running, it arrives a minute or so after your next /reload or logout.", { 0.85, 0.85, 0.85 })
     end
   else
     c.text("big", plan.headline or "Your build", GOLD, 0, 6)
@@ -390,8 +390,17 @@ local function buildView(f, c)
   end
   f.action:SetText("Ask for a fresh plan"); f.action:SetScript("OnClick", function() ns.coach.requestPlan(); UI.refresh() end); f.action:Show()
   f.action2:Hide()
-  local req = ch.planRequest
-  f.foot:SetText(req and plan and plan.at and req > plan.at and "Fresh plan asked for. Reload to send it." or (plan and plan.at and ("Made at level " .. (plan.level or "?") .. ", " .. date("%d %b", plan.at)) or ""))
+  -- Footer: where a requested plan is (waiting for a reload, or sent and on its way), else when the plan was made.
+  local req, planAt = ch.planRequest, plan and plan.at
+  local generated = (WowGuildInbox and WowGuildInbox.generatedAt) or 0
+  local foot = ""
+  if req and (not planAt or req > planAt) then
+    foot = generated > req and "Fresh plan asked for. It arrives a minute or so after the Guild Camp app sends it: reload to check."
+      or "Fresh plan asked for. Reload and the Guild Camp app sends it."
+  elseif planAt then
+    foot = "Made at level " .. (plan.level or "?") .. ", " .. date("%d %b", planAt)
+  end
+  f.foot:SetText(foot)
 end
 
 local function askView(f, c)
@@ -400,8 +409,8 @@ local function askView(f, c)
   for _, w in ipairs(waiting) do
     if w.state == "unsent" then unsent = unsent + 1 end
     c.text("body", w.text, GOLD, 0, 2)
-    c.text("small", w.state == "unsent" and "Waiting to send: press 'Send now' (it reloads your UI)."
-      or "Sent. The answer arrives in a minute: press 'Check for answers'.", EMBER, 0, 8)
+    c.text("small", w.state == "unsent" and "Waiting to send: press 'Send now'. It reloads your UI so the Guild Camp app can send it."
+      or "Sent. The Guild Camp app brings the answer back in a minute: press 'Check for answers'.", EMBER, 0, 8)
     c.line(0.12)
   end
   for _, a in ipairs(ns.coach.answers()) do
@@ -413,14 +422,14 @@ local function askView(f, c)
     end
   end
   if #waiting == 0 and #ns.coach.answers() == 0 then
-    c.text("small", "Questions go to the Coach on the guild website, which answers using your character and play style. "
-      .. "Answers arrive after a reload with the companion running, and as a notification on your phone if you've turned those on. "
-      .. "For instant answers, use the Coach page on the website.", GREY)
+    c.text("small", "Questions go to your guild's Coach, which answers using your character and play style. "
+      .. "The Guild Camp app sends them and brings the answers back: they show after a reload, and the app tells you when one arrives. "
+      .. "For instant answers, use the Coach page in the Guild Camp app.", GREY)
   end
   f.action:SetText("Ask"); f.action:SetScript("OnClick", function() UI.submit() end); f.action:Show()
   f.action2:SetText(unsent > 0 and "Send now (reload)" or "Check for answers")
   f.action2:SetScript("OnClick", function() ReloadUI() end); f.action2:Show()
-  f.foot:SetText(not ns.coach.aiEnabled() and "The Coach AI is off on the website." or "")
+  f.foot:SetText(not ns.coach.aiEnabled() and "Your guild has switched the Coach AI off." or "")
 end
 
 function UI.view(key)
@@ -450,7 +459,7 @@ function UI.submit()
   if ns.coach.ask(t) then
     f.edit:SetText(""); f.edit:ClearFocus()
     if f.placeholder then f.placeholder:Show() end
-    ns.print("Question saved for the Coach. Press 'Send now' (or reload) to send it.")
+    ns.print("Question saved for the Coach. Press 'Send now' (or reload) and the Guild Camp app sends it.")
   end
   UI.view("ask")
 end

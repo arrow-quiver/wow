@@ -1,0 +1,132 @@
+/* Guild Camp design tokens: the WoW: Forever palette (slate-navy frame, emblem blue, Warcraft gold, cream lettering).
+   Light and dark follow the system unless Settings → Theme sets <html data-theme="light|dark">.
+   Components use the semantic tokens (--bg, --surface, --text, --accent...), never raw colour values. */
+
+/* ---------- fonts (vendored by scripts/vendor.js) ---------- */
+@font-face { font-family: "Alegreya"; font-style: normal; font-weight: 500; font-display: swap; src: url("../vendor/fonts/alegreya-latin-500-normal.woff2") format("woff2"); }
+@font-face { font-family: "Alegreya"; font-style: normal; font-weight: 700; font-display: swap; src: url("../vendor/fonts/alegreya-latin-700-normal.woff2") format("woff2"); }
+@font-face { font-family: "Alegreya"; font-style: normal; font-weight: 800; font-display: swap; src: url("../vendor/fonts/alegreya-latin-800-normal.woff2") format("woff2"); }
+@font-face { font-family: "Alegreya Sans"; font-style: normal; font-weight: 400; font-display: swap; src: url("../vendor/fonts/alegreya-sans-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "Alegreya Sans"; font-style: normal; font-weight: 500; font-display: swap; src: url("../vendor/fonts/alegreya-sans-latin-500-normal.woff2") format("woff2"); }
+@font-face { font-family: "Alegreya Sans"; font-style: normal; font-weight: 700; font-display: swap; src: url("../vendor/fonts/alegreya-sans-latin-700-normal.woff2") format("woff2"); }
+
+:root {
+  /* Raw palette, ported from the old site's style.css. */
+  --pine: #18222e;        /* slate-navy frame */
+  --pine-2: #1a5d8f;      /* emblem blue */
+  --ember: #eaa93a;       /* Warcraft gold */
+  --ember-deep: #a8701f;
+  --ember-soft: #f2bd5c;
+  --cream: #efe8d8;       /* lettering on the frame */
+  --mist: #f4f0e7;
+  --paper: #fbf9f4;
+  --ink: #1a2230;
+  --ink-2: #55606c;
+  --line: #ddd4c2;
+
+  /* Semantic tokens. */
+  --bg: var(--mist);
+  --surface: var(--paper);
+  --surface-2: #f1ece1;          /* subtle fills: table headers, hovered rows, wells */
+  --surface-3: #e8e1d2;
+  --text: var(--ink);
+  --text-2: var(--ink-2);
+  --text-3: #7c8692;
+  --line-strong: #c9bea8;
+  --link: var(--pine-2);
+  --accent: var(--ember);
+  --accent-deep: var(--ember-deep);
+  --accent-hover: var(--ember-soft);
+  --on-accent: #231505;
+  --focus: var(--ember);
+
+  --frame: var(--pine);           /* sidebar + top bar */
+  --frame-2: #223142;             /* hovered nav item */
+  --frame-active: var(--pine-2);  /* current nav item */
+  --frame-line: #2a3a4c;
+  --frame-text: var(--cream);
+  --frame-text-2: #a9b6c3;
+  --frame-text-3: #7d8c9b;
+
+  --ok: #3f8a5a;
+  --warn: #a8701f;
+  --alarm: #b3392f;
+  --info: var(--pine-2);
+  --muted: #6b7480;
+  --on-alarm: #ffffff;
+  --alarm-hover: #c4443a;
+  --alarm-deep: #8c2a22;
+
+  /* Item quality, tuned for contrast on paper. */
+  --q-0: #6f6f6f; --q-1: var(--ink); --q-2: #1c8a0b; --q-3: #0062c4; --q-4: #8b2fd1; --q-5: #c25e00; --q-6: #b08d3c; --q-7: #2a9fc4;
+
+  /* Campfire logo. */
+  --flame-core: #ffe0a3; --log: #8a5f3a;
+
+  /* Coins. */
+  --coin-g: #c99a17; --coin-s: #8f989f; --coin-c: #b0673a;
+
+  /* Shape and depth. */
+  --radius-s: 4px;
+  --radius-m: 8px;
+  --radius-l: 14px;
+  --shadow-1: 0 1px 2px rgb(24 34 46 / .06), 0 1px 1px rgb(24 34 46 / .04);
+  --shadow-2: 0 6px 18px rgb(24 34 46 / .12), 0 2px 6px rgb(24 34 46 / .08);
+  --shadow-3: 0 24px 60px rgb(10 14 20 / .32), 0 6px 18px rgb(10 14 20 / .18);
+  --backdrop: rgb(11 16 23 / .55);
+
+  /* Spacing scale. */
+  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 20px; --s-6: 24px; --s-7: 32px; --s-8: 40px; --s-9: 56px;
+
+  /* Type. */
+  --font-body: "Alegreya Sans", "Segoe UI", system-ui, sans-serif;
+  --font-head: "Alegreya", Georgia, "Times New Roman", serif;
+  --fs-xs: .78rem; --fs-s: .88rem; --fs-m: 1rem; --fs-l: 1.15rem; --fs-xl: 1.45rem; --fs-2xl: 1.9rem; --fs-3xl: 2.6rem;
+
+  /* Layout. */
+  --sidebar-w: 236px;
+  --topbar-h: 38px;
+  --overlay-w: 140px;   /* room for the native window buttons (titleBarOverlay) */
+  --content-max: 1180px;
+
+  /* Motion. */
+  --ease: cubic-bezier(.2, .7, .2, 1);
+  --t-fast: .12s;
+  --t-med: .22s;
+
+  color-scheme: light;
+}
+
+/* Dark: follows the system unless the user picked light. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --pine: #0b1017; --pine-2: #1d4f78;
+    --mist: #10161e; --paper: #18212c; --ink: #f1ebdd; --ink-2: #aab3bd; --line: #2c3a4b;
+    --surface-2: #1d2734; --surface-3: #243142; --text-3: #8592a0; --line-strong: #3a4b60;
+    --link: var(--ember);
+    --frame-2: #151e29; --frame-active: #1d4f78; --frame-line: #1c2734;
+    --ok: #5fb67f; --warn: #e0a33a; --alarm: #e0675c; --info: #6aa9dc; --muted: #8f9aa6;
+    --alarm-hover: #c4443a; --alarm-deep: #8c2a22; --on-alarm: #ffffff;
+    --q-0: #9d9d9d; --q-1: var(--ink); --q-2: #3ddc2a; --q-3: #4a9eff; --q-4: #b366ff; --q-5: #ff8a1c; --q-6: #e6cc80; --q-7: #4fd2f5;
+    --coin-g: #f0c850; --coin-s: #c3cbd2; --coin-c: #d98b55;
+    --shadow-1: 0 1px 2px rgb(0 0 0 / .3);
+    --shadow-2: 0 8px 22px rgb(0 0 0 / .4), 0 2px 6px rgb(0 0 0 / .3);
+    --backdrop: rgb(3 6 10 / .66);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --pine: #0b1017; --pine-2: #1d4f78;
+  --mist: #10161e; --paper: #18212c; --ink: #f1ebdd; --ink-2: #aab3bd; --line: #2c3a4b;
+  --surface-2: #1d2734; --surface-3: #243142; --text-3: #8592a0; --line-strong: #3a4b60;
+  --link: var(--ember);
+  --frame-2: #151e29; --frame-active: #1d4f78; --frame-line: #1c2734;
+  --ok: #5fb67f; --warn: #e0a33a; --alarm: #e0675c; --info: #6aa9dc; --muted: #8f9aa6;
+  --alarm-hover: #c4443a; --alarm-deep: #8c2a22; --on-alarm: #ffffff;
+  --q-0: #9d9d9d; --q-1: var(--ink); --q-2: #3ddc2a; --q-3: #4a9eff; --q-4: #b366ff; --q-5: #ff8a1c; --q-6: #e6cc80; --q-7: #4fd2f5;
+  --coin-g: #f0c850; --coin-s: #c3cbd2; --coin-c: #d98b55;
+  --shadow-1: 0 1px 2px rgb(0 0 0 / .3);
+  --shadow-2: 0 8px 22px rgb(0 0 0 / .4), 0 2px 6px rgb(0 0 0 / .3);
+  --backdrop: rgb(3 6 10 / .66);
+  color-scheme: dark;
+}

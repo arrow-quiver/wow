@@ -1,0 +1,133 @@
+# Builds and publishes Guild Camp releases on this repository's GitHub Releases page.
+#
+#   v<version>        tag → build the Windows installer and publish release v<version>, marked Latest
+#                     (the app updates itself from the Latest release)
+#   addon-v<version>  tag → zip the addon and publish release addon-v<version>, never marked Latest,
+#                     and upload it to CurseForge when CF_API_TOKEN is set
+#
+# Make the tag with: node scripts/release.js addon --bump patch --tag-only --push   (or app)
+# The tag must match the version in the files; this workflow never bumps versions.
+# A release that is already on GitHub (published from a computer or the app's Releases page) is
+# skipped, not an error.
+#
+# Publishing runs scripts/release.js, which uses the GitHub CLI with this run's GITHUB_TOKEN
+# (GH_TOKEN below; it needs "contents: write"). Repository secrets (Settings → Secrets and
+# variables → Actions):
+#   GUILDCAMP_BNET_CLIENT_ID      Battle.net client id and secret, built into the installer. Without
+#   GUILDCAMP_BNET_CLIENT_SECRET  them the app builds fine but has no Battle.net sign-in.
+#   CF_API_TOKEN                  CurseForge API token (optional; addon only)
+name: Release
+
+on:
+  push:
+    tags: ['v*', 'addon-v*']
+  workflow_dispatch:
+    inputs:
+      kind:
+        description: What to publish (the version already in the files, on the branch you pick)
+        type: choice
+        options: [addon, app]
+        required: true
+      notes:
+        description: Release notes (leave empty to use the commits since the last tag)
+        type: string
+        required: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  app:
+    if: (github.event_name == 'push' && startsWith(github.ref_name, 'v')) || (github.event_name == 'workflow_dispatch' && inputs.kind == 'app')
+    runs-on: windows-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history and tags, for the changelog
+      - name: Skip a release that is already on GitHub
+        id: existing
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft' 2>/dev/null | grep -qx false; then
+            echo "::notice::The release $GITHUB_REF_NAME is already on GitHub. Nothing to do."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/setup-node@v4
+        if: steps.existing.outputs.skip != 'true'
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - name: Check the tag matches app/package.json
+        if: github.event_name == 'push' && steps.existing.outputs.skip != 'true'
+        shell: bash
+        run: |
+          v=$(node -p "require('./app/package.json').version")
+          if [ "$GITHUB_REF_NAME" != "v$v" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME doesn't match app/package.json version $v. Bump the version, commit, then tag v<version>."
+            exit 1
+          fi
+      - name: Install app dependencies
+        if: steps.existing.outputs.skip != 'true'
+        run: npm ci --prefix app
+      - name: Build and publish
+        if: steps.existing.outputs.skip != 'true'
+        shell: bash
+        env:
+          GUILDCAMP_BNET_CLIENT_ID: ${{ secrets.GUILDCAMP_BNET_CLIENT_ID }}
+          GUILDCAMP_BNET_CLIENT_SECRET: ${{ secrets.GUILDCAMP_BNET_CLIENT_SECRET }}
+          NOTES: ${{ inputs.notes }}
+        run: |
+          if [ -z "$GUILDCAMP_BNET_CLIENT_ID" ] && [ -z "$GUILDCAMP_BNET_CLIENT_SECRET" ]; then
+            echo "::warning::The GUILDCAMP_BNET_CLIENT_ID and GUILDCAMP_BNET_CLIENT_SECRET secrets aren't set, so this build has no Battle.net sign-in."
+          fi
+          args=(app --no-bump --skip-published)
+          if [ -n "$NOTES" ]; then args+=(--notes "$NOTES"); else args+=(--notes-from-git); fi
+          node scripts/release.js "${args[@]}"
+
+  addon:
+    if: (github.event_name == 'push' && startsWith(github.ref_name, 'addon-v')) || (github.event_name == 'workflow_dispatch' && inputs.kind == 'addon')
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history and tags, for the changelog
+      - name: Skip a release that is already on GitHub
+        id: existing
+        if: github.event_name == 'push'
+        run: |
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft' 2>/dev/null | grep -qx false; then
+            echo "::notice::The release $GITHUB_REF_NAME is already on GitHub. Nothing to do."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/setup-node@v4
+        if: steps.existing.outputs.skip != 'true'
+        with:
+          node-version: 24
+      - name: Check the tag matches WowGuild.toc
+        if: github.event_name == 'push' && steps.existing.outputs.skip != 'true'
+        run: |
+          v=$(node -p "require('./app/src/shared/toc').tocVersion(require('fs').readFileSync('addon/WowGuild/WowGuild.toc','utf8'))")
+          if [ "$GITHUB_REF_NAME" != "addon-v$v" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME doesn't match \"## Version: $v\" in WowGuild.toc. Bump the version, commit, then tag addon-v<version>."
+            exit 1
+          fi
+      - name: Zip and publish
+        if: steps.existing.outputs.skip != 'true'
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          NOTES: ${{ inputs.notes }}
+        run: |
+          args=(addon --no-bump --skip-published)
+          if [ -n "$NOTES" ]; then args+=(--notes "$NOTES"); else args+=(--notes-from-git); fi
+          if [ -n "$CF_API_TOKEN" ]; then args+=(--curseforge); fi
+          node scripts/release.js "${args[@]}"
