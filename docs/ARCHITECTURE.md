@@ -540,7 +540,7 @@ a Discord webhook. Use it?".
   sharing status. `lib/router.js` is a hash router.
 - Pages are `pages/<name>.js`, registered in `pages/index.js` with `{ path, load, title, nav, icon, officer?,
   owner?, publisher?, public?, bare? }`.
-- Navigation: **Play** Camp, Coach, War, Raids, Crafters, Requests, Partners · **Guild** Roster, Bank, Prices, Drives,
+- Navigation: **Play** Camp, Coach, War, Raids, Crafters, Requests, Partners · **Guild** Roster, Bank, Donate, Prices, Drives,
   Loot, Guild settings · **Officers** Officer tools · **App** Addon & sync, Settings, Updates, Releases (only on a
   PC that can publish). Not in the sidebar: `/raids/:id`, `/raids/:id/loot`, `/characters/:name`, `/welcome`.
 - The gate: the welcome flow until setup is done (`settings.onboarded`), then every page. Pages that need guild

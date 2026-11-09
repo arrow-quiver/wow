@@ -805,6 +805,25 @@ const MIGRATIONS = [
    );
    CREATE INDEX war_marks_at ON war_marks(guild_id, at);
    CREATE TABLE war_maps (map_id INTEGER PRIMARY KEY, name TEXT NOT NULL);`,
+
+  // 21: Donations. Each gold or item deposit in the guild bank log (bank_log, from whoever scanned the bank), valued
+  // once at the price of its day: the guild's Auctionator price index on or before that day, else what a vendor
+  // pays. value NULL = no price known yet (tried again later). user_id = the player of the character `who`.
+  `CREATE TABLE donations (
+     id INTEGER PRIMARY KEY,
+     guild_id INTEGER NOT NULL REFERENCES guilds(id),
+     log_id INTEGER NOT NULL REFERENCES bank_log(id) ON DELETE CASCADE,
+     who TEXT NOT NULL,
+     user_id INTEGER REFERENCES users(id),
+     kind TEXT NOT NULL CHECK (kind IN ('gold','item')),
+     item_id INTEGER, count INTEGER,
+     value INTEGER,
+     priced_from TEXT CHECK (priced_from IN ('gold','auction','vendor')),
+     price_day TEXT,
+     at TEXT NOT NULL,
+     UNIQUE (log_id)
+   );
+   CREATE INDEX donations_at ON donations(guild_id, at);`,
 ];
 
 // Runs every migration the database hasn't had yet, each in its own transaction.

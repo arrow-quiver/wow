@@ -434,3 +434,17 @@ test('raids page data through the API: the projected raid shows like any other',
   const one = await h.srv.api.get(`/api/raids/${raid.id}`);
   assert.equal(one.status, 200);
 });
+
+test('guild bank log from the shared record: identical lines are kept apart and a line I uploaded myself is not doubled', () => {
+  const h = lightDb({ role: 'member' });
+  try {
+    const E = require('../../src/core/services/economy');
+    // My own upload saw the gold deposit with a time estimate 50 minutes off the shared record's whole hour.
+    E.recordBankLog(h.db, h.gid, [{ kind: 'deposit', who: 'Jaina', amount: 500000, at: NOW - 3600 * 5 + 3000 }]);
+    const line = { at: NOW - 3600, kind: 'deposit', who: 'Jaina', item: 2589, count: 20 };
+    h.imp([...CHS, rec('gb', '0', NOW - 100, 'Jaina', { scannedAt: NOW - 120, money: 1, tabs: ['Mats'],
+      log: [line, line, { at: NOW - 3600 * 5, kind: 'deposit', who: 'Jaina', amount: 500000 }] })]);
+    assert.deepEqual(h.db.prepare('SELECT item_id, amount FROM bank_log ORDER BY id').all().map((r) => [r.item_id, r.amount]),
+      [[null, 500000], [2589, null], [2589, null]]);
+  } finally { h.close(); }
+});

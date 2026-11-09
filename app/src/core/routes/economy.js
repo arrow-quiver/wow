@@ -12,6 +12,7 @@
 // Guildmates are told by their own apps, and Discord posts go out when the game confirms the change.
 const E = require('../services/economy');
 const D = require('../services/deals');
+const Donations = require('../services/donations');
 const sharing = require('../sharing');
 const { notElsewhere } = require('../identity');
 const { HttpError, str, int, needGuild, needOfficer, isOfficer } = require('../http');
@@ -183,6 +184,12 @@ function register(app, ctx) {
   }
 
   // ---------- Bank ----------
+
+  // Donations: what guildies asked the bank for (with today's prices) and who has given what (services/donations.js).
+  app.get('/api/donations', needGuild, (req, res) => {
+    const days = int(req.query.days, 1, 365) || 30;
+    res.json(Donations.overview(db, req.guild.id, req.user.id, { days }));
+  });
 
   app.get('/api/bank', needGuild, (req, res) => {
     const gid = req.guild.id;

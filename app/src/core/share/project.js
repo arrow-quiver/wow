@@ -14,6 +14,7 @@ const S = require('../../shared/sharing');
 const identity = require('../identity');
 const st = require('./store');
 const War = require('../services/war');
+const Economy = require('../services/economy');
 
 const AWARD_KIND = { s: 'sr', m: 'ms', o: 'os', f: 'free' };
 const ROLE = { t: 'tank', h: 'healer', d: 'dps' };
@@ -694,14 +695,8 @@ function projectGb(db, gid) {
     const name = String(tabs[n - 1] || `Tab ${n}`).slice(0, 40);
     for (const it of r.fields.items || []) if (it && it.id && it.count > 0) ins.run(gid, name, it.id, it.count);
   }
-  const insLog = db.prepare('INSERT OR IGNORE INTO bank_log (guild_id, kind, who, item_id, count, amount, at, dedupe) VALUES (?,?,?,?,?,?,?,?)');
-  for (const e of f0.log || []) {
-    if (!e || !e.at) continue;
-    const kind = String(e.kind || 'unknown').slice(0, 20);
-    const who = e.who ? String(e.who).slice(0, 40) : null;
-    const key = [kind, who, e.item || '', e.count || '', e.amount || '', Math.floor(e.at / 21600)].join('|');
-    insLog.run(gid, kind, who, e.item || null, e.count ?? null, e.amount ?? null, st.iso(e.at), key);
-  }
+  Economy.recordBankLog(db, gid, (f0.log || []).filter(Boolean)
+    .map((e) => ({ at: e.at, kind: e.kind, who: e.who, item: e.item, count: e.count, amount: e.amount })));
 }
 
 // ---------------------------------------------------------------------------------------------

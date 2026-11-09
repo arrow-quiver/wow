@@ -19,6 +19,7 @@ export const routes = [
   // Guild
   { path: '/roster', load: () => import('./roster.js'), title: 'Roster', nav: 'Guild', icon: 'roster' },
   { path: '/bank', load: () => import('./bank.js'), title: 'Bank', nav: 'Guild', icon: 'bank' },
+  { path: '/donate', load: () => import('./donate.js'), title: 'Donate', nav: 'Guild', icon: 'gift' },
   { path: '/prices', load: () => import('./prices.js'), title: 'Prices', nav: 'Guild', icon: 'prices' },
   { path: '/deals', load: () => import('./deals.js'), title: 'Deal hunter', nav: 'Guild', icon: 'deals' },
   { path: '/drives', load: () => import('./drives.js'), title: 'Drives', nav: 'Guild', icon: 'drives' },
