@@ -16,7 +16,7 @@ const PLAN = {
   next_steps: [{ title: 'Spend your talent point', detail: 'Put it in Tactical Mastery' }], tips: ['Open with Charge from max range'], confidence: 'classic',
 };
 const ANSWER = '**Take Deflection** for now — it’s better in duels.\n# Why\n* parry more';
-const ALLOWED = ['wowhead.com', 'warcraft.wiki.gg', 'worldofwarcraft.blizzard.com', 'icy-veins.com', 'reddit.com'];
+const ALLOWED = ['wowhead.com', 'warcraft.wiki.gg', 'worldofwarcraft.blizzard.com', 'method.gg', 'mobalytics.gg', 'warcrafttavern.com', 'icy-veins.com'];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function waitFor(fn, what, ms = 4000) {

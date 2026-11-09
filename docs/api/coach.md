@@ -13,7 +13,7 @@ The Coach is personal: nothing here is shared with guildmates.
 - **Claude.** The player's own Anthropic API key, entered in Settings → Coach and stored encrypted on this computer
   (secret `anthropicKey`; the page can set it but never read it back). Plans use `cfg.coachModel` (`claude-sonnet-5-5`,
   up to 4 web searches), answers use `cfg.coachFastModel` (`claude-haiku-5-5`, up to 2 searches). Web search is
-  limited to wowhead.com, warcraft.wiki.gg, worldofwarcraft.blizzard.com, icy-veins.com and reddit.com. Every call is metered in `ai_usage`.
+  limited to WoW: Forever guides and databases (`ai.SEARCH_SITES`: wowhead.com, warcraft.wiki.gg, worldofwarcraft.blizzard.com, method.gg, mobalytics.gg, warcrafttavern.com, icy-veins.com). Reddit blocks Claude's search, so it is not on the list; a site the API refuses ("domains are not accessible") is dropped until the app restarts and the question is sent again without it. Every call is metered in `ai_usage`.
 - **Limits.** **30 questions and 5 plans a day** (UTC). A **monthly budget** (USD, default 15) and an on/off switch
   for the AI live in Guild settings (`PUT /api/guild/settings { coach_enabled, coach_budget_usd }`, see core.md).
   Anyone can change them: the key and the bill are the player's own.

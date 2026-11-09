@@ -390,6 +390,35 @@ test('ai: costs per model, and clear errors without a key or when Claude fails',
   await assert.rejects(ai.ask({ anthropicKey: 'k' }, { model: 'm', messages: [], fetchImpl: refused }), /Claude API 401: invalid x-api-key/);
 });
 
+test('ai: searches Forever guide sites, never Reddit; a site Claude\'s search refuses is dropped and the question asked again', async () => {
+  assert.ok(!ai.SEARCH_SITES.includes('reddit.com'));
+  assert.ok(ai.SEARCH_SITES.includes('wowhead.com'));
+  assert.deepStrictEqual(ai.refusedDomains("The following domains are not accessible to our user agent: ['reddit.com', \"x.gg\"]. Read more: …"), ['reddit.com', 'x.gg']);
+  assert.deepStrictEqual(ai.refusedDomains('something else [1]'), []);
+  const calls = [];
+  const fetchImpl = async (url, opts) => {
+    const body = JSON.parse(opts.body);
+    calls.push(body.tools ? body.tools[0].allowed_domains : null);
+    if (body.tools && body.tools[0].allowed_domains.includes('mobalytics.gg')) {
+      return { ok: false, status: 400, json: async () => ({ error: { message: "The following domains are not accessible to our user agent: ['mobalytics.gg']." } }) };
+    }
+    return { ok: true, status: 200, json: async () => ({ content: [{ type: 'text', text: 'Take Flurry.' }], usage: { input_tokens: 5, output_tokens: 3 }, stop_reason: 'end_turn' }) };
+  };
+  try {
+    const r = await ai.ask({ anthropicKey: 'k' }, { model: 'claude-haiku-5-5', messages: [{ role: 'user', content: 'q' }], searches: 2, fetchImpl });
+    assert.strictEqual(r.text, 'Take Flurry.');
+    assert.strictEqual(calls.length, 2);
+    assert.ok(calls[0].includes('mobalytics.gg'));
+    assert.ok(!calls[1].includes('mobalytics.gg') && calls[1].includes('wowhead.com'));
+    // Remembered: the next question leaves it out from the start.
+    await ai.ask({ anthropicKey: 'k' }, { model: 'claude-haiku-5-5', messages: [{ role: 'user', content: 'q' }], searches: 2, fetchImpl });
+    assert.strictEqual(calls.length, 3);
+    // Other 400s are still errors.
+    const bad = async () => ({ ok: false, status: 400, json: async () => ({ error: { message: 'max_tokens too large' } }) });
+    await assert.rejects(ai.ask({ anthropicKey: 'k' }, { model: 'm', messages: [], searches: 1, fetchImpl: bad }), /Claude API 400: max_tokens too large/);
+  } finally { ai._refusedSites.clear(); }
+});
+
 // ====================================================================== raids
 
 // A database built by hand, the way the old server stored raids (no shared records): for the tests that only read rows.
