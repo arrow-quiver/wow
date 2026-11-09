@@ -524,3 +524,34 @@ test('the background hook: kick() waits for timers, run() works at once, and the
   await waitFor(() => live.srv.db.prepare("SELECT status FROM coach_qa WHERE status = 'answered'").get(), 'the kicked run');
   assert.strictEqual(live.Cl.answers().length, 1);
 });
+
+test('follow-up questions: the Coach sees the last few answers about the same character, unless it is a new topic', async (t) => {
+  const { srv, g: G, u, Cl, owner } = await setup();
+  t.after(() => srv.close());
+  applyPayload(srv.db, G.guildId, u, coachPayload({ questions: [] }));
+  const ask = (question, extra = {}) => owner.post('/api/coach/ask', { char: 'Grom', question, ...extra });
+  assert.strictEqual((await ask('Best place to level at 24?')).status, 200);
+  let msgs = Cl.answers().at(-1).body.messages;
+  assert.strictEqual(msgs.length, 1, 'the first question stands alone');
+  assert.match(msgs[0].content, /Character: Grom[\s\S]*Question: Best place to level at 24\?/);
+
+  await ask('And at level 40?');
+  msgs = Cl.answers().at(-1).body.messages;
+  assert.deepStrictEqual(msgs.map((m) => m.role), ['user', 'assistant', 'user']);
+  assert.match(msgs[0].content, /Character: Grom[\s\S]*Question: Best place to level at 24\?/);
+  assert.strictEqual(msgs[1].content, srv.db.prepare('SELECT answer FROM coach_qa ORDER BY id LIMIT 1').get().answer);
+  assert.strictEqual(msgs[2].content, 'Follow-up question: And at level 40?');
+
+  // At most three earlier turns.
+  await ask('Three?'); await ask('Four?'); await ask('Five?');
+  msgs = Cl.answers().at(-1).body.messages;
+  assert.strictEqual(msgs.length, 7);
+  assert.match(msgs[0].content, /Question: And at level 40\?/);
+
+  // A new topic, or questions older than three hours, start fresh.
+  await ask('Totally new thing', { fresh: true });
+  assert.strictEqual(Cl.answers().at(-1).body.messages.length, 1);
+  srv.db.prepare("UPDATE coach_qa SET created_at = datetime('now', '-4 hours')").run();
+  await ask('After a break?');
+  assert.strictEqual(Cl.answers().at(-1).body.messages.length, 1);
+});
