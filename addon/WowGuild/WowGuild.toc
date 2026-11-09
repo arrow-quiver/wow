@@ -21,6 +21,7 @@ UI.lua
 Professions.lua
 ProfUI.lua
 Deals.lua
+AuctionTab.lua
 Options.lua
 Coach.lua
 CoachUI.lua
