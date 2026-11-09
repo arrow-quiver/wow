@@ -1,4 +1,4 @@
--- wow guild: the shared look. Dark night-sky panels, gold rules and corner brackets,
+-- Guild Camp: the shared look. Dark night-sky panels, gold rules and corner brackets,
 -- the same style as the guild website and its loading screen.
 local ADDON, ns = ...
 local S = {}

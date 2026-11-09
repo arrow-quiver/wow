@@ -1,4 +1,4 @@
--- wow guild: the main window. Everything the slash commands do, as buttons.
+-- Guild Camp: the main window. Everything the slash commands do, as buttons.
 -- Open it from the minimap campfire, the addon list (Retail), a key binding, or /wow.
 local ADDON, ns = ...
 local W = {}
@@ -367,7 +367,7 @@ local function createWindow()
     f.title = label(f, "", "GameFontNormalLarge"); f.title:SetPoint("TOPLEFT", 16, -12)
     local close = CreateFrame("Button", nil, f, "UIPanelCloseButton"); close:SetPoint("TOPRIGHT", -2, -2)
   end
-  setTitle(f, "wow guild")
+  setTitle(f, "Guild Camp")
 
   -- Tabs along the bottom edge, like the character and guild windows.
   f.tabs, f.pages = {}, {}
@@ -436,7 +436,7 @@ function W.show(key)
     if f.styled then tab.select(t.key == key)
     elseif not f.bottomTabs and tab.LockHighlight then if t.key == key then tab:LockHighlight() else tab:UnlockHighlight() end end
   end
-  setTitle(f, "wow guild" .. ((WowGuildInbox and WowGuildInbox.guild) and ("  |cff999999" .. WowGuildInbox.guild .. "|r") or ""))
+  setTitle(f, "Guild Camp" .. ((WowGuildInbox and WowGuildInbox.guild) and ("  |cff999999" .. WowGuildInbox.guild .. "|r") or ""))
   f:Show()
   f.pages[key].refresh()
 end
@@ -501,7 +501,7 @@ local function createMini()
   b:SetScript("OnEnter", function(self)
     if not GameTooltip then return end
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-    GameTooltip:AddLine("wow guild")
+    GameTooltip:AddLine("Guild Camp")
     GameTooltip:AddLine("Click: open the guild window", 1, 1, 1)
     GameTooltip:AddLine("Right-click: settings", 1, 1, 1)
     GameTooltip:AddLine("Drag: move this button", 0.6, 0.6, 0.6)
@@ -518,11 +518,11 @@ local function setupBroker()
   if ldbObject or not LibStub then return end
   local ldb = LibStub("LibDataBroker-1.1", true)
   if not ldb then return end
-  ldbObject = ldb:NewDataObject("wow guild", {
-    type = "launcher", label = "wow guild", icon = "Interface\\Icons\\Spell_Fire_Fire",
+  ldbObject = ldb:NewDataObject("Guild Camp", {
+    type = "launcher", label = "Guild Camp", icon = "Interface\\Icons\\Spell_Fire_Fire",
     OnClick = function(_, which) if which == "RightButton" then W.show("settings") else W.toggle() end end,
     OnTooltipShow = function(tt)
-      tt:AddLine("wow guild")
+      tt:AddLine("Guild Camp")
       tt:AddLine("Click: open the guild window", 1, 1, 1)
       tt:AddLine("Right-click: settings", 1, 1, 1)
     end,
@@ -531,7 +531,7 @@ local function setupBroker()
   if dbicon then
     ns.db.ui = ns.db.ui or {}
     ns.db.ui.dbicon = ns.db.ui.dbicon or {}
-    dbicon:Register("wow guild", ldbObject, ns.db.ui.dbicon)
+    dbicon:Register("Guild Camp", ldbObject, ns.db.ui.dbicon)
   end
 end
 ns.broker = function() return ldbObject, dbicon end
@@ -540,7 +540,7 @@ function ns.applyOptions()
   setupBroker()
   if dbicon then
     ns.db.ui.dbicon.hide = not ns.opt("minimapButton")
-    if ns.opt("minimapButton") then dbicon:Show("wow guild") else dbicon:Hide("wow guild") end
+    if ns.opt("minimapButton") then dbicon:Show("Guild Camp") else dbicon:Hide("Guild Camp") end
     if mini then mini:Hide() end
   elseif Minimap then
     if ns.opt("minimapButton") then
@@ -560,6 +560,6 @@ ns.on("PLAYER_LOGIN", function() ns.applyOptions() end)
 -- Retail's addon drawer (AddonCompartmentFunc in the .toc) and the key binding (Bindings.xml).
 function WowGuild_OnAddonCompartmentClick() W.toggle() end
 function WowGuild_Toggle() W.toggle() end
-BINDING_HEADER_WOWGUILD = "wow guild"
+BINDING_HEADER_WOWGUILD = "Guild Camp"
 BINDING_NAME_WOWGUILD_TOGGLE = "Open or close the guild window"
 BINDING_NAME_WOWGUILD_COACH = "Open or close the Coach"

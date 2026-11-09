@@ -1,4 +1,4 @@
--- wow guild: problem report. Settings tab → "Problem report" (or /wow debug) shows a box
+-- Guild Camp: problem report. Settings tab → "Problem report" (or /wow debug) shows a box
 -- of text to copy (Ctrl+A, Ctrl+C) and send to an officer.
 local ADDON, ns = ...
 

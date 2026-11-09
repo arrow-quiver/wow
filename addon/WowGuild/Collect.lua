@@ -1,4 +1,4 @@
--- wow guild: data collectors. All out of combat.
+-- Guild Camp: data collectors. All out of combat.
 local ADDON, ns = ...
 
 local function safeCombat() return not (InCombatLockdown and InCombatLockdown()) end

@@ -1,18 +1,19 @@
-/* Theme: dark fantasy, matching the loading screen and the in-game Coach. One theme for everyone. */
+/* Theme: WoW: Forever palette (slate-navy, emblem blue, Warcraft gold, cream lettering), dark,
+   with the gold frames of the loading screen and the in-game Coach. One theme for everyone. */
 :root {
-  --pine: #090b0f;          /* sidebar */
-  --pine-2: #1c1914;        /* sidebar hover/active */
-  --ember: #e0a650;         /* gold-ember accent */
-  --ember-deep: #b77a35;
+  --pine: #0b1017;          /* sidebar */
+  --pine-2: #1d4f78;        /* emblem blue */
+  --ember: #eaa93a;         /* Warcraft gold */
+  --ember-deep: #a8701f;
   --gold: #d8b777;
   --gold-soft: #d8b77733;
   --blood: #7a2a24;
-  --mist: #0b0d12;          /* page */
-  --paper: #141821;         /* cards and inputs */
-  --paper-2: #1a1f2a;
-  --ink: #ece3d0;           /* parchment text */
-  --ink-2: #a49d91;
-  --line: #2e2a24;
+  --mist: #10161e;          /* page */
+  --paper: #18212c;         /* cards and inputs */
+  --paper-2: #1d2735;
+  --ink: #f1ebdd;           /* cream lettering */
+  --ink-2: #aab3bd;
+  --line: #2c3a4b;
   --alarm: #e0634f;
   --ok: #73c088;
   --radius-s: 3px;
@@ -42,14 +43,14 @@ code { font-size: .9em; background: color-mix(in srgb, var(--ink) 8%, transparen
 .shell { display: grid; grid-template-columns: 230px 1fr; min-height: 100vh; }
 .shell--bare { grid-template-columns: minmax(0, 1fr); }
 .side, .main { min-width: 0; }
-.side { background: var(--pine); color: #e8efe9; padding: 1.4rem 1rem; display: flex; flex-direction: column; gap: 1.6rem; position: sticky; top: 0; height: 100vh; }
+.side { background: var(--pine); color: #efe8d8; padding: 1.4rem 1rem; display: flex; flex-direction: column; gap: 1.6rem; position: sticky; top: 0; height: 100vh; }
 .side .brand { display: flex; align-items: center; gap: .6rem; color: #fff; text-decoration: none; font: 800 1.6rem "Alegreya", serif; }
 .nav { display: flex; flex-direction: column; gap: .15rem; }
-.side .nav-link { color: #cfdcd5; text-decoration: none; padding: .45rem .7rem; border-radius: var(--radius-s); }
+.side .nav-link { color: #d0d7df; text-decoration: none; padding: .45rem .7rem; border-radius: var(--radius-s); }
 .side .nav-link:hover { background: var(--pine-2); color: #fff; }
 .side .nav-link.is-active { background: var(--pine-2); color: #fff; box-shadow: inset 3px 0 0 var(--ember); }
 .side-foot { margin-top: auto; font-size: .9rem; display: flex; flex-direction: column; gap: .3rem; }
-.who { color: #cfdcd5; }
+.who { color: #d0d7df; }
 .link-btn { background: none; border: 0; padding: 0; color: var(--ember); cursor: pointer; font: inherit; text-decoration: underline; }
 .main { padding: 2.2rem clamp(16px, 4vw, 3.5rem) 4rem; max-width: 1180px; width: 100%; }
 .flash { background: var(--paper); border-left: 4px solid var(--ok); padding: .6rem .9rem; border-radius: var(--radius-s); }
@@ -77,7 +78,7 @@ label { display: flex; flex-direction: column; gap: .25rem; font-weight: 500; fo
 }
 .btn:hover { border-color: var(--ink-2); }
 .btn-primary { background: var(--ember); border-color: var(--ember-deep); color: #231505; }
-.btn-primary:hover { background: #f0b456; border-color: var(--ember-deep); }
+.btn-primary:hover { background: #f2bd5c; border-color: var(--ember-deep); }
 .btn-alarm { background: var(--alarm); border-color: #8c2a22; color: #fff; }
 .btn-alarm:hover { background: #c4443a; border-color: #8c2a22; }
 .btn-small { padding: .3rem .65rem; font-size: .88rem; }
@@ -239,7 +240,7 @@ th.num, td.num { text-align: right; }
 details > summary { cursor: pointer; }
 .setting details { margin: .5rem 0; }
 /* Sidebar links keep their own colours in dark mode too. */
-body .side a.nav-link { color: #cfdcd5; }
+body .side a.nav-link { color: #d0d7df; }
 body .side a.nav-link:hover, body .side a.nav-link.is-active { color: #fff; }
 body .side a.brand { color: #fff; }
 
@@ -302,12 +303,12 @@ button[aria-busy="true"] { opacity: .7; cursor: progress; }
 @media (max-width: 720px) { .coach-hero, .coach-grid { grid-template-columns: minmax(0, 1fr); } }
 
 /* ================= Dark fantasy skin ================= */
-html { background: #0a0c10; }
+html { background: #0b1017; }
 body {
   background:
-    radial-gradient(ellipse 70% 45% at 85% -5%, #a14b3826, transparent 70%),
-    radial-gradient(ellipse 50% 40% at 0% 100%, #3c716e14, transparent 70%),
-    linear-gradient(180deg, #0d1118 0%, #0a0c10 60%, #08090c 100%) fixed;
+    radial-gradient(ellipse 70% 45% at 85% -5%, #a14b3824, transparent 70%),
+    radial-gradient(ellipse 60% 45% at 0% 100%, #1a5d8f1f, transparent 70%),
+    linear-gradient(180deg, #131b26 0%, #0f151d 60%, #0b1017 100%) fixed;
 }
 h1, h2, legend, .raid-title, .welcome h1 { font-family: "Cinzel", "Alegreya", Georgia, serif; color: #e8d3ac; letter-spacing: .03em; }
 h1 { font-weight: 700; text-shadow: 0 2px 18px #000, 0 0 30px #c48d4b22; }
@@ -317,17 +318,17 @@ h3 { font-family: "Cinzel", Georgia, serif; color: var(--gold); letter-spacing: 
 ::selection { background: #e0a65055; }
 
 /* Sidebar: dark, with a gold rule and an ember marker. */
-.side { background: linear-gradient(180deg, #0c0e13, #07080b); border-right: 1px solid var(--gold-soft); }
+.side { background: linear-gradient(180deg, #0e141c, #090d13); border-right: 1px solid var(--gold-soft); }
 .side .brand { font-family: "Cinzel", serif; letter-spacing: .12em; color: #e8d3ac; text-transform: uppercase; font-size: 1.35rem; }
 body .side a.brand { color: #e8d3ac; }
 body .side a.nav-link { color: #b9b1a3; letter-spacing: .02em; }
 body .side a.nav-link:hover { color: #f1e5ce; background: #ffffff08; }
-body .side a.nav-link.is-active { color: #f1d9ac; background: linear-gradient(90deg, #e0a65022, transparent); box-shadow: inset 2px 0 0 var(--ember); }
+body .side a.nav-link.is-active { color: #f5dcaa; background: linear-gradient(90deg, #1d4f7888, transparent); box-shadow: inset 2px 0 0 var(--ember); }
 .who { color: #8d877d; }
 
 /* Sections become framed panels with gold corner brackets, like the loading screen. */
 .setting, .loot-card, .onboard, .drive, .coach-hero {
-  position: relative; background: linear-gradient(180deg, #151a23e6, #10141be6);
+  position: relative; background: linear-gradient(180deg, #19222ee6, #141b25e6);
   border: 1px solid #d8b77722; border-radius: var(--radius-s);
   padding: 1.2rem 1.4rem 1.4rem; margin: 0 0 1.2rem; box-shadow: 0 10px 30px #0006;
 }
@@ -354,7 +355,7 @@ body .side a.nav-link.is-active { color: #f1d9ac; background: linear-gradient(90
 body .main a.btn { color: var(--ink); }
 
 /* Inputs */
-input, select, textarea { background: #0c0f15; border-color: #3a342b; color: var(--ink); }
+input, select, textarea { background: #0d131b; border-color: #2f3d4f; color: var(--ink); }
 input:focus, select:focus, textarea:focus { border-color: var(--gold); outline: none; box-shadow: 0 0 0 3px #e0a65022; }
 input::placeholder, textarea::placeholder { color: #6f6a62; }
 
@@ -368,17 +369,17 @@ tbody tr:hover td { background: #ffffff05; }
 .bar span { background: linear-gradient(90deg, #63251f, #c47d43, #f4d49c); box-shadow: 0 0 10px #d39a5c66; }
 .pill { background: #d8b7771f; color: #f1d9ac; border: 1px solid #d8b77733; }
 .flash { background: #1b2a20; border-left-color: var(--ok); }
-code, .token { background: #0c0f15; border: 1px solid #2e2a24; }
-.token-once { background: #17140f; }
+code, .token { background: #0d131b; border: 1px solid #2c3a4b; }
+.token-once { background: #1a1d1f; }
 .feed-item, .notices li, .board li, .results li, .prof-summary li, .req, .signups li, .raid-row { border-bottom-color: #ffffff0f; }
 .cta-item strong { color: #ff8a73; }
 .spark polyline { stroke: var(--ember); }
 .rolls li.top strong { color: var(--ember); }
 
 /* The camp ring sits under a night sky. */
-.ring { background: radial-gradient(circle at 50% 54%, #e0a6504d 0, transparent 46%), radial-gradient(circle at 50% 50%, #1a1d26, #0a0c11 70%); box-shadow: 0 0 0 1px #d8b77744, 0 0 60px #c47d4322; }
+.ring { background: radial-gradient(circle at 50% 54%, #eaa93a4d 0, transparent 46%), radial-gradient(circle at 50% 50%, #1a2433, #0b1017 70%); box-shadow: 0 0 0 1px #d8b77744, 0 0 60px #c47d4322; }
 .seat-dot { border-color: #e8d3ac; box-shadow: 0 0 10px #000; }
-.seat-name { background: #090b0fdd; }
+.seat-name { background: #0b1017dd; }
 
 /* Wowhead links stay readable on dark. */
 a.wh { color: #f1e5ce; }

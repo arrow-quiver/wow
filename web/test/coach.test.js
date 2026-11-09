@@ -171,6 +171,6 @@ test('the companion keeps checking until the Coach has answered, then saves the 
     const ok = await followCoach({ siteUrl: `http://127.0.0.1:${srv.address().port}`, syncKey: 'wowg_x' }, game, { every: 5, tries: 10 });
     assert.strictEqual(ok, true);
     assert.strictEqual(calls, 3);
-    assert.match(fs.readFileSync(path.join(game, 'Interface', 'AddOns', 'WowGuild', 'Data', 'Inbox.lua'), 'utf8'), /hello/);
+    assert.match(fs.readFileSync(path.join(game, 'Interface', 'AddOns', 'WowGuild_Inbox', 'Inbox.lua'), 'utf8'), /hello/);
   } finally { srv.close(); }
 });

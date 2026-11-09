@@ -1,4 +1,4 @@
--- wow guild: options panel (Settings → AddOns → wow guild, or /wow options).
+-- Guild Camp: options panel (Settings → AddOns → Guild Camp, or /wow options).
 local ADDON, ns = ...
 
 ns.OPTION_LIST = {
@@ -14,11 +14,11 @@ ns.OPTION_LIST = {
 local OPTIONS = ns.OPTION_LIST
 
 local panel = CreateFrame("Frame")
-panel.name = "wow guild"
+panel.name = "Guild Camp"
 
 local title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
 title:SetPoint("TOPLEFT", 16, -16)
-title:SetText("wow guild")
+title:SetText("Guild Camp")
 local sub = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
 sub:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -8)
 sub:SetWidth(560); sub:SetJustifyH("LEFT")

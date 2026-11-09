@@ -1,4 +1,4 @@
--- wow guild: profession helper panels.
+-- Guild Camp: profession helper panels.
 --   Guide: sits beside the profession window, lists the cheapest skill-ups.
 --   Tracker: small movable list of mats still needed for your shopping list.
 local ADDON, ns = ...

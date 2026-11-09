@@ -116,12 +116,12 @@ test('professions tab: mats as item rows, auction house search and Auctionator l
   assert.strictEqual(wow.eval('__tt[1]'), 'item:2589');
   assert.strictEqual(wow.eval('tostring(WowGuildWindow.pages.prof.ahBtn:IsShown())'), 'true');
   wow.exec('__click(WowGuildWindow.pages.prof.ahBtn); __click(WowGuildWindow.pages.prof.listBtn)');
-  assert.deepStrictEqual(wow.eval('table.concat(__ah, ";")').split(';'), ['WowGuild:Linen Cloth', 'list:wow guild shopping list:1']);
+  assert.deepStrictEqual(wow.eval('table.concat(__ah, ";")').split(';'), ['WowGuild:Linen Cloth', 'list:Guild Camp shopping list:1']);
   assert.strictEqual(wow.eval('__ns.debugError'), null);
 });
 
 test('guild style by default: dark-and-gold window with text tabs, first-run welcome, what\'s new', () => {
-  const wow = client(INBOX, '\nfunction GetAddOnMetadata() return "0.9.0" end');
+  const wow = client(INBOX, '\nfunction GetAddOnMetadata() return "0.10.0" end');
   // First login shows the welcome once.
   assert.strictEqual(wow.eval('tostring(WowGuildWelcome:IsShown())'), 'true');
   assert.match(wow.eval('WowGuildWelcome.title:GetText()'), /wow/);
@@ -135,9 +135,9 @@ test('guild style by default: dark-and-gold window with text tabs, first-run wel
   assert.strictEqual(wow.eval('tostring(WowGuildWindow.tabs.camp.on)'), 'false');
   wow.exec('__click(WowGuildWindow.tabs.coach)');
   assert.strictEqual(wow.eval('tostring(WowGuildWindow.pages.coach:IsShown())'), 'true');
-  assert.match(wow.eval('WowGuildWindow.title:GetText()'), /wow guild/);
+  assert.match(wow.eval('WowGuildWindow.title:GetText()'), /Guild Camp/);
   // Next login: no welcome; after an update with news: what's new, once.
-  wow.exec('WowGuildWelcome:Hide(); __ns.db.newsSeen = "0.8.0"; __ns.welcome.check()');
+  wow.exec('WowGuildWelcome:Hide(); __ns.db.newsSeen = "0.9.0"; __ns.welcome.check()');
   assert.strictEqual(wow.eval('WowGuildWelcome.caps:GetText()'), "WHAT'S NEW");
   wow.exec('WowGuildWelcome:Hide(); __ns.welcome.check()');
   assert.strictEqual(wow.eval('tostring(WowGuildWelcome:IsShown())'), 'false');
@@ -150,7 +150,7 @@ test('window uses Blizzard frame and bottom tabs when that style is picked', () 
   assert.strictEqual(wow.eval('tostring(WowGuildWindow.native)'), 'true');
   assert.strictEqual(wow.eval('tostring(WowGuildWindow.bottomTabs)'), 'true');
   assert.strictEqual(wow.eval('WowGuildWindow.selectedTab'), '5');
-  assert.match(wow.eval('WowGuildWindow.TitleText:GetText()'), /wow guild/);
+  assert.match(wow.eval('WowGuildWindow.TitleText:GetText()'), /Guild Camp/);
 });
 
 test('uses LibDBIcon when another addon provides it, instead of its own button', () => {
@@ -161,7 +161,7 @@ local dbi = { Register = function(self, name, obj, db) __dbicon.registered = nam
   Show = function(self) __dbicon.shown = true end, Hide = function(self) __dbicon.shown = false end }
 function LibStub(name) if name == "LibDataBroker-1.1" then return ldb elseif name == "LibDBIcon-1.0" then return dbi end end`;
   const wow = client(INBOX, LIBS);
-  assert.strictEqual(wow.eval('__dbicon.registered'), 'wow guild');
+  assert.strictEqual(wow.eval('__dbicon.registered'), 'Guild Camp');
   assert.strictEqual(wow.eval('tostring(__dbicon.shown)'), 'true');
   assert.strictEqual(wow.eval('tostring(WowGuildMinimapButton)'), 'nil', 'no duplicate button');
   wow.exec('__ldbobj.OnClick(nil, "LeftButton")');

@@ -1,4 +1,4 @@
--- wow guild: item helpers shared by the windows (icons, quality colours, tooltips, chat links).
+-- Guild Camp: item helpers shared by the windows (icons, quality colours, tooltips, chat links).
 local ADDON, ns = ...
 local I = {}
 ns.items = I

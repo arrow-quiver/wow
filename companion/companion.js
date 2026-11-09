@@ -145,7 +145,8 @@ async function ensureAddon(cfg, { fetchImpl = fetch } = {}) {
 function findGameFolders(cfg) {
   const roots = [];
   if (cfg.wowFolder) roots.push(cfg.wowFolder);
-  roots.push(
+  // Tests set this so they never touch a real game install on the machine running them.
+  if (!process.env.WOW_COMPANION_NO_SCAN) roots.push(
     'C:\\Program Files (x86)\\World of Warcraft', 'C:\\Program Files\\World of Warcraft',
     'D:\\World of Warcraft', 'D:\\Games\\World of Warcraft', 'E:\\World of Warcraft',
     '/Applications/World of Warcraft',
@@ -264,13 +265,58 @@ async function followCoach(cfg, gameDir, { every = 6000, tries = 20 } = {}) {
   } catch (e) { log(`Couldn't check on the Coach: ${e.message}`); return false; } finally { following.delete(gameDir); }
 }
 
+// The news goes in its own small addon folder (WowGuild_Inbox) so the addon's folder stays exactly
+// as shipped: addon managers like CurseForge replace that folder on every update and recognise it
+// by its files. WowGuild lists WowGuild_Inbox as an optional dependency, so the news loads first.
+const INBOX_ADDON = `${ADDON}_Inbox`;
+
+function writeFileAtomic(target, text) {
+  const tmp = target + '.tmp';
+  fs.writeFileSync(tmp, text);
+  fs.renameSync(tmp, target);
+}
+
+// Copy the Interface line from the installed addon, so the news addon is never "out of date".
+function inboxToc(addonDir) {
+  let iface = '16001, 120105';
+  try {
+    const m = /^## Interface:\s*(.+?)\s*$/m.exec(fs.readFileSync(path.join(addonDir, `${ADDON}.toc`), 'utf8'));
+    if (m) iface = m[1];
+  } catch { /* keep the default */ }
+  return [
+    `## Interface: ${iface}`,
+    '## Title: Guild Camp news',
+    '## Notes: News from your guild site for Guild Camp. The companion app rewrites this on every sync.',
+    `## Version: ${VERSION}`,
+    '',
+    'Inbox.lua',
+    '',
+  ].join('\r\n');
+}
+
 async function writeInbox(cfg, gameDir) {
   const lua = await api(cfg, 'GET', '/api/inbox.lua');
-  const target = path.join(gameDir, 'Interface', 'AddOns', ADDON, 'Data', 'Inbox.lua');
-  fs.mkdirSync(path.dirname(target), { recursive: true });
-  const tmp = target + '.tmp';
-  fs.writeFileSync(tmp, lua);
-  fs.renameSync(tmp, target);
+  const addons = path.join(gameDir, 'Interface', 'AddOns');
+  const addonDir = path.join(addons, ADDON);
+  const dir = path.join(addons, INBOX_ADDON);
+  fs.mkdirSync(dir, { recursive: true });
+  const toc = path.join(dir, `${INBOX_ADDON}.toc`);
+  const tocText = inboxToc(addonDir);
+  if (!fs.existsSync(toc) || fs.readFileSync(toc, 'utf8') !== tocText) writeFileAtomic(toc, tocText);
+  writeFileAtomic(path.join(dir, 'Inbox.lua'), lua);
+
+  // Addon 0.8 and older load the news from Data\Inbox.lua inside their own folder. Keep writing it
+  // for them; once the addon is updated, tidy the old file away.
+  const oldInbox = path.join(addonDir, 'Data', 'Inbox.lua');
+  let oldAddon = false;
+  try { oldAddon = /^Data[\\/]Inbox\.lua\s*$/m.test(fs.readFileSync(path.join(addonDir, `${ADDON}.toc`), 'utf8')); } catch { /* no toc */ }
+  if (oldAddon) {
+    fs.mkdirSync(path.dirname(oldInbox), { recursive: true });
+    writeFileAtomic(oldInbox, lua);
+  } else if (fs.existsSync(oldInbox)) {
+    fs.unlinkSync(oldInbox);
+    try { fs.rmdirSync(path.dirname(oldInbox)); } catch { /* not empty */ }
+  }
 }
 
 async function main() {
@@ -352,4 +398,4 @@ if (require.main === module) {
   main().catch((e) => { log(`Problem: ${e.message}`); if (process.platform === 'win32' && !process.argv.includes('--once')) setTimeout(() => {}, 60000); process.exitCode = 1; });
 }
 
-module.exports = { findGameFolders, findInstalls, installedVersion, ensureAddon, savedVariablesFiles, extractPrices, versionLess, followCoach };
+module.exports = { findGameFolders, findInstalls, installedVersion, ensureAddon, savedVariablesFiles, extractPrices, versionLess, followCoach, writeInbox, inboxToc };

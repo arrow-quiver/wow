@@ -1,4 +1,4 @@
--- wow guild: a short welcome the first time you log in, and "what's new" after an update.
+-- Guild Camp: a short welcome the first time you log in, and "what's new" after an update.
 local ADDON, ns = ...
 local S = ns.skin
 local WEL = {}
@@ -6,7 +6,7 @@ ns.welcome = WEL
 
 -- Shown once after updating to a version listed here.
 WEL.NEWS = {
-  ["0.9.0"] = {
+  ["0.10.0"] = {
     "A new dark-and-gold look for every window, matching the guild website. Prefer Blizzard's style? It's in the options.",
     "The Coach: your play style, a build plan from Claude, next steps, and questions (/wow coach).",
     "The companion can now install and update this addon for you.",
@@ -85,7 +85,7 @@ end
 function WEL.showNews(version, lines)
   local f = WEL.window()
   f.caps:SetText("WHAT'S NEW")
-  f.title:SetText("wow guild " .. version)
+  f.title:SetText("Guild Camp " .. version)
   for _, r in ipairs(f.rows) do r:Hide() end
   local t = {}
   for _, l in ipairs(lines) do t[#t + 1] = "|cffe8a33d-|r  " .. l end
