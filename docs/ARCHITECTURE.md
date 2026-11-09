@@ -345,7 +345,8 @@ addon/WowGuild/ShareCodec.lua   the same codec in Lua, byte for byte
 addon/WowGuild/Share.lua        store, outbox and acknowledgements, receiving and checks, queues and token bucket, /wow share
 addon/WowGuild/ShareSync.lua    hellos, inventories, gets, the beacon, catch-up, pruning
 addon/WowGuild/Collect.lua      builds my ch, rc, bk, sh records and the guild bank gb records
-addon/WowGuild/Dungeons.lua     /wow lfg: dungeon groups (dg) and joins (dj) in game, and their chat lines
+addon/WowGuild/Dungeons.lua     /wow lfg: dungeon groups (dg) and joins (dj) in game, guests, invites, and their chat lines
+addon/WowGuild/Finder.lua       the group finder: LFG/LFM chat lines and /who results to whisper, invite or add as guests
 ```
 
 The app's sharing routes are in [api/share.md](api/share.md). What sharing still can't do without a server is

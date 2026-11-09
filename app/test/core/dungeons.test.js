@@ -49,7 +49,7 @@ test('dungeon groups: post, edit, guildmates join first come first in, wait, lea
     const myPid = sharing.myPid(db);
     assert.deepEqual(dg.fields, {
       pid: myPid, character: 'Mokra', dungeon: 'The Deadmines', startsAt: kit.now(), role: 'h', level: 22,
-      tank: 1, heal: 1, dps: 3, note: 'VC quests', state: 'o',
+      tank: 1, heal: 1, dps: 3, note: 'VC quests', state: 'o', guests: [],
     });
     assert.deepEqual(r.body.group.open, { tank: 1, healer: 0, dps: 3 }, 'the leader fills a healer slot');
     assert.deepEqual([r.body.group.mine, r.body.group.canJoin, r.body.group.canCancel], [true, false, true]);
@@ -85,6 +85,22 @@ test('dungeon groups: post, edit, guildmates join first come first in, wait, lea
     g = (await api.get('/api/dungeons')).body.groups.find((x) => x.key === key);
     assert.deepEqual(g.members.map((m) => m.character), ['Grom', 'Zul']);
     assert.deepEqual(g.waiting, []);
+
+    // Players from outside the guild: the leader adds them as guests; they take spots in the order added, after the leader.
+    r = await api.post(`/api/dungeons/${key}/guest`, { name: 'not a name!', role: 'dps' });
+    assert.deepEqual([r.status, r.body.error], [400, "Type the player's character name, like Brokk or Brokk-Mirage."]);
+    r = await api.post(`/api/dungeons/${key}/guest`, { name: 'Brokk-Mirage', role: 'dps', class: 'WARRIOR', level: 21 });
+    assert.equal(r.status, 200);
+    assert.equal(r.body.message, 'Brokk-Mirage added to the group.');
+    assert.deepEqual(kit.last('dg').fields.guests, [{ name: 'Brokk-Mirage', role: 'd', class: 'WARRIOR', level: 21 }]);
+    const brokk = r.body.group.members.find((m) => m.character === 'Brokk-Mirage');
+    assert.deepEqual([brokk.guest, brokk.battletag, brokk.role], [true, null, 'dps']);
+    assert.deepEqual(r.body.group.open, { tank: 0, healer: 0, dps: 2 });
+    assert.equal((await api.post(`/api/dungeons/${key}/guest`, { name: 'brokk-mirage', role: 'tank' })).status, 409, 'already in it');
+    assert.equal((await api.post(`/api/dungeons/${key}/guest`, { name: 'Ýrsa', role: 'healer' })).status, 200, 'names in any script');
+    r = await api.post(`/api/dungeons/${key}/unguest`, { name: 'Ýrsa' });
+    assert.deepEqual([r.status, kit.last('dg').fields.guests.map((x) => x.name)], [200, ['Brokk-Mirage']]);
+    assert.equal((await api.post(`/api/dungeons/${key}/unguest`, { name: 'Nobody' })).status, 404);
 
     // Call it off: final, and it leaves the board.
     r = await api.post(`/api/dungeons/${key}/cancel`);
@@ -137,6 +153,7 @@ test("dungeon groups: joining a guildmate's group, the waiting list, leaving, an
     assert.deepEqual(g.joined, { character: 'Mokra', role: 'healer', waiting: false });
     assert.equal(g.state, 'full');
     assert.equal((await api.post('/api/dungeons/gr0up1/cancel')).status, 403, 'only the leader');
+    assert.equal((await api.post('/api/dungeons/gr0up1/guest', { name: 'Brokk', role: 'dps' })).status, 403, 'only the leader adds guests');
 
     // The leader marks it done: off the board everywhere.
     kit.imp([kit.rec('dg', 'gr0up1', { pid: grom.pid, character: 'Grom', dungeon: 'Wailing Caverns', startsAt: starts, role: 't', state: 'd' }, { author: 'Grom', t: kit.now() })]);
@@ -161,4 +178,9 @@ test('dungeon group state: slots, first come first in, waiting, leader ignored',
   assert.equal(s.state, 'full', "the leader's own join never counts");
   assert.equal(S.dungeonGroupState(rec('dg', 'dg1grp', NOW, 'Lead', { pid: 'Lead.aaaa', role: 'd', state: 'x' }, true), []).state, 'cancelled');
   assert.equal(S.dungeonGroupState(null, []).state, 'cancelled');
+  // Guests take spots right after the leader, before guildmates' joins.
+  const withGuests = rec('dg', 'dg1grp', NOW, 'Lead', { pid: 'Lead.aaaa', role: 'd', tank: 1, heal: 1, dps: 2, state: 'o', guests: [{ name: 'Out-Realm', role: 'd' }, { name: 'Late', role: 'd' }] });
+  s = S.dungeonGroupState(withGuests, [j('Aa', 'd', NOW + 2), j('Cc', 't', NOW + 3)]);
+  assert.deepEqual(s.members.map((m) => [m.character, m.guest]), [['Out-Realm', true], ['Cc', false]]);
+  assert.deepEqual(s.waiting.map((m) => m.character), ['Late', 'Aa']);
 });

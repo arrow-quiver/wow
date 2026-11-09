@@ -170,10 +170,11 @@ local TYPES = {
   },
   -- Dungeon groups: dg is a group a guildmate puts together, dj a guildmate joining it with a role.
   dg = {
-    key = { "b36x6" }, max = 400, final = { field = "state", values = "xd" }, expiry = { field = "startsAt", days = 1 },
+    key = { "b36x6" }, max = 700, final = { field = "state", values = "xd" }, expiry = { field = "startsAt", days = 1 },
     fields = {
       text("pid", 64), text("character", 48), text("dungeon", 60), int("startsAt"), enm("role", "thd"), int("level"),
       int("tank"), int("heal"), int("dps"), text("note", 140), enm("state", "oxd"),
+      listParts("guests", 9, { pText("name", 48), pText("role", 1), pText("class", 20), pInt("level") }),
     },
   },
   dj = {

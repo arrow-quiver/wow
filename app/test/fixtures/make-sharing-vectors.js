@@ -55,6 +55,7 @@ add('cr done (final)', rec('cr', 'r1r1r1', NOW - 30, 'Thrallia', { pid: 'Thralli
 add('cl claim', rec('cl', 'r1r1r1:Zuljin.a8x2', NOW - 60, 'Zuljin', { state: 'c', claimedAt: NOW - 60 }));
 add('lp partner post', rec('lp', 'Thrallia.p4m7:Zuljinne', NOW - 60, 'Zuljinne', { character: 'Zuljinne', level: 24, zone: 'Stranglethorn Vale', when: 'tonight 8pm', note: 'questing; anyone?' }));
 add('dg dungeon group', rec('dg', 'dg1grp', NOW - 60, 'Thrallia', { pid: 'Thrallia.p4m7', character: 'Thrallia', dungeon: 'The Deadmines', startsAt: NOW + 3600, role: 'h', level: 20, tank: 1, heal: 1, dps: 3, note: 'quest run; bring VC quests', state: 'o' }));
+add('dg with guests', rec('dg', 'dg1grp', NOW - 40, 'Thrallia', { pid: 'Thrallia.p4m7', character: 'Thrallia', dungeon: 'The Deadmines', startsAt: NOW + 3600, role: 'h', tank: 1, heal: 1, dps: 3, state: 'o', guests: [{ name: 'Brokk-Mirage', role: 't', class: 'WARRIOR', level: 21 }, { name: 'Zulé', role: 'd' }] }));
 add('dg cancelled (final)', rec('dg', 'dg1grp', NOW - 30, 'Thrallia', { pid: 'Thrallia.p4m7', character: 'Thrallia', dungeon: 'The Deadmines', startsAt: NOW + 3600, role: 'h', state: 'x' }, { final: true }));
 add('dj join', rec('dj', 'dg1grp:Zuljin.a8x2', NOW - 50, 'Zuljin', { character: 'Zuljin', role: 't', status: 'y', class: 'Warrior', level: 21, joinedAt: NOW - 50 }));
 add('dc hand-in', rec('dc', 'h4nd1n', NOW - 60, 'Thrallia', { pid: 'Thrallia.p4m7', drive: 'dr1v3x', character: 'Thrallia', amount: 40, note: 'Linen' }));

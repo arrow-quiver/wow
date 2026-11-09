@@ -122,7 +122,7 @@ test('/wow lfg join and leave: first come first in, the waiting list, and a vali
 test("the addon's line-up matches the app's for the same records", () => {
   const wow = client();
   const t = now(wow);
-  const dg = { pid: 'Lead.aaaa', dungeon: 'SFK', role: 'd', tank: 1, heal: 1, dps: 2, state: 'o' };
+  const dg = { pid: 'Lead.aaaa', dungeon: 'SFK', role: 'd', tank: 1, heal: 1, dps: 3, state: 'o', guests: [{ name: 'Out-Realm', role: 'd' }, { name: 'Odd', role: 'x' }] };
   const joins = [['Bb', 'd', t + 2], ['Aa', 'd', t + 2], ['Cc', 't', t + 3], ['Dd', 'h', t + 1, 'w'], ['Ee', 'h', t + 4], ['Ff', 't', t + 1]];
   wow.exec(`__add("dg", "dg1grp", ${toLua(dg)}, "Lead", ${t})`);
   for (const [who, role, at, status = 'y'] of joins) {
@@ -166,3 +166,98 @@ test('chat lines: a guildmate\'s new group, a join and a leave on my group; mine
   assert.equal(wow.printed(), '', 'joins on someone else\'s group are not my business');
   noError(wow);
 });
+
+// ---------------------------------------------------------------- outside the guild
+
+const GAME = `
+__opened = {}; __invited = {}; __who = {}; __party = {}
+function ChatFrame_OpenChat(text) table.insert(__opened, text) end
+C_PartyInfo = { InviteUnit = function(name) table.insert(__invited, name) end }
+function UnitInParty(name) return __party[name] and true or false end
+__whoResults = {}
+C_FriendList = {
+  SendWho = function(q) table.insert(__who, q) end,
+  SetWhoToUi = function() end,
+  GetNumWhoResults = function() return #__whoResults end,
+  GetWhoInfo = function(i) return __whoResults[i] end,
+}
+RAID_CLASS_COLORS = { WARRIOR = { r = 0.78, g = 0.61, b = 0.43 } }`;
+
+function gameClient() {
+  const wow = client();
+  wow.exec(GAME);
+  return wow;
+}
+
+test('the finder reads LFG / LFM chat lines: the dungeon from its name or short name, the role, and who wants what', () => {
+  const wow = gameClient();
+  const parse = (text) => wow.get(`__ns.finder.parse(${toLua(text)})`);
+  assert.deepEqual(parse('LF tank for WC, 3/5'), { kind: 'lfg', dungeon: 'Wailing Caverns', role: 't' });
+  assert.deepEqual(parse('LF2M heal + dps Deadmines'), { kind: 'lfm', dungeon: 'The Deadmines', role: 'h' });
+  assert.deepEqual(parse('lfg dm east, mage'), { kind: 'lfg', dungeon: 'Dire Maul', role: 'd' });
+  assert.deepEqual(parse('LFG DM'), { kind: 'lfg', dungeon: 'The Deadmines' });
+  assert.deepEqual(parse('need healer for SM cath'), { kind: 'lfm', dungeon: 'Scarlet Monastery', role: 'h' });
+  assert.equal(parse('selling linen cloth'), null, 'not a group');
+  assert.equal(parse('lfg anyone?'), null, 'no dungeon');
+  noError(wow);
+});
+
+test('the finder lists players from chat and /who, but not me or guildmates; whisper opens the chat box, invite invites', () => {
+  const wow = gameClient();
+  wow.exec('__ns.db.roster = { members = { { name = "Grom" } } }');
+  wow.exec(`__ns.finder.onChat("LFG WC tank 19", "Brokk-Mirage")
+    __ns.finder.onChat("LFG WC healer", "Grom")
+    __ns.finder.onChat("LFG WC", "Thrallia")
+    __ns.finder.onChat("LFM BRD", "Far-Away")`);
+  wow.slash('lfg find wc');
+  let list = list2(wow.get('__ns.finder.results(__ns.finder.current.name)'));
+  assert.deepEqual(list.map((e) => [e.name, e.kind, e.role, e.source]), [['Brokk-Mirage', 'lfg', 't', 'chat']]);
+  assert.match(wow.texts().join('\n'), /Wailing Caverns \(levels 17-24\)/);
+  // /who for the dungeon's levels: players from other guilds and none.
+  wow.click('__ns.finder.frame.who');
+  assert.deepEqual(list2(wow.get('__who')), ['17-24']);
+  wow.exec(`__whoResults = {
+    { fullName = "Ash", fullGuildName = "", level = 20, classStr = "Priest", filename = "PRIEST", area = "The Barrens" },
+    { fullName = "Grom", fullGuildName = "wow", level = 21, classStr = "Warrior", filename = "WARRIOR", area = "The Barrens" } }`);
+  wow.fire('WHO_LIST_UPDATE');
+  list = list2(wow.get('__ns.finder.results(__ns.finder.current.name)'));
+  assert.deepEqual(list.map((e) => [e.name, e.source]), [['Brokk-Mirage', 'chat'], ['Ash', 'who']], 'my own guild left out');
+  assert.match(wow.texts().join('\n'), /\/who found 1\./);
+  // Whisper: the chat box opens with a message to send; Invite invites.
+  wow.click('__ns.finder.frame.rows[1].whisper');
+  assert.deepEqual(list2(wow.get('__opened')), ['/w Brokk-Mirage Hi! Want to group for Wailing Caverns?']);
+  wow.click('__ns.finder.frame.rows[2].invite');
+  assert.deepEqual(list2(wow.get('__invited')), ['Ash']);
+  noError(wow);
+});
+
+test('guests: add a player from outside the guild to my group, see them in the line-up, invite the whole group', () => {
+  const wow = gameClient();
+  wow.slash('lfg add Brokk tank');
+  assert.match(wow.printed(), /Start a group first/);
+  wow.slash('lfg new healer Wailing Caverns');
+  const key = puts(wow)[0].key;
+  wow.exec('__ns.finder.onChat("LFG WC tank", "Brokk-Mirage")');
+  wow.slash('lfg find');
+  assert.match(wow.texts().join('\n'), /Your group needs 1 tank, 3 dps\./);
+  wow.click('__ns.finder.frame.rows[1].whisper');
+  assert.deepEqual(list2(wow.get('__opened')), ["/w Brokk-Mirage Hi! Want to join our Wailing Caverns group as tank? We need 1 tank, 3 dps. I'll invite you."]);
+  wow.click('__ns.finder.frame.rows[1].add');
+  const dg = puts(wow)[1];
+  assert.deepEqual([dg.type, dg.key, dg.fields.guests], ['dg', key, [{ name: 'Brokk-Mirage', role: 't', class: '' }]]);
+  assert.equal(valid(wow, 2).fields.guests[0].name, 'Brokk-Mirage', 'the app accepts the record');
+  assert.match(wow.printed(), /Brokk-Mirage added to your Wailing Caverns group as tank\./);
+  wow.slash('lfg add brokk-mirage dps');
+  assert.match(wow.printed(), /brokk-mirage is already in your group\./);
+  // A guildmate joins; invite everyone who isn't in my party yet.
+  wow.exec(`__add("dj", "${key}:Zul.cccc", { character = "Zul", role = "d", status = "y", joinedAt = ${now(wow)} }, "Zul")`);
+  wow.clearOutput();
+  wow.slash('lfg');
+  assert.match(wow.printed(), /needs 2 dps/);
+  wow.exec('__party["Zul"] = true');
+  wow.slash('lfg invite');
+  assert.deepEqual(list2(wow.get('__invited')), ['Brokk-Mirage']);
+  assert.match(wow.printed(), /Invited Brokk-Mirage\./);
+  noError(wow);
+});
+const list2 = (v) => (Array.isArray(v) ? v : []);

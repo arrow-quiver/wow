@@ -5,6 +5,9 @@
 -- /wow lfg join <n> <role>         join group n as tank, healer or dps
 -- /wow lfg leave <n>               leave group n
 -- /wow lfg done <n> | cancel <n>   as the leader: the run is over, or call it off
+-- /wow lfg find [dungeon]          the group finder (Finder.lua): players looking in chat and /who, to whisper and invite
+-- /wow lfg add <name> <role>       add a player from outside the guild to my group (a guest on the dg record)
+-- /wow lfg invite [n]              invite everyone in my group (guildmates who joined and guests) to my party
 --
 -- The line-up follows the same rule as the app (sharing.js dungeonGroupState): the leader fills a slot of their
 -- own role, then joins count in the order they were made; a join past its role's free slots waits.
@@ -50,6 +53,23 @@ function L.state(dg, joins)
   local f = dg.fields or {}
   local open = slots(f)
   if f.role and (open[f.role] or 0) > 0 then open[f.role] = open[f.role] - 1 end
+  local members, waiting = {}, {}
+  local function seat(m)
+    if open[m.role] > 0 then
+      open[m.role] = open[m.role] - 1
+      members[#members + 1] = m
+    else
+      waiting[#waiting + 1] = m
+    end
+  end
+  -- The leader's guests (players from outside the guild) come right after the leader, in the order listed.
+  if type(f.guests) == "table" then
+    for _, gu in ipairs(f.guests) do
+      if type(gu) == "table" and type(gu.name) == "string" and gu.name ~= "" and open[gu.role] then
+        seat({ character = gu.name, role = gu.role, guest = true, class = gu.class, level = gu.level, at = 0 })
+      end
+    end
+  end
   local list = {}
   for _, j in ipairs(joins or {}) do
     if type(j) == "table" and j.type == "dj" and type(j.key) == "string" and type(j.fields) == "table" then
@@ -65,15 +85,7 @@ function L.state(dg, joins)
     if a.at ~= b.at then return a.at < b.at end
     return a.pid < b.pid
   end)
-  local members, waiting = {}, {}
-  for _, m in ipairs(list) do
-    if open[m.role] > 0 then
-      open[m.role] = open[m.role] - 1
-      members[#members + 1] = m
-    else
-      waiting[#waiting + 1] = m
-    end
-  end
+  for _, m in ipairs(list) do seat(m) end
   local state = (open.t + open.h + open.d == 0) and "full" or "open"
   if f.state == "x" then state = "cancelled" elseif f.state == "d" then state = "done" end
   return { state = state, open = open, members = members, waiting = waiting }
@@ -262,6 +274,92 @@ function L.finish(n, state)
   return true
 end
 
+-- ---------- players from outside the guild ----------
+
+-- The first open group I lead, or nil.
+function L.myGroup()
+  for _, e in ipairs(L.groups()) do if e.mine then return e end end
+  return nil
+end
+
+local function sameName(a, b) return type(a) == "string" and type(b) == "string" and string.lower(a) == string.lower(b) end
+
+-- Add a guest to the group I lead: name (Name or Name-Realm), role t/h/d. Guildmates see them in the line-up.
+function L.addGuest(name, roleWord, class, level)
+  local role = roleWord and ROLE_OF[string.lower(roleWord)]
+  if type(name) ~= "string" or not string.match(name, "^[^%s%d%p][^%s%p]+%-?[^%s%p]*$") then
+    ns.print("Usage: /wow lfg add <name> <tank|healer|dps>")
+    return false
+  end
+  if not role then ns.print("Pick their role: tank, healer or dps.") return false end
+  local e = L.myGroup()
+  if not e then ns.print("Start a group first: /wow lfg new <tank|healer|dps> <dungeon>") return false end
+  local f = e.rec.fields
+  local guests = {}
+  for _, gu in ipairs(type(f.guests) == "table" and f.guests or {}) do
+    if type(gu) == "table" and gu.name then
+      if sameName(gu.name, name) then ns.print(name .. " is already in your group.") return false end
+      guests[#guests + 1] = gu
+    end
+  end
+  if #guests >= 9 then ns.print("Your group lists 9 players from outside the guild already.") return false end
+  guests[#guests + 1] = { name = name, role = role, class = class or "", level = level }
+  local fields = {}
+  for k, v in pairs(f) do fields[k] = v end
+  fields.guests = guests
+  if not put("dg", e.rec.key, fields) then return false end
+  local free = (e.g.open[role] or 0) > 0
+  ns.print(string.format("%s added to your %s group as %s%s.", plain(name), plain(f.dungeon), ROLE_NAME[role], free and "" or " (the spots are full: waiting)"))
+  L.last = nil
+  return true
+end
+
+function L.invite(name)
+  if type(name) ~= "string" or name == "" then return false end
+  local fn = (C_PartyInfo and C_PartyInfo.InviteUnit) or InviteUnit
+  if type(fn) ~= "function" then return false end
+  local ok, err = pcall(fn, name)
+  if not ok then ns.reportError(err) end
+  return ok
+end
+
+-- Opens the chat box with "/w Name <text>" so the player reads it and presses Enter themselves.
+function L.whisper(name, text)
+  if type(name) ~= "string" or name == "" then return false end
+  local line = "/w " .. name .. " " .. (text or "")
+  if ChatFrame_OpenChat then
+    ns.try(ChatFrame_OpenChat, line)
+    return true
+  end
+  if ChatFrame_SendTell then ns.try(ChatFrame_SendTell, name) return true end
+  return false
+end
+
+local function inParty(name)
+  if not UnitInParty then return false end
+  local short = string.match(name, "^([^%-]+)") or name
+  return (ns.try(UnitInParty, name) or ns.try(UnitInParty, short)) and true or false
+end
+
+-- Invite everyone in a group (default: the one I lead) who isn't in my party yet: guildmates who joined and guests.
+function L.inviteGroup(n)
+  local e = n and pick(n) or L.myGroup()
+  if not e then ns.print("You don't lead an open group. Start one: /wow lfg new <tank|healer|dps> <dungeon>") return 0 end
+  local myName = UnitName and UnitName("player")
+  local sent = 0
+  local names = {}
+  for _, m in ipairs(e.g.members) do
+    if m.character and m.character ~= myName and not inParty(m.character) then
+      if L.invite(m.character) then sent = sent + 1; names[#names + 1] = m.character end
+    end
+  end
+  if sent == 0 then ns.print("Everyone in the group is in your party already, or nobody has joined yet.")
+  else ns.print("Invited " .. plain(table.concat(names, ", ")) .. ".") end
+  return sent
+end
+
+L.needText, L.whenText, L.ROLE_OF, L.ROLE_NAME, L.plain = needText, whenText, ROLE_OF, ROLE_NAME, plain
+
 function L.slash(rest)
   local cmd, args = string.match(rest or "", "^(%S*)%s*(.-)$")
   cmd = string.lower(cmd or "")
@@ -274,6 +372,13 @@ function L.slash(rest)
     L.join(n, role ~= "" and role or nil)
   elseif cmd == "leave" then
     L.leave(args)
+  elseif cmd == "find" or cmd == "search" then
+    if ns.finder then ns.finder.show(args ~= "" and args or nil) end
+  elseif cmd == "invite" then
+    L.inviteGroup(args ~= "" and args or nil)
+  elseif cmd == "add" then
+    local name, role = string.match(args, "^(%S+)%s*(%S*)")
+    L.addGuest(name, role ~= "" and role or nil)
   elseif cmd == "done" then
     L.finish(args, "d")
   elseif cmd == "cancel" then
@@ -281,6 +386,8 @@ function L.slash(rest)
   else
     ns.print("/wow lfg  guild dungeon groups;  /wow lfg new <tank|healer|dps> <dungeon>  start one")
     ns.print("/wow lfg join <n> <role>  ·  /wow lfg leave <n>  ·  /wow lfg done <n>  ·  /wow lfg cancel <n>")
+    ns.print("/wow lfg find [dungeon]  search chat and /who for players, whisper and invite them")
+    ns.print("/wow lfg add <name> <role>  add someone from outside the guild  ·  /wow lfg invite  invite your group")
   end
 end
 

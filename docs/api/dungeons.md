@@ -6,6 +6,14 @@ when someone leaves. Implemented in `app/src/core/routes/dungeons.js`; the app p
 lives in `app/src/renderer/lib/mocks/dungeons.js`. In game the same groups are listed and joined with `/wow lfg`
 (`addon/WowGuild/Dungeons.lua`).
 
+**Players from outside the guild.** The leader can add guests (Name or Name-Realm, with a role). They are listed on
+the `dg` record, so guildmates see them, and they take spots right after the leader, before guildmates' joins. The
+app can't reach the game, so finding, whispering and inviting happen there: `/wow lfg find [dungeon]` opens the group
+finder (`addon/WowGuild/Finder.lua`), which lists players posting LFG or LFM for the dungeon in the chat channels and,
+after a click on "Who's around", a `/who` for its level range (never the player's own guild). Each one has Whisper
+(opens the chat box with a message the player sends), Invite, and Add (as a guest of the group they lead).
+`/wow lfg invite` invites everyone in the group who isn't in the party yet; `/wow lfg add <name> <role>` adds a guest.
+
 Every route needs the guild to be known (`403 NO_GUILD`). Conventions are in [core.md](core.md).
 
 **Shared through the addon** ([SHARING.md](../SHARING.md) §4.3): a group is a `dg` record (called off `x` and done
@@ -29,7 +37,10 @@ Open and full groups that started at most 3 hours ago, soonest first, and my cha
     "state": "open", "pending": false,
     "leader": { "character": "Grom", "role": "tank", "class": "WARRIOR", "level": 25, "battletag": "Grom#3333", "mine": false },
     "slots": { "tank": 1, "healer": 1, "dps": 3 }, "open": { "tank": 0, "healer": 1, "dps": 2 },
-    "members": [{ "character": "Varok", "role": "dps", "class": "MAGE", "level": 24, "battletag": "Varok", "mine": false, "waiting": false }],
+    "members": [
+      { "character": "Varok", "role": "dps", "class": "MAGE", "level": 24, "battletag": "Varok", "mine": false, "waiting": false, "guest": false },
+      { "character": "Brokk-Mirage", "role": "dps", "class": "WARRIOR", "level": 21, "battletag": null, "mine": false, "waiting": false, "guest": true }
+    ],
     "waiting": [],
     "mine": false, "joined": null,
     "canJoin": true, "canLeave": false, "canCancel": false, "canDone": false, "over": false
@@ -54,6 +65,9 @@ my main. Errors: `400` "Name the dungeon.", "Pick your role: tank, healer or dps
 - `join` `{ role, character? }`: my `dj` (status `y`, joinedAt now). The message says whether I'm in or waiting.
   `409` for the leader or when already in it.
 - `leave`: my `dj` with status `w` (joinedAt kept).
+- `guest` `{ name, role, class?, level? }` / `unguest` `{ name }` (the leader, open group): add or remove a player from
+  outside the guild (the `dg` record's `guests`, at most 9). `400` "Type the player's character name, like Brokk or
+  Brokk-Mirage.", `409` when already in the group, `404` when removing someone who isn't.
 - `done` / `cancel` (the leader): the group's `dg` with state `d` / `x` (final); it leaves the board. `403` for anyone else.
 
 `404` "That group no longer exists." for an unknown or malformed key.

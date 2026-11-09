@@ -108,6 +108,29 @@ function GroupList({ groups, chars, reload }) {
   </div>`;
 }
 
+// The leader adds someone from outside the guild: found in game with the group finder (/wow lfg find), or a friend.
+function GuestForm({ g, busy, onAdd }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState('');
+  const firstOpen = ['tank', 'healer', 'dps'].find((r) => g.open[r] > 0) || 'dps';
+  const [role, setRole] = useState(firstOpen);
+  if (!open) {
+    return html`<button type="button" class="link-btn small dungeons-guest-open" onClick=${() => setOpen(true)}>+ Add a player from outside the guild</button>`;
+  }
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!name.trim()) return;
+    await onAdd({ name: name.trim(), role });
+    setName('');
+  };
+  return html`<form class="row dungeons-join" onSubmit=${submit} novalidate>
+    <${Input} value=${name} onValue=${setName} maxLength="48" placeholder="Name or Name-Realm" aria-label="Player name" />
+    <${Select} value=${role} onValue=${setRole} aria-label="Their role" options=${ROLES} />
+    <${Button} type="submit" size="sm" variant="secondary" busy=${busy}>Add<//>
+    <span class="hint small">Find players in game with /wow lfg find, then whisper and invite them there.</span>
+  </form>`;
+}
+
 function GroupCard({ g, chars, reload }) {
   const [character, setCharacter] = useState(chars[0] ? chars[0].name : '');
   const firstOpen = ['tank', 'healer', 'dps'].find((r) => g.open[r] > 0) || 'dps';
@@ -144,12 +167,16 @@ function GroupCard({ g, chars, reload }) {
           <${ClassName} name=${p.character} cls=${p.class} />
           ${p.level != null ? html`<span class="muted small">${p.level}</span>` : null}
           ${p.leader ? html`<span class="muted small">leader, ${shortTag(p.battletag)}</span>` : null}
+          ${p.guest ? html`<${Pill} kind="muted" title="Not in the guild. Added by the leader.">guest<//>` : null}
+          ${p.guest && g.mine ? html`<button type="button" class="link-btn small" title=${`Remove ${p.character}`}
+              onClick=${() => run('unguest', { name: p.character })}>remove</button>` : null}
         </li>`)}
         ${empty.map((r, i) => html`<li key=${`open-${r}-${i}`} class="is-open">
           <span class="dungeons-role">${ROLE_ICON[r]}</span><span class="faint">${ROLE_LABEL[r]} wanted</span>
         </li>`)}
       </ul>
-      ${g.waiting.length ? html`<div class="small muted">Waiting: ${g.waiting.map((p, i) => html`<span key=${p.character}><${ClassName} name=${p.character} cls=${p.class} /> (${ROLE_LABEL[p.role]})${i < g.waiting.length - 1 ? ', ' : ''}</span>`)}</div>` : null}
+      ${g.waiting.length ? html`<div class="small muted">Waiting: ${g.waiting.map((p, i) => html`<span key=${p.character}><${ClassName} name=${p.character} cls=${p.class} /> (${ROLE_LABEL[p.role]})${p.guest ? ', guest' : ''}${i < g.waiting.length - 1 ? ', ' : ''}</span>`)}</div>` : null}
+      ${g.mine && g.canCancel ? html`<${GuestForm} g=${g} busy=${busy === 'guest'} onAdd=${(body) => run('guest', body)} />` : null}
       ${g.canJoin ? html`<div class="row dungeons-join">
         ${chars.length > 1 ? html`<${Select} value=${character} onValue=${setCharacter} aria-label="Character"
           options=${chars.map((c) => ({ value: c.name, label: `${c.name} (${c.level ?? '?'})` }))} />` : null}

@@ -21,7 +21,8 @@ const world = {
       state: 'o', leader: person('Velanne', 'healer', 0), slots: { tank: 1, healer: 1, dps: 3 },
       joins: [person('Hrogar', 'dps', 1), person('Brannoc', 'dps', 2)] },
     { key: 'wc9x1a', dungeon: 'Wailing Caverns', startsAt: iso(-5 * MIN), note: 'Quest run',
-      state: 'o', leader: person('Ilyra', 'dps', 0), slots: { tank: 1, healer: 1, dps: 3 }, joins: [] },
+      state: 'o', leader: person('Ilyra', 'dps', 0), slots: { tank: 1, healer: 1, dps: 3 }, joins: [],
+      guests: [{ character: 'Brokk-Mirage', role: 'dps', class: 'WARRIOR', level: 19 }] },
   ],
 };
 
@@ -33,10 +34,11 @@ function groupJson(g, uid) {
   if (open[g.leader.role] > 0) open[g.leader.role]--;
   const members = [];
   const waiting = [];
-  for (const j of [...g.joins].sort((a, b) => a.at - b.at)) {
-    if (open[j.role] > 0) { open[j.role]--; members.push(j); } else waiting.push(j);
-  }
-  const view = (p, w) => ({ character: p.character, role: p.role, class: p.class, level: p.level, battletag: USERS[p.uid] || p.character, mine: p.uid === uid, waiting: w });
+  const seat = (j) => { if (open[j.role] > 0) { open[j.role]--; members.push(j); } else waiting.push(j); };
+  for (const gu of g.guests || []) seat({ ...gu, guest: true, uid: null });
+  for (const j of [...g.joins].sort((a, b) => a.at - b.at)) seat(j);
+  const view = (p, w) => ({ character: p.character, role: p.role, class: p.class || null, level: p.level ?? null,
+    battletag: p.guest ? null : USERS[p.uid] || p.character, mine: !p.guest && p.uid === uid, waiting: w, guest: Boolean(p.guest) });
   const mine = g.leader.uid === uid;
   const myJoin = g.joins.find((j) => j.uid === uid) || null;
   const state = g.state === 'x' ? 'cancelled' : g.state === 'd' ? 'done' : open.tank + open.healer + open.dps === 0 ? 'full' : 'open';
@@ -100,6 +102,21 @@ addMockRoutes({
     } else if (params.verb === 'leave') {
       g.joins = g.joins.filter((j) => j.uid !== uid);
       message = 'You left the group.';
+    } else if (params.verb === 'guest' || params.verb === 'unguest') {
+      if (!view.mine) throw httpError(403, 'Only the leader can add or remove players.');
+      const name = String(body?.name || '').trim();
+      if (!/^\p{L}{2,24}(-[\p{L}']{2,30})?$/u.test(name)) throw httpError(400, "Type the player's character name, like Brokk or Brokk-Mirage.");
+      g.guests = g.guests || [];
+      const i = g.guests.findIndex((x) => x.character.toLowerCase() === name.toLowerCase());
+      if (params.verb === 'guest') {
+        if (i >= 0) throw httpError(409, `${name} is already in the group.`);
+        g.guests.push({ character: name, role: body?.role || 'dps' });
+        message = `${name} added to the group.`;
+      } else {
+        if (i < 0) throw httpError(404, `${name} isn't in the group.`);
+        g.guests.splice(i, 1);
+        message = `${name} removed from the group.`;
+      }
     } else if (params.verb === 'cancel' || params.verb === 'done') {
       if (!view.mine) throw httpError(403, 'Only the leader can do that.');
       g.state = params.verb === 'cancel' ? 'x' : 'd';

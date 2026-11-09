@@ -22,7 +22,11 @@ const SHOW_AFTER_START = 3 * 3600;
 // How far ahead a group can be planned, and the most people in one (UBRS-sized).
 const AHEAD_MAX = 14 * 86400;
 const SIZE_MAX = 10;
-const VERBS = ['join', 'leave', 'cancel', 'done'];
+const VERBS = ['join', 'leave', 'cancel', 'done', 'guest', 'unguest'];
+// Players from outside the guild: a character name, optionally with its realm (Name-Realm).
+// Letters only (any script), 2-24 of them, then an optional "-Realm" (letters, spaces and apostrophes removed).
+const GUEST_RE = /^\p{L}{2,24}(-[\p{L}']{2,30})?$/u;
+const GUESTS_MAX = 9;
 
 function register(app, ctx) {
   const { db } = ctx;
@@ -60,8 +64,8 @@ function register(app, ctx) {
     const joins = [...st.effectiveMany(db, gid, `dj:${key}:`).values()].map((x) => x.str);
     const g = S.dungeonGroupState(e.str, joins);
     const person = (m, waiting) => ({
-      character: m.character, role: ROLE_NAME[m.role], class: m.class || (q.char.get(gid, m.character) || {}).class || null,
-      level: m.level ?? null, battletag: tagOf(gid, m.pid), mine: m.pid === mine, waiting,
+      character: m.character, role: ROLE_NAME[m.role], class: m.class || (m.guest ? null : (q.char.get(gid, m.character) || {}).class) || null,
+      level: m.level ?? null, battletag: m.guest ? null : tagOf(gid, m.pid), mine: !m.guest && m.pid === mine, waiting, guest: Boolean(m.guest),
     });
     const leaderChar = q.char.get(gid, f.character) || {};
     const myJoin = [...g.members, ...g.waiting].find((m) => m.pid === mine) || null;
@@ -151,7 +155,7 @@ function register(app, ctx) {
       type: 'dg', key,
       fields: {
         pid: myPid(), character: c.name, dungeon, startsAt: startFrom(b, now), role, level: c.level ?? null,
-        tank: slots.t, heal: slots.h, dps: slots.d, note: str(b.note, 140) || '', state: 'o',
+        tank: slots.t, heal: slots.h, dps: slots.d, note: str(b.note, 140) || '', state: 'o', guests: [],
       },
     });
     ctx.activity(gid, 'dungeon', `${c.name} is putting a group together for ${dungeon}`);
@@ -214,6 +218,30 @@ function register(app, ctx) {
       const mine = sharing.recordOf(db, gid, `dj:${key}:${pid}`);
       sharing.queue(db, ctx, { type: 'dj', key: `${key}:${pid}`, fields: { ...mine.fields, status: 'w' } });
       message = 'You left the group.';
+    } else if (verb === 'guest' || verb === 'unguest') {
+      // The leader adds or removes a player from outside the guild (Name or Name-Realm).
+      if (!g.mine) throw new HttpError(403, 'Only the leader can add or remove players.');
+      if (!g.canCancel) throw new HttpError(409, 'That group is over.');
+      const b = req.body || {};
+      const name = str(b.name, 48);
+      if (!name || !GUEST_RE.test(name)) throw new HttpError(400, 'Type the player\'s character name, like Brokk or Brokk-Mirage.');
+      const same = (x) => x && String(x.name).toLowerCase() === name.toLowerCase();
+      const guests = (dg.fields.guests || []).filter((x) => x && x.name);
+      if (verb === 'guest') {
+        const role = ROLE_CODE[oneOf(b.role, Object.keys(ROLE_CODE))];
+        if (!role) throw new HttpError(400, 'Pick their role: tank, healer or dps.');
+        if (guests.some(same) || g.members.some((m) => same({ name: m.character })) || same({ name: g.leader.character })) {
+          throw new HttpError(409, `${name} is already in the group.`);
+        }
+        if (guests.length >= GUESTS_MAX) throw new HttpError(409, `A group can list at most ${GUESTS_MAX} players from outside the guild.`);
+        guests.push({ name, role, class: str(b.class, 20) || '', level: int(b.level, 1, 100) });
+        message = `${name} added to the group.`;
+      } else {
+        if (!guests.some(same)) throw new HttpError(404, `${name} isn't in the group.`);
+        guests.splice(guests.findIndex(same), 1);
+        message = `${name} removed from the group.`;
+      }
+      sharing.queue(db, ctx, { type: 'dg', key, fields: { ...dg.fields, guests } });
     } else {
       if (!g.mine) throw new HttpError(403, 'Only the leader can do that.');
       if (!g.canCancel) throw new HttpError(409, 'That group is over.');
