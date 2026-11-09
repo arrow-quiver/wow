@@ -315,7 +315,12 @@ function C.nextSteps()
   local plan = C.plan()
   if t.unspent then
     add(string.format("Spend %d talent point%s", t.unspent, t.unspent == 1 and "" or "s"),
-      plan and plan.talents and plan.talents[1] and ("Your plan says: " .. plan.talents[1].name .. " (" .. (plan.talents[1].tree or "") .. ")") or "Open your talents (N).", "talent")
+      (function()
+        -- The first plan talent not taken yet (CoachTalents.lua), not just the plan's first line.
+        local p = ns.coachTalents and ns.coachTalents.progress()
+        local n = p and p.next
+        return n and string.format("Your plan says: %s (%s), %d of %d", n.name, n.tree or "", n.have, n.points) or "Open your talents (N)."
+      end)(), "talent")
   end
   if g.lowestDurability and g.lowestDurability < 25 then add("Repair your gear", string.format("Something is down to %d%% durability.", g.lowestDurability), "repair") end
   if g.freeSlots and g.freeSlots < 4 then add("Make bag space", string.format("Only %d free bag slot%s. Vendor grey items or bank what you don't need.", g.freeSlots, g.freeSlots == 1 and "" or "s"), "bags") end
