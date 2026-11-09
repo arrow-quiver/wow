@@ -158,10 +158,12 @@ const TYPES = {
   // Dungeon groups: dg is a group a guildmate puts together (the leader fills one of the role slots); dj is a
   // guildmate joining it with a role (withdrawn 'w'). First come, first in; the rest wait (dungeonGroupState).
   dg: {
-    key: ['b36x6'], max: 400, final: { field: 'state', values: 'xd' }, expiry: { field: 'startsAt', days: 1 },
+    key: ['b36x6'], max: 700, final: { field: 'state', values: 'xd' }, expiry: { field: 'startsAt', days: 1 },
     fields: [
       text('pid', 64), text('character', 48), text('dungeon', 60), int('startsAt'), enm('role', 'thd'), int('level'),
       int('tank'), int('heal'), int('dps'), text('note', 140), enm('state', 'oxd'),
+      // Players from outside the guild the leader added (found in game with the group finder): name (Name-Realm), role t/h/d.
+      list('guests', 9, { parts: [pText('name', 48), pText('role', 1), pText('class', 20), pInt('level')] }),
     ],
   },
   dj: {
@@ -1256,8 +1258,9 @@ function craftRequestState(cr, claims) {
 }
 
 // dg + its dj records → { state: 'open'|'full'|'cancelled'|'done', slots: { t, h, d }, open: { t, h, d },
-//   members: [{ pid, character, role, class, level, joinedAt }], waiting: [same] }.
-// The leader takes one slot of their own role. Joins count in the order they were made (joinedAt, else t; a tie
+//   members: [{ pid, character, role, class, level, joinedAt, guest }], waiting: [same] }.
+// The leader takes one slot of their own role, then the leader's guests (players from outside the guild, pid null,
+// guest true) in the order listed. Joins count in the order they were made (joinedAt, else t; a tie
 // goes to the smaller pid by bytes); a join past its role's free slots waits. The leader's own join never counts.
 function dungeonGroupState(dg, joins) {
   const g = asRec(dg);
@@ -1268,6 +1271,13 @@ function dungeonGroupState(dg, joins) {
   const slots = { t: n(f.tank, 1), h: n(f.heal, 1), d: n(f.dps, 3) };
   const open = { ...slots };
   if (open[f.role] > 0) open[f.role]--;
+  const members = [];
+  const waiting = [];
+  const seat = (m) => { if (open[m.role] > 0) { open[m.role]--; members.push(m); } else waiting.push(m); };
+  for (const gu of Array.isArray(f.guests) ? f.guests : []) {
+    if (!gu || !gu.name || !(gu.role in slots)) continue;
+    seat({ pid: null, character: gu.name, role: gu.role, class: gu.class || '', level: gu.level ?? null, joinedAt: null, guest: true });
+  }
   const list = [];
   for (const raw of Array.isArray(joins) ? joins : []) {
     const j = live(raw);
@@ -1275,14 +1285,10 @@ function dungeonGroupState(dg, joins) {
     const [k, pid] = j.key.split(':');
     if (k !== g.key || pid === f.pid || j.fields.status !== 'y' || !(j.fields.role in slots)) continue;
     const at = typeof j.fields.joinedAt === 'number' ? j.fields.joinedAt : j.t;
-    list.push({ pid, character: j.fields.character || '', role: j.fields.role, class: j.fields.class || '', level: j.fields.level ?? null, joinedAt: at });
+    list.push({ pid, character: j.fields.character || '', role: j.fields.role, class: j.fields.class || '', level: j.fields.level ?? null, joinedAt: at, guest: false });
   }
   list.sort((a, b) => (a.joinedAt - b.joinedAt) || compareBytes(a.pid, b.pid));
-  const members = [];
-  const waiting = [];
-  for (const m of list) {
-    if (open[m.role] > 0) { open[m.role]--; members.push(m); } else waiting.push(m);
-  }
+  for (const m of list) seat(m);
   let state = open.t + open.h + open.d === 0 ? 'full' : 'open';
   if (f.state === 'x') state = 'cancelled';
   else if (f.state === 'd') state = 'done';

@@ -238,7 +238,7 @@ RT:k3f9a2^wzltl343^Grommash^^d^tob9c0^r^4kq1zm^tobn80^Thrallia.p4m7,d72,eim;Zulj
 | `cl` craft claim | request`:`pid | a character of pid | state `c`/`d`/`w` (claimed, done, withdrawn), claimedAt | | with the request | 60 |
 | `lp` leveling post | pid`:`character | a character of pid | character, level, zone, when, note | | 3 d | 400 |
 | `ca` call to arms | random | any member | character, zone, needed, message | | 1 d | 300 |
-| `dg` dungeon group | random | a character of pid (the leader) | pid, character, dungeon, startsAt, leader role `t`/`h`/`d`, level, slots tank, heal, dps (leader included), note, state `o`/`x`/`d` (open, called off, done) | `x`, `d` | startsAt + 1 d | 400 |
+| `dg` dungeon group | random | a character of pid (the leader) | pid, character, dungeon, startsAt, leader role `t`/`h`/`d`, level, slots tank, heal, dps (leader included), note, state `o`/`x`/`d` (open, called off, done), guests `name,role,class,level;…` (players from outside the guild the leader added) | `x`, `d` | startsAt + 1 d | 700 |
 | `dj` dungeon join | group`:`pid | a character of pid | character, role `t`/`h`/`d`, status `y`/`w` (in, left), class, level, joinedAt | | with the group | 160 |
 | `dc` drive hand-in | random | a character of pid | pid, drive, character, amount, note | | with the drive | 250 |
 | `bq` bank request | random | a character of pid | pid, item, count, note, state `o`/`x` | `x` | 30 d | 400 |
@@ -651,7 +651,7 @@ confirmed with "It was me"), `share_repair` (the repair after the update ran, §
 | `LY` + closes + `LA` | loyalty, rebuilt per instance by the fold |
 | `cr` + `cl` | craft_requests (status and crafter_id derived) |
 | `lp`, `ca`, `AN` | buddy_posts, ctas (client_ref = key), announcements |
-| `dg` + `dj` | no rows: routes/dungeons.js reads the effective records and the line-up comes from `dungeonGroupState` (the leader fills a slot of their role; then joins in joinedAt order, a tie to the smaller pid; past a role's free slots they wait). A `dj` on the leader's own group is ignored (`own group`). |
+| `dg` + `dj` | no rows: routes/dungeons.js reads the effective records and the line-up comes from `dungeonGroupState` (the leader fills a slot of their role; then the leader's guests in the order listed; then joins in joinedAt order, a tie to the smaller pid; past a role's free slots they wait). A `dj` on the leader's own group is ignored (`own group`). |
 | `DR` + `dc` | drives (status derived), drive_contribs |
 | `bq` + `BH` | bank_requests (status and handled_by derived); with no record at all (my new request cancelled or refused) the row goes |
 | `gb` | guild_bank, bank_log, guilds.bank_money and bank_scanned_at |
@@ -984,7 +984,7 @@ pid (`<name>.<4 base36>`), tab (`0`–`8`), `1`.
 | `cl` | random:pid | state enum `cdw`, claimedAt int |
 | `lp` | pid:name | character text(48), level int, zone text(60), when text(60), note text(140) |
 | `ca` | random | character text(48), zone text(60), needed int, message text(200) |
-| `dg` | random | pid text(64), character text(48), dungeon text(60), startsAt int, role enum `thd`, level int, tank int, heal int, dps int, note text(140), state enum `oxd` |
+| `dg` | random | pid text(64), character text(48), dungeon text(60), startsAt int, role enum `thd`, level int, tank int, heal int, dps int, note text(140), state enum `oxd`, guests [(name text(48), role text(1), class text(20), level int)] ≤ 9 |
 | `dj` | random:pid | character text(48), role enum `thd`, status enum `yw`, class text(20), level int, joinedAt int |
 | `dc` | random | pid text(64), drive text(8) (the `DR` key), character text(48), amount int, note text(120) |
 | `bq` | random | pid text(64), item text(100), count int, note text(200), state enum `ox` |
