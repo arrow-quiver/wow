@@ -69,6 +69,12 @@ death, **Why did I die?** sends the death's recap (who hit you, with what, how m
 The live link reads the game's own combat log file as you play, like Warcraft Logs' uploader does; type `/wow live on`
 once and the addon turns combat logging on at every login. Answers reach the game's Coach after your next /reload.
 
+**War alerts and the war map.** Die to players and the app posts it to the guild's Discord at once ("⚔️ Grom died to
+Sneaky and 2 more in Hillsbrad Foothills. Anyone near?"), so whoever's close can come and help. In game, a popup
+after a death in a PvP area calls the guild to arms in one click; the overlay and the **War** page have a
+**Call for help** button for Discord. Every death and honorable kill in the open world goes on the guild's war map:
+pins on the in-game world map, and the **War** page with hotspots and your nemeses (the players who keep killing you).
+
 ### 🛠️ Crafters, requests and partners
 
 <img src="docs/screenshots/crafters.png" alt="Crafters page with guild professions and a shopping list" width="900">
@@ -106,6 +112,7 @@ The addon works on its own, and does much more with the app:
 | --- | --- |
 | `/wow` or `/guildcamp` | Open the Guild Camp window |
 | `/wow coach` | Open the Coach |
+| `/wow war` | Your war map marks; `/wow war off` hides the guild's deaths and kills on the world map |
 | `/wow live on` | Turn on combat logging at every login, for the app's live link and Coach overlay (`/wow live off` stops it) |
 | `/wow guide` | Open the skill-up guide |
 | `/wow list` | Open the shopping list |

@@ -858,6 +858,7 @@ function Collect.sharedRecords()
   for _, r in ipairs(ns.safely(Collect.rc) or {}) do add(r) end
   add(ns.safely(Collect.bk))
   add(ns.safely(Collect.sh))
+  if ns.war and ns.war.record then add(ns.safely(ns.war.record, myPid())) end
   return out
 end
 

@@ -23,13 +23,17 @@ const ME_PID = 'Thrallia.t000';
 
 const rec = (type, key, t, author, fields, opts = {}) => S.encode({ type, key, v: S.makeVersion(t, author, !!opts.final), author, del: !!opts.del, fields });
 
+// Set `down = true` for a webhook that answers HTTP 500; `delayMs` makes every post take that long.
 function fakeDiscord() {
   const calls = [];
-  const fetch = async (url, init = {}) => {
+  const d = { calls, down: false, delayMs: 0 };
+  d.fetch = async (url, init = {}) => {
     calls.push({ url, body: init.body ? JSON.parse(init.body) : null });
+    if (d.delayMs) await new Promise((r) => setTimeout(r, d.delayMs));
+    if (d.down) return { ok: false, status: 500, json: async () => ({}), text: async () => '' };
     return { ok: true, status: 204, json: async () => ({}), text: async () => '' };
   };
-  return { calls, fetch };
+  return d;
 }
 
 async function setupShare(t, { role = 'member', character = 'Thrallia', pid = ME_PID, now = NOW, webhook = null, roster = ROSTER } = {}) {

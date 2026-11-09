@@ -662,6 +662,13 @@ function bootstrap() {
     registerAppProtocol(path.join(__dirname, '..', 'renderer'), log.scope('protocol'));
     createWindow();
     live.on('update', (state) => broadcast('live', state));
+    // War alerts: every death goes to the local core (the War page, the Coach's report); a death to players is posted
+    // to the guild's Discord when War alerts are on (core/routes/war.js decides and limits).
+    live.on('death', (d) => Promise.resolve().then(() => api.request('POST', '/api/war/death', {
+      character: d.character, at: d.at, killer: d.killer, pvp: d.pvp, enemies: d.enemies || [], zone: d.zone, zoneId: d.zoneId,
+      spell: d.killingBlow && d.killingBlow.spell, amount: d.killingBlow && d.killingBlow.amount,
+      seconds: d.seconds, damageTaken: d.damageTaken, healed: d.healed, alert: store.get().warAlerts !== false,
+    })).catch((err) => log.warn(`Saving a death failed: ${err.message}`)));
 
     if (args.smoke) {
       runSmoke().catch((err) => {

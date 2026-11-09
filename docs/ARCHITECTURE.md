@@ -119,7 +119,7 @@ upload to finish before that.
 | `api.js` | HTTP client for the core. Adds the token and `X-App-Version`; errors become `ApiError { status, message, code, body }`. |
 | `wow.js` | Finds game folders (`_forever_`, `_retail_`, `_classic_era_` …) under the usual install places and the folders the player added. `GUILDCAMP_NO_SCAN=1` turns the usual places off. Reads, never writes, `WowGuildDB.characters` for `detectGuild`. `isWowRunning()` (true, false or null when it can't tell) and `gameProcessIds()` (the game clients' process ids, `null` when it can't tell) look at the running processes. |
 | `sync.js` | The file channel (below): watches SavedVariables, uploads, writes the inbox. |
-| `live.js` | The live link: follows the newest `Logs/WoWCombatLog*.txt` in the game folders in use (from its end, once a second; a newer file every 30 s), and keeps this play session (kills, deaths, fights) and the last death's recap with `shared/combatlog.js`. Emits `live` to every window. The game writes that file only while combat logging is on (`/combatlog`, or the addon's `/wow live on`). Reads, never writes. |
+| `live.js` | The live link: follows the newest `Logs/WoWCombatLog*.txt` in the game folders in use (from its end, once a second; a newer file every 30 s), and keeps this play session (kills, deaths, fights) and the last death's recap with `shared/combatlog.js`. Emits `live` to every window, and each death (main.js posts it to `POST /api/war/death`: the War page, and Discord war alerts). The game writes that file only while combat logging is on (`/combatlog`, or the addon's `/wow live on`). Reads, never writes. |
 | `overlay.js` | The Coach overlay: a frameless, always-on-top, see-through window (`#/overlay`) shown and hidden with a global hotkey (Ctrl+Shift+G by default). Remembers where it was. Shows over the game in Windowed (Fullscreen) mode. |
 | `addon.js` | Installs, updates, repairs and removes the addon in every game folder (below). |
 | `updater.js` | App self-update from GitHub with electron-updater (below). |
@@ -540,7 +540,7 @@ a Discord webhook. Use it?".
   sharing status. `lib/router.js` is a hash router.
 - Pages are `pages/<name>.js`, registered in `pages/index.js` with `{ path, load, title, nav, icon, officer?,
   owner?, publisher?, public?, bare? }`.
-- Navigation: **Play** Camp, Coach, Raids, Crafters, Requests, Partners · **Guild** Roster, Bank, Prices, Drives,
+- Navigation: **Play** Camp, Coach, War, Raids, Crafters, Requests, Partners · **Guild** Roster, Bank, Prices, Drives,
   Loot, Guild settings · **Officers** Officer tools · **App** Addon & sync, Settings, Updates, Releases (only on a
   PC that can publish). Not in the sidebar: `/raids/:id`, `/raids/:id/loot`, `/characters/:name`, `/welcome`.
 - The gate: the welcome flow until setup is done (`settings.onboarded`), then every page. Pages that need guild

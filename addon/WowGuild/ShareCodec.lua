@@ -190,6 +190,13 @@ local TYPES = {
     key = { "pid" }, max = 1024, expiry = { days = 30 },
     fields = { listParts("items", 20, { pText("name", 100), pInt("qty"), pInt("skill") }) },
   },
+  wm = {
+    key = { "pid" }, max = 1280, expiry = { days = 30 },
+    fields = {
+      listParts("marks", 30, { pInt("map"), pInt("x"), pInt("y"), pInt("at"), pText("kind", 1), pInt("n") }),
+      listParts("maps", 12, { pInt("id"), pText("name", 40) }),
+    },
+  },
   pr = {
     key = { "pid" }, max = 800, expiry = { days = 14 },
     fields = { int("day"), listParts("prices", 60, { pInt("id"), pInt("copper") }) },

@@ -83,3 +83,81 @@ test('a session knows me by GUID once named, and by a new name list', () => {
   assert.strictEqual(s.summary().kills, 2);
   assert.strictEqual(s.summary().pvpKills, 1);
 });
+
+test('the zone: MAP_CHANGE names it; ZONE_CHANGE (the instance, a continent outdoors) only until the next MAP_CHANGE', () => {
+  const s = createSession({ names: ['Grom'] });
+  const add = (time, rest) => s.add(parseLine(L(time, rest), { year: 2026 }));
+  assert.strictEqual(s.zone, null);
+  // Logging in (or zoning onto a continent): the instance first, then the map.
+  add('17:00:00.000', 'ZONE_CHANGE,0,"Eastern Kingdoms",0');
+  assert.deepStrictEqual(s.zone, { id: 0, name: 'Eastern Kingdoms' });
+  add('17:00:00.000', 'MAP_CHANGE,1424,"Hillsbrad Foothills",-1066.667,-3133.333,-1100.000,-4250.000');
+  assert.deepStrictEqual(s.zone, { id: 1424, name: 'Hillsbrad Foothills' });
+  // Walking into the next zone writes only a MAP_CHANGE.
+  add('17:05:00.000', 'MAP_CHANGE,1425,"The Hinterlands",-1500.000,-4300.000,-500.000,-2500.000');
+  assert.deepStrictEqual(s.zone, { id: 1425, name: 'The Hinterlands' });
+  add('17:06:00.000', 'MAP_CHANGE,1424,"Hillsbrad Foothills",-1066.667,-3133.333,-1100.000,-4250.000');
+  assert.deepStrictEqual(s.zone, { id: 1424, name: 'Hillsbrad Foothills' });
+  // A dungeon: its ZONE_CHANGE stands in until its map arrives (a MAP_CHANGE from before doesn't).
+  add('17:10:00.000', 'ZONE_CHANGE,33,"Shadowfang Keep",1');
+  assert.deepStrictEqual(s.zone, { id: 33, name: 'Shadowfang Keep' });
+  add('17:10:00.000', 'MAP_CHANGE,310,"Shadowfang Keep",0,0,0,0');
+  assert.deepStrictEqual(s.zone, { id: 310, name: 'Shadowfang Keep' });
+  assert.strictEqual(s.summary().zone, 'Shadowfang Keep');
+});
+
+test('a session knows the zone and every player in a death', () => {
+  const s = createSession({ names: ['Grom'] });
+  const add = (time, rest) => s.add(parseLine(L(time, rest), { year: 2026 }));
+  const HOLY = 'Player-4395-0E0E0E0E,"Holy-Zuljin",0x548,0x0';
+  add('17:00:00.000', 'ZONE_CHANGE,0,"Eastern Kingdoms",0');
+  add('17:00:00.000', 'MAP_CHANGE,1424,"Hillsbrad Foothills",-1066.667,-3133.333,-1100.000,-4250.000');
+  assert.deepStrictEqual(s.zone, { id: 1424, name: 'Hillsbrad Foothills' });
+  add('17:00:01.000', `SPELL_DAMAGE,${HOLY},${ME},585,"Smite",0x2,200,0,2,0,0,0,nil,nil,nil`);
+  add('17:00:02.000', `SWING_DAMAGE,${MOB},${ME},50,-1,1,0,0,0,nil,nil,nil`);
+  add('17:00:03.000', `SPELL_DAMAGE,${ROGUE},${ME},2098,"Eviscerate",0x1,600,0,1,0,0,0,nil,nil,nil`);
+  add('17:00:03.100', `UNIT_DIED,0000000000000000,nil,0x80000000,0x0,${ME}`);
+  const d = s.lastDeath;
+  assert.deepStrictEqual(d.enemies, ['Holy', 'Sneaky']);
+  assert.strictEqual(d.zone, 'Hillsbrad Foothills');
+  assert.strictEqual(d.zoneId, 1424);
+  assert.match(deathText(d), /^Died to Sneaky \(a player\) and 1 other player in Hillsbrad Foothills, killing blow Eviscerate/);
+  assert.strictEqual(s.summary().zone, 'Hillsbrad Foothills');
+});
+
+test("a player's pet counts as the player; a mob's last hit after players still makes a PvP death", () => {
+  const s = createSession({ names: ['Grom'] });
+  const add = (time, rest) => s.add(parseLine(L(time, rest), { year: 2026 }));
+  const HUNTER = 'Player-4395-0D0D0D0D,"Hunty-Zuljin",0x548,0x0';
+  const WOLF = 'Pet-0-4395-0-1-1234-0100ABCDEF,"Fang",0x1148,0x0';
+  const CAT = 'Pet-0-4395-0-1-5678-0200ABCDEF,"Shadow",0x1148,0x0';
+  // A summon line ties the wolf to its hunter (the hunter has to have been named in some line).
+  add('17:00:00.000', `SPELL_SUMMON,${HUNTER},${WOLF},883,"Call Pet",0x1`);
+  add('17:00:01.000', `SWING_DAMAGE,${WOLF},${ME},70,-1,1,0,0,0,nil,nil,nil`);
+  add('17:00:02.000', `SWING_DAMAGE,${MOB},${ME},50,-1,1,0,0,0,nil,nil,nil`);
+  add('17:00:02.100', `UNIT_DIED,0000000000000000,nil,0x80000000,0x0,${ME}`);
+  let d = s.lastDeath;
+  assert.strictEqual(d.killer, 'Defias Pillager');
+  assert.strictEqual(d.pvp, true, 'a player was in on it');
+  assert.deepStrictEqual(d.enemies, ['Hunty']);
+  assert.ok(d.sources.some((x) => x.who === 'Hunty' && x.spell === 'Melee (Fang)' && x.player));
+  assert.strictEqual(s.summary().pvpDeaths, 1);
+  // An unknown owner: the pet's own name. Advanced logging names the owner by GUID in the unit info.
+  add('17:01:00.000', `SWING_DAMAGE,${CAT},${ME},80,-1,1,0,0,0,nil,nil,nil`);
+  add('17:01:00.100', `UNIT_DIED,0000000000000000,nil,0x80000000,0x0,${ME}`);
+  d = s.lastDeath;
+  assert.strictEqual(d.pvp, true);
+  assert.deepStrictEqual(d.enemies, ['Shadow']);
+  const info = ['Pet-0-4395-0-1-5678-0200ABCDEF', 'Player-4395-0D0D0D0D', '100', '100', '0', '0', '0', '0', '0', '0', '1', '0', '0', '0', '1.0', '2.0', '0'];
+  add('17:02:00.000', `SWING_DAMAGE,${CAT},${ME},${info.join(',')},90,-1,1`);
+  add('17:02:00.100', `UNIT_DIED,0000000000000000,nil,0x80000000,0x0,${ME}`);
+  assert.deepStrictEqual(s.lastDeath.enemies, ['Hunty']);
+  // Mobs and my own damage only: not PvP.
+  add('17:03:00.000', `ENVIRONMENTAL_DAMAGE,0000000000000000,nil,0x80000000,0x80000000,${ME},Falling,300,0,1,0,0,0,nil,nil,nil`);
+  add('17:03:00.200', `SPELL_DAMAGE,${ME},${ME},1454,"Life Tap",0x20,100,0,32,0,0,0,nil,nil,nil`);
+  add('17:03:00.500', `SWING_DAMAGE,${MOB},${ME},50,-1,1,0,0,0,nil,nil,nil`);
+  add('17:03:00.600', `UNIT_DIED,0000000000000000,nil,0x80000000,0x0,${ME}`);
+  assert.strictEqual(s.lastDeath.pvp, false);
+  assert.deepStrictEqual(s.lastDeath.enemies, []);
+  assert.strictEqual(s.summary().pvpDeaths, 3);
+});

@@ -10,6 +10,9 @@
 // unit-info fields come after the spell fields, before the amounts; we detect that by the info GUID that starts them.
 
 const TYPE_PLAYER = 0x400;
+// COMBATLOG_OBJECT_CONTROL_PLAYER: a player's pet, totem or guardian (and players themselves). Pets kill people too.
+const CONTROL_PLAYER = 0x100;
+const MAX_KNOWN = 500; // GUIDs remembered for naming pets' owners
 
 // Split the CSV part: commas outside double quotes; quotes removed.
 function splitFields(s) {
@@ -69,12 +72,36 @@ function createSession({ names = [] } = {}) {
     fights: 0, fightMs: 0, me: null,
   };
   let fightStart = null; let fightLast = null;
+  // Where I am. `MAP_CHANGE,<uiMapID>,"Hillsbrad Foothills",…` names the zone; `ZONE_CHANGE,<instanceID>,"Eastern
+  // Kingdoms",<difficulty>` only names the instance, which in the open world is the whole continent. So a MAP_CHANGE
+  // always wins, and a ZONE_CHANGE (written when the instance changes, before that instance's first MAP_CHANGE) only
+  // stands in until the next MAP_CHANGE.
+  let map = null; // { id, name } from the last MAP_CHANGE since the last ZONE_CHANGE
+  let instance = null; // { id, name } from the last ZONE_CHANGE
+  const where = () => map || instance;
+  // Player-controlled units' owners, so a hunter's pet's bite counts as the hunter's: player GUID → name (from any
+  // line a player is named in) and pet GUID → owner GUID (SPELL_SUMMON lines, and the owner field of advanced logging).
+  const playerNames = new Map(); const owners = new Map();
+  const remember = (m, k, v) => { if (m.has(k)) m.delete(k); m.set(k, v); if (m.size > MAX_KNOWN) m.delete(m.keys().next().value); };
   const recent = []; // events involving me, last ~60
   let lastDeath = null;
 
   // Me: one of my character names, or the same GUID once a line has named me.
   const isMe = (u) => Boolean(u.name && mine.has(shortName(u.name).toLowerCase())) || Boolean(s.me && u.guid && u.guid === s.me.guid);
   const isPlayer = (u) => Boolean(u.flags & TYPE_PLAYER) || String(u.guid).startsWith('Player-');
+  // A player or something a player controls (pets, totems, mind-controlled mobs).
+  const isPlayerControlled = (u) => isPlayer(u) || Boolean(u.flags & CONTROL_PLAYER);
+
+  // Who to blame for a hit: the player, or a pet's owner when we know them (else the pet's own name).
+  function attacker(e) {
+    if (isPlayer(e.src) || !(e.src.flags & CONTROL_PLAYER)) return { who: shortName(e.src.name), pet: null };
+    let owner = owners.get(e.src.guid);
+    // Advanced logging: the unit info after the spell fields starts with the source's GUID, then its owner's.
+    const f = e.fields; const at = e.event.startsWith('SWING_') ? 0 : 3;
+    if (!owner && f[at] === e.src.guid && String(f[at + 1] || '').startsWith('Player-')) owner = f[at + 1];
+    const name = owner && playerNames.get(owner);
+    return name ? { who: name, pet: shortName(e.src.name) || null } : { who: shortName(e.src.name), pet: null };
+  }
 
   function closeFight() {
     if (fightStart != null && fightLast != null) { s.fights += 1; s.fightMs += Math.max(0, fightLast - fightStart); }
@@ -83,6 +110,16 @@ function createSession({ names = [] } = {}) {
 
   function add(e) {
     if (!e) return null;
+    if (e.event === 'ZONE_CHANGE' || e.event === 'MAP_CHANGE') {
+      // `MAP_CHANGE,1424,"Hillsbrad Foothills",…`: parseLine read the id and name as the source unit's.
+      const id = Number(e.src.guid); const name = e.src.name;
+      if (!name) return null;
+      const z = { id: Number.isFinite(id) ? id : null, name };
+      if (e.event === 'MAP_CHANGE') map = z; else { instance = z; map = null; }
+      return null;
+    }
+    for (const u of [e.src, e.dst]) if (u.name && String(u.guid).startsWith('Player-')) remember(playerNames, u.guid, shortName(u.name));
+    if (e.event === 'SPELL_SUMMON' && String(e.src.guid).startsWith('Player-') && e.dst.guid) remember(owners, e.dst.guid, e.src.guid);
     const srcMe = isMe(e.src); const dstMe = isMe(e.dst);
     if (!srcMe && !dstMe) return null;
     s.events += 1;
@@ -98,7 +135,11 @@ function createSession({ names = [] } = {}) {
       const { spell, amount } = amountOf(e);
       if (srcMe && !dstMe) s.damageDone += amount;
       if (dstMe) s.damageTaken += amount;
-      entry = { t: e.t, kind: dstMe ? 'hit-me' : 'hit', who: shortName(dstMe ? e.src.name : e.dst.name) || spell, player: isPlayer(dstMe ? e.src : e.dst), spell, amount };
+      if (dstMe) {
+        // My own damage (a fall, Life Tap) is never an enemy's.
+        const by = srcMe ? { who: shortName(e.src.name), pet: null } : attacker(e);
+        entry = { t: e.t, kind: 'hit-me', who: by.who || spell, player: !srcMe && isPlayerControlled(e.src), spell: by.pet ? `${spell} (${by.pet})` : spell, amount };
+      } else entry = { t: e.t, kind: 'hit', who: shortName(e.dst.name) || spell, player: isPlayer(e.dst), spell, amount };
     } else if (HEAL.test(e.event)) {
       const { spell, amount } = amountOf(e);
       if (dstMe) s.healingTaken += amount;
@@ -120,11 +161,14 @@ function createSession({ names = [] } = {}) {
         bySource[k].amount += h.amount; bySource[k].hits += 1;
       }
       const killing = hits[hits.length - 1] || null;
-      const pvp = Boolean(killing && killing.player);
+      const enemies = [...new Set(hits.filter((h) => h.player).map((h) => h.who).filter(Boolean))];
+      // Players (or their pets) hurt me in the last seconds: a death to players, even when a mob landed the last hit.
+      const pvp = enemies.length > 0;
       if (pvp) s.pvpDeaths += 1;
       lastDeath = {
         at: e.t, character: s.me && s.me.name,
         killer: killing ? killing.who : null, killingBlow: killing ? { spell: killing.spell, amount: killing.amount } : null, pvp,
+        enemies, zone: where() ? where().name : null, zoneId: where() ? where().id : null,
         seconds: window.length ? Math.round((e.t - window[0].t) / 100) / 10 : 0,
         damageTaken: hits.reduce((a, h) => a + h.amount, 0),
         healed: window.filter((r) => r.kind === 'healed').reduce((a, h) => a + h.amount, 0),
@@ -146,7 +190,7 @@ function createSession({ names = [] } = {}) {
       character: s.me && s.me.name, startedAt: s.startedAt, lastAt: s.lastAt, minutes: Math.round(minutes),
       kills: s.kills, pvpKills: s.pvpKills, deaths: s.deaths, pvpDeaths: s.pvpDeaths,
       damageDone: s.damageDone, damageTaken: s.damageTaken, healingTaken: s.healingTaken,
-      fights: s.fights + (fightStart != null ? 1 : 0), fightShare: minutes ? Math.round((fightMs / 60000 / minutes) * 100) / 100 : 0,
+      fights: s.fights + (fightStart != null ? 1 : 0), zone: where() ? where().name : null, fightShare: minutes ? Math.round((fightMs / 60000 / minutes) * 100) / 100 : 0,
       killsPerHour: perHour(s.kills), deathsPerHour: perHour(s.deaths),
     };
   }
@@ -154,6 +198,7 @@ function createSession({ names = [] } = {}) {
   return {
     add, summary,
     get lastDeath() { return lastDeath; },
+    get zone() { return where(); },
     setNames(list) { mine = new Set(list.map((n) => shortName(n).toLowerCase())); },
   };
 }
@@ -161,7 +206,8 @@ function createSession({ names = [] } = {}) {
 // The death recap as plain text for the Coach.
 function deathText(d) {
   if (!d) return '';
-  const lines = [`Died${d.killer ? ` to ${d.killer}${d.pvp ? ' (a player)' : ''}` : ''}${d.killingBlow && d.killingBlow.spell ? `, killing blow ${d.killingBlow.spell} for ${d.killingBlow.amount}` : ''}.`,
+  const others = d.enemies && d.enemies.length > 1 ? ` and ${d.enemies.length - 1} other player${d.enemies.length === 2 ? '' : 's'}` : '';
+  const lines = [`Died${d.killer ? ` to ${d.killer}${d.pvp ? ' (a player)' : ''}${others}` : ''}${d.zone ? ` in ${d.zone}` : ''}${d.killingBlow && d.killingBlow.spell ? `, killing blow ${d.killingBlow.spell} for ${d.killingBlow.amount}` : ''}.`,
     `In the last ${d.seconds}s: took ${d.damageTaken} damage, was healed for ${d.healed}.`];
   if (d.sources.length) lines.push(`Damage taken by source: ${d.sources.map((x) => `${x.who}${x.player ? ' (player)' : ''} ${x.spell || ''} ${x.amount} in ${x.hits} hit${x.hits === 1 ? '' : 's'}`).join('; ')}.`);
   lines.push(d.myCasts.length ? `My casts: ${d.myCasts.join(', ')}.` : 'I cast nothing in that time.');
@@ -176,4 +222,4 @@ function sessionText(x) {
     + `damage done ${x.damageDone}, taken ${x.damageTaken}, healed for ${x.healingTaken}.`;
 }
 
-module.exports = { parseLine, splitFields, amountOf, createSession, deathText, sessionText, TYPE_PLAYER };
+module.exports = { parseLine, splitFields, amountOf, createSession, deathText, sessionText, TYPE_PLAYER, CONTROL_PLAYER };

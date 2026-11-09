@@ -720,6 +720,7 @@ const methods = {
       session: { character: 'Grimtusk', startedAt: now - 47 * 60000, lastAt: now - 20000, minutes: 47, kills: 38, pvpKills: 4, deaths: 2, pvpDeaths: 1,
         damageDone: 182400, damageTaken: 96350, healingTaken: 21800, fights: 31, fightShare: 0.41, killsPerHour: 48.5, deathsPerHour: 2.6 },
       lastDeath: { at: now - 6 * 60000, character: 'Grimtusk', killer: 'Shadowstep', killingBlow: { spell: 'Ambush', amount: 1287 }, pvp: true, seconds: 6.4,
+        enemies: ['Shadowstep', 'Holymoly'], zone: 'Hillsbrad Foothills', zoneId: 1424,
         damageTaken: 3920, healed: 0,
         sources: [{ who: 'Shadowstep', spell: 'Ambush', player: true, amount: 1287, hits: 1 }, { who: 'Shadowstep', spell: 'Sinister Strike', player: true, amount: 1460, hits: 4 },
           { who: 'Shadowstep', spell: 'Melee', player: true, amount: 1173, hits: 5 }],

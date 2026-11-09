@@ -775,6 +775,36 @@ const MIGRATIONS = [
    CREATE TABLE ah_days (realm TEXT NOT NULL, item_id INTEGER NOT NULL, day INTEGER NOT NULL, price INTEGER NOT NULL, qty INTEGER,
      PRIMARY KEY (realm, item_id, day));
    ALTER TABLE item_info ADD COLUMN sell_price INTEGER;`,
+
+  // 20: War alerts. pvp_deaths = my own deaths from the app's live link (the combat log): who killed me, where,
+  // and whether Discord was told (at = ms). war_marks = the guild's deaths and kills in the open world with their map
+  // position (x, y in thousandths), from every member's "wm" record; war_maps = the game's map names they give.
+  `CREATE TABLE pvp_deaths (
+     id INTEGER PRIMARY KEY,
+     guild_id INTEGER REFERENCES guilds(id),
+     user_id INTEGER NOT NULL REFERENCES users(id),
+     character TEXT NOT NULL,
+     at INTEGER NOT NULL,
+     pvp INTEGER NOT NULL DEFAULT 0,
+     killer TEXT, enemies TEXT, zone TEXT, zone_id INTEGER, spell TEXT, amount INTEGER,
+     seconds REAL, damage_taken INTEGER, healed INTEGER,
+     posted INTEGER NOT NULL DEFAULT 0,
+     UNIQUE (user_id, character, at)
+   );
+   CREATE INDEX pvp_deaths_user ON pvp_deaths(user_id, at);
+   CREATE TABLE war_marks (
+     guild_id INTEGER NOT NULL REFERENCES guilds(id),
+     pid TEXT NOT NULL,
+     user_id INTEGER REFERENCES users(id),
+     map_id INTEGER NOT NULL,
+     x INTEGER NOT NULL, y INTEGER NOT NULL,
+     at INTEGER NOT NULL,
+     kind TEXT NOT NULL CHECK (kind IN ('d','k')),
+     n INTEGER,
+     PRIMARY KEY (guild_id, pid, map_id, at, kind)
+   );
+   CREATE INDEX war_marks_at ON war_marks(guild_id, at);
+   CREATE TABLE war_maps (map_id INTEGER PRIMARY KEY, name TEXT NOT NULL);`,
 ];
 
 // Runs every migration the database hasn't had yet, each in its own transaction.
