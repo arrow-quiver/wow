@@ -60,7 +60,7 @@ function ns.versionLess(a, b)
 end
 
 -- Options (Settings → AddOns → wow guild). Defaults are on.
-ns.DEFAULTS = { tooltips = true, minimapButton = true, loginNews = true, autoGuide = true, trackerOnLogin = true, collectBank = true, updateNotice = true }
+ns.DEFAULTS = { blizzardStyle = false, tooltips = true, minimapButton = true, loginNews = true, autoGuide = true, trackerOnLogin = true, collectBank = true, updateNotice = true }
 function ns.opt(key)
   local o = ns.db and ns.db.options
   if o and o[key] ~= nil then return o[key] end
@@ -158,6 +158,8 @@ SlashCmdList["WOWGUILD"] = function(input)
     ns.prof.toggleGuide()
   elseif cmd == "list" then
     if rest == "clear" then ns.prof.clearList() else ns.prof.toggleTracker() end
+  elseif cmd == "welcome" then
+    ns.welcome.showWelcome()
   elseif cmd == "coach" then
     if rest == "" then ns.coachUI.toggle() else ns.coachUI.show(rest == "ask" and "ask" or rest == "build" and "build" or "steps") end
   elseif cmd == "options" or cmd == "config" then

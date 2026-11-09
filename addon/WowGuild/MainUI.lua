@@ -16,6 +16,7 @@ local TABS = {
 local LIST_ROWS = 6
 
 local function skin(f, alpha)
+  if ns.skin and ns.skin.enabled() then return ns.skin.window(f) end
   if f.SetBackdrop then
     f:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8x8", edgeFile = "Interface\\Buttons\\WHITE8x8", edgeSize = 2 })
     f:SetBackdropColor(0.12, 0.23, 0.2, alpha or 0.97)
@@ -321,7 +322,8 @@ end
 local win
 
 local function setTitle(f, text)
-  if f.SetTitle then f:SetTitle(text)
+  if f.styled and f.title then f.title:SetText(text)
+  elseif f.SetTitle then f:SetTitle(text)
   elseif f.TitleText then f.TitleText:SetText(text)
   elseif f.TitleContainer and f.TitleContainer.TitleText then f.TitleContainer.TitleText:SetText(text)
   elseif f.title then f.title:SetText(text) end
@@ -329,8 +331,11 @@ end
 W.setTitle = setTitle
 
 local function createWindow()
-  local f, template = tryFrame("Frame", "WowGuildWindow", UIParent, "ButtonFrameTemplate", "BackdropTemplate")
+  local styled = ns.skin and ns.skin.enabled()
+  local f, template
+  if styled then f = CreateFrame("Frame", "WowGuildWindow", UIParent) else f, template = tryFrame("Frame", "WowGuildWindow", UIParent, "ButtonFrameTemplate", "BackdropTemplate") end
   f.native = template == "ButtonFrameTemplate"
+  f.styled = styled
   f:SetSize(WIDTH, HEIGHT)
   f:SetFrameStrata("DIALOG")
   f:SetMovable(true); f:EnableMouse(true); f:RegisterForDrag("LeftButton"); f:SetClampedToScreen(true)
@@ -352,6 +357,11 @@ local function createWindow()
       f.Inset:SetPoint("TOPLEFT", 4, -26)
       f.Inset:SetPoint("BOTTOMRIGHT", -6, 4)
     end
+  elseif styled then
+    ns.skin.window(f)
+    f.title = ns.skin.text(f, "title", "", ns.skin.GOLD); f.title:SetPoint("TOPLEFT", 18, -14)
+    local close = CreateFrame("Button", nil, f, "UIPanelCloseButton"); close:SetPoint("TOPRIGHT", -4, -4)
+    ns.skin.rule(f, -76, 14)
   else
     skin(f)
     f.title = label(f, "", "GameFontNormalLarge"); f.title:SetPoint("TOPLEFT", 16, -12)
@@ -363,22 +373,35 @@ local function createWindow()
   f.tabs, f.pages = {}, {}
   local prev
   for i, t in ipairs(TABS) do
-    local tab, tabTemplate = tryFrame("Button", "WowGuildWindowTab" .. i, f, "PanelTabButtonTemplate", "CharacterFrameTabButtonTemplate", "UIPanelButtonTemplate")
-    tab:SetID(i)
-    tab:SetText(t.label)
-    if tabTemplate == "UIPanelButtonTemplate" then
+    local tab, tabTemplate
+    if styled then
+      tab = ns.skin.tab(f, t.label, function() W.show(t.key) end)
+      if prev then tab:SetPoint("LEFT", prev, "RIGHT", 2, 0) else tab:SetPoint("TOPLEFT", f, "TOPLEFT", 10, -44) end
+      f.bottomTabs = false
+    else
+      tab, tabTemplate = tryFrame("Button", "WowGuildWindowTab" .. i, f, "PanelTabButtonTemplate", "CharacterFrameTabButtonTemplate", "UIPanelButtonTemplate")
+      tab:SetID(i)
+      tab:SetText(t.label)
+    end
+    if styled then -- placed above
+    elseif tabTemplate == "UIPanelButtonTemplate" then
       tab:SetSize(110, 24)
       tab:SetPoint("TOPLEFT", f, "TOPLEFT", 14 + (i - 1) * 116, -40)
     else
       if PanelTemplates_TabResize then PanelTemplates_TabResize(tab, 0) end
       if prev then tab:SetPoint("LEFT", prev, "RIGHT", 3, 0) else tab:SetPoint("TOPLEFT", f, "BOTTOMLEFT", 11, 2) end
     end
-    f.bottomTabs = tabTemplate ~= "UIPanelButtonTemplate"
-    tab:SetScript("OnClick", function() W.show(t.key) end)
+    if not styled then
+      f.bottomTabs = tabTemplate ~= "UIPanelButtonTemplate"
+      tab:SetScript("OnClick", function() W.show(t.key) end)
+    end
     f.tabs[t.key] = tab
     prev = tab
     local page = CreateFrame("Frame", nil, f)
-    if f.native and f.Inset then
+    if styled then
+      page:SetPoint("TOPLEFT", 18, -88)
+      page:SetPoint("BOTTOMRIGHT", -16, 14)
+    elseif f.native and f.Inset then
       page:SetPoint("TOPLEFT", f.Inset, "TOPLEFT", 12, -10)
       page:SetPoint("BOTTOMRIGHT", f.Inset, "BOTTOMRIGHT", -8, 8)
     else
@@ -389,7 +412,7 @@ local function createWindow()
     page:Hide()
     f.pages[t.key] = page
   end
-  if PanelTemplates_SetNumTabs then PanelTemplates_SetNumTabs(f, #TABS) end
+  if PanelTemplates_SetNumTabs and not styled then PanelTemplates_SetNumTabs(f, #TABS) end
 
   local pos = ns.db.ui and ns.db.ui.windowPos
   if pos then f:SetPoint(pos.point or "CENTER", UIParent, pos.rel or "CENTER", pos.x or 0, pos.y or 0) else f:SetPoint("CENTER") end
@@ -410,7 +433,8 @@ function W.show(key)
     local page, tab = f.pages[t.key], f.tabs[t.key]
     if t.key == key then page:Show() else page:Hide() end
     if t.key == key and PanelTemplates_SetTab and f.bottomTabs then PanelTemplates_SetTab(f, i) end
-    if not f.bottomTabs and tab.LockHighlight then if t.key == key then tab:LockHighlight() else tab:UnlockHighlight() end end
+    if f.styled then tab.select(t.key == key)
+    elseif not f.bottomTabs and tab.LockHighlight then if t.key == key then tab:LockHighlight() else tab:UnlockHighlight() end end
   end
   setTitle(f, "wow guild" .. ((WowGuildInbox and WowGuildInbox.guild) and ("  |cff999999" .. WowGuildInbox.guild .. "|r") or ""))
   f:Show()

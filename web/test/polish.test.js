@@ -120,9 +120,33 @@ test('professions tab: mats as item rows, auction house search and Auctionator l
   assert.strictEqual(wow.eval('__ns.debugError'), null);
 });
 
-test('window uses Blizzard frame and bottom tabs when available', () => {
-  const wow = client(INBOX);
+test('guild style by default: dark-and-gold window with text tabs, first-run welcome, what\'s new', () => {
+  const wow = client(INBOX, '\nfunction GetAddOnMetadata() return "0.9.0" end');
+  // First login shows the welcome once.
+  assert.strictEqual(wow.eval('tostring(WowGuildWelcome:IsShown())'), 'true');
+  assert.match(wow.eval('WowGuildWelcome.title:GetText()'), /wow/);
+  assert.strictEqual(wow.eval('WowGuildWelcome.rows[3].head:GetText()'), 'Connect to the website', 'no sync yet, so it explains the companion');
+  wow.exec('__click(WowGuildWelcome.rows[2].btn)');
+  assert.strictEqual(wow.eval('tostring(WowGuildCoach.quiz:IsShown())'), 'true', 'Take the quiz opens the Coach quiz');
   wow.exec('__ns.ui.show("guild")');
+  assert.strictEqual(wow.eval('tostring(WowGuildWindow.styled)'), 'true');
+  assert.strictEqual(wow.eval('tostring(WowGuildWindow.skinned)'), 'true');
+  assert.strictEqual(wow.eval('tostring(WowGuildWindow.tabs.guild.on)'), 'true');
+  assert.strictEqual(wow.eval('tostring(WowGuildWindow.tabs.camp.on)'), 'false');
+  wow.exec('__click(WowGuildWindow.tabs.coach)');
+  assert.strictEqual(wow.eval('tostring(WowGuildWindow.pages.coach:IsShown())'), 'true');
+  assert.match(wow.eval('WowGuildWindow.title:GetText()'), /wow guild/);
+  // Next login: no welcome; after an update with news: what's new, once.
+  wow.exec('WowGuildWelcome:Hide(); __ns.db.newsSeen = "0.8.0"; __ns.welcome.check()');
+  assert.strictEqual(wow.eval('WowGuildWelcome.caps:GetText()'), "WHAT'S NEW");
+  wow.exec('WowGuildWelcome:Hide(); __ns.welcome.check()');
+  assert.strictEqual(wow.eval('tostring(WowGuildWelcome:IsShown())'), 'false');
+  assert.strictEqual(wow.eval('__ns.debugError'), null);
+});
+
+test('window uses Blizzard frame and bottom tabs when that style is picked', () => {
+  const wow = client(INBOX);
+  wow.exec('__ns.db.options.blizzardStyle = true; __ns.ui.show("guild")');
   assert.strictEqual(wow.eval('tostring(WowGuildWindow.native)'), 'true');
   assert.strictEqual(wow.eval('tostring(WowGuildWindow.bottomTabs)'), 'true');
   assert.strictEqual(wow.eval('WowGuildWindow.selectedTab'), '5');
