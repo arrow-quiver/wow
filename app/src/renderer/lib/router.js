@@ -125,7 +125,9 @@ export function back(fallback = '/') {
 }
 
 // The main process asks for a route (notification clicks, guildcamp:// links).
+// The Coach overlay window stays on its own page.
 gc.on('navigate', (route) => {
+  if (locationStore.get && locationStore.get().path === '/overlay') return;
   if (typeof route === 'string') navigate(route);
   else if (route && typeof route.route === 'string') navigate(route.route);
 });

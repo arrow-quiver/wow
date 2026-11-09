@@ -40,10 +40,11 @@ const METHOD_NAMES = [
   'updater.status', 'updater.check', 'updater.download', 'updater.install',
   'publisher.status', 'publisher.publishAddon', 'publisher.publishApp', 'publisher.setRepoDir', 'publisher.cancel',
   'notify.test',
+  'live.state', 'overlay.toggle', 'overlay.hide',
 ];
 
 // Keep in sync with CHANNELS in src/preload/preload.js and src/renderer/lib/gc.js.
-const EVENT_CHANNELS = ['auth', 'sync', 'addon', 'updater', 'publisher:log', 'server-event', 'navigate', 'log', 'settings'];
+const EVENT_CHANNELS = ['auth', 'sync', 'addon', 'updater', 'publisher:log', 'server-event', 'navigate', 'log', 'settings', 'live'];
 
 // Secrets the renderer may set (never read back): the player's own Anthropic API key for the Coach AI.
 const RENDERER_SECRETS = ['anthropicKey'];
@@ -456,6 +457,11 @@ function buildMethods(d) {
 
     // --- notifications --------------------------------------------------------------------
     'notify.test': () => notify.test(),
+
+    // --- live link and Coach overlay (live.js, overlay.js) ------------------------------------
+    'live.state': () => (d.live ? d.live.state() : { status: 'off', session: null, lastDeath: null, hint: null }),
+    'overlay.toggle': () => (d.overlay ? d.overlay.toggle() : false),
+    'overlay.hide': () => (d.overlay ? d.overlay.hide() : false),
   };
 }
 

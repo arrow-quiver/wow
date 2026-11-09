@@ -30,7 +30,7 @@ const CONTRACT_METHODS = [
   'notify.test',
 ];
 
-const CONTRACT_CHANNELS = ['auth', 'sync', 'addon', 'updater', 'publisher:log', 'server-event', 'navigate', 'log', 'settings'];
+const CONTRACT_CHANNELS = ['auth', 'sync', 'addon', 'updater', 'publisher:log', 'server-event', 'navigate', 'log', 'settings', 'live'];
 // Gone with the server: joining by itself, dev sign-in, the membership channel.
 const REMOVED_METHODS = ['guild.autoJoin', 'membership.status', 'auth.devSignIn'];
 

@@ -165,11 +165,12 @@ function charFor(db, guildId, userId, name) {
 // ---------- work ----------
 // fresh: true starts a new conversation; otherwise the Coach sees this character's last few answered questions
 // from the past 3 hours, so follow-ups ("and at level 40?") make sense.
-async function answer(db, cfg, qaId, { fresh = false } = {}) {
+// extra: more context for this question only (the live link's death recap or session), not stored.
+async function answer(db, cfg, qaId, { fresh = false, extra = '' } = {}) {
   const qa = db.prepare('SELECT q.*, g.name AS guild FROM coach_qa q JOIN guilds g ON g.id = q.guild_id WHERE q.id = ?').get(qaId);
   if (!qa || qa.status !== 'pending' || answering.has(qa.id)) return qa;
   answering.add(qa.id);
-  try { return await answerNow(db, cfg, qa, { fresh }); } finally { answering.delete(qa.id); }
+  try { return await answerNow(db, cfg, qa, { fresh, extra }); } finally { answering.delete(qa.id); }
 }
 
 const FOLLOW_UP_TURNS = 3;
@@ -181,7 +182,7 @@ function conversation(db, qa) {
       ORDER BY id DESC LIMIT ?`).all(qa.user_id, qa.id, qa.char_name, qa.created_at, FOLLOW_UP_TURNS).reverse();
 }
 
-async function answerNow(db, cfg, qa, { fresh = false } = {}) {
+async function answerNow(db, cfg, qa, { fresh = false, extra = '' } = {}) {
   const fail = (msg) => { db.prepare("UPDATE coach_qa SET status = 'failed', error = ?, answered_at = datetime('now') WHERE id = ?").run(msg, qa.id); return { ...qa, status: 'failed', error: msg }; };
   const blocked = guard(db, qa.guild_id, qa.user_id, 'question');
   if (blocked) return fail(blocked);
@@ -192,7 +193,7 @@ async function answerNow(db, cfg, qa, { fresh = false } = {}) {
     const r = await ai.ask(cfg, {
       model, maxTokens: 700, searches: 2,
       system: `${system(qa.guild)}\nAnswer in at most 120 words of plain text: no markdown, no headings, short lines. It is shown inside the game.`,
-      messages: messagesFor(qa, `${charContext(c)}${plan ? `\nTheir current build plan: ${plan.headline} (${plan.spec} ${plan.split}).` : ''}`, fresh ? [] : conversation(db, qa)),
+      messages: messagesFor(qa, `${charContext(c)}${plan ? `\nTheir current build plan: ${plan.headline} (${plan.spec} ${plan.split}).` : ''}`, fresh ? [] : conversation(db, qa), extra),
     });
     ai.record(db, { guildId: qa.guild_id, userId: qa.user_id, kind: 'question', model, r });
     const text = forGame(r.text).slice(0, 1200) || 'Sorry, I had no answer for that. Try asking another way.';
@@ -202,13 +203,14 @@ async function answerNow(db, cfg, qa, { fresh = false } = {}) {
 }
 
 // The character's details go with the first question of the conversation; earlier turns follow as they were.
-function messagesFor(qa, context, earlier) {
+function messagesFor(qa, context, earlier, extra = '') {
   const msgs = [];
   earlier.forEach((t, i) => {
     msgs.push({ role: 'user', content: i === 0 ? `${context}\n\nQuestion: ${t.question}` : `Question: ${t.question}` });
     msgs.push({ role: 'assistant', content: t.answer });
   });
-  msgs.push({ role: 'user', content: earlier.length ? `Follow-up question: ${qa.question}` : `${context}\n\nQuestion: ${qa.question}` });
+  const more = extra ? `\n\nFrom the game, live (the combat log):\n${String(extra).slice(0, 2500)}` : '';
+  msgs.push({ role: 'user', content: earlier.length ? `Follow-up question: ${qa.question}${more}` : `${context}${more}\n\nQuestion: ${qa.question}` });
   return msgs;
 }
 
