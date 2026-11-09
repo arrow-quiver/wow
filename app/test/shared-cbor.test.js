@@ -67,3 +67,15 @@ test('Auctionator 8 (CBOR per realm) reads the same as the old Lua tables', () =
   assert.doesNotThrow(() => A.extractPrices(mangled, now));
   assert.deepStrictEqual(A.realmTables({ __dbversion: 8, Broken: '\x19\x01' }), []);
 });
+
+test('bytes mode keeps table keys as UTF-8 text (realm names with accents or Cyrillic)', () => {
+  const realm = 'Гордунни Horde';
+  const items = { 35: { h: { 2504: 5 }, m: 5 } };
+  const file = Buffer.concat([
+    Buffer.from(`AUCTIONATOR_PRICE_DATABASE = {\n["__dbversion"] = 8,\n["${realm}"] = `, 'utf8'),
+    Buffer.from(luaQuote(enc(items)), 'latin1'),
+    Buffer.from(',\n["Café Alliance"] = { ["36"] = { ["m"] = 7 } },\n}\n', 'utf8'),
+  ]);
+  const db = parseSavedVariables(file, { bytes: true }).AUCTIONATOR_PRICE_DATABASE;
+  assert.deepStrictEqual(A.realmTables(db).map(([k]) => k), [realm, 'Café Alliance']);
+});

@@ -91,7 +91,7 @@ class Parser {
     if (/inf|nan/.test(t)) return null;
     return /0[xX]/.test(t) ? (t.startsWith('-') ? -parseInt(t.slice(1), 16) : parseInt(t, 16)) : Number(t);
   }
-  string() {
+  string(text = false) {
     const q = this.s[this.i++];
     let out = '';
     for (;;) {
@@ -109,7 +109,8 @@ class Parser {
       } else out += e;
     }
     // The source is read byte for byte (latin1), so decode each string as UTF-8 (or keep the bytes).
-    return this.bytes ? out : Buffer.from(out, 'latin1').toString('utf8');
+    // Table keys are always text (realm and character names), even in bytes mode.
+    return this.bytes && !text ? out : Buffer.from(out, 'latin1').toString('utf8');
   }
   longString() {
     const m = /^\[(=*)\[/.exec(this.s.slice(this.i, this.i + 64));
@@ -133,7 +134,8 @@ class Parser {
       let key;
       if (this.peek() === '[') {
         this.i++; this.ws();
-        key = this.value();
+        const kc = this.peek();
+        key = kc === '"' || kc === "'" ? this.string(true) : this.value();
         this.ws(); this.expect(']'); this.ws(); this.expect('=');
       } else {
         const save = this.i;
