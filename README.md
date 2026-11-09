@@ -118,6 +118,16 @@ The addon also records PvP rank and honor, reputations and currencies (for examp
 
 Windows may show a SmartScreen warning the first time, because the exe isn't code-signed. Choose "More info → Run anyway".
 
+## Look and setup (addon 0.9.0, companion 0.6.0)
+
+- **One look everywhere:** the website and every addon window use the same dark-and-gold style as the loading screen. The shared addon style is `Skin.lua`. Players who prefer Blizzard's style can switch in the addon options.
+- **First login:** a welcome shows the guild window, the Coach quiz and whether the website is connected. After an update, a short "what's new" appears once (`Welcome.lua`, `WEL.NEWS`).
+- **The companion installs the addon:**
+  - It finds WoW (the Battle.net registry entry, the usual folders, or `wowFolder`), installs WowGuild into `_forever_` and updates every copy already installed. It checks at start and every 30 minutes.
+  - The site's `/api/addon` gives the version and SHA-256, and a download that doesn't match is refused.
+  - `Data/Inbox.lua` is never overwritten.
+  - Settings in `config.json`: `"autoUpdateAddon": false` turns this off, and `"installAddonTo": ["_forever_", "_retail_"]` picks the game versions.
+
 ## Coach (addon 0.8.0+, companion 0.5.0+)
 
 - **In game:** `/wow coach`, the Coach tab, or a key binding opens the Coach window. It shows your play style, your build plan, your next steps, and lets you ask questions.

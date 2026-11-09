@@ -82,7 +82,8 @@ function createApp(cfg, db) {
     '1. Keep wow-companion.exe and config.json together in any folder.',
     key ? '2. Your sync key is already in config.json. Keep it private.' : '2. Sign in on the guild site, go to Settings, choose "Create sync key" and paste it into config.json as syncKey.',
     '3. Run wow-companion.exe and leave it open while you play (or run it once with --install-startup).',
-    '4. Install the addon (WowGuild) into your game\'s Interface\\AddOns folder.', '',
+    '4. That\'s it: the companion finds WoW: Forever and installs (and later updates) the WowGuild addon for you.',
+    '   If your game is somewhere unusual, put its folder in config.json as "wowFolder".', '',
     `Guild site: ${cfg.baseUrl}`,
   ].join('\r\n');
   const companionZip = (key) => zipkit.writeZip([
@@ -96,6 +97,19 @@ function createApp(cfg, db) {
       res.setHeader('Content-Disposition', 'attachment; filename="wow-companion.zip"');
       res.type('application/zip').send(buf);
     } catch (e) { next(); }
+  });
+  // The companion checks this to install or update the addon by itself. Public: no secrets.
+  let addonCache = null;
+  app.get('/api/addon', (req, res) => {
+    try {
+      const zipFile = path.join(DOWNLOADS, 'WowGuild.zip');
+      const m = fs.statSync(zipFile).mtimeMs;
+      if (!addonCache || addonCache.m !== m) {
+        addonCache = { m, sha256: require('crypto').createHash('sha256').update(fs.readFileSync(zipFile)).digest('hex'),
+          version: fs.readFileSync(path.join(DOWNLOADS, 'addon-version.txt'), 'utf8').trim() };
+      }
+      res.set('Cache-Control', 'no-cache').json({ version: addonCache.version, sha256: addonCache.sha256, url: '/downloads/WowGuild.zip' });
+    } catch { res.status(404).json({ error: 'No addon build on this server.' }); }
   });
   app.use('/downloads', express.static(DOWNLOADS, {
     maxAge: '10m',

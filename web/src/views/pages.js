@@ -306,9 +306,9 @@ function settings({ csrf, tokens, newToken, guild, baseUrl, isOfficer, isOwner, 
   <section class="setting">
     <h2>Connect the game</h2>
     <ol class="steps">
-      <li><a href="/get">Download the addon and companion</a>, then copy the <code>WowGuild</code> folder into <code>World of Warcraft\\_forever_\\Interface\\AddOns</code>. The folder name may differ: use whichever one holds Forever.</li>
       <li>Download the companion below. It comes set up with this site's address and your own sync key. Unzip it anywhere.</li>
-      <li>Run <code>wow-companion.exe</code> and leave it open while you play. It uploads every time you log out or reload.</li>
+      <li>Run <code>wow-companion.exe</code>. It finds WoW: Forever, installs the addon for you and keeps it up to date.</li>
+      <li>Leave it open while you play. It uploads every time you log out or reload, and brings back guild news and Coach answers.</li>
     </ol>
     <form method="post" action="/settings/companion" class="actions-row">${csrfField(csrf)}<button class="btn btn-primary">Download companion, ready to go</button></form>
     <details><summary>Set it up by hand instead</summary><ol class="steps">
@@ -414,13 +414,9 @@ function settings({ csrf, tokens, newToken, guild, baseUrl, isOfficer, isOwner, 
 function downloads({ addon, companion, baseUrl, signedIn, csrf }) {
   return `<section class="downloads">
     <h1>Get the guild tools</h1>
-    <p class="lede">Two small downloads connect your game to the guild site: the addon (inside WoW) and the companion (on your PC, carries the data).</p>
+    <p class="lede">One download connects your game to the guild. The companion runs on your PC: it installs the addon into WoW: Forever, keeps it updated, and carries your data to the site.</p>
     <ol class="steps big-steps">
-      <li><h2>The addon</h2>
-        ${addon ? `<p><a class="btn btn-primary" href="/downloads/WowGuild.zip" download>Download WowGuild ${esc(addon.version || '')}</a> <span class="muted">${esc(addon.mb)}</span></p>` : '<p class="muted">Not available on this server yet.</p>'}
-        <p>Unzip it into your game's <code>Interface\\AddOns</code> folder, so you end up with <code>Interface\\AddOns\\WowGuild</code>.
-          For Forever that's inside <code>World of Warcraft\\_forever_</code>; for Retail, <code>_retail_</code>.</p></li>
-      <li><h2>The companion</h2>
+      <li><h2>Get the companion</h2>
         ${!companion ? '<p class="muted">Not available on this server yet.</p>' : signedIn
           ? `<form method="post" action="/settings/companion"><input type="hidden" name="_csrf" value="${esc(csrf)}">
               <button class="btn btn-primary">Download companion ${esc(companion.version || '')}, ready to go</button> <span class="muted">${esc(companion.mb)}, Windows</span></form>
@@ -428,8 +424,13 @@ function downloads({ addon, companion, baseUrl, signedIn, csrf }) {
           : `<p><a class="btn btn-primary" href="/downloads/wow-companion.zip" download>Download companion ${esc(companion.version || '')}</a> <span class="muted">${esc(companion.mb)}, Windows</span></p>
             <p>Comes with <code>config.json</code> already pointing at this site. <a href="/">Sign in</a> first and this button gives you a version with your sync key filled in too.</p>`}
         <p class="muted">Windows may warn the first time because the app isn't code-signed: choose <em>More info → Run anyway</em>.</p></li>
+      <li><h2>Run it</h2>
+        <p>Double-click <code>wow-companion.exe</code>. It finds your game and installs the <strong>WowGuild</strong> addon${addon && addon.version ? ` (${esc(addon.version)})` : ''} into WoW: Forever. Restart the game if it was open.</p>
+        ${addon ? `<details><summary>Install the addon by hand instead</summary>
+          <p><a class="btn" href="/downloads/WowGuild.zip" download>Download WowGuild ${esc(addon.version || '')}</a> <span class="muted">${esc(addon.mb)}</span></p>
+          <p>Unzip it into <code>World of Warcraft\\_forever_\\Interface\\AddOns</code>, so you end up with <code>Interface\\AddOns\\WowGuild</code>. For Retail use <code>_retail_</code>.</p></details>` : ''}</li>
       <li><h2>Play</h2>
-        <p>Leave the companion open while you play. In game, click the campfire on the minimap. On the Camp tab, <strong>Sync now</strong> sends everything to the site.</p></li>
+        <p>Leave the companion open while you play (or run it once with <code>--install-startup</code> so it starts with Windows). In game, a welcome shows you around the first time. The campfire on the minimap opens the guild window.</p></li>
     </ol>
   </section>`;
 }

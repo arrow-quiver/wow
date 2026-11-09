@@ -12,6 +12,8 @@
 const fs = require('fs');
 const path = require('path');
 const { parseSavedVariables } = require('./lua');
+const unzip = require('./unzip');
+const crypto = require('crypto');
 
 const IS_EXE = Boolean(process.pkg) || (() => { try { return require('node:sea').isSea(); } catch { return false; } })();
 const APP_DIR = IS_EXE ? path.dirname(process.execPath) : __dirname;
@@ -67,6 +69,79 @@ function loadConfig() {
 }
 
 // Find game folders (e.g. _forever_, _retail_) that have our addon installed.
+// Where Battle.net installed WoW, from the Windows registry (best effort).
+function registryRoots() {
+  if (process.platform !== 'win32') return [];
+  const out = [];
+  for (const key of ['HKLM\\SOFTWARE\\WOW6432Node\\Blizzard Entertainment\\World of Warcraft', 'HKLM\\SOFTWARE\\Blizzard Entertainment\\World of Warcraft']) {
+    try {
+      const txt = require('child_process').execFileSync('reg', ['query', key, '/v', 'InstallPath'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 5000 });
+      const m = /InstallPath\s+REG_SZ\s+(.+)/.exec(txt);
+      if (m) { const p = m[1].trim().replace(/\\+$/, ''); out.push(/_.+_$/.test(path.basename(p)) ? path.dirname(p) : p); }
+    } catch { /* not installed there */ }
+  }
+  return out;
+}
+
+// Every game version folder (_forever_, _retail_, ...) under the usual install places.
+function findInstalls(cfg) {
+  const roots = [];
+  if (cfg.wowFolder) roots.push(/_.+_$/.test(path.basename(cfg.wowFolder)) ? path.dirname(cfg.wowFolder) : cfg.wowFolder);
+  roots.push(...registryRoots(),
+    'C:\\Program Files (x86)\\World of Warcraft', 'C:\\Program Files\\World of Warcraft',
+    'D:\\World of Warcraft', 'D:\\Games\\World of Warcraft', 'E:\\World of Warcraft', '/Applications/World of Warcraft');
+  const found = new Set();
+  for (const root of roots) {
+    if (!root || !fs.existsSync(root)) continue;
+    try { for (const d of fs.readdirSync(root)) if (/^_.+_$/.test(d)) found.add(path.resolve(root, d)); } catch { /* ignore */ }
+  }
+  if (cfg.wowFolder && fs.existsSync(cfg.wowFolder)) found.add(path.resolve(cfg.wowFolder));
+  return [...found];
+}
+
+function installedVersion(gameDir) {
+  try {
+    const toc = fs.readFileSync(path.join(gameDir, 'Interface', 'AddOns', ADDON, `${ADDON}.toc`), 'utf8');
+    const m = /^## Version:\s*(\S+)/m.exec(toc);
+    return m ? m[1] : '0';
+  } catch { return null; }
+}
+
+// Install or update the addon from the guild site. Installs into WoW: Forever (and any other
+// game version listed in "installAddonTo"), and keeps every folder that already has it up to date.
+async function ensureAddon(cfg, { fetchImpl = fetch } = {}) {
+  if (cfg.autoUpdateAddon === false) return [];
+  const res = await fetchImpl(`${cfg.siteUrl}/api/addon`, { signal: AbortSignal.timeout(15000) });
+  if (!res.ok) throw new Error(`Couldn't check for addon updates (${res.status}).`);
+  const latest = await res.json();
+  if (!latest.version || !latest.sha256) return [];
+  const want = new Set((cfg.installAddonTo || ['_forever_']).map((s) => s.toLowerCase()));
+  const targets = findInstalls(cfg).filter((g) => installedVersion(g) != null || want.has(path.basename(g).toLowerCase()));
+  const todo = targets.filter((g) => { const v = installedVersion(g); return v == null || versionLess(v, latest.version); });
+  if (!todo.length) return [];
+  const zr = await fetchImpl(`${cfg.siteUrl}${latest.url || '/downloads/WowGuild.zip'}`, { signal: AbortSignal.timeout(60000) });
+  if (!zr.ok) throw new Error(`Couldn't download the addon (${zr.status}).`);
+  const zip = Buffer.from(await zr.arrayBuffer());
+  if (crypto.createHash('sha256').update(zip).digest('hex') !== latest.sha256) throw new Error('The addon download was damaged. Will try again later.');
+  const files = unzip.entries(zip).filter((e) => !e.dir && e.name.startsWith(`${ADDON}/`));
+  const done = [];
+  for (const g of todo) {
+    const addons = path.join(g, 'Interface', 'AddOns');
+    const was = installedVersion(g);
+    for (const e of files) {
+      const dest = path.resolve(addons, e.name);
+      if (!dest.startsWith(path.resolve(addons, ADDON) + path.sep)) continue; // never write outside the addon folder
+      if (/[\\/]Data[\\/]Inbox\.lua$/.test(dest) && fs.existsSync(dest)) continue; // keep the guild news already there
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      fs.writeFileSync(dest, e.read());
+    }
+    done.push({ game: g, from: was, to: latest.version });
+    log(was ? `Updated the wow guild addon in ${path.basename(g)} from ${was} to ${latest.version}. /reload in game to use it.`
+      : `Installed the wow guild addon ${latest.version} into ${path.basename(g)}. Restart the game (or /reload) to use it.`);
+  }
+  return done;
+}
+
 function findGameFolders(cfg) {
   const roots = [];
   if (cfg.wowFolder) roots.push(cfg.wowFolder);
@@ -204,10 +279,11 @@ async function main() {
   if (args.has('--uninstall-startup')) { log(uninstallStartup() ? 'Removed from Windows startup.' : 'It wasn’t set to start with Windows.'); return; }
   log(`wow companion ${VERSION}`);
   const cfg = loadConfig();
-  const games = findGameFolders(cfg);
+  try { await ensureAddon(cfg); } catch (e) { log(e.message); }
+  let games = findGameFolders(cfg);
   if (!games.length) {
-    throw new Error('Could not find a WoW folder with the WowGuild addon installed. Put the full path of your game folder '
-      + '(the one containing Interface and WTF, e.g. C:\\Program Files (x86)\\World of Warcraft\\_forever_) in config.json as "wowFolder".');
+    log('No WoW folder with the wow guild addon and saved data yet. If the game is installed somewhere unusual, put the full path of your game folder '
+      + '(e.g. C:\\Program Files (x86)\\World of Warcraft\\_forever_) in config.json as "wowFolder". Log in once with the addon and this starts by itself.');
   }
   for (const g of games) log(`Game folder: ${g} (${savedVariablesFiles(g).length} account(s) with saved data)`);
   // Check the site and sync key before watching, so setup problems are obvious.
@@ -262,6 +338,13 @@ async function main() {
   setInterval(async () => {
     for (const g of games) { try { await writeInbox(cfg, g); } catch (e) { log(e.message); } }
   }, INBOX_REFRESH_MS);
+  setInterval(() => ensureAddon(cfg).catch((e) => log(e.message)), 30 * 60 * 1000);
+  // Pick up a game folder that appears later (first login after installing).
+  setInterval(() => {
+    const now = findGameFolders(cfg);
+    for (const g of now) if (!games.includes(g)) log(`Game folder: ${g}`);
+    games = now;
+  }, 60 * 1000);
   process.on('SIGINT', () => { log('Stopped.'); process.exit(0); });
 }
 
@@ -269,4 +352,4 @@ if (require.main === module) {
   main().catch((e) => { log(`Problem: ${e.message}`); if (process.platform === 'win32' && !process.argv.includes('--once')) setTimeout(() => {}, 60000); process.exitCode = 1; });
 }
 
-module.exports = { findGameFolders, savedVariablesFiles, extractPrices, versionLess, followCoach };
+module.exports = { findGameFolders, findInstalls, installedVersion, ensureAddon, savedVariablesFiles, extractPrices, versionLess, followCoach };
