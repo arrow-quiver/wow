@@ -171,7 +171,12 @@ The `--git --push` tag also starts GitHub Actions; the workflow sees that the re
 
 ### Option B: through GitHub Actions
 
-Let CI build and publish, so your computer only makes the tag:
+**On merge to main.** Every push to `main` runs the **Release** workflow for both the app and the addon. Each one
+is published only if the version in the files (`app/package.json`, `WowGuild.toc`) isn't on GitHub yet, so bump
+the version in the PR to ship it when it merges, and leave it alone to merge without a release. The tag goes on
+the merge commit and the notes come from the commits since the previous tag.
+
+**By tag.** Let CI build and publish, so your computer only makes the tag:
 ```
 node scripts/release.js addon --bump patch --tag-only --push
 node scripts/release.js app --bump minor --tag-only --push

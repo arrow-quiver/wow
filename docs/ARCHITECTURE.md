@@ -49,7 +49,7 @@ addon/WowGuild/            the addon (Lua 5.1)
 scripts/release.js         publishes GitHub releases with gh (wraps app/src/shared/release.js)
 scripts/vendor.js          copies Preact, htm and fonts into app/src/renderer/vendor (output is committed)
 scripts/curseforge.js      optional CurseForge upload of the addon zip
-.github/workflows/release.yml   builds and publishes on v* and addon-v* tags
+.github/workflows/release.yml   builds and publishes on v* and addon-v* tags, and on push to main when a version is new
 docs/                      this file, PIVOT.md, SHARING.md, RELEASING.md, api/*.md
 ```
 
