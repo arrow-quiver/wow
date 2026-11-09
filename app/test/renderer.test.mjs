@@ -90,7 +90,7 @@ test('router matching', () => {
 test('route table covers the architecture navigation', () => {
   const nav = pages.routes.filter((r) => r.nav).map((r) => `${r.nav}:${r.path}`);
   assert.deepEqual(nav, [
-    'Play:/', 'Play:/coach', 'Play:/war', 'Play:/raids', 'Play:/crafters', 'Play:/requests', 'Play:/partners',
+    'Play:/', 'Play:/coach', 'Play:/war', 'Play:/raids', 'Play:/dungeons', 'Play:/crafters', 'Play:/requests', 'Play:/partners',
     'Guild:/roster', 'Guild:/bank', 'Guild:/donate', 'Guild:/prices', 'Guild:/deals', 'Guild:/drives', 'Guild:/loot', 'Guild:/guild-settings',
     'Officers:/admin',
     'App:/addon', 'App:/settings', 'App:/updates', 'App:/releases',
@@ -998,4 +998,26 @@ test("admin: after a fresh start the card says unsent changes stay and shared gu
   assert.ok(core.includes(tail) && mock.includes(tail));
   assert.ok(mock.includes('rows of game data removed from this PC (backup'));
   assert.doesNotMatch(mock, /People and settings are untouched|wipe the guild’s data/);
+});
+
+test('dungeons: actions follow the core flags, level fit, and the preview mock joins and leaves like the core', async () => {
+  const dg = await load('pages/dungeons.js');
+  assert.deepEqual(dg.groupActions({ canJoin: true }), ['join']);
+  assert.deepEqual(dg.groupActions({ canLeave: true }), ['leave']);
+  assert.deepEqual(dg.groupActions({ canDone: true, canCancel: true }), ['done', 'cancel']);
+  assert.deepEqual(dg.groupActions(null), []);
+  assert.equal(dg.fitsLevel('The Deadmines', 20), true);
+  assert.equal(dg.fitsLevel('the deadmines ', 40), false);
+  assert.equal(dg.fitsLevel('Somewhere Else', 20), null);
+
+  const req = (method, path, body) => gcmod.gc.api.request(method, path, body);
+  const list = await req('GET', '/api/dungeons');
+  const g = list.groups.find((x) => x.canJoin);
+  assert.ok(g, 'a guildmate\'s group to join');
+  const joined = await req('POST', `/api/dungeons/${g.key}/join`, { role: 'tank' });
+  assert.deepEqual([joined.group.joined.role, joined.group.canLeave, joined.group.canJoin], ['tank', true, false]);
+  const left = await req('POST', `/api/dungeons/${g.key}/leave`);
+  assert.deepEqual([left.group.joined, left.group.canJoin], [null, true]);
+  const made = await req('POST', '/api/dungeons', { dungeon: 'Scholomance', role: 'healer' });
+  assert.deepEqual([made.group.mine, made.group.open.healer, made.group.canCancel], [true, 0, true]);
 });

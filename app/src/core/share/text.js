@@ -62,6 +62,17 @@ function summaryOf(recIn, lookup) {
     }
     case 'lp': return del ? `Leveling partner post for ${segs[1] || 'a character'}: closed` : `Leveling partner post for ${f.character || segs[1]}`;
     case 'ca': return removed(`Call to arms: ${clip(f.zone, 40) || 'somewhere'}`);
+    case 'dg': {
+      if (del) return 'Dungeon group: removed';
+      const st = f.state === 'x' ? ' (called off)' : f.state === 'd' ? ' (done)' : '';
+      return `Dungeon group: ${clip(f.dungeon, 60) || 'a dungeon'}${st}`;
+    }
+    case 'dj': {
+      const dg = typeof lookup === 'function' ? asRec(lookup(`dg:${segs[0]}`)) : null;
+      const where = dg && dg.fields && dg.fields.dungeon ? clip(dg.fields.dungeon, 60) : 'a dungeon group';
+      if (del || f.status === 'w') return `Left the group: ${where}`;
+      return `Joined the group: ${where}${f.role ? ` as ${ROLE[f.role]}` : ''}`;
+    }
     case 'dc': {
       const dr = typeof lookup === 'function' && f.drive ? asRec(lookup(`DR:${f.drive}`)) : null;
       const unit = dr && dr.fields ? ` ${dr.fields.unit}` : '';
@@ -127,6 +138,7 @@ const REASONS = {
   'loot list': 'an item is not on the loot list',
   limit: 'more reserves than the raid allows',
   'own request': 'nobody can claim their own crafting request',
+  'own group': 'the leader is already in their own dungeon group',
   bank: 'that character is not a bank character',
   rank: 'only officers can make that change',
   'officers only': 'only officers keep a shared webhook',
@@ -202,4 +214,13 @@ function whenLabel(t) {
   return `${days[d.getUTCDay()]} ${d.getUTCDate()} ${months[d.getUTCMonth()]}, ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())} UTC`;
 }
 
-module.exports = { LINES, KIND_ICON, KIND_NAME, summaryOf, auditSentence, reasonText, waitNote, refusedNote, discordPost, driveGoalPost, whenLabel, clip, unixTag, raidTitle, num };
+// When a dungeon group meets: 'Starting now', 'In 25 min', or the time (whenLabel).
+function dungeonWhen(startsAt, now) {
+  const s = Number(startsAt) || 0;
+  const n = Number(now) || 0;
+  if (s <= n + 300) return 'Starting now';
+  if (s - n < 90 * 60) return `In ${Math.round((s - n) / 60)} min`;
+  return whenLabel(s);
+}
+
+module.exports = { ROLE, dungeonWhen, LINES, KIND_ICON, KIND_NAME, summaryOf, auditSentence, reasonText, waitNote, refusedNote, discordPost, driveGoalPost, whenLabel, clip, unixTag, raidTitle, num };

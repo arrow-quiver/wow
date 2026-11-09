@@ -212,7 +212,7 @@ the folder given with `--smoke-user-data`; it ignores `--user-data` and `GUILDCA
 | `events.js` | The in-process notification bus (below). |
 | `db.js` | `node:sqlite` behind a small better-sqlite3-compatible adapter, and the migrations (below). |
 | `sharing.js`, `share/*.js` | In-game sharing on the app side (below). |
-| `routes/*.js` | `core`, `sync`, `community`, `raids`, `economy`, `coach`, `admin`, `calendar`, `share`. Each exports `register(app, ctx)`. |
+| `routes/*.js` | `core`, `sync`, `community`, `dungeons`, `raids`, `economy`, `coach`, `admin`, `calendar`, `share`. Each exports `register(app, ctx)`. |
 | `services/*.js` | Domain rules ported from the old server: sync, raids, community, economy, coach and ai, backup, reset, blizzard, gamedata, calendar. |
 | `demo.js` | A demo guild for `--smoke --smoke-seed` screenshot runs only. |
 
@@ -345,6 +345,7 @@ addon/WowGuild/ShareCodec.lua   the same codec in Lua, byte for byte
 addon/WowGuild/Share.lua        store, outbox and acknowledgements, receiving and checks, queues and token bucket, /wow share
 addon/WowGuild/ShareSync.lua    hellos, inventories, gets, the beacon, catch-up, pruning
 addon/WowGuild/Collect.lua      builds my ch, rc, bk, sh records and the guild bank gb records
+addon/WowGuild/Dungeons.lua     /wow lfg: dungeon groups (dg) and joins (dj) in game, and their chat lines
 ```
 
 The app's sharing routes are in [api/share.md](api/share.md). What sharing still can't do without a server is

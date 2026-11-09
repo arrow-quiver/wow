@@ -15,6 +15,7 @@ Share.lua
 ShareSync.lua
 Items.lua
 Collect.lua
+Dungeons.lua
 UI.lua
 Professions.lua
 ProfUI.lua

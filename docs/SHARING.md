@@ -231,13 +231,15 @@ RT:k3f9a2^wzltl343^Grommash^^d^tob9c0^r^4kq1zm^tobn80^Thrallia.p4m7,d72,eim;Zulj
 
 | Type | Key | Writer | Fields, in order | Final | Expires | Max |
 |---|---|---|---|---|---|---|
-| `ch` character | name | that character | pid, BattleTag, main (`1` or empty), alts (anchor only), class, race, level, faction, ilvl, repair %, consumables `flask,elixir,potion,food,bandage`, professions `skill,rank,max;…`, pvp `rank,hk`, addon version | | 60 d; re-stamped at once when pid, BattleTag, main or alts change, on another real change at most every 30 min, else weekly | 400 |
+| `ch` character | name | that character | pid, BattleTag, main (`1` or empty), alts (anchor only), class, race, level, faction, ilvl, repair %, consumables `flask,elixir,potion,food,bandage`, professions `skill,rank,max;…`, pvp `rank,hk`, addon version, talent points `a,b,c,unspent`, resistances `fire,nature,frost,shadow,arcane`, unenchanted slot ids `;` | | 60 d; re-stamped at once when pid, BattleTag, main or alts change, on another real change at most every 30 min, else weekly | 400 |
 | `rc` recipes | name`:`skill | that character | kind `s`/`i`/`n` (spell ids, item ids, names), count, varint ids (or `;` names) | | 60 d after the newer of itself and its `ch` | 2 KB (names 6 KB) |
 | `su` sign-up + reserves | raid`:`pid | a character of pid | character, role `t`/`h`/`d`, status `y`/`t`/`n`/`b`, note, reserves (item keys), reservesAt, prev reserves, prevAt | | with the raid | 400 |
 | `cr` craft request | random | a character of pid | pid, item, notes, state `o`/`x`/`d` | `x`, `d` | 30 d open; 7 d after final | 400 |
 | `cl` craft claim | request`:`pid | a character of pid | state `c`/`d`/`w` (claimed, done, withdrawn), claimedAt | | with the request | 60 |
 | `lp` leveling post | pid`:`character | a character of pid | character, level, zone, when, note | | 3 d | 400 |
 | `ca` call to arms | random | any member | character, zone, needed, message | | 1 d | 300 |
+| `dg` dungeon group | random | a character of pid (the leader) | pid, character, dungeon, startsAt, leader role `t`/`h`/`d`, level, slots tank, heal, dps (leader included), note, state `o`/`x`/`d` (open, called off, done) | `x`, `d` | startsAt + 1 d | 400 |
+| `dj` dungeon join | group`:`pid | a character of pid | character, role `t`/`h`/`d`, status `y`/`w` (in, left), class, level, joinedAt | | with the group | 160 |
 | `dc` drive hand-in | random | a character of pid | pid, drive, character, amount, note | | with the drive | 250 |
 | `bq` bank request | random | a character of pid | pid, item, count, note, state `o`/`x` | `x` | 30 d | 400 |
 | `gb` guild bank | tab `0`–`8` | any member who scanned | tab 0: scannedAt, money, tab names, last 25 log lines; tabs 1–8: `id,count;…` | | 30 d | 1.5 KB |
@@ -649,6 +651,7 @@ confirmed with "It was me"), `share_repair` (the repair after the update ran, §
 | `LY` + closes + `LA` | loyalty, rebuilt per instance by the fold |
 | `cr` + `cl` | craft_requests (status and crafter_id derived) |
 | `lp`, `ca`, `AN` | buddy_posts, ctas (client_ref = key), announcements |
+| `dg` + `dj` | no rows: routes/dungeons.js reads the effective records and the line-up comes from `dungeonGroupState` (the leader fills a slot of their role; then joins in joinedAt order, a tie to the smaller pid; past a role's free slots they wait). A `dj` on the leader's own group is ignored (`own group`). |
 | `DR` + `dc` | drives (status derived), drive_contribs |
 | `bq` + `BH` | bank_requests (status and handled_by derived); with no record at all (my new request cancelled or refused) the row goes |
 | `gb` | guild_bank, bank_log, guilds.bank_money and bank_scanned_at |
@@ -974,13 +977,15 @@ pid (`<name>.<4 base36>`), tab (`0`–`8`), `1`.
 
 | Type | Key | Fields |
 |---|---|---|
-| `ch` | name | pid text(64), battletag text(32), main flag, alts [text(48)] ≤ 20, class text(20), race text(20), level int, faction text(12), ilvl int, repair int, consumables (flask, elixir, potion, food, bandage: int), professions [(skill, rank, max: int)] ≤ 12, pvp (rank, hk: int), addon text(16) |
+| `ch` | name | pid text(64), battletag text(32), main flag, alts [text(48)] ≤ 20, class text(20), race text(20), level int, faction text(12), ilvl int, repair int, consumables (flask, elixir, potion, food, bandage: int), professions [(skill, rank, max: int)] ≤ 12, pvp (rank, hk: int), addon text(16), talents (a, b, c, unspent: int), resists (fire, nature, frost, shadow, arcane: int), unenchanted [int] ≤ 10 (slot ids of chest 5, feet 8, wrist 9, hands 10, back 15, main hand 16) |
 | `rc` | name:int (skill-line id) | kind enum `sin`, count int, list: kind `n` → [text(100)] ≤ 500, else ids ≤ 2000 |
 | `su` | random:pid | character text(48), role enum `thd`, status enum `ytnb`, note text(120), reserves [text(12)] ≤ 10, reservesAt int, prev [text(12)] ≤ 10, prevAt int |
 | `cr` | random | pid text(64), item text(100), notes text(200), state enum `oxd` |
 | `cl` | random:pid | state enum `cdw`, claimedAt int |
 | `lp` | pid:name | character text(48), level int, zone text(60), when text(60), note text(140) |
 | `ca` | random | character text(48), zone text(60), needed int, message text(200) |
+| `dg` | random | pid text(64), character text(48), dungeon text(60), startsAt int, role enum `thd`, level int, tank int, heal int, dps int, note text(140), state enum `oxd` |
+| `dj` | random:pid | character text(48), role enum `thd`, status enum `yw`, class text(20), level int, joinedAt int |
 | `dc` | random | pid text(64), drive text(8) (the `DR` key), character text(48), amount int, note text(120) |
 | `bq` | random | pid text(64), item text(100), count int, note text(200), state enum `ox` |
 | `gb` | tab `0` | scannedAt int, money int, tabs [text(32)] ≤ 8, log [(at int, kind text(12), who text(48), item int, count int, amount int)] ≤ 25 |
