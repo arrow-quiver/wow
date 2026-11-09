@@ -23,6 +23,7 @@ function register(app, ctx) {
   const log = ctx.log || console;
   const now = () => st.localNow() * 1000; // the sharing clock (tests fix it)
   let lastHelp = 0;
+  const reserved = new Map(); // user id → `at` of the death alert being (or last) posted
 
   const q = {
     insert: db.prepare(`INSERT OR IGNORE INTO pvp_deaths (guild_id, user_id, character, at, pvp, killer, enemies, zone, zone_id, spell,
@@ -48,10 +49,18 @@ function register(app, ctx) {
     const saved = r.changes > 0;
     let posted = false;
     if (saved && row.pvp && bool(b.alert) && ctx.cfg.discordWebhook) {
-      const last = q.lastPosted.get(req.user.id).at || 0;
+      const uid = req.user.id;
+      const last = Math.max(q.lastPosted.get(uid).at || 0, reserved.get(uid) || 0);
       if (at - last >= ALERT_GAP_MS) {
-        posted = await ctx.discord(null, W.alertText({ ...row, enemies }));
-        if (posted) q.markPosted.run(r.lastInsertRowid);
+        // Take the slot before awaiting Discord: two deaths arriving together would both pass the check otherwise.
+        const before = reserved.get(uid);
+        reserved.set(uid, at);
+        try {
+          posted = await ctx.discord(null, W.alertText({ ...row, enemies }));
+        } finally {
+          if (posted) q.markPosted.run(r.lastInsertRowid);
+          else if (reserved.get(uid) === at) reserved.set(uid, before || 0); // not posted: free the slot again
+        }
       }
     }
     res.json({ saved, posted });

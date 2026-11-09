@@ -197,6 +197,8 @@ and bank after their next sync."`; nothing changed → `"No changes."`
 What to buy on the auction house now and sell again for more. It works from **my own** Auctionator history:
 the app reads every realm in `Auctionator.lua` scanned in the last 14 days (up to 4 realms, 15,000 items each) and
 sends it with `POST /api/market` ([sync.md](sync.md)) after each upload. Nothing here is shared with the guild.
+Both Auctionator formats are read: the old one (each realm a Lua table of items) and Auctionator 8+ (`__dbversion`
+8: each realm one CBOR string, written with `C_EncodingUtil.SerializeCBOR`; `shared/cbor.js` decodes it).
 Implemented in `app/src/core/services/deals.js`.
 
 ### `GET /api/deals?realm=&min_profit=&max_price=&budget=` (guild)
