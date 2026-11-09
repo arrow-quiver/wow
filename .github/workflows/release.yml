@@ -1,5 +1,7 @@
 # Builds and publishes Guild Camp releases on this repository's GitHub Releases page.
 #
+#   push to main      → publish whichever of the app and addon has a version in the files that isn't
+#                       on GitHub yet; bump a version (in the PR) to ship it on merge, leave it to skip
 #   v<version>        tag → build the Windows installer and publish release v<version>, marked Latest
 #                     (the app updates itself from the Latest release)
 #   addon-v<version>  tag → zip the addon and publish release addon-v<version>, never marked Latest,
@@ -20,6 +22,7 @@ name: Release
 
 on:
   push:
+    branches: [main]
     tags: ['v*', 'addon-v*']
   workflow_dispatch:
     inputs:
@@ -36,13 +39,15 @@ on:
 permissions:
   contents: write
 
+# One run at a time, so a push to main and the tag it carries can't both publish the same release:
+# the second run finds it on GitHub and skips.
 concurrency:
-  group: release-${{ github.ref }}
+  group: release
   cancel-in-progress: false
 
 jobs:
   app:
-    if: (github.event_name == 'push' && startsWith(github.ref_name, 'v')) || (github.event_name == 'workflow_dispatch' && inputs.kind == 'app')
+    if: (github.event_name == 'push' && (github.ref == 'refs/heads/main' || (github.ref_type == 'tag' && startsWith(github.ref_name, 'v')))) || (github.event_name == 'workflow_dispatch' && inputs.kind == 'app')
     runs-on: windows-latest
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -55,8 +60,10 @@ jobs:
         if: github.event_name == 'push'
         shell: bash
         run: |
-          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft' 2>/dev/null | grep -qx false; then
-            echo "::notice::The release $GITHUB_REF_NAME is already on GitHub. Nothing to do."
+          tag="$GITHUB_REF_NAME"
+          if [ "$GITHUB_REF_TYPE" = branch ]; then tag="v$(node -p "require('./app/package.json').version")"; fi
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft' 2>/dev/null | grep -qx false; then
+            echo "::notice::The release $tag is already on GitHub. Nothing to do."
             echo "skip=true" >> "$GITHUB_OUTPUT"
           fi
       - uses: actions/setup-node@v4
@@ -66,7 +73,7 @@ jobs:
           cache: npm
           cache-dependency-path: app/package-lock.json
       - name: Check the tag matches app/package.json
-        if: github.event_name == 'push' && steps.existing.outputs.skip != 'true'
+        if: github.ref_type == 'tag' && steps.existing.outputs.skip != 'true'
         shell: bash
         run: |
           v=$(node -p "require('./app/package.json').version")
@@ -93,7 +100,7 @@ jobs:
           node scripts/release.js "${args[@]}"
 
   addon:
-    if: (github.event_name == 'push' && startsWith(github.ref_name, 'addon-v')) || (github.event_name == 'workflow_dispatch' && inputs.kind == 'addon')
+    if: (github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref_name, 'addon-v'))) || (github.event_name == 'workflow_dispatch' && inputs.kind == 'addon')
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -105,8 +112,10 @@ jobs:
         id: existing
         if: github.event_name == 'push'
         run: |
-          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft' 2>/dev/null | grep -qx false; then
-            echo "::notice::The release $GITHUB_REF_NAME is already on GitHub. Nothing to do."
+          tag="$GITHUB_REF_NAME"
+          if [ "$GITHUB_REF_TYPE" = branch ]; then tag="addon-v$(node -p "require('./app/src/shared/toc').tocVersion(require('fs').readFileSync('addon/WowGuild/WowGuild.toc','utf8'))")"; fi
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft' 2>/dev/null | grep -qx false; then
+            echo "::notice::The release $tag is already on GitHub. Nothing to do."
             echo "skip=true" >> "$GITHUB_OUTPUT"
           fi
       - uses: actions/setup-node@v4
@@ -114,7 +123,7 @@ jobs:
         with:
           node-version: 24
       - name: Check the tag matches WowGuild.toc
-        if: github.event_name == 'push' && steps.existing.outputs.skip != 'true'
+        if: github.ref_type == 'tag' && steps.existing.outputs.skip != 'true'
         run: |
           v=$(node -p "require('./app/src/shared/toc').tocVersion(require('fs').readFileSync('addon/WowGuild/WowGuild.toc','utf8'))")
           if [ "$GITHUB_REF_NAME" != "addon-v$v" ]; then
