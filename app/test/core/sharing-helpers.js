@@ -98,6 +98,8 @@ async function setupShare(t, { role = 'member', character = 'Thrallia', pid = ME
 // arrival orders. imp(records, opts) imports one upload; ctx is a stand-in that only records events.
 function lightDb({ role = 'member', character = 'Thrallia', pid = ME_PID } = {}) {
   const { open } = require('../../src/core/db');
+  // The clock is fixed at NOW, as in setupShare, so records made near NOW don't expire by the real date.
+  sharing.setClock(() => NOW * 1000);
   const db = open(':memory:');
   const g = seedGuild(db, { name: 'wow', realm: 'Forever', role, character });
   const ins = db.prepare("INSERT INTO characters (guild_id, name, class, level, rank, rank_index) VALUES (?,?, 'WARRIOR', 60, 'r', ?) ON CONFLICT (guild_id, name) DO UPDATE SET rank_index = excluded.rank_index");
@@ -115,7 +117,7 @@ function lightDb({ role = 'member', character = 'Thrallia', pid = ME_PID } = {})
     }
     return db.transaction(() => sharing.importShared(db, ctx, { guilds: { [G]: { recs, via: v, sent: {} } } }))();
   };
-  return { db, ctx, gid: g.guildId, me: g.me, imp, events, close: () => db.close() };
+  return { db, ctx, gid: g.guildId, me: g.me, imp, events, close: () => { sharing.setClock(); db.close(); } };
 }
 
 // Every order of a list (n ≤ 6).
