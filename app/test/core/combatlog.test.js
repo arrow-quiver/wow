@@ -83,3 +83,21 @@ test('a session knows me by GUID once named, and by a new name list', () => {
   assert.strictEqual(s.summary().kills, 2);
   assert.strictEqual(s.summary().pvpKills, 1);
 });
+
+test('a session knows the zone (ZONE_CHANGE) and every player in a death', () => {
+  const s = createSession({ names: ['Grom'] });
+  const add = (time, rest) => s.add(parseLine(L(time, rest), { year: 2026 }));
+  const HOLY = 'Player-4395-0E0E0E0E,"Holy-Zuljin",0x548,0x0';
+  add('17:00:00.000', 'ZONE_CHANGE,1424,"Hillsbrad Foothills",0');
+  assert.deepStrictEqual(s.zone, { id: 1424, name: 'Hillsbrad Foothills' });
+  add('17:00:01.000', `SPELL_DAMAGE,${HOLY},${ME},585,"Smite",0x2,200,0,2,0,0,0,nil,nil,nil`);
+  add('17:00:02.000', `SWING_DAMAGE,${MOB},${ME},50,-1,1,0,0,0,nil,nil,nil`);
+  add('17:00:03.000', `SPELL_DAMAGE,${ROGUE},${ME},2098,"Eviscerate",0x1,600,0,1,0,0,0,nil,nil,nil`);
+  add('17:00:03.100', `UNIT_DIED,0000000000000000,nil,0x80000000,0x0,${ME}`);
+  const d = s.lastDeath;
+  assert.deepStrictEqual(d.enemies, ['Holy', 'Sneaky']);
+  assert.strictEqual(d.zone, 'Hillsbrad Foothills');
+  assert.strictEqual(d.zoneId, 1424);
+  assert.match(deathText(d), /^Died to Sneaky \(a player\) and 1 other player in Hillsbrad Foothills, killing blow Eviscerate/);
+  assert.strictEqual(s.summary().zone, 'Hillsbrad Foothills');
+});

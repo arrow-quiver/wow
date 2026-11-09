@@ -11,6 +11,8 @@ ns.OPTION_LIST = {
   { key = "collectBank", label = "Share my bank and the guild bank with the guild" },
   { key = "dealsPanel", label = "Show the Deal hunter next to the auction house" },
   { key = "coachTalents", label = "Show the Coach's talent guide next to the talent window" },
+  { key = "warMap", label = "Show the guild's deaths and kills of the last week on the world map" },
+  { key = "warHelp", label = "When I die to players, offer to call the guild for help" },
   { key = "liveLink", label = "Turn on combat logging when I log in (the Guild Camp app's live link reads it)" },
   { key = "blizzardStyle", label = "Use Blizzard's window style instead of the guild's dark-and-gold look (reload to apply)" },
 }

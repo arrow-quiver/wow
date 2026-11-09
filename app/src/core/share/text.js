@@ -75,6 +75,7 @@ function summaryOf(recIn, lookup) {
     case 'bk': return `Bank character stock of ${r.key}`;
     case 'sh': return removed('Shopping list');
     case 'pr': return 'Auction prices';
+    case 'wm': return removed('War map: deaths and kills in the open world');
     case 'RD': return removed(`${f.title || 'Raid'}: scheduled`);
     case 'RT': return `${raidTitle(r.key, lookup)}: ${del ? 'status removed' : f.status === 'o' ? 'open' : (RAID_STATUS[f.status] || 'open')}`;
     case 'LA': return removed(`${clip(f.itemName, 60) || 'Loot'} to ${f.character || 'someone'}`);

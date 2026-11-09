@@ -875,6 +875,9 @@ function OverlayCard({ settings, change }) {
     <${ToggleRow} title="Live link" checked=${s.liveLink !== false} disabled=${!ready}
       hint=${html`Follows the game's combat log while you play, for live kills, deaths and "Why did I die?". ${liveLine}`}
       onValue=${(on) => change({ liveLink: on }, on ? 'The live link is on.' : 'The live link is off.')} />
+    <${ToggleRow} title="War alerts on Discord" checked=${s.warAlerts !== false} disabled=${!ready || s.liveLink === false}
+      hint="When the live link sees you die to players, post who and where to the guild's Discord (at most every 2 minutes), so guildies nearby can help."
+      onValue=${(on) => change({ warAlerts: on }, on ? 'War alerts are on.' : 'War alerts are off.')} />
   <//>`;
 }
 

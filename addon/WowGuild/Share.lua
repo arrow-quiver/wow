@@ -90,6 +90,7 @@ local CFG = {
   HOUSEKEEPING = 60,
   -- records
   CH_MIN_GAP = 1800,         -- ch: a real change at most every 30 min
+  WM_MIN_GAP = 300,          -- wm: the war list goes out at most every 5 min (a death in a fight costs nothing at once)
   REFRESH = 604800,          -- ch, bk, sh, gb: re-stamped weekly even when unchanged
   GB_MIN_AGE = 900, GB_TAB0_GAP = 7200,
   CA_FRESH = 900,            -- a call to arms younger than this gets a chat line and a sound
@@ -109,7 +110,7 @@ I.CFG = CFG
 -- Types whose records several people edit (compare-and-set, §9).
 local MULTI = { RT = true, LL = true, BC = true, DR = true, LY = true, CFG = true }
 -- Records keyed by a player id: where the pid sits (key segment, or a field).
-local PIDKEY = { su = { seg = 2 }, cl = { seg = 2 }, lp = { seg = 1 }, sh = { seg = 1 }, pr = { seg = 1 },
+local PIDKEY = { su = { seg = 2 }, cl = { seg = 2 }, lp = { seg = 1 }, sh = { seg = 1 }, pr = { seg = 1 }, wm = { seg = 1 },
   cr = { field = "pid" }, dc = { field = "pid" }, bq = { field = "pid" } }
 
 local SAY = {
@@ -1685,6 +1686,10 @@ local function due(ty, key, body, stored, tnow)
   elseif ty == "bk" or ty == "sh" then
     if same then return age >= CFG.REFRESH end
     return true
+  elseif ty == "wm" then
+    if same then return false end
+    if age >= CFG.WM_MIN_GAP then return true end
+    return false, st + CFG.WM_MIN_GAP
   end
   return not same
 end

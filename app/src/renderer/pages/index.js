@@ -11,6 +11,7 @@ export const routes = [
   // Play
   { path: '/', load: () => import('./camp.js'), title: 'Camp', nav: 'Play', icon: 'camp' },
   { path: '/coach', load: () => import('./coach.js'), title: 'Coach', nav: 'Play', icon: 'coach' },
+  { path: '/war', load: () => import('./war.js'), title: 'War', nav: 'Play', icon: 'war' },
   { path: '/raids', load: () => import('./raids.js'), title: 'Raids', nav: 'Play', icon: 'raids' },
   { path: '/crafters', load: () => import('./crafters.js'), title: 'Crafters', nav: 'Play', icon: 'crafters' },
   { path: '/requests', load: () => import('./requests.js'), title: 'Requests', nav: 'Play', icon: 'requests' },

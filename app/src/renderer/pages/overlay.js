@@ -69,18 +69,26 @@ function DeathCard({ live, ch, onAsked }) {
     char: ch ? ch.name : undefined, fresh: true, live: (live.context && live.context.death) || '',
     question: d.killer ? `Why did I die to ${d.killer}${d.pvp ? ' (a player)' : ''}? What should I do differently?` : 'Why did I die? What should I do differently?',
   }));
+  const [called, setCalled] = useState(false);
+  const help = useAction(() => api.post('/api/war/help', { character: d.character, zone: d.zone }), { quiet: true });
+  const callHelp = async () => { const r = await help.run(); if (r.ok) setCalled(true); };
   const why = async () => {
     const r = await ask.run();
     if (r.ok) { setAnswer(r.value.question); onAsked(); }
   };
   return html`<section class="ovl-card ovl-death">
     <div class="ovl-row"><h2 class="ovl-h">You died${d.killer ? ` to ${d.killer}` : ''}</h2>${d.pvp ? html`<${Pill} kind="warn">PvP<//>` : null}</div>
+    ${d.zone || (d.enemies && d.enemies.length > 1) ? html`<p class="hint mb-0">${d.zone ? `In ${d.zone}` : ''}${d.enemies && d.enemies.length > 1 ? `${d.zone ? ', ' : ''}${d.enemies.length} players: ${d.enemies.join(', ')}` : ''}</p>` : null}
     <p class="hint">${d.killingBlow && d.killingBlow.spell ? `${d.killingBlow.spell} for ${number(d.killingBlow.amount)}. ` : ''}${number(d.damageTaken)} damage in ${d.seconds}s${d.healed ? `, healed ${number(d.healed)}` : ', no healing'}.</p>
     ${d.sources && d.sources.length ? html`<ul class="ovl-sources">${d.sources.slice(0, 4).map((x) => html`<li key=${`${x.who}${x.spell}`}>
       <span>${x.spell || 'Melee'} <span class="hint">${x.who}</span></span><b>${number(x.amount)}</b></li>`)}</ul>` : null}
     ${answer && answer.status === 'answered' ? html`<p class="ovl-answer">${answer.answer}</p>`
       : answer && answer.status === 'pending' ? html`<p class="hint"><${Spinner} size="xs" label="" /> Still thinking… it shows on the Coach page when ready.</p>`
-        : html`<${Button} size="sm" variant="primary" icon="spark" busy=${ask.busy} onClick=${why}>${ask.busy ? 'Thinking…' : 'Why did I die?'}<//>`}
+        : html`<div class="ovl-row ovl-row--start">
+          <${Button} size="sm" variant="primary" icon="spark" busy=${ask.busy} onClick=${why}>${ask.busy ? 'Thinking…' : 'Why did I die?'}<//>
+          ${d.pvp ? html`<${Button} size="sm" icon="bell" busy=${help.busy} disabled=${called} onClick=${callHelp}>${called ? 'Guild called' : 'Call for help'}<//>` : null}
+        </div>`}
+    ${help.error ? html`<p class="hint ovl-err">${help.error.message}</p>` : null}
   </section>`;
 }
 

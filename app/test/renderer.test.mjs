@@ -90,7 +90,7 @@ test('router matching', () => {
 test('route table covers the architecture navigation', () => {
   const nav = pages.routes.filter((r) => r.nav).map((r) => `${r.nav}:${r.path}`);
   assert.deepEqual(nav, [
-    'Play:/', 'Play:/coach', 'Play:/raids', 'Play:/crafters', 'Play:/requests', 'Play:/partners',
+    'Play:/', 'Play:/coach', 'Play:/war', 'Play:/raids', 'Play:/crafters', 'Play:/requests', 'Play:/partners',
     'Guild:/roster', 'Guild:/bank', 'Guild:/prices', 'Guild:/deals', 'Guild:/drives', 'Guild:/loot', 'Guild:/guild-settings',
     'Officers:/admin',
     'App:/addon', 'App:/settings', 'App:/updates', 'App:/releases',

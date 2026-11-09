@@ -69,6 +69,7 @@ function createSession({ names = [] } = {}) {
     fights: 0, fightMs: 0, me: null,
   };
   let fightStart = null; let fightLast = null;
+  let zone = null; // { id, name } from the last ZONE_CHANGE (or MAP_CHANGE) line
   const recent = []; // events involving me, last ~60
   let lastDeath = null;
 
@@ -83,6 +84,12 @@ function createSession({ names = [] } = {}) {
 
   function add(e) {
     if (!e) return null;
+    if (e.event === 'ZONE_CHANGE' || (e.event === 'MAP_CHANGE' && !zone)) {
+      // `ZONE_CHANGE,1519,"Stormwind City",0`: parseLine read the id and name as the source unit's.
+      const id = Number(e.src.guid); const name = e.src.name;
+      if (name) zone = { id: Number.isFinite(id) ? id : null, name };
+      return null;
+    }
     const srcMe = isMe(e.src); const dstMe = isMe(e.dst);
     if (!srcMe && !dstMe) return null;
     s.events += 1;
@@ -121,10 +128,12 @@ function createSession({ names = [] } = {}) {
       }
       const killing = hits[hits.length - 1] || null;
       const pvp = Boolean(killing && killing.player);
+      const enemies = [...new Set(hits.filter((h) => h.player).map((h) => h.who).filter(Boolean))];
       if (pvp) s.pvpDeaths += 1;
       lastDeath = {
         at: e.t, character: s.me && s.me.name,
         killer: killing ? killing.who : null, killingBlow: killing ? { spell: killing.spell, amount: killing.amount } : null, pvp,
+        enemies, zone: zone ? zone.name : null, zoneId: zone ? zone.id : null,
         seconds: window.length ? Math.round((e.t - window[0].t) / 100) / 10 : 0,
         damageTaken: hits.reduce((a, h) => a + h.amount, 0),
         healed: window.filter((r) => r.kind === 'healed').reduce((a, h) => a + h.amount, 0),
@@ -146,7 +155,7 @@ function createSession({ names = [] } = {}) {
       character: s.me && s.me.name, startedAt: s.startedAt, lastAt: s.lastAt, minutes: Math.round(minutes),
       kills: s.kills, pvpKills: s.pvpKills, deaths: s.deaths, pvpDeaths: s.pvpDeaths,
       damageDone: s.damageDone, damageTaken: s.damageTaken, healingTaken: s.healingTaken,
-      fights: s.fights + (fightStart != null ? 1 : 0), fightShare: minutes ? Math.round((fightMs / 60000 / minutes) * 100) / 100 : 0,
+      fights: s.fights + (fightStart != null ? 1 : 0), zone: zone ? zone.name : null, fightShare: minutes ? Math.round((fightMs / 60000 / minutes) * 100) / 100 : 0,
       killsPerHour: perHour(s.kills), deathsPerHour: perHour(s.deaths),
     };
   }
@@ -154,6 +163,7 @@ function createSession({ names = [] } = {}) {
   return {
     add, summary,
     get lastDeath() { return lastDeath; },
+    get zone() { return zone; },
     setNames(list) { mine = new Set(list.map((n) => shortName(n).toLowerCase())); },
   };
 }
@@ -161,7 +171,8 @@ function createSession({ names = [] } = {}) {
 // The death recap as plain text for the Coach.
 function deathText(d) {
   if (!d) return '';
-  const lines = [`Died${d.killer ? ` to ${d.killer}${d.pvp ? ' (a player)' : ''}` : ''}${d.killingBlow && d.killingBlow.spell ? `, killing blow ${d.killingBlow.spell} for ${d.killingBlow.amount}` : ''}.`,
+  const others = d.enemies && d.enemies.length > 1 ? ` and ${d.enemies.length - 1} other player${d.enemies.length === 2 ? '' : 's'}` : '';
+  const lines = [`Died${d.killer ? ` to ${d.killer}${d.pvp ? ' (a player)' : ''}${others}` : ''}${d.zone ? ` in ${d.zone}` : ''}${d.killingBlow && d.killingBlow.spell ? `, killing blow ${d.killingBlow.spell} for ${d.killingBlow.amount}` : ''}.`,
     `In the last ${d.seconds}s: took ${d.damageTaken} damage, was healed for ${d.healed}.`];
   if (d.sources.length) lines.push(`Damage taken by source: ${d.sources.map((x) => `${x.who}${x.player ? ' (player)' : ''} ${x.spell || ''} ${x.amount} in ${x.hits} hit${x.hits === 1 ? '' : 's'}`).join('; ')}.`);
   lines.push(d.myCasts.length ? `My casts: ${d.myCasts.join(', ')}.` : 'I cast nothing in that time.');

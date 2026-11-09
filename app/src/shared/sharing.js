@@ -177,6 +177,13 @@ const TYPES = {
     key: ['pid'], max: 1024, expiry: { days: 30 },
     fields: [list('items', 20, { parts: [pText('name', 100), pInt('qty'), pInt('skill')] })],
   },
+  wm: {
+    key: ['pid'], max: 1280, expiry: { days: 30 },
+    fields: [
+      list('marks', 30, { parts: [pInt('map'), pInt('x'), pInt('y'), pInt('at'), pText('kind', 1), pInt('n')] }),
+      list('maps', 12, { parts: [pInt('id'), pText('name', 40)] }),
+    ],
+  },
   pr: {
     key: ['pid'], max: 800, expiry: { days: 14 },
     fields: [int('day'), list('prices', 60, { parts: [pInt('id'), pInt('copper')] })],

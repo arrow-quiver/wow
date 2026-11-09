@@ -28,7 +28,7 @@ const obj = (v) => (v && typeof v === 'object' ? v : {});
 const seg = (r, i) => String(r.key).split(':')[i];
 // Where a pid-keyed record names its player.
 const PID_OF = {
-  su: (r) => seg(r, 1), cl: (r) => seg(r, 1), lp: (r) => seg(r, 0), sh: (r) => r.key, pr: (r) => r.key,
+  su: (r) => seg(r, 1), cl: (r) => seg(r, 1), lp: (r) => seg(r, 0), sh: (r) => r.key, pr: (r) => r.key, wm: (r) => r.key,
   cr: (r) => r.fields && r.fields.pid, dc: (r) => r.fields && r.fields.pid, bq: (r) => r.fields && r.fields.pid,
 };
 

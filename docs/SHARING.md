@@ -243,6 +243,7 @@ RT:k3f9a2^wzltl343^Grommash^^d^tob9c0^r^4kq1zm^tobn80^Thrallia.p4m7,d72,eim;Zulj
 | `gb` guild bank | tab `0`–`8` | any member who scanned | tab 0: scannedAt, money, tab names, last 25 log lines; tabs 1–8: `id,count;…` | | 30 d | 1.5 KB |
 | `bk` bank character stock | name | that character, while listed in `BC` | bags and bank `id,count;…` | | 30 d | 2 KB |
 | `sh` shopping list | pid | a character of pid | `name,qty,skill;…` (≤ 20) | | 30 d | 1 KB |
+| `wm` war marks | pid | a character of pid; at most every 5 min | marks `map,x,y,at,kind,n;…` (≤ 30; x, y in thousandths, kind `d`/`k`), maps `id,name;…` (≤ 12) | | 30 d | 1.25 KB |
 | `pr` prices | pid | a character of pid | scan day, `id,copper;…` (≤ 60 reagents and bank items) | | 14 d | 800 |
 | `RD` raid or event | random | officer; never rewritten | kind `r`/`p`/`e`, title, instance, startsAt, minutes, size, srLimit, notes | | startsAt + 45 d | 600 |
 | `RT` raid status | raid | officer | status `o`/`l`/`x`/`d`, lockedAt; when `d` also kind, instance key, closedAt, attendees `pid,itemKey,…;…` (reserve snapshot minus items won), no-shows `pid;…` | `x`, `d` | as `RD`; a raid close stays until folded into `LY` | 2 KB |
@@ -653,6 +654,7 @@ confirmed with "It was me"), `share_repair` (the repair after the update ran, §
 | `gb` | guild_bank, bank_log, guilds.bank_money and bank_scanned_at |
 | `BC`, `bk` | characters.is_bank (no record: no bank characters); inventory of bank characters |
 | `sh`, `pr` | shopping_lists; prices (the lower price kept for the same item and day) |
+| `wm` | war_marks, replaced per player (mine too), and war_maps (map names); see [api/war.md](api/war.md) |
 | `CFG` | guilds.officer_rank_max and relay_rank_max (no record: the defaults, 1 and none), then identity.syncRanks |
 | `WH` | app_settings `shared_webhook`, officers only; Settings offers "Grommash shared a Discord webhook. Use it?" |
 
@@ -985,6 +987,7 @@ pid (`<name>.<4 base36>`), tab (`0`–`8`), `1`.
 | `gb` | tab `1`–`8` | items [(id, count: int)] ≤ 98 |
 | `bk` | name | bags [(id, count: int)] ≤ 200, bank [(id, count: int)] ≤ 300 |
 | `sh` | pid | items [(name text(100), qty int, skill int)] ≤ 20 |
+| `wm` | pid | marks [(map int, x int, y int, at int, kind text(1), n int)] ≤ 30, maps [(id int, name text(40))] ≤ 12 |
 | `pr` | pid | day int, prices [(id, copper: int)] ≤ 60 |
 | `RD` | random | kind enum `rpe`, title text(60), instance text(60), startsAt int, minutes int, size int, srLimit int, notes text(300) |
 | `RT` | random (the raid) | status enum `olxd`, lockedAt int, kind enum `rpe`, instance text(8) (instance key), closedAt int, attendees [(pid text(64), items text(12)…)] ≤ 60 (≤ 20 items each), noShows [text(64)] ≤ 60 |

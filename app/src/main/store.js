@@ -55,6 +55,8 @@ const DEFAULTS = Object.freeze({
   overlayBounds: null,
   // Live link (live.js): follow the game's combat log while you play.
   liveLink: true,
+  // War alerts: post my deaths to players to the guild's Discord (with the zone and who), from the live link.
+  warAlerts: true,
 });
 
 // Keys the app manages itself. The renderer may send them back (e.g. a spread of settings),
@@ -288,7 +290,7 @@ function cleanFolderList(value) {
   return out;
 }
 
-const BOOLEAN_KEYS = ['syncEnabled', 'closeToTray', 'startWithWindows', 'addonAutoUpdate', 'addonAutoInstall', 'appAutoUpdate', 'notifications', 'onboarded', 'overlayEnabled', 'liveLink'];
+const BOOLEAN_KEYS = ['syncEnabled', 'closeToTray', 'startWithWindows', 'addonAutoUpdate', 'addonAutoInstall', 'appAutoUpdate', 'notifications', 'onboarded', 'overlayEnabled', 'liveLink', 'warAlerts'];
 
 function sanitizeSettingsPatch(patch) {
   if (!patch || typeof patch !== 'object' || Array.isArray(patch)) throw new Error('Settings must be sent as an object.');
