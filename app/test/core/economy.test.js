@@ -12,6 +12,7 @@ const sharing = require('../../src/core/sharing');
 const { applyPayload } = require('../../src/core/services/sync');
 const identity = require('../../src/core/identity');
 const { priceChange } = require('../../src/core/routes/economy');
+const E = require('../../src/core/services/economy');
 
 const WEBHOOK = 'https://discord.com/api/webhooks/123/abc';
 const DAY0 = Date.UTC(2020, 0, 1);
@@ -572,4 +573,24 @@ test('economy works without a Discord webhook', async () => {
     assert.equal((await t.api.post('/api/drives', { title: 'Gold', unit: 'gold', goal: 5 })).status, 201);
     assert.equal(t.discord.length, 0);
   } finally { await t.close(); }
+});
+
+test('guild bank log: drifting time estimates match the known line, identical lines stay separate, far-apart repeats are new', async () => {
+  const c = await startCore();
+  try {
+    const g = seedGuild(c.db, { character: 'Grunta' });
+    const rows = () => c.db.prepare('SELECT kind, who, item_id, count, amount FROM bank_log ORDER BY at, id').all().map((r) => [r.kind, r.who, r.item_id, r.count, r.amount]);
+    const edge = Math.floor(Date.now() / 1000 / 21600) * 21600;
+    const rune = (at) => ({ kind: 'deposit', who: 'Grommash', item: 14047, count: 20, at });
+    const gold = (at, amount = 1000000) => ({ kind: 'withdraw', who: 'Thrallia', amount, at });
+    assert.equal(E.recordBankLog(c.db, g.guildId, [rune(edge - 300), rune(edge - 300), rune(edge - 300), gold(edge - 300)]), 4);
+    // The same lines estimated across the 6-hour boundary (and to the hour, as the shared record does): nothing new.
+    assert.equal(E.recordBankLog(c.db, g.guildId, [rune(edge + 300), rune(edge + 300), rune(edge - 3600), gold(edge + 300)]), 0);
+    // A fourth identical deposit, a withdrawal of another amount, and the same withdrawal a day later are new.
+    assert.equal(E.recordBankLog(c.db, g.guildId, [rune(edge), rune(edge), rune(edge), rune(edge + 600), gold(edge, 5), gold(edge + 86400)]), 3);
+    assert.equal(rows().filter((r) => r[0] === 'deposit').length, 4);
+    assert.deepEqual(rows().filter((r) => r[0] === 'withdraw').map((r) => r[4]), [1000000, 5, 1000000]);
+    // Lines without a time are skipped; 0 and missing fields are the same line.
+    assert.equal(E.recordBankLog(c.db, g.guildId, [{ kind: 'deposit', who: 'Grommash', item: 14047, count: 20 }, { ...gold(edge), count: 0 }]), 0);
+  } finally { await c.close(); }
 });

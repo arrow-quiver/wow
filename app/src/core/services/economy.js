@@ -9,6 +9,7 @@
 //   priceHistory(db, guildId, itemId) → { latest: {day, price}|null, history: [{day, price}] (oldest first, max 14) }
 //   money(copper) → "123g 45s 67c"      dayToDate(auctionatorDay) → "YYYY-MM-DD"
 //   rememberNames(db, [{ id, name }])   keeps item_names current
+//   recordBankLog(db, guildId, lines) → rows added   guild bank log lines, matched against known rows
 // Injected dependencies: none (pure database code).
 
 const int = (v) => (Number.isFinite(Number(v)) ? Math.trunc(Number(v)) : null);
@@ -70,18 +71,13 @@ function applyEconomy(db, guildId, userId, payload, charIdByName) {
         }
       }
     }
-    // The game only shows "x hours ago", so the dedupe key buckets times into 6-hour windows.
-    const insLog = db.prepare('INSERT OR IGNORE INTO bank_log (guild_id, kind, who, item_id, count, amount, at, dedupe) VALUES (?,?,?,?,?,?,?,?)');
+    const lines = [];
     for (const e of list(gb.log).slice(0, 500)) {
-      const at = int(e && e.at);
-      if (!at) continue;
-      const kind = str(e.kind, 20) || 'unknown';
-      const who = str(e.who, 40);
-      const iid = int(e.id);
+      const iid = int(e && e.id);
       if (iid && e.name) rememberNames(db, [e]);
-      const key = [kind, who, iid || '', int(e.count) || '', int(e.amount) || '', Math.floor(at / 21600)].join('|');
-      insLog.run(guildId, kind, who, iid, int(e.count), int(e.amount), new Date(at * 1000).toISOString(), key);
+      lines.push({ at: int(e && e.at), kind: str(e && e.kind, 20) || 'unknown', who: str(e && e.who, 40), item: iid, count: int(e && e.count), amount: int(e && e.amount) });
     }
+    recordBankLog(db, guildId, lines);
   }
 
   // 3. Auction prices from Auctionator (read by the app from Auctionator's SavedVariables)
@@ -95,6 +91,52 @@ function applyEconomy(db, guildId, userId, payload, charIdByName) {
     }
   }
   return stats;
+}
+
+// Guild bank log lines → bank_log, without counting a line twice and without merging identical lines.
+// The game only shows "x hours ago", so each scan's time estimate for one line drifts (by up to an hour, and the
+// shared gb record rounds to the hour). A line matches an existing row with the same kind, who, item, count and
+// amount whose time is within BANK_LOG_MATCH_SECS; each existing row matches at most one line of a scan, so three
+// identical deposits seen in one scan stay three rows, and a later scan only adds the lines beyond those already
+// known. lines: [{ at (unix seconds), kind, who, item, count, amount }]. Returns how many rows were added.
+const BANK_LOG_MATCH_SECS = 2 * 3600;
+function recordBankLog(db, guildId, lines) {
+  const nz = (v) => (Number.isFinite(Number(v)) && Math.trunc(Number(v)) !== 0 ? Math.trunc(Number(v)) : null);
+  const same = db.prepare(`SELECT id, at FROM bank_log WHERE guild_id = ? AND kind = ? AND who IS ?
+    AND COALESCE(item_id, 0) = ? AND COALESCE(count, 0) = ? AND COALESCE(amount, 0) = ?`);
+  const ins = db.prepare('INSERT OR IGNORE INTO bank_log (guild_id, kind, who, item_id, count, amount, at, dedupe) VALUES (?,?,?,?,?,?,?,?)');
+  const groups = new Map();
+  for (const l of lines) {
+    const at = nz(l && l.at);
+    if (!at) continue;
+    const row = { at, kind: String(l.kind || 'unknown').slice(0, 20), who: l.who ? String(l.who).slice(0, 40) : null, item: nz(l.item), count: nz(l.count), amount: nz(l.amount) };
+    const key = [row.kind, row.who, row.item || '', row.count || '', row.amount || ''].join('|');
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(row);
+  }
+  let added = 0;
+  for (const [key, rows] of groups) {
+    const r0 = rows[0];
+    const known = same.all(guildId, r0.kind, r0.who, r0.item || 0, r0.count || 0, r0.amount || 0)
+      .map((k) => ({ id: k.id, at: Math.floor(Date.parse(k.at) / 1000) }));
+    const used = new Set();
+    rows.sort((x, y) => x.at - y.at);
+    for (const row of rows) {
+      let best = null;
+      for (const k of known) {
+        const d = Math.abs(k.at - row.at);
+        if (!used.has(k.id) && d <= BANK_LOG_MATCH_SECS && (!best || d < best.d)) best = { id: k.id, d };
+      }
+      if (best) { used.add(best.id); continue; }
+      const at = new Date(row.at * 1000).toISOString();
+      for (let n = 0; ; n++) {
+        const info = ins.run(guildId, row.kind, row.who, row.item, row.count, row.amount, at, `${key}|${row.at}|${n}`);
+        if (info.changes) { const id = Number(info.lastInsertRowid); used.add(id); known.push({ id, at: row.at }); break; }
+      }
+      added += 1;
+    }
+  }
+  return added;
 }
 
 // Latest known price per item (copper), within the last `days` days.
@@ -129,4 +171,4 @@ function money(copper) {
   return `${copper < 0 ? '-' : ''}${g ? `${g.toLocaleString('en')}g ` : ''}${g || s ? `${s}s ` : ''}${cc}c`.replace(/ 0c$/, '').trim();
 }
 
-module.exports = { applyEconomy, latestPrices, searchPrices, priceHistory, money, dayToDate, rememberNames };
+module.exports = { applyEconomy, recordBankLog, BANK_LOG_MATCH_SECS, latestPrices, searchPrices, priceHistory, money, dayToDate, rememberNames };

@@ -5,6 +5,8 @@ const test = require('node:test');
 const assert = require('node:assert');
 const { startCore, seedGuild, addPlayer } = require('./helpers');
 const Dn = require('../../src/core/services/donations');
+const Economy = require('../../src/core/services/economy');
+const { applyPayload } = require('../../src/core/services/sync');
 
 const iso = (daysAgo, h = 12) => { const d = new Date(Date.now() - daysAgo * 86400000); d.setUTCHours(h, 0, 0, 0); return d.toISOString(); };
 const dayOf = (daysAgo) => iso(daysAgo).slice(0, 10);
@@ -70,4 +72,64 @@ test('open bank requests show today\'s price and the total to buy them all', asy
   assert.strictEqual(r.toBuy, 36260);
   assert.strictEqual(r.unpricedRequests, 1);
   assert.strictEqual(r.days, 7);
+});
+
+// --- Regressions: the bank log's time estimates drift, identical lines are separate gifts, bank characters marked
+// later, vendor prices upgraded to the auction price.
+
+const bankScan = (scannedAt, log) => ({ guildBank: { scannedAt, money: 1, tabs: [{ name: 'Mats', items: [] }], log } });
+
+test('one deposit seen by scans whose time estimates straddle a 6-hour window, and by the shared record, is one gift', async (t) => {
+  const { db, g } = await setup(t);
+  const edge = Math.floor(Date.now() / 1000 / 21600) * 21600; // a 6-hour window boundary
+  const gold = (at) => ({ kind: 'deposit', who: 'Grommash', amount: 1000000, at });
+  applyPayload(db, g.guildId, g.me, bankScan(edge, [gold(edge - 300)]));          // scanned at 11:55
+  applyPayload(db, g.guildId, g.me, bankScan(edge + 600, [gold(edge + 300)]));    // scanned at 12:05: estimate drifted
+  Economy.recordBankLog(db, g.guildId, [{ kind: 'deposit', who: 'Grommash', amount: 1000000, at: edge - 3600 }]); // shared gb: hour - age
+  assert.strictEqual(db.prepare('SELECT COUNT(*) n FROM bank_log').get().n, 1);
+  assert.strictEqual(Dn.capture(db, g.guildId), 1);
+  assert.deepStrictEqual(db.prepare('SELECT kind, value FROM donations').all().map((r) => [r.kind, r.value]), [['gold', 1000000]]);
+});
+
+test('identical deposits in one scan are separate gifts; a rescan adds only the new ones', async (t) => {
+  const { db, g, price } = await setup(t);
+  price.run(g.guildId, 14047, dayOf(0), 1000);
+  const now = Math.floor(Date.now() / 1000);
+  const rune = (at) => ({ kind: 'deposit', who: 'Grommash', id: 14047, name: 'Runecloth', count: 20, at });
+  applyPayload(db, g.guildId, g.me, bankScan(now - 1200, [rune(now - 4000), rune(now - 4000), rune(now - 4000)]));
+  assert.strictEqual(Dn.capture(db, g.guildId), 3);
+  // The same three, estimated 40 minutes apart from before, plus a fourth.
+  applyPayload(db, g.guildId, g.me, bankScan(now, [rune(now - 1600), rune(now - 1600), rune(now - 1600), rune(now - 60)]));
+  assert.strictEqual(Dn.capture(db, g.guildId), 1);
+  assert.strictEqual(db.prepare('SELECT SUM(value) v FROM donations').get().v, 4 * 20 * 1000);
+});
+
+test('a character marked as a bank character after its deposits were captured leaves the board and the recent list', async (t) => {
+  const { c, db, g, add } = await setup(t);
+  add('deposit', 'Grommash', null, null, 500000, iso(1));
+  add('deposit', 'Mychar', null, null, 1000, iso(1));
+  Dn.capture(db, g.guildId);
+  let r = (await c.api.get('/api/donations')).body;
+  assert.deepStrictEqual(r.board.map((b) => b.who), ['Grommash', 'Mychar']);
+  db.prepare("UPDATE characters SET is_bank = 1 WHERE name = 'Grommash'").run();
+  r = (await c.api.get('/api/donations')).body;
+  assert.deepStrictEqual(r.board.map((b) => b.who), ['Mychar']);
+  assert.deepStrictEqual(r.recent.map((d) => d.who), ['Mychar']);
+  assert.strictEqual(r.total, 1000);
+});
+
+test('a vendor-priced gift gets the auction price when a scan from its day arrives; older ones and auction prices stay', async (t) => {
+  const { db, g, add, price } = await setup(t);
+  add('deposit', 'Mychar', 2589, 10, null, iso(2));   // Linen: vendor 13 each for now
+  add('deposit', 'Mychar', 2589, 10, null, iso(40));  // too old to retry
+  Dn.capture(db, g.guildId);
+  assert.deepStrictEqual(db.prepare('SELECT value, priced_from FROM donations ORDER BY id').all().map((r) => [r.value, r.priced_from]), [[130, 'vendor'], [130, 'vendor']]);
+  price.run(g.guildId, 2589, dayOf(4), 50);  // within the lookback before the deposit day
+  price.run(g.guildId, 2589, dayOf(41), 50);
+  Dn.capture(db, g.guildId);
+  assert.deepStrictEqual(db.prepare('SELECT value, priced_from, price_day FROM donations ORDER BY id').all().map((r) => [r.value, r.priced_from, r.price_day]),
+    [[500, 'auction', dayOf(4)], [130, 'vendor', dayOf(40)]]);
+  price.run(g.guildId, 2589, dayOf(2), 70);  // a closer auction price later doesn't change an auction value
+  Dn.capture(db, g.guildId);
+  assert.strictEqual(db.prepare('SELECT value FROM donations ORDER BY id').get().value, 500);
 });

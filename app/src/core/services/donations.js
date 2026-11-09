@@ -9,8 +9,13 @@
 //
 // "Auctionator price on that day": the guild price index (prices, the lowest scan of each day from everyone's
 // Auctionator) on the deposit day, else the newest earlier day within PRICE_LOOKBACK_DAYS; else what a vendor pays
-// (item_info.sell_price). Once a donation has a value it never changes.
+// (item_info.sell_price). Once a donation has an auction (or gold) value it never changes; a vendor value is replaced
+// by the auction price when a scan from that day (or the lookback before it) arrives within RETRY_DAYS.
+// A character marked as a bank character later drops off the board and the recent list (BANK_CHAR below).
 const PRICE_LOOKBACK_DAYS = 14;
+const RETRY_DAYS = 30;
+// SQL: the donation d was made by a character that is (now) a guild bank character.
+const BANK_CHAR = 'EXISTS (SELECT 1 FROM characters c WHERE c.guild_id = d.guild_id AND lower(c.name) = lower(d.who) AND c.is_bank = 1)';
 
 const day = (iso) => String(iso).slice(0, 10);
 
@@ -43,12 +48,15 @@ function capture(db, guildId) {
     }
     n += 1;
   }
-  // Prices that arrived later (a scan from the deposit day), and players linked later.
-  const unpriced = db.prepare("SELECT * FROM donations WHERE guild_id = ? AND value IS NULL AND at >= datetime('now', '-30 days')").all(guildId);
+  // Prices that arrived later (a scan from the deposit day): unpriced gifts get one, vendor-priced gifts get the
+  // auction price. And players linked later.
+  const retry = db.prepare(`SELECT * FROM donations WHERE guild_id = ? AND kind = 'item' AND (value IS NULL OR priced_from = 'vendor')
+    AND at >= datetime('now', '-${RETRY_DAYS} days')`).all(guildId);
   const setValue = db.prepare('UPDATE donations SET value = ?, priced_from = ?, price_day = ? WHERE id = ?');
-  for (const d of unpriced) {
+  for (const d of retry) {
     const p = priceOn(db, guildId, d.item_id, day(d.at));
-    if (p) setValue.run(p.value * (d.count || 1), p.from, p.day, d.id);
+    if (!p || (d.value != null && p.from !== 'auction')) continue;
+    setValue.run(p.value * (d.count || 1), p.from, p.day, d.id);
   }
   db.prepare(`UPDATE donations SET user_id = (SELECT c.user_id FROM characters c WHERE c.guild_id = donations.guild_id AND lower(c.name) = lower(donations.who))
     WHERE guild_id = ? AND user_id IS NULL`).run(guildId);
@@ -68,7 +76,7 @@ function board(db, guildId, { since }) {
       (SELECT name FROM characters c WHERE c.user_id = d.user_id AND c.guild_id = d.guild_id ORDER BY c.is_main DESC, c.level DESC LIMIT 1), MAX(d.who)) AS who,
       SUM(COALESCE(d.value, 0)) AS value, SUM(CASE WHEN d.kind = 'gold' THEN d.value ELSE 0 END) AS gold,
       SUM(CASE WHEN d.kind = 'item' THEN COALESCE(d.value, 0) ELSE 0 END) AS items, COUNT(*) AS count
-    FROM donations d WHERE d.guild_id = ? AND d.at >= ?
+    FROM donations d WHERE d.guild_id = ? AND d.at >= ? AND NOT ${BANK_CHAR}
     GROUP BY COALESCE(CAST(d.user_id AS TEXT), 'w:' || lower(d.who))
     ORDER BY value DESC, count DESC`).all(guildId, since);
 }
@@ -78,7 +86,7 @@ function overview(db, guildId, userId, { days = 30 } = {}) {
   const since = new Date(Date.now() - days * 86400000).toISOString();
   const recent = db.prepare(`SELECT d.*, COALESCE(n.name, i.name) AS item_name, i.quality FROM donations d
     LEFT JOIN item_names n ON n.item_id = d.item_id LEFT JOIN item_info i ON i.item_id = d.item_id
-    WHERE d.guild_id = ? ORDER BY d.at DESC, d.id DESC LIMIT 40`).all(guildId);
+    WHERE d.guild_id = ? AND NOT ${BANK_CHAR} ORDER BY d.at DESC, d.id DESC LIMIT 40`).all(guildId);
   const requests = db.prepare(`SELECT b.id, b.item, b.count, b.note, b.created_at, u.battletag AS requester_tag,
       (SELECT name FROM characters c WHERE c.user_id = b.requester_id AND c.guild_id = b.guild_id ORDER BY c.is_main DESC, c.level DESC LIMIT 1) AS requester
     FROM bank_requests b JOIN users u ON u.id = b.requester_id WHERE b.guild_id = ? AND b.status = 'open' ORDER BY b.created_at`).all(guildId)
@@ -107,4 +115,4 @@ function overview(db, guildId, userId, { days = 30 } = {}) {
   };
 }
 
-module.exports = { capture, priceOn, unitPriceByName, board, overview, PRICE_LOOKBACK_DAYS };
+module.exports = { capture, priceOn, unitPriceByName, board, overview, PRICE_LOOKBACK_DAYS, RETRY_DAYS };
