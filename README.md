@@ -57,7 +57,11 @@ the Alliance hits the Crossroads, read guild notices and see what's coming up ne
 The Coach learns how you play from a short quiz and from what you do in game, then scores your play style
 (aggression, risk taking, social, PvP focus and pace). It suggests a build plan and a list of next steps: unspent
 talent points, repairs, bag space, trainer visits, raid sign-ups and more. Ask it questions with your own
-Anthropic API key; everything else works without one.
+Anthropic API key; everything else works without one. Follow-up questions remember the last few answers.
+
+In game, the Coach sits **beside your talent window**: the next talent your plan wants (with a glow on it), and the
+plan's order with what you've taken ticked off. **Item tooltips** say whether an item is an upgrade for your build,
+weighed by your plan's stat priorities against what you're wearing.
 
 ### 🛠️ Crafters, requests and partners
 

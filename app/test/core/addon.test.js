@@ -450,7 +450,7 @@ test('Settings tab: options apply immediately, app link and update notice shown'
   assert.strictEqual(text(wow, 'WowGuildMinimapButton:IsShown()'), 'true');
   // Every option has a box, in the same order as the Blizzard options panel.
   assert.strictEqual(wow.eval(`#${page}.boxes`), wow.eval('#__ns.OPTION_LIST'));
-  assert.strictEqual(wow.eval('#__ns.OPTION_LIST'), '8');
+  assert.strictEqual(wow.eval('#__ns.OPTION_LIST'), '9');
   wow.exec('__ns.optionsPanel.scripts.OnShow()');
   assert.strictEqual(text(wow, '__ns.optionsPanel.boxes[2]:GetChecked()'), 'true');
   wow.exec('__ns.optionsPanel.boxes[2]:SetChecked(false); __click(__ns.optionsPanel.boxes[2])');
@@ -977,7 +977,8 @@ test('the Coach shows answers and the build plan the app brings back', () => {
   assert.match(shown, /Two-hand:\|r Slow and heavy/);
   assert.match(wow.eval('WowGuildCoach.foot:GetText()'), /^Made at level 23, /);
   const steps2 = wow.get('(function() local t = {} for _, s in ipairs(__ns.coach.nextSteps()) do t[#t+1] = s.title .. ": " .. s.detail end return t end)()').join('|');
-  assert.match(steps2, /Spend 1 talent point: Your plan says: Ancestral Knowledge \(Enhancement\)/);
+  // Ancestral Knowledge is already 5/5, so the step points at the next talent the plan wants.
+  assert.match(steps2, /Spend 1 talent point: Your plan says: Flurry \(Enhancement\), 0 of 5/);
   assert.match(steps2, /Get a slow two-hander: Windfury loves it/);
   assert.match(wow.eval('__ns.coach.summary()'), /Warmonger[\s\S]*Plan: Enhancement for world PvP/);
   noError(wow);
