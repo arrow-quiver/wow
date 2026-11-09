@@ -844,6 +844,23 @@ a.wh.q0 { color: var(--q-0) !important; } a.wh.q1 { color: var(--q-1) !important
 .prices-stale { opacity: .6; transition: opacity var(--t-med) var(--ease); }
 @media (max-width: 1000px) { .prices-overview { grid-template-columns: minmax(0, 1fr); } }
 
+/* Deal hunter (pages/deals.js) */
+.deals-filters { display: flex; flex-wrap: wrap; gap: var(--s-3); align-items: end; margin-bottom: var(--s-4); }
+.deals-filters .field { flex: 0 1 170px; }
+.deals-filters .field:has(select) { flex: 0 1 260px; }
+.deals-bad { flex-basis: 100%; margin: 0; }
+.deals-stats { display: grid; gap: var(--s-4); grid-template-columns: repeat(3, minmax(0, 1fr)); margin-bottom: var(--s-4); }
+.deals-stats .stat-value { font-size: var(--fs-xl); min-height: 1.6em; display: flex; align-items: center; }
+.deals-item { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.deals-flags { display: flex; flex-wrap: wrap; gap: 4px; }
+.deals-flags .pill { font-size: var(--fs-xs); }
+.deals-vendor > li { padding: 5px 0; gap: var(--s-3); }
+.deals-plan { margin: 0; padding-left: 1.2em; display: grid; gap: 3px; }
+.deals-how { margin-top: var(--s-4); padding: var(--s-3) var(--s-5); }
+.deals-how summary { cursor: pointer; font-weight: 700; }
+.deals-how ul { margin: var(--s-3) 0 0; padding-left: 1.2em; display: grid; gap: 4px; color: var(--text-2); }
+@media (max-width: 900px) { .deals-stats { grid-template-columns: minmax(0, 1fr); } }
+
 .drives-grid { display: grid; gap: var(--s-4); grid-template-columns: repeat(auto-fill, minmax(460px, 1fr)); align-items: start; }
 .drive-notes { margin: 0; color: var(--text-2); }
 .drive-progress { display: flex; flex-direction: column; gap: 6px; }

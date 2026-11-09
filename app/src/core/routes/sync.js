@@ -4,6 +4,7 @@
 //
 //   POST /api/sync    WowGuildDB as JSON (+ Auctionator prices) → counts + latest versions
 //   GET  /api/inbox   the news for WowGuild_Inbox/Inbox.lua, as JSON
+//   POST /api/market  my Auctionator market history for the Deal hunter ({ realms }) → { ok, realms, items }
 //   POST /api/sync/roster-guild  { name } → { ok, guild, created }: the player accepts the roster's guild
 //
 // A guildless upload whose roster scan names a guild replies with `rosterGuild: { name, realm }` too; the
@@ -14,6 +15,7 @@
 // Roles follow the in-game ranks of the roster rows the upload brought (identity.syncRanks).
 const { HttpError, ver } = require('../http');
 const { applyPayload, buildInbox, emptyInbox } = require('../services/sync');
+const deals = require('../services/deals');
 const coach = require('../services/coach');
 const identity = require('../identity');
 
@@ -31,6 +33,13 @@ function register(app, ctx) {
     log: db.prepare('INSERT INTO sync_log (guild_id, user_id, bytes) VALUES (?,?,?)'),
     user: db.prepare(`UPDATE users SET addon_version = COALESCE(?, addon_version), last_sync_at = datetime('now') WHERE id = ?`),
   };
+
+  // The Deal hunter's market history (shared/auctionator.js extractMarket). Mine alone: stored, never shared.
+  // Sent apart from the main upload so a big Auctionator file can't push the upload over its size limit.
+  app.post('/api/market', (req, res) => {
+    if (!req.body || !Array.isArray(req.body.realms)) throw new HttpError(400, 'Send the market as { realms: [...] }.');
+    res.json({ ok: true, ...deals.applyMarket(db, req.body) });
+  });
 
   // What the addon gets back: the guild news, plus the newest addon version (so it can tell the
   // player to update from the app).

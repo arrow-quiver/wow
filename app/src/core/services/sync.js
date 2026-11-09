@@ -29,6 +29,7 @@
 // Injected dependencies: none. Coach and economy parts come from services/coach.js and services/economy.js.
 const { applyCoach, inboxPart } = require('./coach');
 const { applyEconomy, latestPrices } = require('./economy');
+const deals = require('./deals');
 const { toLua } = require('../../shared/lua');
 const sharing = require('../sharing');
 const { HttpError } = require('../http');
@@ -290,6 +291,14 @@ function applyPayload(db, guildId, userId, payload, { trustedRanks = true, ctx =
   return stats;
 }
 
+function inboxDeals(db, guildId) {
+  const g = db.prepare('SELECT realm, faction FROM guilds WHERE id = ?').get(guildId) || {};
+  const r = deals.findDeals(db, { preferRealms: g.realm ? [`${g.realm} ${g.faction || ''}`.trim(), g.realm] : [], limit: 15 });
+  if (!r.realm) return null;
+  const row = (d) => ({ id: d.item_id, name: d.name, buy: d.buy, worth: d.worth, profit: d.profit, sure: d.sure });
+  return { realm: r.realm, day: r.scan.day, items: r.deals.map(row), vendor: r.vendor.slice(0, 10).map((d) => ({ ...row(d), worth: d.sell_price })) };
+}
+
 function buildInbox(db, guildId, userId, { ctx = null } = {}) {
   const guild = db.prepare('SELECT name FROM guilds WHERE id = ?').get(guildId);
   const announcements = db.prepare(`SELECT a.body, a.created_at AS at, u.battletag AS by FROM announcements a
@@ -355,6 +364,8 @@ function buildInbox(db, guildId, userId, { ctx = null } = {}) {
     generatedAt: Math.floor(Date.now() / 1000),
     announcements, canCraft, myRequests: mine, buddies,
     coach: inboxPart(db, guildId, userId),
+    // Deal hunter: the best buys from my newest scan, for the addon's auction house panel.
+    deals: inboxDeals(db, guildId),
     // Sharing (docs/SHARING.md §9): changes for the addon to send, who I am, and a seed for a store far behind.
     outbox: sharing.exportOutbox(db),
     me: sharing.exportMe(db),

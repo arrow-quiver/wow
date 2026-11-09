@@ -764,7 +764,7 @@ test('inbox: notices, requests you can craft, your requests, leveling partners, 
   assert.strictEqual(r.status, 200);
   assert.strictEqual(r.headers.get('cache-control'), 'no-store');
   const inbox = r.body;
-  assert.deepStrictEqual(Object.keys(inbox).sort(), ['announcements', 'buddies', 'canCraft', 'coach', 'crafters', 'generatedAt', 'guild', 'holdings',
+  assert.deepStrictEqual(Object.keys(inbox).sort(), ['announcements', 'buddies', 'canCraft', 'coach', 'crafters', 'deals', 'generatedAt', 'guild', 'holdings',
     'latestAddon', 'me', 'myRequests', 'outbox', 'prices', 'raids', 'seed', 'stock'].sort());
   assert.strictEqual(inbox.guild, 'wow');
   assert.strictEqual(inbox.latestAddon, TOC_VERSION);

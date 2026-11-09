@@ -124,7 +124,7 @@ function ns.updateAvailable()
 end
 
 -- Options (Settings → AddOns → Guild Camp). Defaults are on.
-ns.DEFAULTS = { blizzardStyle = false, tooltips = true, minimapButton = true, loginNews = true, autoGuide = true, trackerOnLogin = true, collectBank = true, updateNotice = true }
+ns.DEFAULTS = { blizzardStyle = false, dealsPanel = true, tooltips = true, minimapButton = true, loginNews = true, autoGuide = true, trackerOnLogin = true, collectBank = true, updateNotice = true }
 function ns.opt(key)
   local o = ns.db and ns.db.options
   if o and o[key] ~= nil then return o[key] end
@@ -317,6 +317,8 @@ local function slash(input)
     if rest == "clear" then ns.prof.clearList() else ns.prof.toggleTracker() end
   elseif cmd == "welcome" then
     ns.welcome.showWelcome()
+  elseif cmd == "deals" then
+    ns.deals.toggle()
   elseif cmd == "coach" then
     if rest == "" then ns.coachUI.toggle() else ns.coachUI.show(rest == "ask" and "ask" or rest == "build" and "build" or "steps") end
   elseif cmd == "options" or cmd == "config" then
@@ -332,6 +334,7 @@ local function slash(input)
     ns.print("/wow guide  show or hide the skill-up guide (next to your profession window)")
     ns.print("/wow list  show or hide your shopping list;  /wow list clear  empties it")
     ns.print("/wow coach  your play style, build plan and next steps (/wow coach ask to ask a question)")
+    ns.print("/wow deals  the Deal hunter: what to buy on the auction house and sell again")
     ns.print("/wow options  addon settings")
     ns.print("/wow debug  problem report to copy and send")
   else

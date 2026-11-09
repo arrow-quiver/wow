@@ -251,6 +251,46 @@ addMockRoutes({
     };
   },
 
+  'GET /api/deals': ({ query, state }) => {
+    needGuild(state);
+    const minProfit = Number(query.min_profit) || 5000;
+    const maxPrice = Number(query.max_price) || null;
+    const mk = (id, cut, sure, extra = {}) => {
+      const worth = PRICE[id];
+      const buy = Math.max(1, Math.round(worth * (1 - cut)));
+      const resale = Math.floor(worth * 0.95);
+      const conf = { high: 82, medium: 58, low: 31 }[sure];
+      return { item_id: Number(id), name: ITEMS[id], quality: id === '13468' || id === '13510' ? 'uncommon' : 'common', category: 'Trade Goods',
+        buy, worth, resale, profit: resale - buy, roi: Math.round(((resale - buy) / buy) * 1000) / 10, discount: Math.round(cut * 1000) / 10,
+        confidence: conf, sure, history_days: sure === 'low' ? 5 : 19, listed_days: sure === 'low' ? 4 : 13, listed: 22, sell_price: null,
+        history: history(id).map((h, i, a) => (i === a.length - 1 ? { ...h, price: buy } : h)), flags: [], seen: dayStr(0), age_days: 0, ...extra };
+    };
+    let deals = [
+      mk('13468', 0.31, 'high', { flags: [{ kind: 'low', text: 'Lowest price in 30 days' }] }),
+      mk('13452', 0.38, 'high'),
+      mk('12363', 0.27, 'medium', { flags: [{ kind: 'swingy', text: 'The price swings a lot' }] }),
+      mk('14344', 0.42, 'medium'),
+      mk('13457', 0.33, 'low', { flags: [{ kind: 'slow', text: 'Listed on only 4 of the last 14 days: may take a while to sell' }] }),
+      mk('12808', 0.24, 'high', { flags: [{ kind: 'falling', text: 'Price has been falling this week' }] }),
+    ].filter((d) => d.profit >= minProfit && (!maxPrice || d.buy <= maxPrice));
+    deals = deals.sort((a, b) => b.profit * b.confidence - a.profit * a.confidence);
+    const vendor = [{ ...mk('4338', 0, 'high'), buy: 40, sell_price: 100, profit: 60, roi: 150, confidence: 100, sure: 'certain', flags: [] }];
+    const budget = Number(query.budget) || null;
+    let plan = null;
+    if (budget) {
+      const chosen = []; let spend = 0; let profit = 0;
+      for (const d of [...vendor, ...deals]) if (spend + d.buy <= budget) { chosen.push(d.item_id); spend += d.buy; profit += d.profit; }
+      plan = { budget, items: chosen, spend, profit };
+    }
+    return {
+      realms: [{ key: "Zul'jin Horde", newest: dayStr(0), items: 6120 }, { key: "Zul'jin Alliance", newest: dayStr(3), items: 980 }],
+      realm: query.realm || "Zul'jin Horde", scan: { day: dayStr(0), age_days: 0, items: 6120 },
+      deals, vendor, plan,
+      notes: query.realm === "Zul'jin Alliance" ? ["Your newest scan of Zul'jin Alliance is from 3 days ago. Prices move fast: scan again before you buy."] : [],
+      rules: { ah_cut: 0.05, min_discount: 0.2, min_history_days: 4, min_profit: minProfit },
+    };
+  },
+
   'GET /api/drives': ({ state }) => {
     needGuild(state);
     return {

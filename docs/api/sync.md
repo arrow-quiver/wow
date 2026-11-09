@@ -206,6 +206,23 @@ table, a malformed record) are skipped, not refused.
 
 ---
 
+## `POST /api/market`
+
+The Deal hunter's market history, sent by the app after each successful `POST /api/sync` when `Auctionator.lua`
+changed (`shared/auctionator.js` `extractMarket`). Stored for this computer only; never shared.
+```json
+{ "realms": [ { "key": "Zul'jin Horde", "newest": 2504,
+    "items": [ [14047, 30000, 2504, [[2484, 50000, 25], [2504, 30000, 25]]] ] } ] }
+```
+Each item is `[itemId, current lowest buyout, its day, [[day, price, listed|null], …]]`; days are Auctionator day
+numbers (days since 1 January 2020). Each realm in the body replaces what was stored for it. A failure is logged and
+doesn't affect the upload.
+
+`200` `{ "ok": true, "realms": 1, "items": 6120 }` · no `realms` list → `400 "Send the market as { realms: [...] }."`
+
+The inbox (`GET /api/inbox`) carries `deals`: `{ realm, day, items: [{ id, name, buy, worth, profit, sure }], vendor: […] }`
+or `null` without scans (see [economy.md](economy.md#deal-hunter)).
+
 ## `GET /api/inbox`
 
 The news for the addon, and what it should send. `Cache-Control: no-store`.

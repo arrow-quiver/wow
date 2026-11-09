@@ -65,22 +65,24 @@ function client(cfg, fetchImpl) {
 function missingItemIds(db, limit = 300) {
   return db.prepare(`SELECT id FROM (
       SELECT item_id AS id FROM inventory UNION SELECT item_id FROM guild_bank UNION SELECT item_id FROM prices
-      UNION SELECT item_id FROM loot_items WHERE item_id IS NOT NULL UNION SELECT item_id FROM item_names)
+      UNION SELECT item_id FROM loot_items WHERE item_id IS NOT NULL UNION SELECT item_id FROM item_names
+      UNION SELECT item_id FROM ah_items)
     WHERE id > 0 AND id NOT IN (SELECT item_id FROM item_info) LIMIT ?`).all(limit).map((r) => r.id);
 }
 
 async function fillItems(db, api, ns, ids) {
-  const save = db.prepare(`INSERT OR REPLACE INTO item_info (item_id, name, quality, ilvl, req_level, item_class, item_subclass, slot, namespace, found, fetched_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?, datetime('now'))`);
+  const save = db.prepare(`INSERT OR REPLACE INTO item_info (item_id, name, quality, ilvl, req_level, item_class, item_subclass, slot, namespace, found, sell_price, fetched_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?, datetime('now'))`);
   const name = db.prepare("INSERT INTO item_names (item_id, name, updated_at) VALUES (?,?, datetime('now')) ON CONFLICT (item_id) DO NOTHING");
   let found = 0;
   for (let i = 0; i < ids.length; i += 5) {
     await Promise.all(ids.slice(i, i + 5).map(async (id) => {
       try {
         const it = await api.get(`/data/wow/item/${id}`, ns.static);
-        if (!it) { save.run(id, null, null, null, null, null, null, null, ns.static, 0); return; }
+        if (!it) { save.run(id, null, null, null, null, null, null, null, ns.static, 0, null); return; }
         save.run(id, it.name || null, it.quality && it.quality.type, it.level ?? null, it.required_level ?? null,
-          it.item_class && it.item_class.name, it.item_subclass && it.item_subclass.name, it.inventory_type && it.inventory_type.name, ns.static, 1);
+          it.item_class && it.item_class.name, it.item_subclass && it.item_subclass.name, it.inventory_type && it.inventory_type.name, ns.static, 1,
+          Number.isFinite(it.sell_price) ? it.sell_price : null);
         if (it.name) name.run(id, it.name);
         found += 1;
       } catch (e) { /* try again next run */ }

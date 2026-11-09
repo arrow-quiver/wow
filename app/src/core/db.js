@@ -764,6 +764,17 @@ const MIGRATIONS = [
   `ALTER TABLE characters ADD COLUMN no_guild INTEGER NOT NULL DEFAULT 0;
    ALTER TABLE characters ADD COLUMN no_guild_at INTEGER;
    ALTER TABLE share_pruned ADD COLUMN until INTEGER;`,
+
+  // 19: Deal hunter. My own Auctionator scans per realm ("<realm> <faction>", as Auctionator names them): each item's
+  // current lowest buyout (current, on current_day) and its daily prices (ah_days: Auctionator day numbers, days since
+  // 1 Jan 2020; qty = how many were listed that day, when Auctionator says). Replaced realm by realm on each upload.
+  // item_info.sell_price = what a vendor pays (copper), from Blizzard's item data, for vendor flips.
+  `CREATE TABLE ah_realms (realm TEXT PRIMARY KEY, newest INTEGER NOT NULL, items INTEGER NOT NULL, uploaded_at TEXT NOT NULL);
+   CREATE TABLE ah_items (realm TEXT NOT NULL, item_id INTEGER NOT NULL, current INTEGER NOT NULL, current_day INTEGER NOT NULL,
+     PRIMARY KEY (realm, item_id));
+   CREATE TABLE ah_days (realm TEXT NOT NULL, item_id INTEGER NOT NULL, day INTEGER NOT NULL, price INTEGER NOT NULL, qty INTEGER,
+     PRIMARY KEY (realm, item_id, day));
+   ALTER TABLE item_info ADD COLUMN sell_price INTEGER;`,
 ];
 
 // Runs every migration the database hasn't had yet, each in its own transaction.

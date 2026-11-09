@@ -51,7 +51,7 @@ const fs = require('fs');
 const path = require('path');
 const { EventEmitter } = require('events');
 const { parseSavedVariables, luaAssignment } = require('../shared/lua');
-const { extractPrices } = require('../shared/auctionator');
+const { extractPrices, extractMarket } = require('../shared/auctionator');
 const { tocField } = require('../shared/toc');
 const versions = require('../shared/version');
 const { writeFileAtomic } = require('./store');
@@ -466,7 +466,7 @@ function createSync({ api, store, log, wow, appVersion, coreEvents, ...opts } = 
     try {
       const db = parseSavedVariables(fs.readFileSync(file)).AUCTIONATOR_PRICE_DATABASE;
       if (!db || typeof db !== 'object') return null;
-      return { key, mtime, prices: extractPrices(db, now()) };
+      return { key, mtime, prices: extractPrices(db, now()), market: extractMarket(db, now()) };
     } catch (err) {
       say('warn', `Couldn't read Auctionator prices (${err.message}). Everything else still uploads.`);
       auctionatorSent.set(key, mtime); // don't try this exact file again
@@ -517,6 +517,12 @@ function createSync({ api, store, log, wow, appVersion, coreEvents, ...opts } = 
       db._source = { account: entry.account, install: entry.install };
       const result = (await api.request('POST', '/api/sync', db, { timeout: o.uploadTimeoutMs })) || {};
       if (auc) auctionatorSent.set(auc.key, auc.mtime);
+      // The Deal hunter's market history goes up on its own; if it fails, everything else is still in.
+      if (auc && auc.market && auc.market.realms.length) {
+        try { await api.request('POST', '/api/market', auc.market, { timeout: o.uploadTimeoutMs }); } catch (err) {
+          say('warn', `Couldn't store the auction house history for the Deal hunter (${err.message}). Prices still uploaded.`);
+        }
+      }
 
       const at = iso(now());
       seen.set(entry.key, mtime);

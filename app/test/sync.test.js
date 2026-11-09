@@ -1072,7 +1072,8 @@ describe('with the real API client', () => {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         if (req.url === '/api/sync') res.end(JSON.stringify(SYNC_OK));
         else if (req.url === '/api/inbox') res.end(JSON.stringify(INBOX));
-        else { res.writeHead(404); res.end('{}'); }
+        else if (req.url === '/api/market') res.end(JSON.stringify({ ok: true, realms: 1, items: 1 }));
+        else res.end('{}');
       });
     });
     await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -1093,6 +1094,11 @@ describe('with the real API client', () => {
       assert.equal(post.type, 'application/json');
       assert.deepEqual(JSON.parse(post.body), { ...DB, prices: extractPricesNow(), _source: { account: 'ACCOUNT1', install: game.dir } });
       assert.ok(seen.some((r) => r.url === '/api/inbox' && r.method === 'GET'));
+      // The Deal hunter's market history goes up on its own, after the upload.
+      const market = seen.find((r) => r.url === '/api/market');
+      assert.ok(market, 'market history sent');
+      assert.ok(seen.indexOf(market) > seen.indexOf(post));
+      assert.ok(Array.isArray(JSON.parse(market.body).realms));
       assert.deepEqual(parseSavedVariables(fs.readFileSync(path.join(game.inboxDir, 'Inbox.lua'))).WowGuildInbox, INBOX);
     } finally {
       server.close();

@@ -19,6 +19,7 @@ export const routes = [
   { path: '/roster', load: () => import('./roster.js'), title: 'Roster', nav: 'Guild', icon: 'roster' },
   { path: '/bank', load: () => import('./bank.js'), title: 'Bank', nav: 'Guild', icon: 'bank' },
   { path: '/prices', load: () => import('./prices.js'), title: 'Prices', nav: 'Guild', icon: 'prices' },
+  { path: '/deals', load: () => import('./deals.js'), title: 'Deal hunter', nav: 'Guild', icon: 'deals' },
   { path: '/drives', load: () => import('./drives.js'), title: 'Drives', nav: 'Guild', icon: 'drives' },
   { path: '/loot', load: () => import('./loot.js'), title: 'Loot', nav: 'Guild', icon: 'loot' },
   // Everyone: officer ranks (the Guild Master changes them), item tooltips, Coach AI, realm and members.

@@ -11,6 +11,7 @@
 //   on top of the stored version); a hand-in → dc.
 // Guildmates are told by their own apps, and Discord posts go out when the game confirms the change.
 const E = require('../services/economy');
+const D = require('../services/deals');
 const sharing = require('../sharing');
 const { notElsewhere } = require('../identity');
 const { HttpError, str, int, needGuild, needOfficer, isOfficer } = require('../http');
@@ -304,6 +305,21 @@ function register(app, ctx) {
       held: text ? [] : q.held.all(gid, gid, gid).map((h) => priceRow({ ...h, ...E.priceHistory(db, gid, h.item_id) })),
       bank: { ...stock.value, priced: stock.priced, unpriced: stock.unpriced, top },
     });
+  });
+
+  // ---------- Deal hunter ----------
+
+  // What to buy on the auction house now and sell again for more, from my own Auctionator scans.
+  app.get('/api/deals', needGuild, (req, res) => {
+    const g = db.prepare('SELECT realm, faction FROM guilds WHERE id = ?').get(req.guild.id) || {};
+    const money = (v) => { const n = int(v); return n && n > 0 ? Math.min(n, 1e10) : null; };
+    res.json(D.findDeals(db, {
+      realm: str(req.query.realm, 80) || null,
+      minProfit: money(req.query.min_profit) ?? 5000,
+      maxPrice: money(req.query.max_price),
+      budget: money(req.query.budget),
+      preferRealms: g.realm ? [`${g.realm} ${g.faction || ''}`.trim(), g.realm] : [],
+    }));
   });
 
   // ---------- Supply drives ----------

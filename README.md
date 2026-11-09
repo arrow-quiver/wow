@@ -75,6 +75,9 @@ Anthropic API key; everything else works without one.
 - Browse the guild bank by tab, valued at guild auction prices, and see what your own alts carry.
 - **Ask the bank** for items; officers handle requests in one place.
 - **Guild prices** come from the Auctionator scans guildmates share.
+- **Deal hunter**: finds items listed well under their usual price in your own Auctionator scans, with the profit
+  after the auction house cut, how sure it is, vendor flips, and what to buy with a budget. In game it sits beside
+  the auction house and searches each deal with one click.
 - Run **supply drives** (fire resistance potions for Molten Core, thorium for the guild blacksmith) and track
   every hand-in.
 
@@ -95,6 +98,7 @@ The addon works on its own, and does much more with the app:
 | `/wow coach` | Open the Coach |
 | `/wow guide` | Open the skill-up guide |
 | `/wow list` | Open the shopping list |
+| `/wow deals` | Open the Deal hunter (it also opens with the auction house) |
 | `/wow cta <where> <need> <what>` | Sound a call to arms, e.g. `/wow cta Crossroads 5 need help` |
 | `/wow status` | Show what's been saved and when guild news last arrived |
 | `/wow options` | Open the settings |

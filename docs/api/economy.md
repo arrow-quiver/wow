@@ -192,6 +192,55 @@ and bank after their next sync."`; nothing changed → `"No changes."`
 
 ---
 
+## Deal hunter
+
+What to buy on the auction house now and sell again for more. It works from **my own** Auctionator history:
+the app reads every realm in `Auctionator.lua` scanned in the last 14 days (up to 4 realms, 15,000 items each) and
+sends it with `POST /api/market` ([sync.md](sync.md)) after each upload. Nothing here is shared with the guild.
+Implemented in `app/src/core/services/deals.js`.
+
+### `GET /api/deals?realm=&min_profit=&max_price=&budget=` (guild)
+Money parameters are copper. `realm` is an Auctionator realm key ("Zul'jin Horde"); without it, the guild's realm
+(with its faction) is used when it has a scan, else the realm with the newest scan. `min_profit` defaults to 5000.
+```json
+{
+  "realms": [ { "key": "Zul'jin Horde", "newest": "2026-11-09", "items": 6120 } ],
+  "realm": "Zul'jin Horde",
+  "scan": { "day": "2026-11-09", "age_days": 0, "items": 6120 },
+  "deals": [
+    { "item_id": 14047, "name": "Runecloth", "quality": "common", "category": "Trade Goods",
+      "buy": 30000, "worth": 50000, "resale": 47500, "profit": 17500, "roi": 58.3, "discount": 40,
+      "confidence": 92, "sure": "high", "history_days": 20, "listed_days": 14, "listed": 25, "sell_price": null,
+      "history": [ { "day": "2026-10-27", "price": 50000 } ],
+      "flags": [ { "kind": "low", "text": "Lowest price in 30 days" } ],
+      "seen": "2026-11-09", "age_days": 0 }
+  ],
+  "vendor": [ { "…": "same shape; profit = sell_price − buy, sure: \"certain\"" } ],
+  "plan": { "budget": 400000, "items": [4338, 14047], "spend": 30500, "profit": 19000 },
+  "notes": [],
+  "rules": { "ah_cut": 0.05, "min_discount": 0.2, "min_history_days": 4, "min_profit": 5000 }
+}
+```
+- Only items in the realm's **newest scan** are judged. `buy` is Auctionator's current lowest buyout.
+- `worth` is the lower of the 30-day and 7-day medians of the daily prices before the current scan day, so a falling
+  price isn't over-valued. `resale` = `worth` less the auction house's 5% cut; `profit` = `resale − buy`.
+- A deal needs 4+ days of history, a discount of 20%+ and `profit ≥ min_profit`. `max_price` leaves out dearer items.
+- `confidence` (0-100) weighs history (10+ days is full marks), `listed_days` of the last 14 (how easily it sells)
+  and price swings. `sure`: `high` ≥ 70, `medium` ≥ 45, else `low`. Deals are sorted by
+  `profit × (confidence/100)²`, so sure profits come first. Up to 50.
+- `flags[].kind`: `low` (cheapest in 30 days), `falling` (7-day median under 85% of the 30-day), `slow` (listed on
+  fewer than 6 of the last 14 days), `swingy` (typical swing over 35%).
+- `vendor`: items listed below what a vendor pays (`item_info.sell_price`, from Blizzard's item data), by profit, up to 20.
+- `plan` (only with `budget`): vendor flips then deals, best first, one of each, that fit the budget.
+- `notes`: plain-English warnings, e.g. a scan older than today (`"Your newest scan of … is from yesterday. Prices
+  move fast: scan again before you buy."`).
+- No scans yet: `realm: null`, `scan: null`, empty lists.
+
+The addon gets the best 15 deals and 10 vendor flips in the inbox (`deals`, see [sync.md](sync.md)) and shows them
+beside the auction house, re-checked against Auctionator's live price from the current session.
+
+---
+
 ## Supply drives
 
 **Drive**

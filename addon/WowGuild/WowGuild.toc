@@ -18,6 +18,7 @@ Collect.lua
 UI.lua
 Professions.lua
 ProfUI.lua
+Deals.lua
 Options.lua
 Coach.lua
 CoachUI.lua
