@@ -658,6 +658,11 @@ function fakeBlizzard(state = { realmUp: true, ns: 'forever' }) {
     if (p === '/data/wow/realm/index') return json({ realms: [{ name: 'Living Flame', slug: 'living-flame' }, { name: "Zul'jin", slug: 'zuljin' }] });
     if (p === '/data/wow/realm/zuljin') return json({ connected_realm: { href: `https://eu.api.blizzard.com/data/wow/connected-realm/42?namespace=${ns}` } });
     if (p === '/data/wow/connected-realm/42') return json({ status: { type: state.realmUp ? 'UP' : 'DOWN' }, has_queue: state.realmUp, population: { name: 'Full' } });
+    if (p === '/data/wow/connected-realm/42/auctions/index') return json({ auctions: [{ id: 2, name: 'Alliance Auction House' }, { id: 6, name: 'Horde Auction House' }, { id: 7, name: 'Blackwater Auction House' }] });
+    if (p === '/data/wow/connected-realm/42/auctions/6') return json({ auctions: [
+      { id: 1, item: { id: 13444 }, buyout: 80000, quantity: 20 }, { id: 2, item: { id: 13444 }, buyout: 3900, quantity: 1 },
+      { id: 3, item: { id: 13510 }, bid: 100, quantity: 1 }, { id: 4, item: { id: 13510 }, buyout: 400000, quantity: 1 },
+    ] });
     if (p === '/data/wow/guild/zuljin/wow/roster') return json({ members: [
       { character: { name: 'Grommash', level: 60, playable_class: { id: 1 } }, rank: 0 },
       { character: { name: 'Newbie', level: 12, playable_class: { id: 8 } }, rank: 4 },
@@ -667,6 +672,29 @@ function fakeBlizzard(state = { realmUp: true, ns: 'forever' }) {
   return { calls, fetchImpl, state };
 }
 const BNET = { bnetClientId: 'id', bnetClientSecret: 'sec', bnetRegion: 'eu' };
+
+test('gamedata: Blizzard auction house prices arrive once the API has the guild game, for its faction', async () => {
+  const { db, u, g } = freshDb();
+  applyPayload(db, g, u, { characters: { Grommash: { name: 'Grommash', class: 'WARRIOR', level: 60, guild: 'wow', realm: "Zul'jin" } } });
+  db.prepare("UPDATE guilds SET faction = 'Horde' WHERE id = ?").run(g);
+  const B = fakeBlizzard({ realmUp: true, ns: 'forever' });
+  await G.run(db, BNET, { fetchImpl: B.fetchImpl });
+  assert.ok(!B.calls.some((c) => c.includes('/auctions')), 'nothing asked while Forever is not in the API');
+
+  blizzard.save(db, { foreverKey: 'forever', forever: 'static-forever-eu', region: 'eu' });
+  const log = await G.run(db, BNET, { fetchImpl: B.fetchImpl });
+  assert.ok(log.includes('Auction house: 2 items from Horde Auction House'), log.join(' | '));
+  assert.equal(JSON.parse(db.prepare('SELECT realm_status FROM guilds').get().realm_status).connectedRealm, 42);
+  const rows = db.prepare('SELECT item_id, price, quantity FROM ah_prices WHERE guild_id = ? ORDER BY item_id').all(g).map((r) => ({ ...r }));
+  assert.deepEqual(rows, [{ item_id: 13444, price: 3900, quantity: 21 }, { item_id: 13510, price: 400000, quantity: 1 }], 'lowest buyout per unit; bid-only auctions skipped');
+
+  const n = B.calls.length;
+  await G.run(db, BNET, { fetchImpl: B.fetchImpl });
+  assert.ok(!B.calls.slice(n).some((c) => c.includes('/auctions')), 'at most hourly');
+  db.prepare("UPDATE guilds SET wowhead_game = 'retail' WHERE id = ?").run(g);
+  await G.run(db, BNET, { fetchImpl: B.fetchImpl, only: 'auctions' });
+  assert.ok(!B.calls.slice(n).some((c) => c.includes('/auctions')), 'not for Retail guilds');
+});
 
 test('gamedata: namespaces fall back to Classic Era items until Forever is in the API', () => {
   assert.deepStrictEqual(G.namespaces(null, 'forever', 'eu'), { static: 'static-classic1x-eu', dynamic: null, profile: null, label: 'Classic Era item data (Forever not in the API yet)' });

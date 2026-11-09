@@ -12,8 +12,12 @@
 //   guildRoster(api, ns, realmSlug, guildName) → [{ name, level, class, rank }] | null
 //   applyRoster(db, guildId, members)   marks in_official_roster, adds missing characters, levels only go up,
 //       sets rank_index from Blizzard's rank (0 = Guild Master; trusted), then identity.syncRanks
-//   run(db, cfg, { fetchImpl, notify, only: 'items'|'realm'|'roster'|undefined }) → [log line, ...]
-//       One pass over every guild. Without only: items, realm status, and the roster when 12+ hours old.
+//   realmStatus also gives connectedRealm (id), which the auction house needs.
+//   auctions(api, ns, connectedRealmId, faction) → { house, items: Map(itemId → { price (copper/unit), quantity }) } | null
+//   applyAuctions(db, guildId, items)   replaces the guild's ah_prices rows
+//   run(db, cfg, { fetchImpl, notify, only: 'items'|'realm'|'auctions'|'roster'|undefined }) → [log line, ...]
+//       One pass over every guild. Without only: items, realm status, the auction house (not Retail; once realm
+//       status has found the connected realm; when an hour old) and the roster when 12+ hours old.
 //   slug(name) → Blizzard realm/guild slug      CLASS_TOKENS { classId: 'WARRIOR', ... }
 //
 // Injected dependencies
@@ -102,6 +106,7 @@ async function realmStatus(api, ns, realmName) {
     up: cr ? cr.status && cr.status.type === 'UP' : null,
     queue: cr ? Boolean(cr.has_queue) : null,
     population: cr && cr.population && cr.population.name,
+    connectedRealm: connectedRealmId(detail),
     checkedAt: new Date().toISOString(),
   };
 }
@@ -116,6 +121,44 @@ async function guildRoster(api, ns, realmSlug, guildName) {
     class: m.character && m.character.playable_class && CLASS_TOKENS[m.character.playable_class.id],
     rank: m.rank,
   })).filter((m) => m.name);
+}
+
+function connectedRealmId(detail) {
+  const m = /connected-realm\/(\d+)/.exec((detail && detail.connected_realm && detail.connected_realm.href) || '');
+  return m ? Number(m[1]) : null;
+}
+
+// ---- Auction house (Classic namespaces: one house per faction plus a neutral one) ----
+// Classic house ids: 2 Alliance, 6 Horde, 7 neutral. Matched by name first, then by id.
+async function auctions(api, ns, connectedRealm, faction) {
+  const base = `/data/wow/connected-realm/${connectedRealm}/auctions`;
+  const index = await api.get(`${base}/index`, ns.dynamic);
+  const houses = (index && index.auctions) || [];
+  if (!houses.length) return null;
+  const want = String(faction || '').toLowerCase();
+  const house = houses.find((h) => want && String(h.name || '').toLowerCase().includes(want))
+    || houses.find((h) => h.id === (want === 'horde' ? 6 : 2)) || houses[0];
+  const data = await api.get(`${base}/${house.id}`, ns.dynamic);
+  if (!data) return null;
+  const best = new Map(); // itemId → { price, quantity }
+  for (const a of data.auctions || []) {
+    const id = a && a.item && a.item.id;
+    const qty = Number(a && a.quantity) || 1;
+    if (!id || !(a.buyout > 0)) continue;
+    const unit = Math.round(a.buyout / qty);
+    const b = best.get(id);
+    if (!b) best.set(id, { price: unit, quantity: qty });
+    else { b.quantity += qty; if (unit < b.price) b.price = unit; }
+  }
+  return { house: house.name || String(house.id), items: best };
+}
+
+function applyAuctions(db, guildId, items) {
+  const ins = db.prepare("INSERT INTO ah_prices (guild_id, item_id, price, quantity, fetched_at) VALUES (?,?,?,?, datetime('now'))");
+  db.transaction(() => {
+    db.prepare('DELETE FROM ah_prices WHERE guild_id = ?').run(guildId);
+    for (const [id, b] of items) ins.run(guildId, id, b.price, b.quantity);
+  })();
 }
 
 // Blizzard's rank: 0 = Guild Master, then each rank below. Anything else is ignored.
@@ -164,6 +207,16 @@ async function run(db, cfg, { fetchImpl, notify, only } = {}) {
         if (!s.found) log.push(`Realm "${g.realm}" not found in ${ns.dynamic}`);
       } catch (e) { log.push(`Realm status failed: ${e.message}`); }
     }
+    // Classic and Forever namespaces only (Retail's auction API is shaped differently); at most hourly.
+    const lastAh = db.prepare('SELECT MAX(fetched_at) AS t FROM ah_prices WHERE guild_id = ?').get(g.id).t;
+    if (g.wowhead_game !== 'retail' && ((!only && hoursSince(lastAh) >= 1) || only === 'auctions')) {
+      try {
+        let rs = null;
+        try { rs = JSON.parse(db.prepare('SELECT realm_status FROM guilds WHERE id = ?').get(g.id).realm_status || 'null'); } catch { rs = null; }
+        const ah = rs && rs.connectedRealm ? await auctions(api, ns, rs.connectedRealm, g.faction) : null;
+        if (ah) { applyAuctions(db, g.id, ah.items); log.push(`Auction house: ${ah.items.size} items from ${ah.house}`); }
+      } catch (e) { log.push(`Auction house failed: ${e.message}`); }
+    }
     if ((!only && hoursSince(g.official_roster_at) >= 12) || only === 'roster') {
       try {
         let rs = null;
@@ -178,4 +231,4 @@ async function run(db, cfg, { fetchImpl, notify, only } = {}) {
   return log;
 }
 
-module.exports = { namespaces, client, missingItemIds, fillItems, realmStatus, guildRoster, applyRoster, run, slug, CLASS_TOKENS };
+module.exports = { namespaces, client, missingItemIds, fillItems, realmStatus, guildRoster, applyRoster, auctions, applyAuctions, run, slug, CLASS_TOKENS };

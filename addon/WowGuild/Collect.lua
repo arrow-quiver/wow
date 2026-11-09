@@ -458,9 +458,43 @@ function ns.collectReadiness(rec)
       r.consumables[kind] = (r.consumables[kind] or 0) + it.count
     end
   end
+  ns.collectRaidGear(r)
   rec.inventory = rec.inventory or {}
   rec.inventory.bags = bags
   rec.readiness = r
+end
+
+-- Talent points per tree, resistances and unenchanted gear, for the raid readiness check.
+-- Slots the Enchanting profession can enchant: chest, wrist, hands, feet, back, main hand.
+Collect.ENCHANT_SLOTS = { 5, 9, 10, 8, 15, 16 }
+-- UnitResistance index: 2 fire, 3 nature, 4 frost, 5 shadow, 6 arcane.
+local RESISTS = { fire = 2, nature = 3, frost = 4, shadow = 5, arcane = 6 }
+
+function ns.collectRaidGear(r)
+  local t = ns.coach and ns.coach.readTalents and ns.try(ns.coach.readTalents)
+  if type(t) == "table" and type(t.trees) == "table" and #t.trees > 0 then
+    local pts = {}
+    for i = 1, 3 do pts[i] = t.trees[i] and whole(t.trees[i].points) or nil end
+    r.talents = { a = pts[1], b = pts[2], c = pts[3], unspent = whole(t.unspent) }
+  end
+  if UnitResistance then
+    local res = {}
+    for k, idx in pairs(RESISTS) do
+      local _, total = ns.try(UnitResistance, "player", idx)
+      res[k] = whole(total) or 0
+    end
+    r.resists = res
+  end
+  if GetInventoryItemLink then
+    local missing = {}
+    for _, slot in ipairs(Collect.ENCHANT_SLOTS) do
+      local link = ns.try(GetInventoryItemLink, "player", slot)
+      -- item:<id>:<enchant>:… ; an empty or 0 enchant means none.
+      local enchant = type(link) == "string" and string.match(link, "item:%d+:(%d*)")
+      if link and (not enchant or enchant == "" or enchant == "0") then missing[#missing + 1] = slot end
+    end
+    r.unenchanted = missing
+  end
 end
 
 -- Professions: modern API first, older skill-line API as a fallback, since
@@ -721,7 +755,18 @@ function Collect.ch()
     ilvl = r and round(r.ilvl), repair = r and round(r.durability), consumables = consumables,
     professions = profs, pvp = { rank = whole(pvp.rank), hk = whole(pvp.hk) }, addon = ns.addonVersion(),
   }
-  fit("ch", name, fields, name, { "alts" })
+  if r then
+    local t = type(r.talents) == "table" and r.talents or {}
+    fields.talents = { a = whole(t.a), b = whole(t.b), c = whole(t.c), unspent = whole(t.unspent) }
+    local s = type(r.resists) == "table" and r.resists or {}
+    fields.resists = { fire = whole(s.fire), nature = whole(s.nature), frost = whole(s.frost), shadow = whole(s.shadow), arcane = whole(s.arcane) }
+    local u = {}
+    for _, slot in ipairs(type(r.unenchanted) == "table" and r.unenchanted or {}) do
+      if whole(slot) and #u < 10 then u[#u + 1] = whole(slot) end
+    end
+    fields.unenchanted = u
+  end
+  fit("ch", name, fields, name, { "alts", "unenchanted" })
   return { type = "ch", key = name, fields = fields }
 end
 

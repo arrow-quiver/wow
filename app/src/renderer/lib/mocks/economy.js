@@ -154,6 +154,16 @@ const priceRow = (id, extra = {}) => {
   return { item_id: Number(id), name: ITEMS[id] || null, ...extra, latest: h[h.length - 1] || null, history: h, change: change(h) };
 };
 
+// A few raid consumables (the real list is core/consumables.js). Two have a Blizzard auction house price.
+const CONSUMABLES = [
+  [13510, 'Flask of the Titans', 'flask'], [13512, 'Flask of Supreme Power', 'flask'], [13452, 'Elixir of the Mongoose', 'elixir'],
+  [13454, 'Greater Arcane Elixir', 'elixir'], [13446, 'Major Healing Potion', 'potion'], [13444, 'Major Mana Potion', 'potion'],
+  [13457, 'Greater Fire Protection Potion', 'potion'], [20452, 'Smoked Desert Dumplings', 'food'], [12404, 'Dense Sharpening Stone', 'weapon'],
+];
+const consumableRows = () => CONSUMABLES.map(([id, name, kind]) => (PRICE[id]
+  ? { ...priceRow(id), name, kind, ah: id === 13444 || id === 13510 ? { price: Math.round(PRICE[id] * 0.94), quantity: id === 13510 ? 6 : 140, fetched_at: '2026-11-09 08:00:00' } : null }
+  : { item_id: id, name, kind, latest: null, history: [], change: null, ah: null }));
+
 addMockRoutes({
   'GET /api/bank': ({ state }) => {
     needGuild(state);
@@ -242,6 +252,7 @@ addMockRoutes({
       stats: { items: 812, newest: dayStr(0) },
       results,
       held,
+      consumables: q ? [] : consumableRows(),
       bank: {
         ...s.value,
         priced: s.all.filter((x) => x.unit != null).length,

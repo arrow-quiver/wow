@@ -11,6 +11,7 @@
 //   on top of the stored version); a hand-in → dc.
 // Guildmates are told by their own apps, and Discord posts go out when the game confirms the change.
 const E = require('../services/economy');
+const { RAID_CONSUMABLES } = require('../consumables');
 const sharing = require('../sharing');
 const { notElsewhere } = require('../identity');
 const { HttpError, str, int, needGuild, needOfficer, isOfficer } = require('../http');
@@ -67,6 +68,8 @@ function register(app, ctx) {
       FROM characters c LEFT JOIN users u ON u.id = c.user_id
       WHERE c.guild_id = ? AND (c.user_id IS NOT NULL OR c.is_bank = 1) ORDER BY c.is_bank DESC, c.name COLLATE NOCASE`),
     charByName: db.prepare('SELECT id, name, is_bank FROM characters WHERE guild_id = ? AND name = ? COLLATE NOCASE'),
+    ahPrice: db.prepare('SELECT price, quantity, fetched_at FROM ah_prices WHERE guild_id = ? AND item_id = ?'),
+    itemName: db.prepare('SELECT name FROM item_names WHERE item_id = ?'),
     priceStats: db.prepare('SELECT COUNT(DISTINCT item_id) AS items, MAX(day) AS newest FROM prices WHERE guild_id = ?'),
     // Without a search: price up what members carry most often (bags, banks and the guild bank).
     held: db.prepare(`SELECT x.item_id, n.name, COUNT(*) AS holders FROM (
@@ -161,6 +164,12 @@ function register(app, ctx) {
   });
 
   const priceRow = (r) => ({ ...r, change: priceChange(r.history) });
+
+  // Raid consumables: the guild's Auctionator prices, plus Blizzard's auction house when gamedata.js has it.
+  const consumableRows = (gid) => RAID_CONSUMABLES.map((c) => {
+    const n = q.itemName.get(c.id);
+    return priceRow({ item_id: c.id, name: (n && n.name) || c.name, kind: c.kind, ...E.priceHistory(db, gid, c.id), ah: q.ahPrice.get(gid, c.id) || null });
+  });
 
   function driveJson(d, userId) {
     return {
@@ -303,6 +312,7 @@ function register(app, ctx) {
       results: text ? E.searchPrices(db, gid, text).map(priceRow) : [],
       held: text ? [] : q.held.all(gid, gid, gid).map((h) => priceRow({ ...h, ...E.priceHistory(db, gid, h.item_id) })),
       bank: { ...stock.value, priced: stock.priced, unpriced: stock.unpriced, top },
+      consumables: text ? [] : consumableRows(gid),
     });
   });
 

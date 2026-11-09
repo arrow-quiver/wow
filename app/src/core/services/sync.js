@@ -31,6 +31,7 @@ const { applyCoach, inboxPart } = require('./coach');
 const { applyEconomy, latestPrices } = require('./economy');
 const { toLua } = require('../../shared/lua');
 const sharing = require('../sharing');
+const readiness = require('../readiness');
 const { HttpError } = require('../http');
 const { meId, guildKey, realmKey, notElsewhere } = require('../identity');
 
@@ -50,7 +51,9 @@ function cleanReadiness(r) {
     const n = num(r.consumables && r.consumables[k], 0, 9999);
     if (n) consumables[k] = Math.round(n);
   }
-  return JSON.stringify({ ilvl: num(r.ilvl, 0, 1000), durability: num(r.durability, 0, 100), consumables, at: num(r.at, 0, 4e9) });
+  const out = { ilvl: num(r.ilvl, 0, 1000), durability: num(r.durability, 0, 100), consumables, at: num(r.at, 0, 4e9) };
+  Object.assign(out, readiness.raidGear(r, (v) => { const n = num(v, 0, 999); return n == null ? null : Math.round(n); }));
+  return JSON.stringify(out);
 }
 
 // PvP, reputations and currencies. Stored as reported; the app only displays them.

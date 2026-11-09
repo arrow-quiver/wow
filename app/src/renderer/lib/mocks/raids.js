@@ -26,10 +26,13 @@ const charOf = (name) => {
   return null;
 };
 const READY = {
-  Grimtusk: { ilvl: 61.4, durability: 88, consumables: { flask: 2, potion: 8, food: 20 }, at: nowSeconds() - 3 * HOUR / 1000 },
-  Velanne: { ilvl: 63, durability: 95, consumables: { potion: 10, elixir: 4 }, at: nowSeconds() - 50 * MIN / 1000 },
+  Grimtusk: { ilvl: 61.4, durability: 88, consumables: { flask: 2, potion: 8, food: 20 }, at: nowSeconds() - 3 * HOUR / 1000,
+    talents: { a: 0, b: 21, c: 30, unspent: 0 }, resists: { fire: 135, nature: 10, frost: 15, shadow: 10, arcane: 10 }, unenchanted: [] },
+  Velanne: { ilvl: 63, durability: 95, consumables: { potion: 10, elixir: 4 }, at: nowSeconds() - 50 * MIN / 1000,
+    talents: { a: 31, b: 0, c: 20, unspent: 0 }, resists: { fire: 48, nature: 0, frost: 0, shadow: 0, arcane: 0 }, unenchanted: [9, 15] },
   Mokra: { ilvl: 52.8, durability: 21, consumables: { bandage: 10 }, at: nowSeconds() - 2 * DAY / 1000 },
-  Tazrik: { ilvl: 57.1, durability: 64, consumables: {}, at: nowSeconds() - 6 * HOUR / 1000 },
+  Tazrik: { ilvl: 57.1, durability: 64, consumables: {}, at: nowSeconds() - 6 * HOUR / 1000,
+    talents: { a: 21, b: 25, c: 2, unspent: 3 }, resists: { fire: 0, nature: 0, frost: 0, shadow: 0, arcane: 0 }, unenchanted: [5, 8, 9, 10, 15, 16] },
   Ilyra: { ilvl: 59, durability: 100, consumables: { food: 12, potion: 3 }, at: nowSeconds() - 30 * MIN / 1000 },
   Brannoc: { ilvl: 55.5, durability: 47, consumables: { potion: 2 }, at: nowSeconds() - 20 * HOUR / 1000 },
 };
@@ -116,7 +119,8 @@ const battletag = (uid) => (PEOPLE[uid] || {}).battletag || `Player#${uid}`;
 
 function raidJson(r) {
   const { signups, reserves, rolls, loot, attended, ...row } = r;
-  return { ...row };
+  const resist = /molten core|onyxia/i.test(row.instance) ? 'fire' : /temple of ahn/i.test(row.instance) ? 'nature' : /naxxramas/i.test(row.instance) ? 'frost' : null;
+  return { ...row, resist };
 }
 function countsOf(signups) {
   const c = { tank: 0, healer: 0, dps: 0, tentative: 0, bench: 0, no: 0 };
@@ -127,9 +131,12 @@ function countsOf(signups) {
   return c;
 }
 function flagsOf(ready) {
-  if (!ready) return { noData: true, lowRepair: false, noConsumables: false };
+  if (!ready) return { noData: true, lowRepair: false, noConsumables: false, unspent: false, unenchanted: null };
   const total = Object.values(ready.consumables || {}).reduce((a, b) => a + b, 0);
-  return { noData: false, lowRepair: ready.durability != null && ready.durability < 30, noConsumables: total === 0 };
+  const SLOT = { 5: 'Chest', 8: 'Feet', 9: 'Wrist', 10: 'Hands', 15: 'Back', 16: 'Main hand' };
+  return { noData: false, lowRepair: ready.durability != null && ready.durability < 30, noConsumables: total === 0,
+    unspent: Boolean(ready.talents && ready.talents.unspent > 0),
+    unenchanted: Array.isArray(ready.unenchanted) ? ready.unenchanted.map((id) => SLOT[id]).filter(Boolean) : null };
 }
 const ROLE_ORDER = { tank: 0, healer: 1, dps: 2 };
 function signupsJson(r, me) {

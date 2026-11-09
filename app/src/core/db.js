@@ -764,6 +764,17 @@ const MIGRATIONS = [
   `ALTER TABLE characters ADD COLUMN no_guild INTEGER NOT NULL DEFAULT 0;
    ALTER TABLE characters ADD COLUMN no_guild_at INTEGER;
    ALTER TABLE share_pruned ADD COLUMN until INTEGER;`,
+
+  // 19: Blizzard's auction house (services/gamedata.js auctions): the lowest buyout per unit for each item in the newest
+  // snapshot of the guild's connected realm and faction. Each fetch replaces the guild's rows.
+  `CREATE TABLE ah_prices (
+     guild_id INTEGER NOT NULL REFERENCES guilds(id),
+     item_id INTEGER NOT NULL,
+     price INTEGER NOT NULL,             -- copper per unit
+     quantity INTEGER NOT NULL,          -- units listed
+     fetched_at TEXT NOT NULL,
+     PRIMARY KEY (guild_id, item_id)
+   );`,
 ];
 
 // Runs every migration the database hasn't had yet, each in its own transaction.
