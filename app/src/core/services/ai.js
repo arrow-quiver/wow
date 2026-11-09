@@ -8,6 +8,9 @@
 //       → { text, sources: [{url, title}] (max 5), usage: {input_tokens, output_tokens}, searches, cost }
 //       Throws HttpError 503 without cfg.anthropicKey, 502 when Claude can't be reached or refuses.
 //   record(db, { guildId, userId, kind: 'plan'|'question', model, r })   one ai_usage row for an ask() result
+//       Searches only SEARCH_SITES. A site Claude's search can't read (the API refuses the whole request with
+//       "domains are not accessible") is dropped for this run of the app and the request sent again without it.
+//   SEARCH_SITES: WoW: Forever guides and item databases, Wowhead first
 //   cost(model, usage, searches) → USD          monthSpend(db, guildId) → USD this calendar month (UTC)
 //   todayCount(db, userId, kind) → calls today (UTC)                     PRICES (USD per million tokens)
 // Injected dependencies: outside HTTP goes through fetchImpl, else cfg.fetch, else global fetch.
@@ -22,6 +25,24 @@ const PRICES = {
   'claude-opus-5-5': { in: 4, out: 20 },
 };
 const SEARCH_USD = 0.01;
+
+// Where the Coach's web search may look: WoW: Forever guides and databases. Reddit and some other sites block
+// Claude's search; listing one makes the API refuse the whole request, so they are left out (and any site the
+// API refuses later is dropped at run time, below).
+const SEARCH_SITES = ['wowhead.com', 'warcraft.wiki.gg', 'worldofwarcraft.blizzard.com', 'method.gg', 'mobalytics.gg',
+  'warcrafttavern.com', 'icy-veins.com'];
+const refusedSites = new Set();
+
+// "The following domains are not accessible to our user agent: ['reddit.com']" → ['reddit.com']
+function refusedDomains(message) {
+  if (!/domains are not accessible/i.test(String(message || ''))) return [];
+  const list = /\[([^\]]*)\]/.exec(message);
+  return list ? [...list[1].matchAll(/['"]([^'"]+)['"]/g)].map((m) => m[1].toLowerCase()) : [];
+}
+const searchTool = (searches) => {
+  const sites = SEARCH_SITES.filter((d) => !refusedSites.has(d));
+  return sites.length ? [{ type: 'web_search_20250305', name: 'web_search', max_uses: searches, allowed_domains: sites }] : null;
+};
 
 function cost(model, usage, searches) {
   const p = PRICES[model] || PRICES['claude-sonnet-5-5'];
@@ -40,10 +61,9 @@ async function ask(cfg, { system, messages, model, maxTokens = 1200, searches = 
   if (!cfg.anthropicKey) throw new HttpError(503, 'The Coach\'s AI answers are off. Add your Anthropic API key in Settings to turn them on.');
   const f = fetchImpl || cfg.fetch || globalThis.fetch;
   const body = { model, max_tokens: maxTokens, system, messages: [...messages] };
-  if (searches > 0) {
-    body.tools = [{ type: 'web_search_20250305', name: 'web_search', max_uses: searches,
-      allowed_domains: ['wowhead.com', 'warcraft.wiki.gg', 'worldofwarcraft.blizzard.com', 'icy-veins.com', 'reddit.com'] }];
-  }
+  const setTools = () => { const t = searches > 0 && searchTool(searches); if (t) body.tools = t; else delete body.tools; };
+  setTools();
+  let retries = 0;
   const total = { input_tokens: 0, output_tokens: 0 };
   let searchCount = 0; const blocks = [];
   // A long search turn can pause; resend it to let Claude finish (at most a few times).
@@ -60,6 +80,14 @@ async function ask(cfg, { system, messages, model, maxTokens = 1200, searches = 
       throw new HttpError(502, 'Could not reach the Claude API. Try again in a minute.');
     }
     const data = await res.json().catch(() => ({}));
+    const refused = res.status === 400 && body.tools ? refusedDomains(data.error && data.error.message) : [];
+    if (refused.length && retries < 2) {
+      // A search site blocks Claude's search: leave it out from now on, and ask again.
+      retries += 1; round -= 1;
+      for (const d of refused) { refusedSites.add(d); for (const s of SEARCH_SITES) if (s === d || s.endsWith(`.${d}`) || d.endsWith(`.${s}`)) refusedSites.add(s); }
+      setTools();
+      continue;
+    }
     if (!res.ok) throw new HttpError(502, `Claude API ${res.status}: ${(data.error && data.error.message) || 'request failed'}`);
     for (const k of ['input_tokens', 'output_tokens']) total[k] += (data.usage && data.usage[k]) || 0;
     searchCount += (data.usage && data.usage.server_tool_use && data.usage.server_tool_use.web_search_requests) || 0;
@@ -78,4 +106,4 @@ function record(db, { guildId, userId, kind, model, r }) {
     .run(guildId, userId || null, kind, model, r.usage.input_tokens, r.usage.output_tokens, r.searches, r.cost);
 }
 
-module.exports = { ask, record, cost, monthSpend, todayCount, PRICES };
+module.exports = { ask, record, cost, monthSpend, todayCount, PRICES, SEARCH_SITES, refusedDomains, _refusedSites: refusedSites };
