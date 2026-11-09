@@ -27,6 +27,7 @@ export const SECTIONS = [
   { id: 'notifications', label: 'Notifications', icon: 'bell' },
   { id: 'discord', label: 'Discord', icon: 'link' },
   { id: 'coach', label: 'Coach AI', icon: 'coach' },
+  { id: 'overlay', label: 'Overlay & live', icon: 'spark' },
   { id: 'calendar', label: 'Calendar', icon: 'raids' },
   { id: 'app', label: 'App', icon: 'settings' },
   { id: 'about', label: 'About & help', icon: 'info' },
@@ -278,6 +279,7 @@ export default function SettingsPage({ query = {} }) {
         <${NotificationsCard} settings=${settings} change=${change} isOfficer=${session.isOfficer} />
         <${DiscordCard} settings=${settings} change=${change} isOfficer=${session.isOfficer} />
         <${CoachCard} />
+        <${OverlayCard} settings=${settings} change=${change} />
         <${CalendarCard} />
         <${AppCard} settings=${settings} change=${change} info=${info} />
         <${AboutCard} info=${info} />
@@ -833,6 +835,46 @@ function AppCard({ settings, change, info }) {
     <${ToggleRow} title="Sync with the game" checked=${s.syncEnabled} disabled=${!ready}
       hint=${html`Reads your characters, professions and bank after each /reload or logout, and passes guild news back to the addon. Details on <${Link} href="/addon">Addon & sync<//>.`}
       onValue=${(on) => change({ syncEnabled: on }, on ? 'Sync is on.' : 'Sync is off. Guild Camp stops reading the game.')} />
+  <//>`;
+}
+
+// ---------- Coach overlay and live link (main/overlay.js, main/live.js) ----------
+
+const HOTKEYS = ['CommandOrControl+Shift+G', 'CommandOrControl+Shift+C', 'Alt+Shift+G', 'Alt+F1', 'CommandOrControl+F12'];
+const keyLabel = (k) => String(k || '').replace(/CommandOrControl|CmdOrCtrl/, 'Ctrl');
+
+function OverlayCard({ settings, change }) {
+  const s = settings || {};
+  const ready = !!settings;
+  const [live, setLive] = useState(null);
+  useEffect(() => { gc.live.state().then(setLive, () => {}); }, []);
+  useGcEvent('live', setLive);
+  const hotkeys = HOTKEYS.includes(s.overlayHotkey) || !s.overlayHotkey ? HOTKEYS : [s.overlayHotkey, ...HOTKEYS];
+  const liveLine = s.liveLink === false ? 'Off.'
+    : !live ? 'Checking…'
+      : live.status === 'live' ? `On: following ${live.game || 'the game'}'s combat log.`
+        : live.status === 'waiting' ? 'On: combat logging is on, waiting for your next fight.'
+          : 'On, but the game isn\'t writing a combat log. In game, type /combatlog, or /wow live on so the addon turns it on at every login.';
+  return html`<${Card} id=${sectionDomId('overlay')} title="Overlay & live link" class="settings-card">
+    <${ToggleRow} title="Coach overlay" checked=${s.overlayEnabled !== false} disabled=${!ready}
+      hint=${`A small window that stays on top of the game: your session, last death, next steps and a quick Ask box. Play WoW in "Windowed (Fullscreen)" mode to see it.`}
+      onValue=${(on) => change({ overlayEnabled: on }, on ? 'The Coach overlay is on.' : 'The Coach overlay is off.')} />
+    <${Row} title="Hotkey" hint="Shows or hides the overlay, even while the game has focus.">
+      <div class="row nowrap">
+        <select class="select" disabled=${!ready || s.overlayEnabled === false} value=${s.overlayHotkey}
+          onChange=${(e) => change({ overlayHotkey: e.currentTarget.value }, `The overlay hotkey is now ${keyLabel(e.currentTarget.value)}.`)}>
+          ${hotkeys.map((k) => html`<option key=${k} value=${k} selected=${k === s.overlayHotkey}>${keyLabel(k)}</option>`)}
+        </select>
+        <${Button} size="sm" variant="secondary" disabled=${s.overlayEnabled === false} onClick=${() => gc.overlay.toggle()}>Show it now<//>
+      </div>
+    <//>
+    <${Row} title="See-through" hint="How solid the overlay is over the game.">
+      <input class="range" type="range" min="40" max="100" step="5" disabled=${!ready} value=${Math.round((s.overlayOpacity || 0.94) * 100)}
+        aria-label="Overlay opacity" onChange=${(e) => change({ overlayOpacity: Number(e.currentTarget.value) / 100 })} />
+    <//>
+    <${ToggleRow} title="Live link" checked=${s.liveLink !== false} disabled=${!ready}
+      hint=${html`Follows the game's combat log while you play, for live kills, deaths and "Why did I die?". ${liveLine}`}
+      onValue=${(on) => change({ liveLink: on }, on ? 'The live link is on.' : 'The live link is off.')} />
   <//>`;
 }
 

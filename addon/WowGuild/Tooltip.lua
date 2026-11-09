@@ -45,6 +45,9 @@ function T.linesFor(id, name)
     if #parts > 0 then out[#out + 1] = { "Your other characters", table.concat(parts, ", ", 1, math.min(#parts, 3)) .. (#parts > 3 and " …" or "") } end
     if (h.guildBank or 0) > 0 then out[#out + 1] = { "Guild bank", tostring(h.guildBank) } end
   end
+  -- The Coach: is this an upgrade for my build plan? (CoachGear.lua)
+  local v = ns.coachGear and ns.coachGear.verdict("item:" .. id)
+  if v then out[#out + 1] = { "Coach", string.format("|cff%02x%02x%02x%s|r", math.floor(v[2] * 255), math.floor(v[3] * 255), math.floor(v[4] * 255), v[1]) } end
   local hasAuctionator = Auctionator and Auctionator.API
   if prices[id] and not hasAuctionator and ns.prof and ns.prof.money then out[#out + 1] = { "Guild price", ns.prof.money(prices[id]) } end
   return out

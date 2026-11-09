@@ -36,6 +36,8 @@ export const routes = [
   { path: '/raids/:id/loot', load: () => import('./raid-loot.js'), title: 'Loot screen', icon: 'loot' },
   { path: '/characters/:name', load: () => import('./character.js'), title: 'Character', icon: 'character' },
   { path: '/welcome', load: () => import('./welcome.js'), title: 'Welcome', public: true, bare: true },
+  // The Coach overlay window (main/overlay.js) shows only this page.
+  { path: '/overlay', load: () => import('./overlay.js'), title: 'Coach overlay', bare: true, overlay: true },
 ];
 
 // Static paths (no :params), e.g. for the smoke test that opens every page.

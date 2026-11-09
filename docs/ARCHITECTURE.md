@@ -119,6 +119,8 @@ upload to finish before that.
 | `api.js` | HTTP client for the core. Adds the token and `X-App-Version`; errors become `ApiError { status, message, code, body }`. |
 | `wow.js` | Finds game folders (`_forever_`, `_retail_`, `_classic_era_` …) under the usual install places and the folders the player added. `GUILDCAMP_NO_SCAN=1` turns the usual places off. Reads, never writes, `WowGuildDB.characters` for `detectGuild`. `isWowRunning()` (true, false or null when it can't tell) and `gameProcessIds()` (the game clients' process ids, `null` when it can't tell) look at the running processes. |
 | `sync.js` | The file channel (below): watches SavedVariables, uploads, writes the inbox. |
+| `live.js` | The live link: follows the newest `Logs/WoWCombatLog*.txt` in the game folders in use (from its end, once a second; a newer file every 30 s), and keeps this play session (kills, deaths, fights) and the last death's recap with `shared/combatlog.js`. Emits `live` to every window. The game writes that file only while combat logging is on (`/combatlog`, or the addon's `/wow live on`). Reads, never writes. |
+| `overlay.js` | The Coach overlay: a frameless, always-on-top, see-through window (`#/overlay`) shown and hidden with a global hotkey (Ctrl+Shift+G by default). Remembers where it was. Shows over the game in Windowed (Fullscreen) mode. |
 | `addon.js` | Installs, updates, repairs and removes the addon in every game folder (below). |
 | `updater.js` | App self-update from GitHub with electron-updater (below). |
 | `publisher.js` | The Releases page: publishes with `gh` on a PC with a source checkout (below). |

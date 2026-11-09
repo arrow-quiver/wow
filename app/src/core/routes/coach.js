@@ -281,7 +281,8 @@ function register(app, ctx) {
     const c = C.charFor(db, req.guild.id, req.user.id, str(req.body.char, 40));
     const qid = `app-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const id = Number(q.insert.run(req.guild.id, req.user.id, c ? c.name : null, qid, question).lastInsertRowid);
-    const work = C.answer(db, cfg, id);
+    // live: what the app's live link saw (a death recap, or this session so far), for this question only.
+    const work = C.answer(db, cfg, id, { fresh: req.body.fresh === true, extra: str(req.body.live, 2500) || '' });
     const done = await within(work, waitMs());
     if (done === LATE) {
       // Still thinking: answer in the background and tell the member when it's there.
