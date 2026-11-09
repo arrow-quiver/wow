@@ -26,9 +26,10 @@ export const METHODS = [
   'updater.status', 'updater.check', 'updater.download', 'updater.install',
   'publisher.status', 'publisher.publishAddon', 'publisher.publishApp', 'publisher.setRepoDir', 'publisher.cancel',
   'notify.test',
+  'live.state', 'overlay.toggle', 'overlay.hide',
 ];
 
-export const CHANNELS = ['auth', 'sync', 'addon', 'updater', 'publisher:log', 'server-event', 'navigate', 'log', 'settings'];
+export const CHANNELS = ['auth', 'sync', 'addon', 'updater', 'publisher:log', 'server-event', 'navigate', 'log', 'settings', 'live'];
 
 const bridge = (typeof window !== 'undefined' && window.gc) || await (async () => {
   const m = await import('./mock.js');

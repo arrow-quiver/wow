@@ -25,9 +25,10 @@ const METHODS = [
   'updater.status', 'updater.check', 'updater.download', 'updater.install',
   'publisher.status', 'publisher.publishAddon', 'publisher.publishApp', 'publisher.setRepoDir', 'publisher.cancel',
   'notify.test',
+  'live.state', 'overlay.toggle', 'overlay.hide',
 ];
 
-const CHANNELS = ['auth', 'sync', 'addon', 'updater', 'publisher:log', 'server-event', 'navigate', 'log', 'settings'];
+const CHANNELS = ['auth', 'sync', 'addon', 'updater', 'publisher:log', 'server-event', 'navigate', 'log', 'settings', 'live'];
 
 async function invoke(method, ...args) {
   if (typeof method !== 'string' || !METHODS.includes(method)) {

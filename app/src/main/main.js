@@ -316,7 +316,9 @@ function bootstrap() {
   const { createNotify } = require('./notify');
   const { createStartup } = require('./startup');
   const { createIpc, buildMethods, forwardEvents } = require('./ipc');
-  const { registerScheme, registerAppProtocol, createMainWindow, showWindow, findIcon } = require('./window');
+  const { registerScheme, registerAppProtocol, createMainWindow, showWindow, findIcon, START_URL } = require('./window');
+  const { createOverlay } = require('./overlay');
+  const { createLive } = require('./live');
   const { createTray } = require('./tray');
   const { createCore } = require('../core');
 
@@ -464,6 +466,8 @@ function bootstrap() {
     for (const t of timers) clearInterval(t);
     if (!services || coreClosed) return;
     try { services.sync.stop(); } catch { /* quitting anyway */ }
+    try { services.live.stop(); } catch { /* quitting anyway */ }
+    try { if (services.overlay) services.overlay.dispose(); } catch { /* quitting anyway */ }
     if (!services.core) return;
     event.preventDefault();
     coreClosed = true;
@@ -598,13 +602,32 @@ function bootstrap() {
     const startup = createStartup();
     const userSession = createSession({ auth, core, log: log.scope('auth') });
 
-    services = { log, store, api, auth, core, session: userSession, wow, sync, addon, updater, publisher, notify, startup, iconPath, ipc: null };
+    // Live link: the game's combat log, followed while you play (live.js).
+    const live = createLive({
+      log: log.scope('live'),
+      findInstalls: () => {
+        const s = store.get();
+        if (process.env.GUILDCAMP_NO_SCAN === '1' && !(s.extraWowFolders || []).length) return [];
+        return wow.findInstalls({ extraRoots: s.extraWowFolders || [], scanDefaults: process.env.GUILDCAMP_NO_SCAN !== '1', otherFolders: s.otherGameFolders || [] })
+          .filter((i) => i && i.inUse !== false);
+      },
+      // My characters: the Coach's list (every character the addon synced for me).
+      myNames: async () => {
+        const r = await api.request('GET', '/api/coach');
+        return (r && Array.isArray(r.characters) ? r.characters : []).map((c) => c.name).filter(Boolean);
+      },
+    });
+    let overlay = null;
+
+    services = { log, store, api, auth, core, session: userSession, wow, sync, addon, updater, publisher, notify, startup, iconPath, ipc: null, live, overlay: null };
 
     if (!store.secretsEncrypted()) log.warn('Secure storage is not available. Your Battle.net sign-in and API key are saved without encryption.');
 
     const methods = buildMethods({
       store, log, auth: userSession, api, wow, sync, addon, updater, publisher, notify, startup, shell, dialog,
       getWindow: () => mainWindow,
+      live,
+      get overlay() { return overlay; },
       downloadsDir: app.getPath('downloads'),
       quit,
       relaunch,
@@ -627,7 +650,8 @@ function bootstrap() {
     });
     services.ipc = createIpc({
       methods,
-      getWindows: () => (mainWindow && !mainWindow.isDestroyed() ? [mainWindow] : []),
+      // The main window and the Coach overlay both get events.
+      getWindows: () => [mainWindow, overlay && overlay.window()].filter((w) => w && !w.isDestroyed()),
       log: log.scope('ipc'),
     });
     forwardEvents({ broadcast, store, log, auth: userSession, sync, addon, updater, publisher });
@@ -637,6 +661,7 @@ function bootstrap() {
 
     registerAppProtocol(path.join(__dirname, '..', 'renderer'), log.scope('protocol'));
     createWindow();
+    live.on('update', (state) => broadcast('live', state));
 
     if (args.smoke) {
       runSmoke().catch((err) => {
@@ -666,6 +691,16 @@ function bootstrap() {
 
     // Sync needs nothing but the game folders: it starts now.
     background(() => sync.start(), 'Sync failed to start');
+
+    // The Coach overlay (a hotkey shows it over the game) and the live link.
+    overlay = createOverlay({ store, log: log.scope('overlay'), preload: path.join(__dirname, '..', 'preload', 'preload.js'), startUrl: START_URL });
+    services.overlay = overlay;
+    overlay.registerHotkey();
+    if (store.get().liveLink) background(() => live.start(), 'Live link failed to start');
+    store.on('change', (s, keys) => {
+      if (!keys.includes('liveLink')) return;
+      if (s.liveLink) background(() => live.start(), 'Live link failed to start'); else live.stop();
+    });
     // Only while the token is still good: refresh() with an expired token signs the person out.
     if (auth.state().canRefresh) background(() => auth.refresh(), "Couldn't read your Battle.net characters");
 

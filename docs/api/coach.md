@@ -133,10 +133,19 @@ ignoring case); without it, or when it doesn't match, the most recently synced c
 
 ## `POST /api/coach/ask` (guild)
 ```json
-{ "char": "Grom", "question": "Should I take Improved Charge or Deflection for world PvP?" }
+{ "char": "Grom", "question": "Should I take Improved Charge or Deflection for world PvP?", "fresh": false, "live": "" }
 ```
+`live` (optional, cut to 2,500 characters) is what the app's live link saw in the combat log: the last death's recap
+(killer, killing blow, damage by source, heals, my casts) or this play session's numbers. The Coach overlay sends it
+for "Why did I die?" and when "Include this session" is ticked. Claude sees it after the character's details as
+`From the game, live (the combat log): …`.
 `question` is trimmed and cut to 500 characters. `char` picks which of my characters the question is about (falls
 back to my most recently synced one; it is stored as `char_name`, or `null` if I have none).
+
+**Follow-ups.** Unless `fresh` is `true`, Claude also sees up to 3 earlier answered questions about the same character
+from the 3 hours before this one, as the conversation so far (the character's details go with the first of them, and
+this question is sent as `Follow-up question: …`). So "And at level 40?" makes sense after "Best place to level at 24?".
+Questions asked in game are always follow-ups.
 
 Answered in time → `200`; still thinking after 12 s → `202` (the answer arrives later with a `coach` event):
 ```json

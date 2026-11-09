@@ -404,7 +404,10 @@ function UsageCard({ usage }) {
 function AskCard({ data, reload }) {
   const { character: ch, questions = [], ai, limits } = data;
   const [text, setText] = useState('');
-  const ask = useAction((question) => api.post('/api/coach/ask', { char: ch.name, question }));
+  const [fresh, setFresh] = useState(false);
+  const ask = useAction((question) => api.post('/api/coach/ask', { char: ch.name, question, fresh }));
+  // Follow-ups: the Coach sees this character's last answers from the past 3 hours (services/coach.js).
+  const recent = questions.find((x) => x.status === 'answered' && x.char_name === ch.name && ageMs(x.created_at) < 3 * 3600 * 1000);
   const outOfQuestions = limits.questionsLeft <= 0;
 
   const submit = async (e) => {
@@ -414,6 +417,7 @@ function AskCard({ data, reload }) {
     const r = await ask.run(question);
     if (!r.ok) return;
     setText('');
+    setFresh(false);
     const status = r.value.question && r.value.question.status;
     toast(r.value.message, status === 'answered' ? 'ok' : status === 'failed' ? 'alarm' : 'info');
     reload();
@@ -426,6 +430,9 @@ function AskCard({ data, reload }) {
           disabled=${outOfQuestions || ask.busy}
           placeholder="For example: Should I take Improved Charge or Deflection for world PvP?"
           onKeyDown=${(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) submit(e); }} />
+        ${recent ? html`<${Checkbox} class="coach-fresh" label="Start a new topic"
+          hint=${fresh ? 'The Coach won’t look at your earlier questions.' : `Otherwise this follows on from “${clipText(recent.question, 60)}”.`}
+          checked=${fresh} onValue=${setFresh} />` : null}
         <div class="actions-row">
           <${Button} type="submit" variant="primary" icon="spark" busy=${ask.busy} disabled=${outOfQuestions || !text.trim()}>
             ${ask.busy ? 'Thinking…' : 'Ask'}
@@ -441,6 +448,12 @@ function AskCard({ data, reload }) {
     </div>
   <//>`;
 }
+
+const ageMs = (t) => {
+  const d = t ? new Date(String(t).includes('T') ? t : `${String(t).replace(' ', 'T')}Z`) : null;
+  return d && !Number.isNaN(d.getTime()) ? Date.now() - d.getTime() : Infinity;
+};
+const clipText = (s, n) => (String(s).length > n ? `${String(s).slice(0, n - 1)}…` : String(s));
 
 function QuestionItem({ q }) {
   const sources = list(q.sources);
