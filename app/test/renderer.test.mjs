@@ -279,7 +279,7 @@ test('session: the local guild data plus the Battle.net sign-in', () => {
 
 test('settings helpers', async () => {
   const st = await load('pages/settings.js');
-  assert.deepEqual(st.SECTIONS.map((x) => x.id), ['guild', 'battlenet', 'notifications', 'discord', 'coach', 'calendar', 'app', 'about']);
+  assert.deepEqual(st.SECTIONS.map((x) => x.id), ['guild', 'battlenet', 'notifications', 'discord', 'coach', 'overlay', 'calendar', 'app', 'about']);
   // Your guild: set-up guilds first, then guilds only in the saved data, with the characters seen in each.
   const options = st.guildOptions(
     { guilds: [{ id: 1, name: 'Aunt bessys', realm: 'Silvermoon', myCharacters: 1 }, { id: 2, name: 'Cheesy Dreamboys', realm: null, myCharacters: 0 }] },

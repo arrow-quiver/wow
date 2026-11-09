@@ -48,11 +48,18 @@ const DEFAULTS = Object.freeze({
   // Game folders whose news folder (WowGuild_Inbox) sync.js made while the game may have been running:
   // { [folder key]: { dir, at, pids } }. That game session never loads it, so sharing waits for a game restart.
   inboxRestart: {},
+  // Coach overlay (overlay.js): a small always-on-top window over the game. Hotkey in Electron accelerator form.
+  overlayEnabled: true,
+  overlayHotkey: 'CommandOrControl+Shift+G',
+  overlayOpacity: 0.94,
+  overlayBounds: null,
+  // Live link (live.js): follow the game's combat log while you play.
+  liveLink: true,
 });
 
 // Keys the app manages itself. The renderer may send them back (e.g. a spread of settings),
 // but they are ignored there rather than trusted.
-const INTERNAL_KEYS = ['windowBounds', 'startupDefaulted', 'addonOptOut', 'inboxRestart'];
+const INTERNAL_KEYS = ['windowBounds', 'startupDefaulted', 'addonOptOut', 'inboxRestart', 'overlayBounds'];
 
 const clone = (v) => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)));
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -281,7 +288,7 @@ function cleanFolderList(value) {
   return out;
 }
 
-const BOOLEAN_KEYS = ['syncEnabled', 'closeToTray', 'startWithWindows', 'addonAutoUpdate', 'addonAutoInstall', 'appAutoUpdate', 'notifications', 'onboarded'];
+const BOOLEAN_KEYS = ['syncEnabled', 'closeToTray', 'startWithWindows', 'addonAutoUpdate', 'addonAutoInstall', 'appAutoUpdate', 'notifications', 'onboarded', 'overlayEnabled', 'liveLink'];
 
 function sanitizeSettingsPatch(patch) {
   if (!patch || typeof patch !== 'object' || Array.isArray(patch)) throw new Error('Settings must be sent as an object.');
@@ -305,6 +312,17 @@ function sanitizeSettingsPatch(patch) {
     } else if (key === 'theme') {
       if (!['system', 'light', 'dark'].includes(value)) throw new Error('Theme must be system, light or dark.');
       out.theme = value;
+    } else if (key === 'overlayOpacity') {
+      const n = Number(value);
+      if (!Number.isFinite(n) || n < 0.4 || n > 1) throw new Error('Overlay opacity must be between 40% and 100%.');
+      out.overlayOpacity = Math.round(n * 100) / 100;
+    } else if (key === 'overlayHotkey') {
+      // Electron accelerators: modifiers joined with +, then one key. At least one modifier, so typing never triggers it.
+      const v = typeof value === 'string' ? value.trim() : '';
+      if (!/^((CommandOrControl|CmdOrCtrl|Control|Ctrl|Alt|Shift|Super)\+){1,3}([A-Z0-9]|F([1-9]|1[0-9]|2[0-4])|Space|Tab|Backspace|Insert|Home|End|PageUp|PageDown)$/.test(v)) {
+        throw new Error('Pick a hotkey with Ctrl, Alt or Shift and one key, e.g. Ctrl+Shift+G.');
+      }
+      out.overlayHotkey = v;
     } else if (key === 'repoDir') {
       if (value === null || value === '') out.repoDir = null;
       else if (typeof value === 'string' && path.isAbsolute(value.trim()) && value.length <= 1024) out.repoDir = path.resolve(value.trim());

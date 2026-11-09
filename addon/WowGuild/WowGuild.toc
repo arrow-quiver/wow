@@ -24,6 +24,7 @@ Coach.lua
 CoachUI.lua
 CoachGear.lua
 CoachTalents.lua
+Live.lua
 Welcome.lua
 MainUI.lua
 Tooltip.lua

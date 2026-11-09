@@ -267,6 +267,15 @@ describe('sanitizeSettingsPatch (settings from the renderer)', () => {
     assert.throws(() => sanitizeSettingsPatch({ bnetRegion: 1 }), /Battle\.net region/);
   });
 
+  test('overlay and live link settings', () => {
+    assert.deepEqual(sanitizeSettingsPatch({ overlayEnabled: false, liveLink: true, overlayOpacity: 0.8, overlayHotkey: 'CommandOrControl+Shift+G' }),
+      { overlayEnabled: false, liveLink: true, overlayOpacity: 0.8, overlayHotkey: 'CommandOrControl+Shift+G' });
+    assert.deepEqual(sanitizeSettingsPatch({ overlayBounds: { x: 1 } }), {}, 'bounds are internal');
+    assert.throws(() => sanitizeSettingsPatch({ overlayOpacity: 0.1 }));
+    assert.throws(() => sanitizeSettingsPatch({ overlayHotkey: 'rm -rf' }));
+    assert.throws(() => sanitizeSettingsPatch({ liveLink: 'yes' }), /on or off/);
+  });
+
   test('cleans the extra game folder list', () => {
     const abs = path.resolve(os.tmpdir(), 'Games', 'World of Warcraft');
     const out = sanitizeSettingsPatch({ extraWowFolders: [abs, abs, '  ', 42] });

@@ -555,3 +555,17 @@ test('follow-up questions: the Coach sees the last few answers about the same ch
   await ask('After a break?');
   assert.strictEqual(Cl.answers().at(-1).body.messages.length, 1);
 });
+
+test('a question from the overlay carries what the live link saw (the combat log)', async (t) => {
+  const { srv, g: G, u, Cl, owner } = await setup();
+  t.after(() => srv.close());
+  applyPayload(srv.db, G.guildId, u, coachPayload({ questions: [] }));
+  const live = 'Died to Sneaky (a player), killing blow Eviscerate for 600.\nMy casts: Fireball.';
+  assert.strictEqual((await owner.post('/api/coach/ask', { char: 'Grom', question: 'Why did I die?', fresh: true, live })).status, 200);
+  const content = Cl.answers().at(-1).body.messages[0].content;
+  assert.match(content, /From the game, live \(the combat log\):\nDied to Sneaky \(a player\), killing blow Eviscerate for 600\./);
+  // Long recaps are cut.
+  await owner.post('/api/coach/ask', { char: 'Grom', question: 'Again?', fresh: true, live: 'x'.repeat(5000) });
+  assert.ok(Cl.answers().at(-1).body.messages[0].content.length < 5000 + 2000);
+  assert.ok(!/x{2600}/.test(Cl.answers().at(-1).body.messages[0].content));
+});

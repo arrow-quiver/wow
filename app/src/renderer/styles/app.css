@@ -1198,3 +1198,36 @@ a.wh.q0 { color: var(--q-0) !important; } a.wh.q1 { color: var(--q-1) !important
 .loot-paste { font-family: "Cascadia Mono", Consolas, ui-monospace, monospace; font-size: var(--fs-s); }
 .loot-bonus-name { gap: 0; min-width: 0; }
 @media (max-width: 1150px) { .loot-cols { grid-template-columns: minmax(0, 1fr); } }
+
+/* ---------- Coach overlay (pages/overlay.js, main/overlay.js) ---------- */
+.ovl { min-height: 100vh; background: var(--frame); color: var(--frame-text); font-size: var(--fs-s); }
+.bare:has(.ovl) .bare-drag { display: none; }
+.ovl-bar { position: sticky; top: 0; z-index: 3; display: flex; align-items: center; justify-content: space-between; gap: var(--s-2);
+  padding: 8px 10px 8px 14px; -webkit-app-region: drag; background: color-mix(in srgb, var(--frame) 92%, black);
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); }
+.ovl-title { font: 700 var(--fs-m) var(--font-head); display: flex; align-items: center; gap: 6px; color: var(--accent); }
+.ovl-who { color: var(--frame-text); font-weight: 600; }
+.ovl-x { -webkit-app-region: no-drag; background: none; border: 0; color: var(--frame-text); font-size: 20px; line-height: 1; cursor: pointer; padding: 2px 6px; border-radius: 4px; }
+.ovl-x:hover { background: color-mix(in srgb, var(--frame-text) 14%, transparent); }
+.ovl-body { padding: 10px; display: flex; flex-direction: column; gap: 10px; }
+.ovl-card { background: color-mix(in srgb, var(--frame-text) 6%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
+  border-radius: var(--radius-m); padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+.ovl-card .hint { color: color-mix(in srgb, var(--frame-text) 65%, transparent); }
+.ovl-death { border-color: color-mix(in srgb, var(--alarm) 55%, transparent); }
+.ovl-row { display: flex; align-items: center; justify-content: space-between; gap: var(--s-2); }
+.ovl-h { margin: 0; font: 700 var(--fs-m) var(--font-head); color: var(--frame-text); }
+.ovl-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin: 0; }
+.ovl-stats dt { font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .06em; opacity: .7; }
+.ovl-stats dd { margin: 0; font-weight: 700; font-size: var(--fs-m); }
+.ovl-hint { margin: 0; opacity: .8; }
+.ovl-sources { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.ovl-sources li { display: flex; justify-content: space-between; gap: 8px; }
+.ovl-answer { margin: 0; white-space: pre-wrap; line-height: 1.45; }
+.ovl-talent { margin: 0; }
+.ovl-steps { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; }
+.ovl-ask { width: 100%; }
+.ovl-qa { border-top: 1px solid color-mix(in srgb, var(--frame-text) 14%, transparent); padding-top: 6px; }
+.ovl-q { margin: 0 0 4px; font-weight: 700; }
+.ovl-foot { margin: 0; font-size: var(--fs-xs); opacity: .6; text-align: center; }
+
+.range { accent-color: var(--accent-deep); width: 160px; }

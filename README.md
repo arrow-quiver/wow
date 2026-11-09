@@ -63,6 +63,12 @@ In game, the Coach sits **beside your talent window**: the next talent your plan
 plan's order with what you've taken ticked off. **Item tooltips** say whether an item is an upgrade for your build,
 weighed by your plan's stat priorities against what you're wearing.
 
+**Coach overlay and live link.** Press **Ctrl+Shift+G** while you play and a small Coach window shows on top of the
+game (use Windowed (Fullscreen) mode): this session's kills and deaths, what to do next and a quick Ask box. After a
+death, **Why did I die?** sends the death's recap (who hit you, with what, how much healing you got) to the Coach.
+The live link reads the game's own combat log file as you play, like Warcraft Logs' uploader does; type `/wow live on`
+once and the addon turns combat logging on at every login. Answers reach the game's Coach after your next /reload.
+
 ### 🛠️ Crafters, requests and partners
 
 <img src="docs/screenshots/crafters.png" alt="Crafters page with guild professions and a shopping list" width="900">
@@ -100,6 +106,7 @@ The addon works on its own, and does much more with the app:
 | --- | --- |
 | `/wow` or `/guildcamp` | Open the Guild Camp window |
 | `/wow coach` | Open the Coach |
+| `/wow live on` | Turn on combat logging at every login, for the app's live link and Coach overlay (`/wow live off` stops it) |
 | `/wow guide` | Open the skill-up guide |
 | `/wow list` | Open the shopping list |
 | `/wow deals` | Open the Deal hunter (it also opens with the auction house) |
