@@ -35,6 +35,10 @@ add('ch full', rec('ch', 'Thrallia', NOW - 60, 'Thrallia', {
   faction: 'Horde', ilvl: 62, repair: 87, consumables: { flask: 2, elixir: 0, potion: 12, food: 20, bandage: 0 },
   professions: [{ skill: 164, rank: 300, max: 300 }, { skill: 186, rank: 275, max: 300 }], pvp: { rank: 7, hk: 1234 }, addon: '0.12.0',
 }));
+add('ch with raid readiness', rec('ch', 'Thrallia', NOW - 60, 'Thrallia', {
+  pid: 'Thrallia.p4m7', class: 'Shaman', level: 60, ilvl: 62, repair: 87, addon: '0.12.0',
+  talents: { a: 0, b: 21, c: 30 }, resists: { fire: 135, nature: 0, frost: 15, shadow: 42, arcane: 10 }, unenchanted: [9, 15],
+}));
 add('ch alt, sparse', rec('ch', 'Zuljinne', NOW - 60, 'Zuljinne', { pid: 'Thrallia.p4m7', level: 12, consumables: { potion: 3 }, pvp: {} }));
 add('ch non-ASCII name', rec('ch', 'Zulé', NOW - 60, 'Zulé', { pid: 'Thrallia.p4m7', class: 'Mage', level: 60 }));
 add('ch over the list limit', rec('ch', 'Thrallia', NOW - 60, 'Thrallia', { pid: 'Thrallia.p4m7', alts: Array.from({ length: 30 }, (_, i) => `Alt${i}`) }));
@@ -50,6 +54,9 @@ add('cr cancelled (final)', rec('cr', 'r1r1r1', NOW - 30, 'Thrallia', { pid: 'Th
 add('cr done (final)', rec('cr', 'r1r1r1', NOW - 30, 'Thrallia', { pid: 'Thrallia.p4m7', item: 'Robe of the Archmage', state: 'd' }, { final: true }));
 add('cl claim', rec('cl', 'r1r1r1:Zuljin.a8x2', NOW - 60, 'Zuljin', { state: 'c', claimedAt: NOW - 60 }));
 add('lp partner post', rec('lp', 'Thrallia.p4m7:Zuljinne', NOW - 60, 'Zuljinne', { character: 'Zuljinne', level: 24, zone: 'Stranglethorn Vale', when: 'tonight 8pm', note: 'questing; anyone?' }));
+add('dg dungeon group', rec('dg', 'dg1grp', NOW - 60, 'Thrallia', { pid: 'Thrallia.p4m7', character: 'Thrallia', dungeon: 'The Deadmines', startsAt: NOW + 3600, role: 'h', level: 20, tank: 1, heal: 1, dps: 3, note: 'quest run; bring VC quests', state: 'o' }));
+add('dg cancelled (final)', rec('dg', 'dg1grp', NOW - 30, 'Thrallia', { pid: 'Thrallia.p4m7', character: 'Thrallia', dungeon: 'The Deadmines', startsAt: NOW + 3600, role: 'h', state: 'x' }, { final: true }));
+add('dj join', rec('dj', 'dg1grp:Zuljin.a8x2', NOW - 50, 'Zuljin', { character: 'Zuljin', role: 't', status: 'y', class: 'Warrior', level: 21, joinedAt: NOW - 50 }));
 add('dc hand-in', rec('dc', 'h4nd1n', NOW - 60, 'Thrallia', { pid: 'Thrallia.p4m7', drive: 'dr1v3x', character: 'Thrallia', amount: 40, note: 'Linen' }));
 add('bq open', rec('bq', 'b4nkrq', NOW - 60, 'Thrallia', { pid: 'Thrallia.p4m7', item: 'Runecloth', count: 20, note: 'for bandages', state: 'o' }));
 add('bq cancelled (final)', rec('bq', 'b4nkrq', NOW - 30, 'Thrallia', { pid: 'Thrallia.p4m7', item: 'Runecloth', count: 20, state: 'x' }, { final: true }));
@@ -177,6 +184,8 @@ const expiryCases = [
   ['su with the raid', S.encode(rec('su', 'k3f9a2:Thrallia.p4m7', NOW - 2 * D, 'Thrallia', { character: 'Thrallia' })), { 'RD:k3f9a2': RDrec(NOW - 10 * D, NOW - 50 * D) }],
   ['su raid unknown (120 days)', S.encode(rec('su', 'k3f9a2:Thrallia.p4m7', NOW - 2 * D, 'Thrallia', { character: 'Thrallia' })), null],
   ['cl with the request', S.encode(rec('cl', 'r1r1r1:Zuljin.a8x2', NOW - D, 'Zuljin', { state: 'c' })), { 'cr:r1r1r1': S.encode(rec('cr', 'r1r1r1', NOW - 8 * D, 'Thrallia', { pid: 'Thrallia.p4m7', item: 'x', state: 'd' }, { final: true })) }],
+  ['dg startsAt + 1 day', S.encode(rec('dg', 'dg1grp', NOW - 2 * D, 'Thrallia', { pid: 'Thrallia.p4m7', dungeon: 'x', startsAt: NOW - D + 10, state: 'o' })), null],
+  ['dj with the group', S.encode(rec('dj', 'dg1grp:Zuljin.a8x2', NOW - D, 'Zuljin', { role: 't', status: 'y' })), { 'dg:dg1grp': S.encode(rec('dg', 'dg1grp', NOW - 2 * D, 'Thrallia', { pid: 'Thrallia.p4m7', dungeon: 'x', startsAt: NOW - 2 * D, state: 'o' })) }],
   ['dc with the drive (field)', S.encode(rec('dc', 'h4nd1n', NOW - D, 'Thrallia', { pid: 'Thrallia.p4m7', drive: 'dr1v3x', amount: 1 })), { 'DR:dr1v3x': S.encode(rec('DR', 'dr1v3x', NOW - 61 * D, 'Grommash', { title: 'x', state: 'c' }, { final: true })) }],
   ['dc tombstone, drive unknown', S.encode(rec('dc', 'h4nd1n', NOW - D, 'Thrallia', null, { del: true })), null],
   ['BH with the bank request', S.encode(rec('BH', 'b4nkrq', NOW - D, 'Varok', { state: 'd' })), { 'bq:b4nkrq': S.encode(rec('bq', 'b4nkrq', NOW - 31 * D, 'Thrallia', { pid: 'Thrallia.p4m7', item: 'x', state: 'o' })) }],

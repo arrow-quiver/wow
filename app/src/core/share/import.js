@@ -16,11 +16,12 @@ const prune = require('./prune');
 const { queue, ensurePid } = require('./queue');
 
 // Built by the addon itself, never by the app: a copy in my name from elsewhere is normal.
-const ADDON_BUILT = new Set(['ch', 'rc', 'gb', 'bk', 'sh', 'ca']);
+// Dungeon groups and joins are also made in game (/wow lfg).
+const ADDON_BUILT = new Set(['ch', 'rc', 'gb', 'bk', 'sh', 'ca', 'dg', 'dj']);
 // Reasons that a later record (a link, a raid, a loot list, the bank characters, my role) can fix.
 const RETRY = ['link', 'raid', 'loot list', 'bank', 'officers only'];
 // ch first (links), then settings and lists that later records are checked against.
-const PRIORITY = { ch: 0, CFG: 1, BC: 2, LL: 3, RD: 4, RT: 5, LY: 6, DR: 7, cr: 8, bq: 8 };
+const PRIORITY = { ch: 0, CFG: 1, BC: 2, LL: 3, RD: 4, RT: 5, LY: 6, DR: 7, cr: 8, bq: 8, dg: 8 };
 const prio = (type) => (type in PRIORITY ? PRIORITY[type] : 9);
 const DAY = 86400;
 
@@ -28,7 +29,7 @@ const obj = (v) => (v && typeof v === 'object' ? v : {});
 const seg = (r, i) => String(r.key).split(':')[i];
 // Where a pid-keyed record names its player.
 const PID_OF = {
-  su: (r) => seg(r, 1), cl: (r) => seg(r, 1), lp: (r) => seg(r, 0), sh: (r) => r.key, pr: (r) => r.key,
+  su: (r) => seg(r, 1), cl: (r) => seg(r, 1), dj: (r) => seg(r, 1), dg: (r) => r.fields && r.fields.pid, lp: (r) => seg(r, 0), sh: (r) => r.key, pr: (r) => r.key,
   cr: (r) => r.fields && r.fields.pid, dc: (r) => r.fields && r.fields.pid, bq: (r) => r.fields && r.fields.pid,
 };
 
@@ -55,13 +56,17 @@ function importRule(db, gid, rec, how, prevOk) {
     if (!pid && rec.del && prevOk && !prevOk.del) pid = pidOf(prevOk);
     if (pid) {
       if (!st.isLinked(db, gid, rec.author, pid)) return 'link';
-      if (prevOk && !prevOk.del && ['cr', 'dc', 'bq'].includes(rec.type) && !rec.del && prevOk.fields.pid !== pid) return 'owner';
+      if (prevOk && !prevOk.del && ['cr', 'dc', 'bq', 'dg'].includes(rec.type) && !rec.del && prevOk.fields.pid !== pid) return 'owner';
     } else if (!rec.del) return 'link';
   }
   if (rec.del) return null;
   if (rec.type === 'cl') {
     const cr = st.live(db, gid, `cr:${seg(rec, 0)}`);
     if (cr && cr.rec.fields.pid === seg(rec, 1)) return 'own request';
+  }
+  if (rec.type === 'dj') {
+    const dg = st.live(db, gid, `dg:${seg(rec, 0)}`);
+    if (dg && dg.rec.fields.pid === seg(rec, 1)) return 'own group';
   }
   if (rec.type === 'bk') {
     const bc = st.live(db, gid, 'BC:1');
@@ -282,6 +287,26 @@ function notify(db, ctx, gid, rec, prevOk, run) {
         route: '/',
       }));
       return;
+    case 'dg':
+      // A new group from a guildmate, still to come: everyone hears (the Calls to arms choice turns it off).
+      if (!created || rec.del || f.state !== 'o' || f.pid === st.myPid(db) || (f.startsAt || 0) < run.now - 3600) return;
+      emitLater(run, () => ctx.emit(gid, 'cta', {
+        title: `🛡️ ${f.character || who} is grouping for ${f.dungeon || 'a dungeon'}`,
+        body: `${text.dungeonWhen(f.startsAt, run.now)}.${f.note ? ` ${f.note}` : ''} Join in Guild Camp or with /wow lfg.`,
+        route: '/dungeons',
+      }));
+      return;
+    case 'dj': {
+      // Someone joined (or left) my group.
+      if (rec.del || (prevOk && !prevOk.del && prevOk.fields.status === f.status)) return;
+      const dg = st.live(db, gid, `dg:${seg(rec, 0)}`);
+      if (!dg || dg.rec.fields.pid !== st.myPid(db) || dg.rec.fields.state !== 'o') return;
+      const role = text.ROLE[f.role] || 'damage';
+      emitLater(run, () => ctx.emit(gid, 'cta', f.status === 'y'
+        ? { title: `🛡️ ${f.character || who} joined your ${dg.rec.fields.dungeon} group`, body: `As ${role}. Invite them in game.`, route: '/dungeons', userId: identity.meId(db) }
+        : { title: `🛡️ ${f.character || who} left your ${dg.rec.fields.dungeon} group`, body: 'Their spot is open again.', route: '/dungeons', userId: identity.meId(db) }));
+      return;
+    }
     case 'cr':
       if (!created || rec.del || f.state !== 'o' || f.pid === st.myPid(db)) return;
       emitLater(run, () => ctx.emit(gid, 'request', {

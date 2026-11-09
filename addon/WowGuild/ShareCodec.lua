@@ -131,6 +131,10 @@ local TYPES = {
       tuple("consumables", { pInt("flask"), pInt("elixir"), pInt("potion"), pInt("food"), pInt("bandage") }),
       listParts("professions", 12, { pInt("skill"), pInt("rank"), pInt("max") }),
       tuple("pvp", { pInt("rank"), pInt("hk") }), text("addon", 16),
+      -- Raid readiness (appended fields: older addons leave them out): points per talent tree, resistances, unenchanted slot ids.
+      tuple("talents", { pInt("a"), pInt("b"), pInt("c"), pInt("unspent") }),
+      tuple("resists", { pInt("fire"), pInt("nature"), pInt("frost"), pInt("shadow"), pInt("arcane") }),
+      { n = "unenchanted", k = "list", maxItems = 10, of = { k = "int" } },
     },
   },
   rc = {
@@ -163,6 +167,18 @@ local TYPES = {
   ca = {
     key = { "b36x6" }, max = 300, expiry = { days = 1 },
     fields = { text("character", 48), text("zone", 60), int("needed"), text("message", 200) },
+  },
+  -- Dungeon groups: dg is a group a guildmate puts together, dj a guildmate joining it with a role.
+  dg = {
+    key = { "b36x6" }, max = 400, final = { field = "state", values = "xd" }, expiry = { field = "startsAt", days = 1 },
+    fields = {
+      text("pid", 64), text("character", 48), text("dungeon", 60), int("startsAt"), enm("role", "thd"), int("level"),
+      int("tank"), int("heal"), int("dps"), text("note", 140), enm("state", "oxd"),
+    },
+  },
+  dj = {
+    key = { "b36x6", "pid" }, max = 160, expiry = { parent = "dg", seg = 1 },
+    fields = { text("character", 48), enm("role", "thd"), enm("status", "yw"), text("class", 20), int("level"), int("joinedAt") },
   },
   dc = {
     key = { "b36x6" }, max = 250, expiry = { parent = "DR", field = "drive" },

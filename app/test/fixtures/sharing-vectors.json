@@ -44,7 +44,7 @@
   "LY_FOLD_DAYS": 30,
   "SHRINK_ROUNDS": 16
  },
- "typesDump": "{AN={code=s2:AN;expiry={days=n60};fields=[{k=s4:text;max=n500;n=s4:body}];key=[s5:b36x6];max=n600;space=s7:officer};BC={code=s2:BC;expiry={never=T};fields=[{k=s4:list;maxItems=n50;n=s5:names;of={k=s4:text;max=n48}}];key=[s3:one];max=n700;space=s7:officer};BH={code=s2:BH;expiry={parent=s2:bq;seg=n1};fields=[{k=s4:enum;n=s5:state;values=s2:sd}];key=[s5:b36x6];max=n40;space=s7:officer};CFG={code=s3:CFG;expiry={never=T};fields=[{k=s3:int;n=s14:officerRankMax},{dash=T;k=s3:int;n=s12:relayRankMax}];key=[s3:one];max=n40;rank=s2:gm;space=s7:officer};DR={code=s2:DR;expiry={days=n180;finalDays=n60};fields=[{k=s4:text;max=n80;n=s5:title},{k=s4:text;max=n40;n=s4:unit},{k=s3:int;n=s4:goal},{k=s4:text;max=n300;n=s5:notes},{k=s4:enum;n=s5:state;values=s2:oc}];final={field=s5:state;values=s1:c};key=[s5:b36x6];max=n500;space=s7:officer};LA={code=s2:LA;expiry={days=n180};fields=[{k=s4:text;max=n8;n=s4:raid},{k=s4:text;max=n8;n=s8:instance},{k=s4:text;max=n12;n=s4:item},{k=s4:text;max=n100;n=s8:itemName},{k=s4:text;max=n48;n=s9:character},{k=s4:text;max=n64;n=s3:pid},{k=s4:enum;n=s4:kind;values=s4:smof},{k=s3:int;n=s4:roll},{k=s3:int;n=s5:bonus}];fold={};key=[s5:b36x6];max=n300;space=s7:officer};LL={code=s2:LL;expiry={never=T};fields=[{k=s4:text;max=n60;n=s4:name},{k=s4:list;maxItems=n40;n=s6:bosses;of={k=s4:text;max=n60}},{k=s4:list;maxItems=n150;n=s5:items;parts=[{k=s4:text;max=n12;n=s4:item},{k=s3:int;n=s4:boss},{k=s4:text;max=n100;n=s4:name}]}];key=[s5:b36x6];max=n8192;space=s7:officer};LY={code=s2:LY;expiry={never=T};fields=[{k=s3:int;n=s4:upto},{k=s4:list;maxItems=n200;n=s7:bonuses;parts=[{k=s4:text;max=n64;n=s3:pid},{k=s4:text;max=n12;n=s4:item},{k=s3:int;n=s5:bonus}]}];key=[s5:b36x6];max=n3072;space=s7:officer};RD={code=s2:RD;expiry={days=n45;field=s8:startsAt};fields=[{k=s4:enum;n=s4:kind;values=s3:rpe},{k=s4:text;max=n60;n=s5:title},{k=s4:text;max=n60;n=s8:instance},{k=s3:int;n=s8:startsAt},{k=s3:int;n=s7:minutes},{k=s3:int;n=s4:size},{k=s3:int;n=s7:srLimit},{k=s4:text;max=n300;n=s5:notes}];key=[s5:b36x6];max=n600;space=s7:officer};RT={code=s2:RT;expiry={parent=s2:RD;seg=n1};fields=[{k=s4:enum;n=s6:status;values=s4:olxd},{k=s3:int;n=s8:lockedAt},{k=s4:enum;n=s4:kind;values=s3:rpe},{k=s4:text;max=n8;n=s8:instance},{k=s3:int;n=s8:closedAt},{k=s4:list;maxItems=n60;n=s9:attendees;parts=[{k=s4:text;max=n64;n=s3:pid}];rest={k=s4:text;max=n12;maxItems=n20;n=s5:items}},{k=s4:list;maxItems=n60;n=s7:noShows;of={k=s4:text;max=n64}}];final={field=s6:status;values=s2:xd};fold={field=s6:status;kind=s1:r;kindField=s4:kind;value=s1:d};key=[s5:b36x6];max=n2048;space=s7:officer};WH={channel=s7:OFFICER;code=s2:WH;expiry={never=T};fields=[{k=s4:text;max=n250;n=s3:url}];firstHand=T;key=[s3:one];max=n300;noBucket=T;space=s7:officer};bk={author=s3:key;code=s2:bk;expiry={days=n30};fields=[{k=s4:list;maxItems=n200;n=s4:bags;parts=[{k=s3:int;n=s2:id},{k=s3:int;n=s5:count}]},{k=s4:list;maxItems=n300;n=s4:bank;parts=[{k=s3:int;n=s2:id},{k=s3:int;n=s5:count}]}];key=[s4:name];max=n2048;space=s6:member};bq={code=s2:bq;expiry={days=n30};fields=[{k=s4:text;max=n64;n=s3:pid},{k=s4:text;max=n100;n=s4:item},{k=s3:int;n=s5:count},{k=s4:text;max=n200;n=s4:note},{k=s4:enum;n=s5:state;values=s2:ox}];final={field=s5:state;values=s1:x};key=[s5:b36x6];max=n400;space=s6:member};ca={code=s2:ca;expiry={days=n1};fields=[{k=s4:text;max=n48;n=s9:character},{k=s4:text;max=n60;n=s4:zone},{k=s3:int;n=s6:needed},{k=s4:text;max=n200;n=s7:message}];key=[s5:b36x6];max=n300;space=s6:member};ch={author=s3:key;code=s2:ch;expiry={days=n60};fields=[{k=s4:text;max=n64;n=s3:pid},{k=s4:text;max=n32;n=s9:battletag},{k=s4:flag;n=s4:main},{k=s4:list;maxItems=n20;n=s4:alts;of={k=s4:text;max=n48}},{k=s4:text;max=n20;n=s5:class},{k=s4:text;max=n20;n=s4:race},{k=s3:int;n=s5:level},{k=s4:text;max=n12;n=s7:faction},{k=s3:int;n=s4:ilvl},{k=s3:int;n=s6:repair},{k=s5:tuple;n=s11:consumables;parts=[{k=s3:int;n=s5:flask},{k=s3:int;n=s6:elixir},{k=s3:int;n=s6:potion},{k=s3:int;n=s4:food},{k=s3:int;n=s7:bandage}]},{k=s4:list;maxItems=n12;n=s11:professions;parts=[{k=s3:int;n=s5:skill},{k=s3:int;n=s4:rank},{k=s3:int;n=s3:max}]},{k=s5:tuple;n=s3:pvp;parts=[{k=s3:int;n=s4:rank},{k=s3:int;n=s2:hk}]},{k=s4:text;max=n16;n=s5:addon}];key=[s4:name];max=n400;space=s6:member};cl={code=s2:cl;expiry={parent=s2:cr;seg=n1};fields=[{k=s4:enum;n=s5:state;values=s3:cdw},{k=s3:int;n=s9:claimedAt}];key=[s5:b36x6,s3:pid];max=n60;space=s6:member};cr={code=s2:cr;expiry={days=n30;finalDays=n7};fields=[{k=s4:text;max=n64;n=s3:pid},{k=s4:text;max=n100;n=s4:item},{k=s4:text;max=n200;n=s5:notes},{k=s4:enum;n=s5:state;values=s3:oxd}];final={field=s5:state;values=s2:xd};key=[s5:b36x6];max=n400;space=s6:member};dc={code=s2:dc;expiry={field=s5:drive;parent=s2:DR};fields=[{k=s4:text;max=n64;n=s3:pid},{k=s4:text;max=n8;n=s5:drive},{k=s4:text;max=n48;n=s9:character},{k=s3:int;n=s6:amount},{k=s4:text;max=n120;n=s4:note}];key=[s5:b36x6];max=n250;space=s6:member};gb={code=s2:gb;expiry={days=n30};fields=[{k=s4:list;maxItems=n98;n=s5:items;parts=[{k=s3:int;n=s2:id},{k=s3:int;n=s5:count}]}];key=[s3:tab];max=n1536;space=s6:member;variants={0=[{k=s3:int;n=s9:scannedAt},{k=s3:int;n=s5:money},{k=s4:list;maxItems=n8;n=s4:tabs;of={k=s4:text;max=n32}},{k=s4:list;maxItems=n25;n=s3:log;parts=[{k=s3:int;n=s2:at},{k=s4:text;max=n12;n=s4:kind},{k=s4:text;max=n48;n=s3:who},{k=s3:int;n=s4:item},{k=s3:int;n=s5:count},{k=s3:int;n=s6:amount}]}]}};lp={code=s2:lp;expiry={days=n3};fields=[{k=s4:text;max=n48;n=s9:character},{k=s3:int;n=s5:level},{k=s4:text;max=n60;n=s4:zone},{k=s4:text;max=n60;n=s4:when},{k=s4:text;max=n140;n=s4:note}];key=[s3:pid,s4:name];max=n400;space=s6:member};pr={code=s2:pr;expiry={days=n14};fields=[{k=s3:int;n=s3:day},{k=s4:list;maxItems=n60;n=s6:prices;parts=[{k=s3:int;n=s2:id},{k=s3:int;n=s6:copper}]}];key=[s3:pid];max=n800;space=s6:member};rc={author=s3:key;code=s2:rc;expiry={days=n60;newerOf=s2:ch};fields=[{k=s4:enum;n=s4:kind;values=s3:sin},{k=s3:int;n=s5:count},{cases={n={k=s4:list;maxItems=n500;of={k=s4:text;max=n100}}};default={k=s3:ids;maxItems=n2000};k=s6:switch;n=s4:list;on=s4:kind}];key=[s4:name,s3:int];max=n2048;maxIf={field=s4:kind;max=n6144;value=s1:n};space=s6:member};sh={code=s2:sh;expiry={days=n30};fields=[{k=s4:list;maxItems=n20;n=s5:items;parts=[{k=s4:text;max=n100;n=s4:name},{k=s3:int;n=s3:qty},{k=s3:int;n=s5:skill}]}];key=[s3:pid];max=n1024;space=s6:member};su={code=s2:su;expiry={parent=s2:RD;seg=n1};fields=[{k=s4:text;max=n48;n=s9:character},{k=s4:enum;n=s4:role;values=s3:thd},{k=s4:enum;n=s6:status;values=s4:ytnb},{k=s4:text;max=n120;n=s4:note},{k=s4:list;maxItems=n10;n=s8:reserves;of={k=s4:text;max=n12}},{k=s3:int;n=s10:reservesAt},{k=s4:list;maxItems=n10;n=s4:prev;of={k=s4:text;max=n12}},{k=s3:int;n=s6:prevAt}];key=[s5:b36x6,s3:pid];max=n400;space=s6:member}}",
+ "typesDump": "{AN={code=s2:AN;expiry={days=n60};fields=[{k=s4:text;max=n500;n=s4:body}];key=[s5:b36x6];max=n600;space=s7:officer};BC={code=s2:BC;expiry={never=T};fields=[{k=s4:list;maxItems=n50;n=s5:names;of={k=s4:text;max=n48}}];key=[s3:one];max=n700;space=s7:officer};BH={code=s2:BH;expiry={parent=s2:bq;seg=n1};fields=[{k=s4:enum;n=s5:state;values=s2:sd}];key=[s5:b36x6];max=n40;space=s7:officer};CFG={code=s3:CFG;expiry={never=T};fields=[{k=s3:int;n=s14:officerRankMax},{dash=T;k=s3:int;n=s12:relayRankMax}];key=[s3:one];max=n40;rank=s2:gm;space=s7:officer};DR={code=s2:DR;expiry={days=n180;finalDays=n60};fields=[{k=s4:text;max=n80;n=s5:title},{k=s4:text;max=n40;n=s4:unit},{k=s3:int;n=s4:goal},{k=s4:text;max=n300;n=s5:notes},{k=s4:enum;n=s5:state;values=s2:oc}];final={field=s5:state;values=s1:c};key=[s5:b36x6];max=n500;space=s7:officer};LA={code=s2:LA;expiry={days=n180};fields=[{k=s4:text;max=n8;n=s4:raid},{k=s4:text;max=n8;n=s8:instance},{k=s4:text;max=n12;n=s4:item},{k=s4:text;max=n100;n=s8:itemName},{k=s4:text;max=n48;n=s9:character},{k=s4:text;max=n64;n=s3:pid},{k=s4:enum;n=s4:kind;values=s4:smof},{k=s3:int;n=s4:roll},{k=s3:int;n=s5:bonus}];fold={};key=[s5:b36x6];max=n300;space=s7:officer};LL={code=s2:LL;expiry={never=T};fields=[{k=s4:text;max=n60;n=s4:name},{k=s4:list;maxItems=n40;n=s6:bosses;of={k=s4:text;max=n60}},{k=s4:list;maxItems=n150;n=s5:items;parts=[{k=s4:text;max=n12;n=s4:item},{k=s3:int;n=s4:boss},{k=s4:text;max=n100;n=s4:name}]}];key=[s5:b36x6];max=n8192;space=s7:officer};LY={code=s2:LY;expiry={never=T};fields=[{k=s3:int;n=s4:upto},{k=s4:list;maxItems=n200;n=s7:bonuses;parts=[{k=s4:text;max=n64;n=s3:pid},{k=s4:text;max=n12;n=s4:item},{k=s3:int;n=s5:bonus}]}];key=[s5:b36x6];max=n3072;space=s7:officer};RD={code=s2:RD;expiry={days=n45;field=s8:startsAt};fields=[{k=s4:enum;n=s4:kind;values=s3:rpe},{k=s4:text;max=n60;n=s5:title},{k=s4:text;max=n60;n=s8:instance},{k=s3:int;n=s8:startsAt},{k=s3:int;n=s7:minutes},{k=s3:int;n=s4:size},{k=s3:int;n=s7:srLimit},{k=s4:text;max=n300;n=s5:notes}];key=[s5:b36x6];max=n600;space=s7:officer};RT={code=s2:RT;expiry={parent=s2:RD;seg=n1};fields=[{k=s4:enum;n=s6:status;values=s4:olxd},{k=s3:int;n=s8:lockedAt},{k=s4:enum;n=s4:kind;values=s3:rpe},{k=s4:text;max=n8;n=s8:instance},{k=s3:int;n=s8:closedAt},{k=s4:list;maxItems=n60;n=s9:attendees;parts=[{k=s4:text;max=n64;n=s3:pid}];rest={k=s4:text;max=n12;maxItems=n20;n=s5:items}},{k=s4:list;maxItems=n60;n=s7:noShows;of={k=s4:text;max=n64}}];final={field=s6:status;values=s2:xd};fold={field=s6:status;kind=s1:r;kindField=s4:kind;value=s1:d};key=[s5:b36x6];max=n2048;space=s7:officer};WH={channel=s7:OFFICER;code=s2:WH;expiry={never=T};fields=[{k=s4:text;max=n250;n=s3:url}];firstHand=T;key=[s3:one];max=n300;noBucket=T;space=s7:officer};bk={author=s3:key;code=s2:bk;expiry={days=n30};fields=[{k=s4:list;maxItems=n200;n=s4:bags;parts=[{k=s3:int;n=s2:id},{k=s3:int;n=s5:count}]},{k=s4:list;maxItems=n300;n=s4:bank;parts=[{k=s3:int;n=s2:id},{k=s3:int;n=s5:count}]}];key=[s4:name];max=n2048;space=s6:member};bq={code=s2:bq;expiry={days=n30};fields=[{k=s4:text;max=n64;n=s3:pid},{k=s4:text;max=n100;n=s4:item},{k=s3:int;n=s5:count},{k=s4:text;max=n200;n=s4:note},{k=s4:enum;n=s5:state;values=s2:ox}];final={field=s5:state;values=s1:x};key=[s5:b36x6];max=n400;space=s6:member};ca={code=s2:ca;expiry={days=n1};fields=[{k=s4:text;max=n48;n=s9:character},{k=s4:text;max=n60;n=s4:zone},{k=s3:int;n=s6:needed},{k=s4:text;max=n200;n=s7:message}];key=[s5:b36x6];max=n300;space=s6:member};ch={author=s3:key;code=s2:ch;expiry={days=n60};fields=[{k=s4:text;max=n64;n=s3:pid},{k=s4:text;max=n32;n=s9:battletag},{k=s4:flag;n=s4:main},{k=s4:list;maxItems=n20;n=s4:alts;of={k=s4:text;max=n48}},{k=s4:text;max=n20;n=s5:class},{k=s4:text;max=n20;n=s4:race},{k=s3:int;n=s5:level},{k=s4:text;max=n12;n=s7:faction},{k=s3:int;n=s4:ilvl},{k=s3:int;n=s6:repair},{k=s5:tuple;n=s11:consumables;parts=[{k=s3:int;n=s5:flask},{k=s3:int;n=s6:elixir},{k=s3:int;n=s6:potion},{k=s3:int;n=s4:food},{k=s3:int;n=s7:bandage}]},{k=s4:list;maxItems=n12;n=s11:professions;parts=[{k=s3:int;n=s5:skill},{k=s3:int;n=s4:rank},{k=s3:int;n=s3:max}]},{k=s5:tuple;n=s3:pvp;parts=[{k=s3:int;n=s4:rank},{k=s3:int;n=s2:hk}]},{k=s4:text;max=n16;n=s5:addon},{k=s5:tuple;n=s7:talents;parts=[{k=s3:int;n=s1:a},{k=s3:int;n=s1:b},{k=s3:int;n=s1:c},{k=s3:int;n=s7:unspent}]},{k=s5:tuple;n=s7:resists;parts=[{k=s3:int;n=s4:fire},{k=s3:int;n=s6:nature},{k=s3:int;n=s5:frost},{k=s3:int;n=s6:shadow},{k=s3:int;n=s6:arcane}]},{k=s4:list;maxItems=n10;n=s11:unenchanted;of={k=s3:int}}];key=[s4:name];max=n400;space=s6:member};cl={code=s2:cl;expiry={parent=s2:cr;seg=n1};fields=[{k=s4:enum;n=s5:state;values=s3:cdw},{k=s3:int;n=s9:claimedAt}];key=[s5:b36x6,s3:pid];max=n60;space=s6:member};cr={code=s2:cr;expiry={days=n30;finalDays=n7};fields=[{k=s4:text;max=n64;n=s3:pid},{k=s4:text;max=n100;n=s4:item},{k=s4:text;max=n200;n=s5:notes},{k=s4:enum;n=s5:state;values=s3:oxd}];final={field=s5:state;values=s2:xd};key=[s5:b36x6];max=n400;space=s6:member};dc={code=s2:dc;expiry={field=s5:drive;parent=s2:DR};fields=[{k=s4:text;max=n64;n=s3:pid},{k=s4:text;max=n8;n=s5:drive},{k=s4:text;max=n48;n=s9:character},{k=s3:int;n=s6:amount},{k=s4:text;max=n120;n=s4:note}];key=[s5:b36x6];max=n250;space=s6:member};dg={code=s2:dg;expiry={days=n1;field=s8:startsAt};fields=[{k=s4:text;max=n64;n=s3:pid},{k=s4:text;max=n48;n=s9:character},{k=s4:text;max=n60;n=s7:dungeon},{k=s3:int;n=s8:startsAt},{k=s4:enum;n=s4:role;values=s3:thd},{k=s3:int;n=s5:level},{k=s3:int;n=s4:tank},{k=s3:int;n=s4:heal},{k=s3:int;n=s3:dps},{k=s4:text;max=n140;n=s4:note},{k=s4:enum;n=s5:state;values=s3:oxd}];final={field=s5:state;values=s2:xd};key=[s5:b36x6];max=n400;space=s6:member};dj={code=s2:dj;expiry={parent=s2:dg;seg=n1};fields=[{k=s4:text;max=n48;n=s9:character},{k=s4:enum;n=s4:role;values=s3:thd},{k=s4:enum;n=s6:status;values=s2:yw},{k=s4:text;max=n20;n=s5:class},{k=s3:int;n=s5:level},{k=s3:int;n=s8:joinedAt}];key=[s5:b36x6,s3:pid];max=n160;space=s6:member};gb={code=s2:gb;expiry={days=n30};fields=[{k=s4:list;maxItems=n98;n=s5:items;parts=[{k=s3:int;n=s2:id},{k=s3:int;n=s5:count}]}];key=[s3:tab];max=n1536;space=s6:member;variants={0=[{k=s3:int;n=s9:scannedAt},{k=s3:int;n=s5:money},{k=s4:list;maxItems=n8;n=s4:tabs;of={k=s4:text;max=n32}},{k=s4:list;maxItems=n25;n=s3:log;parts=[{k=s3:int;n=s2:at},{k=s4:text;max=n12;n=s4:kind},{k=s4:text;max=n48;n=s3:who},{k=s3:int;n=s4:item},{k=s3:int;n=s5:count},{k=s3:int;n=s6:amount}]}]}};lp={code=s2:lp;expiry={days=n3};fields=[{k=s4:text;max=n48;n=s9:character},{k=s3:int;n=s5:level},{k=s4:text;max=n60;n=s4:zone},{k=s4:text;max=n60;n=s4:when},{k=s4:text;max=n140;n=s4:note}];key=[s3:pid,s4:name];max=n400;space=s6:member};pr={code=s2:pr;expiry={days=n14};fields=[{k=s3:int;n=s3:day},{k=s4:list;maxItems=n60;n=s6:prices;parts=[{k=s3:int;n=s2:id},{k=s3:int;n=s6:copper}]}];key=[s3:pid];max=n800;space=s6:member};rc={author=s3:key;code=s2:rc;expiry={days=n60;newerOf=s2:ch};fields=[{k=s4:enum;n=s4:kind;values=s3:sin},{k=s3:int;n=s5:count},{cases={n={k=s4:list;maxItems=n500;of={k=s4:text;max=n100}}};default={k=s3:ids;maxItems=n2000};k=s6:switch;n=s4:list;on=s4:kind}];key=[s4:name,s3:int];max=n2048;maxIf={field=s4:kind;max=n6144;value=s1:n};space=s6:member};sh={code=s2:sh;expiry={days=n30};fields=[{k=s4:list;maxItems=n20;n=s5:items;parts=[{k=s4:text;max=n100;n=s4:name},{k=s3:int;n=s3:qty},{k=s3:int;n=s5:skill}]}];key=[s3:pid];max=n1024;space=s6:member};su={code=s2:su;expiry={parent=s2:RD;seg=n1};fields=[{k=s4:text;max=n48;n=s9:character},{k=s4:enum;n=s4:role;values=s3:thd},{k=s4:enum;n=s6:status;values=s4:ytnb},{k=s4:text;max=n120;n=s4:note},{k=s4:list;maxItems=n10;n=s8:reserves;of={k=s4:text;max=n12}},{k=s3:int;n=s10:reservesAt},{k=s4:list;maxItems=n10;n=s4:prev;of={k=s4:text;max=n12}},{k=s3:int;n=s6:prevAt}];key=[s5:b36x6,s3:pid];max=n400;space=s6:member}}",
  "hashes": [
   {
    "s": "",
@@ -632,6 +632,10 @@
      "v": "1gqx1g5y"
     },
     {
+     "id": "ch:Thrallia",
+     "v": "1gqx1g5y"
+    },
+    {
      "id": "ch:Zuljinne",
      "v": "1gqx1g6s"
     },
@@ -690,6 +694,18 @@
     {
      "id": "lp:Thrallia.p4m7:Zuljinne",
      "v": "1gqx1g6s"
+    },
+    {
+     "id": "dg:dg1grp",
+     "v": "1gqx1g5y"
+    },
+    {
+     "id": "dg:dg1grp",
+     "v": "wzm58vpy"
+    },
+    {
+     "id": "dj:dg1grp:Zuljin.a8x2",
+     "v": "1gqx1go1"
     },
     {
      "id": "dc:h4nd1n",
@@ -825,10 +841,10 @@
     }
    ],
    "removed": [],
-   "sum": 101010618629,
-   "count": 52,
-   "value": 252145,
-   "str": "5ek1"
+   "sum": 108679145856,
+   "count": 56,
+   "value": 1336897,
+   "str": "snk1"
   },
   {
    "entries": [
@@ -843,6 +859,10 @@
     {
      "id": "ca:x8k2pq",
      "v": "1gqx36dy"
+    },
+    {
+     "id": "ch:Thrallia",
+     "v": "1gqx1g5y"
     },
     {
      "id": "ch:Thrallia",
@@ -907,6 +927,18 @@
     {
      "id": "lp:Thrallia.p4m7:Zuljinne",
      "v": "1gqx1g6s"
+    },
+    {
+     "id": "dg:dg1grp",
+     "v": "1gqx1g5y"
+    },
+    {
+     "id": "dg:dg1grp",
+     "v": "wzm58vpy"
+    },
+    {
+     "id": "dj:dg1grp:Zuljin.a8x2",
+     "v": "1gqx1go1"
     },
     {
      "id": "dc:h4nd1n",
@@ -1047,6 +1079,10 @@
      "v": "1gqx1g5y"
     },
     {
+     "id": "ch:Thrallia",
+     "v": "1gqx1g5y"
+    },
+    {
      "id": "ch:Zuljinne",
      "v": "1gqx1g6s"
     },
@@ -1061,16 +1097,12 @@
     {
      "id": "rc:Thrallia:4k",
      "v": "1gqx1g5y"
-    },
-    {
-     "id": "rc:Thrallia:4k",
-     "v": "1gqx1g5y"
     }
    ],
-   "sum": 89553747834,
-   "count": 46,
-   "value": 35265,
-   "str": "0r7l"
+   "sum": 100566521912,
+   "count": 50,
+   "value": 1253403,
+   "str": "qv4r"
   },
   {
    "entries": [
@@ -1428,10 +1460,52 @@
    "record": "ch:Thrallia^1gqx1g5y^Thrallia^^Thrallia.p4m7^Calvin~231234^1^Thrallia;Zuljinne;Zulé^Shaman^Orc^1o^Horde^1q^2f^2,0,c,k,0^4k,8c,8c;56,7n,8c^7,ya^0.12.0",
    "now": 1794067200,
    "lookup": null,
-   "dump": "{author=s8:Thrallia;del=F;fields={addon=s6:0.12.0;alts=[s8:Thrallia,s8:Zuljinne,s5:Zulé];battletag=s11:Calvin#1234;class=s6:Shaman;consumables={bandage=n0;elixir=n0;flask=n2;food=n20;potion=n12};faction=s5:Horde;ilvl=n62;level=n60;main=T;pid=s13:Thrallia.p4m7;professions=[{max=n300;rank=n300;skill=n164},{max=n300;rank=n275;skill=n186}];pvp={hk=n1234;rank=n7};race=s3:Orc;repair=n87};id=s11:ch:Thrallia;key=s8:Thrallia;t=n1794067140;type=s2:ch;v=s8:1gqx1g5y}",
+   "dump": "{author=s8:Thrallia;del=F;fields={addon=s6:0.12.0;alts=[s8:Thrallia,s8:Zuljinne,s5:Zulé];battletag=s11:Calvin#1234;class=s6:Shaman;consumables={bandage=n0;elixir=n0;flask=n2;food=n20;potion=n12};faction=s5:Horde;ilvl=n62;level=n60;main=T;pid=s13:Thrallia.p4m7;professions=[{max=n300;rank=n300;skill=n164},{max=n300;rank=n275;skill=n186}];pvp={hk=n1234;rank=n7};race=s3:Orc;repair=n87;resists={};talents={};unenchanted={}};id=s11:ch:Thrallia;key=s8:Thrallia;t=n1794067140;type=s2:ch;v=s8:1gqx1g5y}",
    "reencode": "ch:Thrallia^1gqx1g5y^Thrallia^^Thrallia.p4m7^Calvin~231234^1^Thrallia;Zuljinne;Zulé^Shaman^Orc^1o^Horde^1q^2f^2,0,c,k,0^4k,8c,8c;56,7n,8c^7,ya^0.12.0",
    "check": null,
    "parseDump": "{author=s8:Thrallia;del=F;id=s11:ch:Thrallia;key=s8:Thrallia;raw=[s13:Thrallia.p4m7,s13:Calvin~231234,s1:1,s23:Thrallia;Zuljinne;Zulé,s6:Shaman,s3:Orc,s2:1o,s5:Horde,s2:1q,s2:2f,s9:2,0,c,k,0,s17:4k,8c,8c;56,7n,8c,s4:7,ya,s6:0.12.0];t=n1794067140;type=s2:ch;v=s8:1gqx1g5y}",
+   "final": false
+  },
+  {
+   "name": "ch with raid readiness",
+   "input": {
+    "type": "ch",
+    "key": "Thrallia",
+    "v": "1gqx1g5y",
+    "author": "Thrallia",
+    "del": false,
+    "fields": {
+     "pid": "Thrallia.p4m7",
+     "class": "Shaman",
+     "level": 60,
+     "ilvl": 62,
+     "repair": 87,
+     "addon": "0.12.0",
+     "talents": {
+      "a": 0,
+      "b": 21,
+      "c": 30
+     },
+     "resists": {
+      "fire": 135,
+      "nature": 0,
+      "frost": 15,
+      "shadow": 42,
+      "arcane": 10
+     },
+     "unenchanted": [
+      9,
+      15
+     ]
+    }
+   },
+   "record": "ch:Thrallia^1gqx1g5y^Thrallia^^Thrallia.p4m7^^^^Shaman^^1o^^1q^2f^^^^0.12.0^0,l,u^3r,0,f,16,a^9;f",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s8:Thrallia;del=F;fields={addon=s6:0.12.0;alts={};battletag=s0:;class=s6:Shaman;consumables={};faction=s0:;ilvl=n62;level=n60;main=F;pid=s13:Thrallia.p4m7;professions={};pvp={};race=s0:;repair=n87;resists={arcane=n10;fire=n135;frost=n15;nature=n0;shadow=n42};talents={a=n0;b=n21;c=n30};unenchanted=[n9,n15]};id=s11:ch:Thrallia;key=s8:Thrallia;t=n1794067140;type=s2:ch;v=s8:1gqx1g5y}",
+   "reencode": "ch:Thrallia^1gqx1g5y^Thrallia^^Thrallia.p4m7^^^^Shaman^^1o^^1q^2f^^^^0.12.0^0,l,u^3r,0,f,16,a^9;f",
+   "check": null,
+   "parseDump": "{author=s8:Thrallia;del=F;id=s11:ch:Thrallia;key=s8:Thrallia;raw=[s13:Thrallia.p4m7,s0:,s0:,s0:,s6:Shaman,s0:,s2:1o,s0:,s2:1q,s2:2f,s0:,s0:,s0:,s6:0.12.0,s5:0,l,u,s11:3r,0,f,16,a,s3:9;f];t=n1794067140;type=s2:ch;v=s8:1gqx1g5y}",
    "final": false
   },
   {
@@ -1454,7 +1528,7 @@
    "record": "ch:Zuljinne^1gqx1g6s^Zuljinne^^Thrallia.p4m7^^^^^^c^^^^,,3",
    "now": 1794067200,
    "lookup": null,
-   "dump": "{author=s8:Zuljinne;del=F;fields={addon=s0:;alts={};battletag=s0:;class=s0:;consumables={potion=n3};faction=s0:;level=n12;main=F;pid=s13:Thrallia.p4m7;professions={};pvp={};race=s0:};id=s11:ch:Zuljinne;key=s8:Zuljinne;t=n1794067140;type=s2:ch;v=s8:1gqx1g6s}",
+   "dump": "{author=s8:Zuljinne;del=F;fields={addon=s0:;alts={};battletag=s0:;class=s0:;consumables={potion=n3};faction=s0:;level=n12;main=F;pid=s13:Thrallia.p4m7;professions={};pvp={};race=s0:;resists={};talents={};unenchanted={}};id=s11:ch:Zuljinne;key=s8:Zuljinne;t=n1794067140;type=s2:ch;v=s8:1gqx1g6s}",
    "reencode": "ch:Zuljinne^1gqx1g6s^Zuljinne^^Thrallia.p4m7^^^^^^c^^^^,,3",
    "check": null,
    "parseDump": "{author=s8:Zuljinne;del=F;id=s11:ch:Zuljinne;key=s8:Zuljinne;raw=[s13:Thrallia.p4m7,s0:,s0:,s0:,s0:,s0:,s1:c,s0:,s0:,s0:,s3:,,3];t=n1794067140;type=s2:ch;v=s8:1gqx1g6s}",
@@ -1477,7 +1551,7 @@
    "record": "ch:Zulé^1gqx1g5o^Zulé^^Thrallia.p4m7^^^^Mage^^1o",
    "now": 1794067200,
    "lookup": null,
-   "dump": "{author=s5:Zulé;del=F;fields={addon=s0:;alts={};battletag=s0:;class=s4:Mage;consumables={};faction=s0:;level=n60;main=F;pid=s13:Thrallia.p4m7;professions={};pvp={};race=s0:};id=s8:ch:Zulé;key=s5:Zulé;t=n1794067140;type=s2:ch;v=s8:1gqx1g5o}",
+   "dump": "{author=s5:Zulé;del=F;fields={addon=s0:;alts={};battletag=s0:;class=s4:Mage;consumables={};faction=s0:;level=n60;main=F;pid=s13:Thrallia.p4m7;professions={};pvp={};race=s0:;resists={};talents={};unenchanted={}};id=s8:ch:Zulé;key=s5:Zulé;t=n1794067140;type=s2:ch;v=s8:1gqx1g5o}",
    "reencode": "ch:Zulé^1gqx1g5o^Zulé^^Thrallia.p4m7^^^^Mage^^1o",
    "check": null,
    "parseDump": "{author=s5:Zulé;del=F;id=s8:ch:Zulé;key=s5:Zulé;raw=[s13:Thrallia.p4m7,s0:,s0:,s0:,s4:Mage,s0:,s2:1o];t=n1794067140;type=s2:ch;v=s8:1gqx1g5o}",
@@ -1530,7 +1604,7 @@
    "record": "ch:Thrallia^1gqx1g5y^Thrallia^^Thrallia.p4m7^^^Alt0;Alt1;Alt2;Alt3;Alt4;Alt5;Alt6;Alt7;Alt8;Alt9;Alt10;Alt11;Alt12;Alt13;Alt14;Alt15;Alt16;Alt17;Alt18;Alt19",
    "now": 1794067200,
    "lookup": null,
-   "dump": "{author=s8:Thrallia;del=F;fields={addon=s0:;alts=[s4:Alt0,s4:Alt1,s4:Alt2,s4:Alt3,s4:Alt4,s4:Alt5,s4:Alt6,s4:Alt7,s4:Alt8,s4:Alt9,s5:Alt10,s5:Alt11,s5:Alt12,s5:Alt13,s5:Alt14,s5:Alt15,s5:Alt16,s5:Alt17,s5:Alt18,s5:Alt19];battletag=s0:;class=s0:;consumables={};faction=s0:;main=F;pid=s13:Thrallia.p4m7;professions={};pvp={};race=s0:};id=s11:ch:Thrallia;key=s8:Thrallia;t=n1794067140;type=s2:ch;v=s8:1gqx1g5y}",
+   "dump": "{author=s8:Thrallia;del=F;fields={addon=s0:;alts=[s4:Alt0,s4:Alt1,s4:Alt2,s4:Alt3,s4:Alt4,s4:Alt5,s4:Alt6,s4:Alt7,s4:Alt8,s4:Alt9,s5:Alt10,s5:Alt11,s5:Alt12,s5:Alt13,s5:Alt14,s5:Alt15,s5:Alt16,s5:Alt17,s5:Alt18,s5:Alt19];battletag=s0:;class=s0:;consumables={};faction=s0:;main=F;pid=s13:Thrallia.p4m7;professions={};pvp={};race=s0:;resists={};talents={};unenchanted={}};id=s11:ch:Thrallia;key=s8:Thrallia;t=n1794067140;type=s2:ch;v=s8:1gqx1g5y}",
    "reencode": "ch:Thrallia^1gqx1g5y^Thrallia^^Thrallia.p4m7^^^Alt0;Alt1;Alt2;Alt3;Alt4;Alt5;Alt6;Alt7;Alt8;Alt9;Alt10;Alt11;Alt12;Alt13;Alt14;Alt15;Alt16;Alt17;Alt18;Alt19",
    "check": null,
    "parseDump": "{author=s8:Thrallia;del=F;id=s11:ch:Thrallia;key=s8:Thrallia;raw=[s13:Thrallia.p4m7,s0:,s0:,s109:Alt0;Alt1;Alt2;Alt3;Alt4;Alt5;Alt6;Alt7;Alt8;Alt9;Alt10;Alt11;Alt12;Alt13;Alt14;Alt15;Alt16;Alt17;Alt18;Alt19];t=n1794067140;type=s2:ch;v=s8:1gqx1g5y}",
@@ -1844,6 +1918,89 @@
    "reencode": "lp:Thrallia.p4m7:Zuljinne^1gqx1g6s^Zuljinne^^Zuljinne^o^Stranglethorn Vale^tonight 8pm^questing~3B anyone?",
    "check": null,
    "parseDump": "{author=s8:Zuljinne;del=F;id=s25:lp:Thrallia.p4m7:Zuljinne;key=s22:Thrallia.p4m7:Zuljinne;raw=[s8:Zuljinne,s1:o,s18:Stranglethorn Vale,s11:tonight 8pm,s19:questing~3B anyone?];t=n1794067140;type=s2:lp;v=s8:1gqx1g6s}",
+   "final": false
+  },
+  {
+   "name": "dg dungeon group",
+   "input": {
+    "type": "dg",
+    "key": "dg1grp",
+    "v": "1gqx1g5y",
+    "author": "Thrallia",
+    "del": false,
+    "fields": {
+     "pid": "Thrallia.p4m7",
+     "character": "Thrallia",
+     "dungeon": "The Deadmines",
+     "startsAt": 1794070800,
+     "role": "h",
+     "level": 20,
+     "tank": 1,
+     "heal": 1,
+     "dps": 3,
+     "note": "quest run; bring VC quests",
+     "state": "o"
+    }
+   },
+   "record": "dg:dg1grp^1gqx1g5y^Thrallia^^Thrallia.p4m7^Thrallia^The Deadmines^to55w0^h^k^1^1^3^quest run~3B bring VC quests^o",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s8:Thrallia;del=F;fields={character=s8:Thrallia;dps=n3;dungeon=s13:The Deadmines;heal=n1;level=n20;note=s26:quest run; bring VC quests;pid=s13:Thrallia.p4m7;role=s1:h;startsAt=n1794070800;state=s1:o;tank=n1};id=s9:dg:dg1grp;key=s6:dg1grp;t=n1794067140;type=s2:dg;v=s8:1gqx1g5y}",
+   "reencode": "dg:dg1grp^1gqx1g5y^Thrallia^^Thrallia.p4m7^Thrallia^The Deadmines^to55w0^h^k^1^1^3^quest run~3B bring VC quests^o",
+   "check": null,
+   "parseDump": "{author=s8:Thrallia;del=F;id=s9:dg:dg1grp;key=s6:dg1grp;raw=[s13:Thrallia.p4m7,s8:Thrallia,s13:The Deadmines,s6:to55w0,s1:h,s1:k,s1:1,s1:1,s1:3,s28:quest run~3B bring VC quests,s1:o];t=n1794067140;type=s2:dg;v=s8:1gqx1g5y}",
+   "final": false
+  },
+  {
+   "name": "dg cancelled (final)",
+   "input": {
+    "type": "dg",
+    "key": "dg1grp",
+    "v": "wzm58vpy",
+    "author": "Thrallia",
+    "del": false,
+    "fields": {
+     "pid": "Thrallia.p4m7",
+     "character": "Thrallia",
+     "dungeon": "The Deadmines",
+     "startsAt": 1794070800,
+     "role": "h",
+     "state": "x"
+    }
+   },
+   "record": "dg:dg1grp^wzm58vpy^Thrallia^^Thrallia.p4m7^Thrallia^The Deadmines^to55w0^h^^^^^^x",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s8:Thrallia;del=F;fields={character=s8:Thrallia;dungeon=s13:The Deadmines;note=s0:;pid=s13:Thrallia.p4m7;role=s1:h;startsAt=n1794070800;state=s1:x};id=s9:dg:dg1grp;key=s6:dg1grp;t=n1794067170;type=s2:dg;v=s8:wzm58vpy}",
+   "reencode": "dg:dg1grp^wzm58vpy^Thrallia^^Thrallia.p4m7^Thrallia^The Deadmines^to55w0^h^^^^^^x",
+   "check": null,
+   "parseDump": "{author=s8:Thrallia;del=F;id=s9:dg:dg1grp;key=s6:dg1grp;raw=[s13:Thrallia.p4m7,s8:Thrallia,s13:The Deadmines,s6:to55w0,s1:h,s0:,s0:,s0:,s0:,s0:,s1:x];t=n1794067170;type=s2:dg;v=s8:wzm58vpy}",
+   "final": true
+  },
+  {
+   "name": "dj join",
+   "input": {
+    "type": "dj",
+    "key": "dg1grp:Zuljin.a8x2",
+    "v": "1gqx1go1",
+    "author": "Zuljin",
+    "del": false,
+    "fields": {
+     "character": "Zuljin",
+     "role": "t",
+     "status": "y",
+     "class": "Warrior",
+     "level": 21,
+     "joinedAt": 1794067150
+    }
+   },
+   "record": "dj:dg1grp:Zuljin.a8x2^1gqx1go1^Zuljin^^Zuljin^t^y^Warrior^l^to532m",
+   "now": 1794067200,
+   "lookup": null,
+   "dump": "{author=s6:Zuljin;del=F;fields={character=s6:Zuljin;class=s7:Warrior;joinedAt=n1794067150;level=n21;role=s1:t;status=s1:y};id=s21:dj:dg1grp:Zuljin.a8x2;key=s18:dg1grp:Zuljin.a8x2;t=n1794067150;type=s2:dj;v=s8:1gqx1go1}",
+   "reencode": "dj:dg1grp:Zuljin.a8x2^1gqx1go1^Zuljin^^Zuljin^t^y^Warrior^l^to532m",
+   "check": null,
+   "parseDump": "{author=s6:Zuljin;del=F;id=s21:dj:dg1grp:Zuljin.a8x2;key=s18:dg1grp:Zuljin.a8x2;raw=[s6:Zuljin,s1:t,s1:y,s7:Warrior,s1:l,s6:to532m];t=n1794067150;type=s2:dj;v=s8:1gqx1go1}",
    "final": false
   },
   {
@@ -2815,6 +2972,24 @@
    "record": "cl:r1r1r1:Zuljin.a8x2^1gqtr0gx^Zuljin^^c",
    "lookup": {
     "cr:r1r1r1": "cr:r1r1r1^wzmvkzkm^Thrallia^^Thrallia.p4m7^x^^d"
+   },
+   "hour": 1794067200,
+   "at": 1793980800,
+   "expired": true
+  },
+  {
+   "name": "dg startsAt + 1 day",
+   "record": "dg:dg1grp^1gqqghsm^Thrallia^^Thrallia.p4m7^^x^to38ga^^^^^^^o",
+   "lookup": null,
+   "hour": 1794067200,
+   "at": 1794067210,
+   "expired": false
+  },
+  {
+   "name": "dj with the group",
+   "record": "dj:dg1grp:Zuljin.a8x2^1gqtr0gx^Zuljin^^^t^y",
+   "lookup": {
+    "dg:dg1grp": "dg:dg1grp^1gqqghsm^Thrallia^^Thrallia.p4m7^^x^to1ds0^^^^^^^o"
    },
    "hour": 1794067200,
    "at": 1793980800,
@@ -4643,6 +4818,7 @@
      "RT:k3f9a2^wzltl343^Grommash^^d^tob9c0^r^4kq1zm^tobn80^Thrallia.p4m7,d72,eim;Zuljin.a8x2,eim^Varok.7tq3",
      "ca:x8k2pq^1gqx36dy^Thrallia^^Thrallia^Crossroads^5^Alliance at the flight master",
      "ch:Thrallia^1gqx1g5y^Thrallia^^Thrallia.p4m7^Calvin~231234^1^Thrallia;Zuljinne;Zulé^Shaman^Orc^1o^Horde^1q^2f^2,0,c,k,0^4k,8c,8c;56,7n,8c^7,ya^0.12.0",
+     "ch:Thrallia^1gqx1g5y^Thrallia^^Thrallia.p4m7^^^^Shaman^^1o^^1q^2f^^^^0.12.0^0,l,u^3r,0,f,16,a^9;f",
      "ch:Zuljinne^1gqx1g6s^Zuljinne^^Thrallia.p4m7^^^^^^c^^^^,,3",
      "ch:Zulé^1gqx1g5o^Zulé^^Thrallia.p4m7^^^^Mage^^1o",
      "ch:Thrallia^1gqx1g5y^Thrallia^^Thrallia.p4m7^^^Alt0;Alt1;Alt2;Alt3;Alt4;Alt5;Alt6;Alt7;Alt8;Alt9;Alt10;Alt11;Alt12;Alt13;Alt14;Alt15;Alt16;Alt17;Alt18;Alt19",
@@ -4658,6 +4834,9 @@
      "cr:r1r1r1^wzm58vpy^Thrallia^^Thrallia.p4m7^Robe of the Archmage^^d",
      "cl:r1r1r1:Zuljin.a8x2^1gqx1g69^Zuljin^^c^to532c",
      "lp:Thrallia.p4m7:Zuljinne^1gqx1g6s^Zuljinne^^Zuljinne^o^Stranglethorn Vale^tonight 8pm^questing~3B anyone?",
+     "dg:dg1grp^1gqx1g5y^Thrallia^^Thrallia.p4m7^Thrallia^The Deadmines^to55w0^h^k^1^1^3^quest run~3B bring VC quests^o",
+     "dg:dg1grp^wzm58vpy^Thrallia^^Thrallia.p4m7^Thrallia^The Deadmines^to55w0^h^^^^^^x",
+     "dj:dg1grp:Zuljin.a8x2^1gqx1go1^Zuljin^^Zuljin^t^y^Warrior^l^to532m",
      "dc:h4nd1n^1gqx1g5y^Thrallia^^Thrallia.p4m7^dr1v3x^Thrallia^14^Linen",
      "bq:b4nkrq^1gqx1g5y^Thrallia^^Thrallia.p4m7^Runecloth^k^for bandages^o",
      "bq:b4nkrq^wzm58vpy^Thrallia^^Thrallia.p4m7^Runecloth^k^^x",
@@ -4689,7 +4868,7 @@
      "gb:0^1gqx1g6s^Zuljinne^^0^zzzzzzzzzz",
      "gb:0^1gqx1g6s^Zuljinne^^^^x"
     ],
-    "msgs": "[s201:1RRD:k3f9a2^1gqwzvur^Grommash^^r^Molten Core Thursday^Molten Core^tobc40^50^14^2^Bring fire resist#RT:k3f9a2^wzltl343^Grommash^^d^tob9c0^r^4kq1zm^tobn80^Thrallia.p4m7,d72,eim;Zuljin.a8x2,eim^Varok.7tq3,s233:1Rca:x8k2pq^1gqx36dy^Thrallia^^Thrallia^Crossroads^5^Alliance at the flight master#ch:Thrallia^1gqx1g5y^Thrallia^^Thrallia.p4m7^Calvin~231234^1^Thrallia;Zuljinne;Zulé^Shaman^Orc^1o^Horde^1q^2f^2,0,c,k,0^4k,8c,8c;56,7n,8c^7,ya^0.12.0,s111:1Rch:Zuljinne^1gqx1g6s^Zuljinne^^Thrallia.p4m7^^^^^^c^^^^,,3#ch:Zulé^1gqx1g5o^Zulé^^Thrallia.p4m7^^^^Mage^^1o,s254:1Rch:Thrallia^1gqx1g5y^Thrallia^^Thrallia.p4m7^^^Alt0;Alt1;Alt2;Alt3;Alt4;Alt5;Alt6;Alt7;Alt8;Alt9;Alt10;Alt11;Alt12;Alt13;Alt14;Alt15;Alt16;Alt17;Alt18;Alt19#rc:Thrallia:4k^1gqx1g5y^Thrallia^^s^6^Yp4111k4cn8#rc:Thrallia:4k^1gqx1g5y^Thrallia^^i^3^0YmTkbH,s223:1Rrc:Thrallia:5h^1gqx1g5y^Thrallia^^n^3^Linen Bandage;Heavy Silk~3B Bandage;Æther~2C cloth#rc:Thrallia:5h^1gqx1g5y^Thrallia^^s^0#su:k3f9a2:Thrallia.p4m7^1gqx1g5y^Thrallia^^Thrallia^h^y^late 10 min^d72;eim^to530o^d72^to50c0,s217:1Rsu:k3f9a2:Thrallia.p4m7^1gqx2cra^Thrallia^^Thrallia^h^y^late 10 min^d72;eim^to53ko#su:k3f9a2:Zuljin.a8x2^1gqx1g69^Zuljin^^Zuljin^d^b#cr:r1r1r1^1gqx1g5y^Thrallia^^Thrallia.p4m7^Robe of the Archmage^I bring the mats^o,s183:1Rcr:r1r1r1^wzm58vpy^Thrallia^^Thrallia.p4m7^Robe of the Archmage^^x#cr:r1r1r1^wzm58vpy^Thrallia^^Thrallia.p4m7^Robe of the Archmage^^d#cl:r1r1r1:Zuljin.a8x2^1gqx1g69^Zuljin^^c^to532c,s246:1Rlp:Thrallia.p4m7:Zuljinne^1gqx1g6s^Zuljinne^^Zuljinne^o^Stranglethorn Vale^tonight 8pm^questing~3B anyone?#dc:h4nd1n^1gqx1g5y^Thrallia^^Thrallia.p4m7^dr1v3x^Thrallia^14^Linen#bq:b4nkrq^1gqx1g5y^Thrallia^^Thrallia.p4m7^Runecloth^k^for bandages^o,s222:1Rbq:b4nkrq^wzm58vpy^Thrallia^^Thrallia.p4m7^Runecloth^k^^x#gb:0^1gqx1g6s^Zuljinne^^to532c^21i3v9^Mats;Gear~3B misc;Ränge^to4xk0,deposit,Thrallia,1zx,k;to50c0,withdraw,Zulé,,,3uw#gb:3^1gqx1g6s^Zuljinne^^1zx,5k;3bm,14;0,5,s250:1Rbk:Bankalt^1gqx1g6a^Bankalt^^1zx,k^au7,2s;3ci,1o#sh:Thrallia.p4m7^1gqx1g5y^Thrallia^^Bolt of Silk Cloth,4,5h;Iron Bar,a,4k#pr:Thrallia.p4m7^1gqx1g5y^Thrallia^^g0t^1zx,46;au7,1uo#RD:pvp001^1gqx1g6g^Varok^^p^Warsong Friday^Warsong Gulch^toan40^3c^a^0,s200:1RRT:k3f9a2^1gr80lc3^Grommash^^l^tob9c0#RT:k3f9a2^1gqx1hns^Varok^^o#RT:k3f9a2^wzm58vqg^Varok^^x#LA:aw4rd1^1gqx1g5f^Grommash^^k3f9a2^2dv8n1^d72^Cloak of the Shrouded Mists^Thrallia^Thrallia.p4m7^s^2f^k,s207:1RLL:2dv8n1^1gqx1g5f^Grommash^^Molten Core^Lucifron;Magmadar;Gehennas^d72,1,Cloak of the Shrouded Mists;h0abcd,0,Trash~2C drop~3B any#LY:2dv8n1^1gqx1g5f^Grommash^^tmlj40^Thrallia.p4m7,d72,u;Zuljin.a8x2,eim,a,s210:1RAN:q2w8zz^1gqx1g5f^Grommash^^Raid ~00~01~02~03~04~05~06~07~08~09~0A~0B~0C~0D~0E~0F~10~11~12~13~14~15~16~17~18~19~1A~1B~1C~1D~1E~1F~7F~7E~5E~3B~2C~23~7C done Zulé Ærøn 東京 😀#AN:q2w8zz^1gqx1hns^Varok^d,s247:1RDR:dr1v3x^1gqx1g5f^Grommash^^Bandages for Naxx^Runecloth^1jk^Bank it with Bankalt^o#DR:dr1v3x^wzm58vpf^Grommash^^Bandages for Naxx^Runecloth^1jk^^c#BH:b4nkrq^1gqx1g6g^Varok^^s#BC:1^1gqx1g5f^Grommash^^Bankalt;Bänkalt#CFG:1^1gqx1g5f^Grommash^^1^-,s245:1RCFG:1^1gqx1g5f^Grommash^^1^2#WH:1^1gqx1g6g^Varok^^https://discord.com/api/webhooks/123/abc_DEF-ghi#zz:any:thing^1gqx1g5y^Thrallia^^1^^x~2Cy#ZQ:1^1gqx1g6g^Varok^d#ca:old001^1gqn5z4m^Thrallia^^^Crossroads#ca:fut001^1gqx6gwm^Thrallia^^^Crossroads,s66:1Rgb:0^1gqx1g6s^Zuljinne^^0^zzzzzzzzzz#gb:0^1gqx1g6s^Zuljinne^^^^x]",
+    "msgs": "[s201:1RRD:k3f9a2^1gqwzvur^Grommash^^r^Molten Core Thursday^Molten Core^tobc40^50^14^2^Bring fire resist#RT:k3f9a2^wzltl343^Grommash^^d^tob9c0^r^4kq1zm^tobn80^Thrallia.p4m7,d72,eim;Zuljin.a8x2,eim^Varok.7tq3,s233:1Rca:x8k2pq^1gqx36dy^Thrallia^^Thrallia^Crossroads^5^Alliance at the flight master#ch:Thrallia^1gqx1g5y^Thrallia^^Thrallia.p4m7^Calvin~231234^1^Thrallia;Zuljinne;Zulé^Shaman^Orc^1o^Horde^1q^2f^2,0,c,k,0^4k,8c,8c;56,7n,8c^7,ya^0.12.0,s209:1Rch:Thrallia^1gqx1g5y^Thrallia^^Thrallia.p4m7^^^^Shaman^^1o^^1q^2f^^^^0.12.0^0,l,u^3r,0,f,16,a^9;f#ch:Zuljinne^1gqx1g6s^Zuljinne^^Thrallia.p4m7^^^^^^c^^^^,,3#ch:Zulé^1gqx1g5o^Zulé^^Thrallia.p4m7^^^^Mage^^1o,s254:1Rch:Thrallia^1gqx1g5y^Thrallia^^Thrallia.p4m7^^^Alt0;Alt1;Alt2;Alt3;Alt4;Alt5;Alt6;Alt7;Alt8;Alt9;Alt10;Alt11;Alt12;Alt13;Alt14;Alt15;Alt16;Alt17;Alt18;Alt19#rc:Thrallia:4k^1gqx1g5y^Thrallia^^s^6^Yp4111k4cn8#rc:Thrallia:4k^1gqx1g5y^Thrallia^^i^3^0YmTkbH,s223:1Rrc:Thrallia:5h^1gqx1g5y^Thrallia^^n^3^Linen Bandage;Heavy Silk~3B Bandage;Æther~2C cloth#rc:Thrallia:5h^1gqx1g5y^Thrallia^^s^0#su:k3f9a2:Thrallia.p4m7^1gqx1g5y^Thrallia^^Thrallia^h^y^late 10 min^d72;eim^to530o^d72^to50c0,s217:1Rsu:k3f9a2:Thrallia.p4m7^1gqx2cra^Thrallia^^Thrallia^h^y^late 10 min^d72;eim^to53ko#su:k3f9a2:Zuljin.a8x2^1gqx1g69^Zuljin^^Zuljin^d^b#cr:r1r1r1^1gqx1g5y^Thrallia^^Thrallia.p4m7^Robe of the Archmage^I bring the mats^o,s183:1Rcr:r1r1r1^wzm58vpy^Thrallia^^Thrallia.p4m7^Robe of the Archmage^^x#cr:r1r1r1^wzm58vpy^Thrallia^^Thrallia.p4m7^Robe of the Archmage^^d#cl:r1r1r1:Zuljin.a8x2^1gqx1g69^Zuljin^^c^to532c,s222:1Rlp:Thrallia.p4m7:Zuljinne^1gqx1g6s^Zuljinne^^Zuljinne^o^Stranglethorn Vale^tonight 8pm^questing~3B anyone?#dg:dg1grp^1gqx1g5y^Thrallia^^Thrallia.p4m7^Thrallia^The Deadmines^to55w0^h^k^1^1^3^quest run~3B bring VC quests^o,s218:1Rdg:dg1grp^wzm58vpy^Thrallia^^Thrallia.p4m7^Thrallia^The Deadmines^to55w0^h^^^^^^x#dj:dg1grp:Zuljin.a8x2^1gqx1go1^Zuljin^^Zuljin^t^y^Warrior^l^to532m#dc:h4nd1n^1gqx1g5y^Thrallia^^Thrallia.p4m7^dr1v3x^Thrallia^14^Linen,s250:1Rbq:b4nkrq^1gqx1g5y^Thrallia^^Thrallia.p4m7^Runecloth^k^for bandages^o#bq:b4nkrq^wzm58vpy^Thrallia^^Thrallia.p4m7^Runecloth^k^^x#gb:0^1gqx1g6s^Zuljinne^^to532c^21i3v9^Mats;Gear~3B misc;Ränge^to4xk0,deposit,Thrallia,1zx,k;to50c0,withdraw,Zulé,,,3uw,s221:1Rgb:3^1gqx1g6s^Zuljinne^^1zx,5k;3bm,14;0,5#bk:Bankalt^1gqx1g6a^Bankalt^^1zx,k^au7,2s;3ci,1o#sh:Thrallia.p4m7^1gqx1g5y^Thrallia^^Bolt of Silk Cloth,4,5h;Iron Bar,a,4k#pr:Thrallia.p4m7^1gqx1g5y^Thrallia^^g0t^1zx,46;au7,1uo,s166:1RRD:pvp001^1gqx1g6g^Varok^^p^Warsong Friday^Warsong Gulch^toan40^3c^a^0#RT:k3f9a2^1gr80lc3^Grommash^^l^tob9c0#RT:k3f9a2^1gqx1hns^Varok^^o#RT:k3f9a2^wzm58vqg^Varok^^x,s238:1RLA:aw4rd1^1gqx1g5f^Grommash^^k3f9a2^2dv8n1^d72^Cloak of the Shrouded Mists^Thrallia^Thrallia.p4m7^s^2f^k#LL:2dv8n1^1gqx1g5f^Grommash^^Molten Core^Lucifron;Magmadar;Gehennas^d72,1,Cloak of the Shrouded Mists;h0abcd,0,Trash~2C drop~3B any,s75:1RLY:2dv8n1^1gqx1g5f^Grommash^^tmlj40^Thrallia.p4m7,d72,u;Zuljin.a8x2,eim,a,s210:1RAN:q2w8zz^1gqx1g5f^Grommash^^Raid ~00~01~02~03~04~05~06~07~08~09~0A~0B~0C~0D~0E~0F~10~11~12~13~14~15~16~17~18~19~1A~1B~1C~1D~1E~1F~7F~7E~5E~3B~2C~23~7C done Zulé Ærøn 東京 😀#AN:q2w8zz^1gqx1hns^Varok^d,s247:1RDR:dr1v3x^1gqx1g5f^Grommash^^Bandages for Naxx^Runecloth^1jk^Bank it with Bankalt^o#DR:dr1v3x^wzm58vpf^Grommash^^Bandages for Naxx^Runecloth^1jk^^c#BH:b4nkrq^1gqx1g6g^Varok^^s#BC:1^1gqx1g5f^Grommash^^Bankalt;Bänkalt#CFG:1^1gqx1g5f^Grommash^^1^-,s245:1RCFG:1^1gqx1g5f^Grommash^^1^2#WH:1^1gqx1g6g^Varok^^https://discord.com/api/webhooks/123/abc_DEF-ghi#zz:any:thing^1gqx1g5y^Thrallia^^1^^x~2Cy#ZQ:1^1gqx1g6g^Varok^d#ca:old001^1gqn5z4m^Thrallia^^^Crossroads#ca:fut001^1gqx6gwm^Thrallia^^^Crossroads,s66:1Rgb:0^1gqx1g6s^Zuljinne^^0^zzzzzzzzzz#gb:0^1gqx1g6s^Zuljinne^^^^x]",
     "parsed": [
      {
       "msg": "1RRD:k3f9a2^1gqwzvur^Grommash^^r^Molten Core Thursday^Molten Core^tobc40^50^14^2^Bring fire resist#RT:k3f9a2^wzltl343^Grommash^^d^tob9c0^r^4kq1zm^tobn80^Thrallia.p4m7,d72,eim;Zuljin.a8x2,eim^Varok.7tq3",
@@ -4700,8 +4879,8 @@
       "dump": "[s80:ca:x8k2pq^1gqx36dy^Thrallia^^Thrallia^Crossroads^5^Alliance at the flight master,s150:ch:Thrallia^1gqx1g5y^Thrallia^^Thrallia.p4m7^Calvin~231234^1^Thrallia;Zuljinne;Zulé^Shaman^Orc^1o^Horde^1q^2f^2,0,c,k,0^4k,8c,8c;56,7n,8c^7,ya^0.12.0]"
      },
      {
-      "msg": "1Rch:Zuljinne^1gqx1g6s^Zuljinne^^Thrallia.p4m7^^^^^^c^^^^,,3#ch:Zulé^1gqx1g5o^Zulé^^Thrallia.p4m7^^^^Mage^^1o",
-      "dump": "[s58:ch:Zuljinne^1gqx1g6s^Zuljinne^^Thrallia.p4m7^^^^^^c^^^^,,3,s50:ch:Zulé^1gqx1g5o^Zulé^^Thrallia.p4m7^^^^Mage^^1o]"
+      "msg": "1Rch:Thrallia^1gqx1g5y^Thrallia^^Thrallia.p4m7^^^^Shaman^^1o^^1q^2f^^^^0.12.0^0,l,u^3r,0,f,16,a^9;f#ch:Zuljinne^1gqx1g6s^Zuljinne^^Thrallia.p4m7^^^^^^c^^^^,,3#ch:Zulé^1gqx1g5o^Zulé^^Thrallia.p4m7^^^^Mage^^1o",
+      "dump": "[s97:ch:Thrallia^1gqx1g5y^Thrallia^^Thrallia.p4m7^^^^Shaman^^1o^^1q^2f^^^^0.12.0^0,l,u^3r,0,f,16,a^9;f,s58:ch:Zuljinne^1gqx1g6s^Zuljinne^^Thrallia.p4m7^^^^^^c^^^^,,3,s50:ch:Zulé^1gqx1g5o^Zulé^^Thrallia.p4m7^^^^Mage^^1o]"
      },
      {
       "msg": "1Rch:Thrallia^1gqx1g5y^Thrallia^^Thrallia.p4m7^^^Alt0;Alt1;Alt2;Alt3;Alt4;Alt5;Alt6;Alt7;Alt8;Alt9;Alt10;Alt11;Alt12;Alt13;Alt14;Alt15;Alt16;Alt17;Alt18;Alt19#rc:Thrallia:4k^1gqx1g5y^Thrallia^^s^6^Yp4111k4cn8#rc:Thrallia:4k^1gqx1g5y^Thrallia^^i^3^0YmTkbH",
@@ -4720,24 +4899,32 @@
       "dump": "[s66:cr:r1r1r1^wzm58vpy^Thrallia^^Thrallia.p4m7^Robe of the Archmage^^x,s66:cr:r1r1r1^wzm58vpy^Thrallia^^Thrallia.p4m7^Robe of the Archmage^^d,s47:cl:r1r1r1:Zuljin.a8x2^1gqx1g69^Zuljin^^c^to532c]"
      },
      {
-      "msg": "1Rlp:Thrallia.p4m7:Zuljinne^1gqx1g6s^Zuljinne^^Zuljinne^o^Stranglethorn Vale^tonight 8pm^questing~3B anyone?#dc:h4nd1n^1gqx1g5y^Thrallia^^Thrallia.p4m7^dr1v3x^Thrallia^14^Linen#bq:b4nkrq^1gqx1g5y^Thrallia^^Thrallia.p4m7^Runecloth^k^for bandages^o",
-      "dump": "[s106:lp:Thrallia.p4m7:Zuljinne^1gqx1g6s^Zuljinne^^Zuljinne^o^Stranglethorn Vale^tonight 8pm^questing~3B anyone?,s67:dc:h4nd1n^1gqx1g5y^Thrallia^^Thrallia.p4m7^dr1v3x^Thrallia^14^Linen,s69:bq:b4nkrq^1gqx1g5y^Thrallia^^Thrallia.p4m7^Runecloth^k^for bandages^o]"
+      "msg": "1Rlp:Thrallia.p4m7:Zuljinne^1gqx1g6s^Zuljinne^^Zuljinne^o^Stranglethorn Vale^tonight 8pm^questing~3B anyone?#dg:dg1grp^1gqx1g5y^Thrallia^^Thrallia.p4m7^Thrallia^The Deadmines^to55w0^h^k^1^1^3^quest run~3B bring VC quests^o",
+      "dump": "[s106:lp:Thrallia.p4m7:Zuljinne^1gqx1g6s^Zuljinne^^Zuljinne^o^Stranglethorn Vale^tonight 8pm^questing~3B anyone?,s113:dg:dg1grp^1gqx1g5y^Thrallia^^Thrallia.p4m7^Thrallia^The Deadmines^to55w0^h^k^1^1^3^quest run~3B bring VC quests^o]"
      },
      {
-      "msg": "1Rbq:b4nkrq^wzm58vpy^Thrallia^^Thrallia.p4m7^Runecloth^k^^x#gb:0^1gqx1g6s^Zuljinne^^to532c^21i3v9^Mats;Gear~3B misc;Ränge^to4xk0,deposit,Thrallia,1zx,k;to50c0,withdraw,Zulé,,,3uw#gb:3^1gqx1g6s^Zuljinne^^1zx,5k;3bm,14;0,5",
-      "dump": "[s57:bq:b4nkrq^wzm58vpy^Thrallia^^Thrallia.p4m7^Runecloth^k^^x,s120:gb:0^1gqx1g6s^Zuljinne^^to532c^21i3v9^Mats;Gear~3B misc;Ränge^to4xk0,deposit,Thrallia,1zx,k;to50c0,withdraw,Zulé,,,3uw,s41:gb:3^1gqx1g6s^Zuljinne^^1zx,5k;3bm,14;0,5]"
+      "msg": "1Rdg:dg1grp^wzm58vpy^Thrallia^^Thrallia.p4m7^Thrallia^The Deadmines^to55w0^h^^^^^^x#dj:dg1grp:Zuljin.a8x2^1gqx1go1^Zuljin^^Zuljin^t^y^Warrior^l^to532m#dc:h4nd1n^1gqx1g5y^Thrallia^^Thrallia.p4m7^dr1v3x^Thrallia^14^Linen",
+      "dump": "[s81:dg:dg1grp^wzm58vpy^Thrallia^^Thrallia.p4m7^Thrallia^The Deadmines^to55w0^h^^^^^^x,s66:dj:dg1grp:Zuljin.a8x2^1gqx1go1^Zuljin^^Zuljin^t^y^Warrior^l^to532m,s67:dc:h4nd1n^1gqx1g5y^Thrallia^^Thrallia.p4m7^dr1v3x^Thrallia^14^Linen]"
      },
      {
-      "msg": "1Rbk:Bankalt^1gqx1g6a^Bankalt^^1zx,k^au7,2s;3ci,1o#sh:Thrallia.p4m7^1gqx1g5y^Thrallia^^Bolt of Silk Cloth,4,5h;Iron Bar,a,4k#pr:Thrallia.p4m7^1gqx1g5y^Thrallia^^g0t^1zx,46;au7,1uo#RD:pvp001^1gqx1g6g^Varok^^p^Warsong Friday^Warsong Gulch^toan40^3c^a^0",
-      "dump": "[s48:bk:Bankalt^1gqx1g6a^Bankalt^^1zx,k^au7,2s;3ci,1o,s73:sh:Thrallia.p4m7^1gqx1g5y^Thrallia^^Bolt of Silk Cloth,4,5h;Iron Bar,a,4k,s54:pr:Thrallia.p4m7^1gqx1g5y^Thrallia^^g0t^1zx,46;au7,1uo,s70:RD:pvp001^1gqx1g6g^Varok^^p^Warsong Friday^Warsong Gulch^toan40^3c^a^0]"
+      "msg": "1Rbq:b4nkrq^1gqx1g5y^Thrallia^^Thrallia.p4m7^Runecloth^k^for bandages^o#bq:b4nkrq^wzm58vpy^Thrallia^^Thrallia.p4m7^Runecloth^k^^x#gb:0^1gqx1g6s^Zuljinne^^to532c^21i3v9^Mats;Gear~3B misc;Ränge^to4xk0,deposit,Thrallia,1zx,k;to50c0,withdraw,Zulé,,,3uw",
+      "dump": "[s69:bq:b4nkrq^1gqx1g5y^Thrallia^^Thrallia.p4m7^Runecloth^k^for bandages^o,s57:bq:b4nkrq^wzm58vpy^Thrallia^^Thrallia.p4m7^Runecloth^k^^x,s120:gb:0^1gqx1g6s^Zuljinne^^to532c^21i3v9^Mats;Gear~3B misc;Ränge^to4xk0,deposit,Thrallia,1zx,k;to50c0,withdraw,Zulé,,,3uw]"
      },
      {
-      "msg": "1RRT:k3f9a2^1gr80lc3^Grommash^^l^tob9c0#RT:k3f9a2^1gqx1hns^Varok^^o#RT:k3f9a2^wzm58vqg^Varok^^x#LA:aw4rd1^1gqx1g5f^Grommash^^k3f9a2^2dv8n1^d72^Cloak of the Shrouded Mists^Thrallia^Thrallia.p4m7^s^2f^k",
-      "dump": "[s37:RT:k3f9a2^1gr80lc3^Grommash^^l^tob9c0,s27:RT:k3f9a2^1gqx1hns^Varok^^o,s27:RT:k3f9a2^wzm58vqg^Varok^^x,s104:LA:aw4rd1^1gqx1g5f^Grommash^^k3f9a2^2dv8n1^d72^Cloak of the Shrouded Mists^Thrallia^Thrallia.p4m7^s^2f^k]"
+      "msg": "1Rgb:3^1gqx1g6s^Zuljinne^^1zx,5k;3bm,14;0,5#bk:Bankalt^1gqx1g6a^Bankalt^^1zx,k^au7,2s;3ci,1o#sh:Thrallia.p4m7^1gqx1g5y^Thrallia^^Bolt of Silk Cloth,4,5h;Iron Bar,a,4k#pr:Thrallia.p4m7^1gqx1g5y^Thrallia^^g0t^1zx,46;au7,1uo",
+      "dump": "[s41:gb:3^1gqx1g6s^Zuljinne^^1zx,5k;3bm,14;0,5,s48:bk:Bankalt^1gqx1g6a^Bankalt^^1zx,k^au7,2s;3ci,1o,s73:sh:Thrallia.p4m7^1gqx1g5y^Thrallia^^Bolt of Silk Cloth,4,5h;Iron Bar,a,4k,s54:pr:Thrallia.p4m7^1gqx1g5y^Thrallia^^g0t^1zx,46;au7,1uo]"
      },
      {
-      "msg": "1RLL:2dv8n1^1gqx1g5f^Grommash^^Molten Core^Lucifron;Magmadar;Gehennas^d72,1,Cloak of the Shrouded Mists;h0abcd,0,Trash~2C drop~3B any#LY:2dv8n1^1gqx1g5f^Grommash^^tmlj40^Thrallia.p4m7,d72,u;Zuljin.a8x2,eim,a",
-      "dump": "[s131:LL:2dv8n1^1gqx1g5f^Grommash^^Molten Core^Lucifron;Magmadar;Gehennas^d72,1,Cloak of the Shrouded Mists;h0abcd,0,Trash~2C drop~3B any,s73:LY:2dv8n1^1gqx1g5f^Grommash^^tmlj40^Thrallia.p4m7,d72,u;Zuljin.a8x2,eim,a]"
+      "msg": "1RRD:pvp001^1gqx1g6g^Varok^^p^Warsong Friday^Warsong Gulch^toan40^3c^a^0#RT:k3f9a2^1gr80lc3^Grommash^^l^tob9c0#RT:k3f9a2^1gqx1hns^Varok^^o#RT:k3f9a2^wzm58vqg^Varok^^x",
+      "dump": "[s70:RD:pvp001^1gqx1g6g^Varok^^p^Warsong Friday^Warsong Gulch^toan40^3c^a^0,s37:RT:k3f9a2^1gr80lc3^Grommash^^l^tob9c0,s27:RT:k3f9a2^1gqx1hns^Varok^^o,s27:RT:k3f9a2^wzm58vqg^Varok^^x]"
+     },
+     {
+      "msg": "1RLA:aw4rd1^1gqx1g5f^Grommash^^k3f9a2^2dv8n1^d72^Cloak of the Shrouded Mists^Thrallia^Thrallia.p4m7^s^2f^k#LL:2dv8n1^1gqx1g5f^Grommash^^Molten Core^Lucifron;Magmadar;Gehennas^d72,1,Cloak of the Shrouded Mists;h0abcd,0,Trash~2C drop~3B any",
+      "dump": "[s104:LA:aw4rd1^1gqx1g5f^Grommash^^k3f9a2^2dv8n1^d72^Cloak of the Shrouded Mists^Thrallia^Thrallia.p4m7^s^2f^k,s131:LL:2dv8n1^1gqx1g5f^Grommash^^Molten Core^Lucifron;Magmadar;Gehennas^d72,1,Cloak of the Shrouded Mists;h0abcd,0,Trash~2C drop~3B any]"
+     },
+     {
+      "msg": "1RLY:2dv8n1^1gqx1g5f^Grommash^^tmlj40^Thrallia.p4m7,d72,u;Zuljin.a8x2,eim,a",
+      "dump": "[s73:LY:2dv8n1^1gqx1g5f^Grommash^^tmlj40^Thrallia.p4m7,d72,u;Zuljin.a8x2,eim,a]"
      },
      {
       "msg": "1RAN:q2w8zz^1gqx1g5f^Grommash^^Raid ~00~01~02~03~04~05~06~07~08~09~0A~0B~0C~0D~0E~0F~10~11~12~13~14~15~16~17~18~19~1A~1B~1C~1D~1E~1F~7F~7E~5E~3B~2C~23~7C done Zulé Ærøn 東京 😀#AN:q2w8zz^1gqx1hns^Varok^d",

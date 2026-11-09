@@ -117,6 +117,10 @@ const TYPES = {
       tuple('consumables', [pInt('flask'), pInt('elixir'), pInt('potion'), pInt('food'), pInt('bandage')]),
       list('professions', 12, { parts: [pInt('skill'), pInt('rank'), pInt('max')] }),
       tuple('pvp', [pInt('rank'), pInt('hk')]), text('addon', 16),
+      // Raid readiness (appended fields: older addons leave them out): points per talent tree, resistances, unenchanted slot ids.
+      tuple('talents', [pInt('a'), pInt('b'), pInt('c'), pInt('unspent')]),
+      tuple('resists', [pInt('fire'), pInt('nature'), pInt('frost'), pInt('shadow'), pInt('arcane')]),
+      list('unenchanted', 10, { of: { k: 'int' } }),
     ],
   },
   rc: {
@@ -150,6 +154,19 @@ const TYPES = {
   ca: {
     key: ['b36x6'], max: 300, expiry: { days: 1 },
     fields: [text('character', 48), text('zone', 60), int('needed'), text('message', 200)],
+  },
+  // Dungeon groups: dg is a group a guildmate puts together (the leader fills one of the role slots); dj is a
+  // guildmate joining it with a role (withdrawn 'w'). First come, first in; the rest wait (dungeonGroupState).
+  dg: {
+    key: ['b36x6'], max: 400, final: { field: 'state', values: 'xd' }, expiry: { field: 'startsAt', days: 1 },
+    fields: [
+      text('pid', 64), text('character', 48), text('dungeon', 60), int('startsAt'), enm('role', 'thd'), int('level'),
+      int('tank'), int('heal'), int('dps'), text('note', 140), enm('state', 'oxd'),
+    ],
+  },
+  dj: {
+    key: ['b36x6', 'pid'], max: 160, expiry: { parent: 'dg', seg: 1 },
+    fields: [text('character', 48), enm('role', 'thd'), enm('status', 'yw'), text('class', 20), int('level'), int('joinedAt')],
   },
   dc: {
     key: ['b36x6'], max: 250, expiry: { parent: 'DR', field: 'drive' },
@@ -1231,6 +1248,40 @@ function craftRequestState(cr, claims) {
   return { state: 'open', claimer: null };
 }
 
+// dg + its dj records → { state: 'open'|'full'|'cancelled'|'done', slots: { t, h, d }, open: { t, h, d },
+//   members: [{ pid, character, role, class, level, joinedAt }], waiting: [same] }.
+// The leader takes one slot of their own role. Joins count in the order they were made (joinedAt, else t; a tie
+// goes to the smaller pid by bytes); a join past its role's free slots waits. The leader's own join never counts.
+function dungeonGroupState(dg, joins) {
+  const g = asRec(dg);
+  const none = { state: 'cancelled', slots: { t: 0, h: 0, d: 0 }, open: { t: 0, h: 0, d: 0 }, members: [], waiting: [] };
+  if (!g || g.del || !g.fields) return none;
+  const f = g.fields;
+  const n = (v, d) => (typeof v === 'number' && v >= 0 ? Math.min(Math.floor(v), 10) : d);
+  const slots = { t: n(f.tank, 1), h: n(f.heal, 1), d: n(f.dps, 3) };
+  const open = { ...slots };
+  if (open[f.role] > 0) open[f.role]--;
+  const list = [];
+  for (const raw of Array.isArray(joins) ? joins : []) {
+    const j = live(raw);
+    if (!j || j.type !== 'dj') continue;
+    const [k, pid] = j.key.split(':');
+    if (k !== g.key || pid === f.pid || j.fields.status !== 'y' || !(j.fields.role in slots)) continue;
+    const at = typeof j.fields.joinedAt === 'number' ? j.fields.joinedAt : j.t;
+    list.push({ pid, character: j.fields.character || '', role: j.fields.role, class: j.fields.class || '', level: j.fields.level ?? null, joinedAt: at });
+  }
+  list.sort((a, b) => (a.joinedAt - b.joinedAt) || compareBytes(a.pid, b.pid));
+  const members = [];
+  const waiting = [];
+  for (const m of list) {
+    if (open[m.role] > 0) { open[m.role]--; members.push(m); } else waiting.push(m);
+  }
+  let state = open.t + open.h + open.d === 0 ? 'full' : 'open';
+  if (f.state === 'x') state = 'cancelled';
+  else if (f.state === 'd') state = 'done';
+  return { state, slots, open, members, waiting };
+}
+
 // bq + BH (either may be missing) → { state: 'open'|'cancelled'|'sent'|'declined', by, at }.
 // The earlier (by t) of the requester's cancel and an officer's answer wins; a tie goes to the cancel.
 function bankRequestState(bq, bh) {
@@ -1442,7 +1493,7 @@ module.exports = {
   checkRecord, acceptRecord, isOfficer, isTrusted, overAuthorCaps, addAuthorUsage,
   encodeHello, parseHello, encodeInventory, inventoryPages, parseInventory, encodeGet, parseGet,
   packRecords, parseRecords, splitRecord, parseParts, joinParts, messageKind,
-  raidStatus, countingReserves, craftRequestState, bankRequestState, driveState,
+  raidStatus, countingReserves, craftRequestState, bankRequestState, driveState, dungeonGroupState,
   loyaltyFold, needsCheckpoint, loyaltyCheckpoint,
   ACCEPT_CASES, runAcceptCase,
 };
