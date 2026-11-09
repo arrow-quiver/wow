@@ -1,5 +1,7 @@
 # Releasing Guild Camp
 
+Release from `main`, after the pull requests for it are merged (see [CONTRIBUTING.md](CONTRIBUTING.md)).
+
 Guild Camp has two things you release, each on its own schedule. Both are published as
 **GitHub releases** on this repository, [arrow-quiver/wow](https://github.com/arrow-quiver/wow/releases).
 Nothing is hosted anywhere else.

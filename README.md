@@ -188,6 +188,7 @@ game folder or the real GitHub CLI.
 
 Read these next:
 
+- [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md): `main` is the trunk; every change goes to it through a pull request.
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): how the app, its local core, the addon and GitHub fit together,
   the safety rules for development, and the test layout.
 - [docs/SHARING.md](docs/SHARING.md): how the addon shares guild data in game.
