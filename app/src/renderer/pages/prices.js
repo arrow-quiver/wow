@@ -93,6 +93,33 @@ export default function PricesPage({ query = {} }) {
     ${data
       ? html`<${Results} data=${data} q=${data.q} stale=${prices.loading} />`
       : html`<${Async} q=${prices} loadingLabel="Checking the auction house…">${() => null}<//>`}
+    ${data && !data.q && data.consumables && data.consumables.length ? html`<${Consumables} rows=${data.consumables} />` : null}
+  <//>`;
+}
+
+const KIND_LABEL = { flask: 'Flask', elixir: 'Elixir', potion: 'Potion', food: 'Food', weapon: 'Weapon buff', other: 'Other' };
+const KIND_ORDER = { flask: 0, elixir: 1, potion: 2, food: 3, weapon: 4, other: 5 };
+
+/** Raid consumables: guild Auctionator prices, and Blizzard's auction house once the API has the guild's game. */
+export function Consumables({ rows }) {
+  const hasAh = rows.some((r) => r.ah);
+  const priced = rows.filter((r) => r.latest || r.ah).length;
+  const columns = [
+    { key: 'name', label: 'Item', sortable: true, value: (r) => r.name, render: (r) => html`<${ItemLink} id=${r.item_id} name=${r.name} />` },
+    { key: 'kind', label: 'Type', sortable: true, value: (r) => KIND_ORDER[r.kind] ?? 9, render: (r) => html`<span class="muted small">${KIND_LABEL[r.kind] || r.kind}</span>` },
+    { key: 'latest', label: 'Guild price', num: true, sortable: true, title: 'Newest Auctionator scan shared in the guild', value: (r) => r.latest?.price ?? null, render: (r) => html`<${Money} copper=${r.latest?.price ?? null} empty="—" />` },
+    { key: 'change', label: 'Change', num: true, sortable: true, render: (r) => html`<${Change} value=${r.change} />` },
+    { key: 'trend', label: 'Last 14 scans', render: (r) => html`<${Sparkline} history=${r.history} />`, width: '140px' },
+    { key: 'day', label: 'Last scan', sortable: true, value: (r) => r.latest?.day ?? null, render: (r) => html`<${Day} day=${r.latest?.day} />` },
+    ...(hasAh ? [{
+      key: 'ah', label: 'Blizzard AH', num: true, sortable: true, title: 'Lowest buyout per item on your faction’s auction house, from Blizzard (hourly)',
+      value: (r) => r.ah?.price ?? null,
+      render: (r) => (r.ah ? html`<span title=${`${number(r.ah.quantity)} listed`}><${Money} copper=${r.ah.price} /></span>` : html`<span class="muted">—</span>`),
+    }] : []),
+  ];
+  return html`<${Card} flush title="Raid consumables"
+      sub=${priced ? `${priced} of ${rows.length} priced${hasAh ? ', with Blizzard’s auction house' : ''}` : 'No prices yet: scan the auction house with Auctionator'}>
+    <${Table} dense columns=${columns} rows=${rows} rowKey=${(r) => r.item_id} sort=${{ key: 'kind', dir: 'asc' }} />
   <//>`;
 }
 
