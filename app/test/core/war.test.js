@@ -42,6 +42,24 @@ test('a death to players is saved and posted to Discord once per 2 minutes; othe
   assert.strictEqual(war.mine.recent.at(-1).posted, true);
 });
 
+test('two deaths arriving together post one alert; a failed post frees the slot', async (t) => {
+  const h = await setupShare(t, { webhook: WEBHOOK });
+  const api = h.srv.api;
+  h.discord.down = true;
+  let r = await api.post('/api/war/death', death({ at: NOW * 1000 - 20000 }));
+  assert.deepStrictEqual(r.body, { saved: true, posted: false });
+  // Discord is back: the next death may post although the failed one was under 2 minutes ago.
+  h.discord.down = false;
+  h.discord.delayMs = 50;
+  const [a, b] = await Promise.all([
+    api.post('/api/war/death', death({ at: NOW * 1000 - 10000 })),
+    api.post('/api/war/death', death({ at: NOW * 1000 - 9000, killer: 'Holy' })),
+  ]);
+  assert.deepStrictEqual([a.body.saved, b.body.saved], [true, true]);
+  assert.strictEqual([a.body.posted, b.body.posted].filter(Boolean).length, 1);
+  assert.strictEqual(h.discord.calls.length, 2, 'the failed post and one alert');
+});
+
 test('Call for help posts the zone and the players of my last death, at most once a minute', async (t) => {
   const h = await setupShare(t, { webhook: WEBHOOK });
   const api = h.srv.api;

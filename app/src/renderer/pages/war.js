@@ -113,11 +113,11 @@ function Recent({ rows }) {
 function HowItWorks() {
   return html`<${Card} title="How it works">
     <ul class="list-tight hint">
-      <li><b>War map:</b> when you die or get an honorable kill in the open world, your addon marks the spot and shares it with the
+      <li><b>War map:</b> when players kill you or you get an honorable kill in the open world, your addon marks the spot and shares it with the
         guild. Guildies see the marks here and as pins on the in-game world map (<code>/wow war off</code> hides them).</li>
       <li><b>Discord alerts:</b> when the live link sees you die to players, the app posts who and where to the guild's Discord
         (at most every 2 minutes). Turn it off in Settings → Overlay & live.</li>
-      <li><b>Call for help:</b> in game, a popup after a death in a PvP area sends a call to arms; here and on the overlay, the
+      <li><b>Call for help:</b> in game, a popup after a death to players sends a call to arms; here and on the overlay, the
         button posts to Discord.</li>
     </ul>
   <//>`;

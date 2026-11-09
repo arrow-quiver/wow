@@ -1,6 +1,7 @@
 -- Guild Camp: war alerts and the war map.
---   * When you die in the open world, the spot goes on your account's war list (and the guild's, through a "wm"
---     record, docs/SHARING.md). In PvP areas a popup offers to call the guild for help (a call to arms, at once).
+--   * When players kill you in the open world, the spot goes on your account's war list (and the guild's, through a
+--     "wm" record, docs/SHARING.md), and a popup offers to call the guild for help (a call to arms, at once). Who
+--     killed you comes from the combat log: a mob's kill in a contested zone is not a fight with the other faction.
 --   * An honorable kill puts a kill mark on the list too.
 --   * The world map shows the guild's deaths (red) and kills (green) of the last week, on the map you're looking at.
 -- Positions come from C_Map, which works in the open world only: dungeons and battlegrounds are skipped.
@@ -83,18 +84,40 @@ function W.record(pid)
     marks[#marks + 1] = { map = m.map, x = m.x, y = m.y, at = m.at, kind = m.kind, n = m.n }
     if not seen[m.map] and w.maps[m.map] and #maps < 12 then
       seen[m.map] = true
-      maps[#maps + 1] = { id = m.map, name = string.sub(w.maps[m.map], 1, 40) }
+      -- Full name: the codec cuts text fields to their size on whole UTF-8 characters (ShareCodec cutUtf8).
+      maps[#maps + 1] = { id = m.map, name = w.maps[m.map] }
     end
   end
   return { type = "wm", key = pid, fields = { marks = marks, maps = maps } }
 end
 
--- ---------- dying: the mark, and a call for help in PvP areas ----------
-local function pvpArea()
-  if UnitIsPVP and ns.try(UnitIsPVP, "player") then return true end
-  local get = (C_PvP and C_PvP.GetZonePVPInfo) or GetZonePVPInfo
-  local kind = get and ns.try(get)
-  return kind == "contested" or kind == "hostile" or kind == "combat"
+-- ---------- dying to players: the mark, and a call for help ----------
+-- A death counts as PvP when a player, or something a player controls (a pet, a totem), hurt me in the last
+-- PVP_WINDOW seconds: in a contested zone most deaths are still to mobs. Remembered from the combat log.
+W.PVP_WINDOW = 10
+local TYPE_PLAYER = COMBATLOG_OBJECT_TYPE_PLAYER or 0x400
+local CONTROL_PLAYER = COMBATLOG_OBJECT_CONTROL_PLAYER or 0x100
+local lastPlayerHit -- GetTime() of the last damage a player-controlled source did to me
+
+-- Bit test without the bit library (flags are small positive integers; a bit is a power of two).
+local function hasFlag(flags, bitValue)
+  return type(flags) == "number" and math.floor(flags / bitValue) % 2 == 1
+end
+
+local function clock() return (GetTime and ns.try(GetTime)) or time() end
+
+function W.combatEvent()
+  if not CombatLogGetCurrentEventInfo then return end
+  -- This runs for every line of the combat log around me: the cheapest test (is it about me?) first.
+  local _, sub, _, srcGUID, _, srcFlags, _, dstGUID = CombatLogGetCurrentEventInfo()
+  local me = UnitGUID and UnitGUID("player")
+  if not me or dstGUID ~= me or srcGUID == me then return end
+  if type(sub) ~= "string" or not string.find(sub, "_DAMAGE$") then return end
+  if hasFlag(srcFlags, TYPE_PLAYER) or hasFlag(srcFlags, CONTROL_PLAYER) then lastPlayerHit = clock() end
+end
+
+function W.killedByPlayers()
+  return lastPlayerHit ~= nil and clock() - lastPlayerHit <= W.PVP_WINDOW
 end
 
 StaticPopupDialogs["WOWGUILD_CALL_HELP"] = {
@@ -110,18 +133,45 @@ StaticPopupDialogs["WOWGUILD_CALL_HELP"] = {
   preferredIndex = 3,
 }
 
+-- → the mark, or nil (not killed by players, or outside the open world).
 function W.died()
+  if not W.killedByPlayers() then return nil end
+  lastPlayerHit = nil
   local m = W.mark("d")
-  if not m or ns.opt("warHelp") == false or not pvpArea() then return m end
+  if not m or ns.opt("warHelp") == false then return m end
   local zone = (GetZoneText and ns.try(GetZoneText)) or mapName(m.map) or "the open world"
   if StaticPopup_Show then ns.try(StaticPopup_Show, "WOWGUILD_CALL_HELP", zone, nil, { zone = zone }) end
   return m
 end
 
+-- The game's own honor-kill line, as a Lua pattern: COMBATLOG_HONORGAIN is "%s dies, honorable kill Rank: %s
+-- (Estimated Honor Points: %d)" in English and translated in every other client, so matching it works everywhere.
+local function honorPattern(fmt)
+  if type(fmt) ~= "string" or fmt == "" then return nil end
+  local p = string.gsub(fmt, "%%%d*%$?[sd]", "\001")          -- %s, %d, %1$s → a placeholder
+  p = string.gsub(p, "([%^%$%(%)%%%.%[%]%*%+%-%?])", "%%%1")  -- the rest is literal
+  p = string.gsub(p, "\001", ".-")
+  return "^" .. p .. "$"
+end
+
+function W.isHonorKill(text)
+  if type(text) ~= "string" then return false end
+  local known = false
+  for _, fmt in ipairs({ COMBATLOG_HONORGAIN or false, COMBATLOG_HONORGAIN_NO_RANK or false }) do
+    local p = honorPattern(fmt)
+    if p then
+      known = true
+      if string.find(text, p) then return true end
+    end
+  end
+  -- Without the game's strings (never in the real client), the English text.
+  return not known and string.find(string.lower(text), "honorable kill", 1, true) ~= nil
+end
+
+ns.on("COMBAT_LOG_EVENT_UNFILTERED", function() ns.safely(W.combatEvent) end)
 ns.on("PLAYER_DEAD", function() ns.safely(W.died) end)
--- "Grom dies, honorable kill Rank: Scout (Estimated Honor Points: 12)". The text itself isn't read.
 ns.on("CHAT_MSG_COMBAT_HONOR_GAIN", function(text)
-  if type(text) == "string" and string.find(string.lower(text), "honorable kill", 1, true) then ns.safely(W.mark, "k") end
+  if W.isHonorKill(text) then ns.safely(W.mark, "k") end
 end)
 
 -- ---------- the guild's marks on the world map ----------

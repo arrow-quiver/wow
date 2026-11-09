@@ -25,17 +25,39 @@ __ns.Share = {
   get = function() return nil end,
 }`;
 
+// The combat log as the game hands it out: CombatLogGetCurrentEventInfo() during COMBAT_LOG_EVENT_UNFILTERED.
+// A fake GetTime so the "hurt by a player in the last 10 s" window can be stepped through.
+const COMBAT = `
+__now = 1000
+GetTime = function() return __now end
+__myGuid = "Player-4395-0A1B2C3D"
+UnitGUID = function(unit) if unit == "player" then return __myGuid end end
+__cl = {}
+CombatLogGetCurrentEventInfo = function() return unpack(__cl) end
+function __hit(sub, srcGuid, srcName, srcFlags)
+  __cl = { __now, sub, false, srcGuid, srcName, srcFlags, 0, __myGuid, "Grom", 0x511, 0 }
+  __fire("COMBAT_LOG_EVENT_UNFILTERED")
+end
+__ROGUE = { "Player-4395-0F0F0F0F", "Sneaky-Zuljin", 0x548 }
+__WOLF = { "Pet-0-4395-0-1-1234-0100ABCDEF", "Fang", 0x1148 }
+__OGRE = { "Creature-0-4395-0-1-2287-000ABC", "Crushridge Ogre", 0x10a48 }
+`;
+
 function client() {
   const wow = new WowClient();
   wow.exec(MAP);
   wow.login();
   wow.exec(SHARE);
+  wow.exec(COMBAT);
   return wow;
 }
+const hit = (wow, sub, who) => wow.exec(`__hit("${sub}", unpack(${who}))`);
 
-test('dying in the open world marks the spot and, in a PvP area, offers to call the guild', () => {
+test('dying to players in the open world marks the spot and offers to call the guild', () => {
   const wow = client();
   const before = Number(wow.eval('__popups'));
+  hit(wow, 'SPELL_DAMAGE', '__ROGUE');
+  wow.exec('__now = __now + 3');
   wow.fire('PLAYER_DEAD');
   assert.strictEqual(wow.eval('#WowGuildDB.war.marks'), '1');
   assert.strictEqual(wow.eval('WowGuildDB.war.marks[1].x .. "," .. WowGuildDB.war.marks[1].y .. "," .. WowGuildDB.war.marks[1].kind'), '452,381,d');
@@ -44,27 +66,81 @@ test('dying in the open world marks the spot and, in a PvP area, offers to call 
   // Accepting the popup sends a call to arms with the zone.
   wow.exec('StaticPopupDialogs.WOWGUILD_CALL_HELP.OnAccept(nil, { zone = "Hillsbrad Foothills" })');
   assert.strictEqual(wow.eval('__lastPut.type .. ":" .. __lastPut.fields.zone .. ":" .. __lastPut.fields.message'), 'ca:Hillsbrad Foothills:Died to players here. Help!');
-  // Sanctuary: a mark, no popup. warHelp off: no popup either.
-  wow.exec('__pvp = "sanctuary"');
+  // A player's pet counts as the player; a mob's last hit after it still makes it a death to players.
+  wow.exec('__now = __now + 120');
+  hit(wow, 'SWING_DAMAGE', '__WOLF');
+  wow.exec('__now = __now + 2');
+  hit(wow, 'SWING_DAMAGE', '__OGRE');
   wow.fire('PLAYER_DEAD');
-  assert.strictEqual(Number(wow.eval('__popups')), before + 1);
-  wow.exec('__pvp = "hostile"; WowGuildDB.options.warHelp = false');
+  assert.strictEqual(wow.eval('#WowGuildDB.war.marks'), '2');
+  assert.strictEqual(Number(wow.eval('__popups')), before + 2);
+  // warHelp off: the mark, no popup.
+  wow.exec('__now = __now + 120; WowGuildDB.options.warHelp = false');
+  hit(wow, 'RANGE_DAMAGE', '__ROGUE');
   wow.fire('PLAYER_DEAD');
-  assert.strictEqual(Number(wow.eval('__popups')), before + 1);
+  assert.strictEqual(Number(wow.eval('__popups')), before + 2);
   assert.strictEqual(wow.eval('#WowGuildDB.war.marks'), '3');
-  // An honorable kill marks a kill; other honor lines don't.
+  assert.strictEqual(wow.eval('__ns.debugError'), null);
+});
+
+test('dying to a mob in a contested zone is no PvP death: no mark, no popup', () => {
+  const wow = client();
+  const before = Number(wow.eval('__popups'));
+  hit(wow, 'SWING_DAMAGE', '__OGRE');
+  wow.fire('PLAYER_DEAD');
+  // A player hit me, but over 10 s before the mob finished me.
+  wow.exec('__now = __now + 60');
+  hit(wow, 'SPELL_DAMAGE', '__ROGUE');
+  wow.exec('__now = __now + 11');
+  hit(wow, 'SWING_DAMAGE', '__OGRE');
+  wow.fire('PLAYER_DEAD');
+  // A player's heal on me, or my own damage, isn't a fight either.
+  wow.exec('__now = __now + 60');
+  hit(wow, 'SPELL_HEAL', '__ROGUE');
+  wow.exec('__cl = { __now, "SPELL_DAMAGE", false, __myGuid, "Grom", 0x511, 0, __myGuid, "Grom", 0x511, 0 }; __fire("COMBAT_LOG_EVENT_UNFILTERED")');
+  wow.fire('PLAYER_DEAD');
+  // Damage a player did to someone else.
+  wow.exec('__cl = { __now, "SPELL_DAMAGE", false, __ROGUE[1], __ROGUE[2], __ROGUE[3], 0, "Player-1-2", "Other", 0x511, 0 }; __fire("COMBAT_LOG_EVENT_UNFILTERED")');
+  wow.fire('PLAYER_DEAD');
+  assert.strictEqual(wow.eval('WowGuildDB.war and #WowGuildDB.war.marks or 0'), '0');
+  assert.strictEqual(Number(wow.eval('__popups')), before);
+  // Without the combat log API (an old client), deaths are simply not marked.
+  wow.exec('CombatLogGetCurrentEventInfo = nil');
+  hit(wow, 'SPELL_DAMAGE', '__ROGUE');
+  wow.fire('PLAYER_DEAD');
+  assert.strictEqual(wow.eval('WowGuildDB.war and #WowGuildDB.war.marks or 0'), '0');
+  assert.strictEqual(wow.eval('__ns.debugError'), null);
+});
+
+test('honorable kills are read with the game\'s own (translated) honor strings', () => {
+  const wow = client();
+  // Without the game's strings: the English text.
   wow.fire('CHAT_MSG_COMBAT_HONOR_GAIN', 'Sneaky dies, honorable kill Rank: Scout (Estimated Honor Points: 12)');
   wow.fire('CHAT_MSG_COMBAT_HONOR_GAIN', 'You have been awarded 50 honor points.');
+  assert.strictEqual(wow.eval('#WowGuildDB.war.marks'), '1');
   assert.strictEqual(wow.eval('WowGuildDB.war.marks[1].kind'), 'k');
-  assert.strictEqual(wow.eval('#WowGuildDB.war.marks'), '4');
+  // A German client.
+  wow.exec(`COMBATLOG_HONORGAIN = "%s stirbt, ehrenhafter Sieg Rang: %s (Geschätzte Ehrenpunkte: %d)"
+    COMBATLOG_HONORGAIN_NO_RANK = "%s stirbt, ehrenhafter Sieg (Geschätzte Ehrenpunkte: %d)"`);
+  wow.fire('CHAT_MSG_COMBAT_HONOR_GAIN', 'Schleicher stirbt, ehrenhafter Sieg Rang: Späher (Geschätzte Ehrenpunkte: 12)');
+  wow.fire('CHAT_MSG_COMBAT_HONOR_GAIN', 'Schleicher stirbt, ehrenhafter Sieg (Geschätzte Ehrenpunkte: 3)');
+  wow.fire('CHAT_MSG_COMBAT_HONOR_GAIN', 'Ihr habt 50 Ehrenpunkte erhalten.');
+  wow.fire('CHAT_MSG_COMBAT_HONOR_GAIN', 'Sneaky dies, honorable kill Rank: Scout (Estimated Honor Points: 12)');
+  assert.strictEqual(wow.eval('#WowGuildDB.war.marks'), '3');
+  // Positional format specifiers (%1$s) and magic characters in the string.
+  wow.exec('COMBATLOG_HONORGAIN = "[%1$s] -- %2$s: %3$d+ honor?"; COMBATLOG_HONORGAIN_NO_RANK = nil');
+  assert.strictEqual(wow.eval('tostring(__ns.war.isHonorKill("[Sneaky] -- Scout: 12+ honor?"))'), 'true');
+  assert.strictEqual(wow.eval('tostring(__ns.war.isHonorKill("Sneaky -- Scout: 12 honor"))'), 'false');
   assert.strictEqual(wow.eval('__ns.debugError'), null);
 });
 
 test('no mark inside an instance or without a position', () => {
   const wow = client();
   wow.exec('__inInstance = true; __instanceType = "pvp"');
+  hit(wow, 'SPELL_DAMAGE', '__ROGUE');
   wow.fire('PLAYER_DEAD');
   wow.exec('__inInstance = false; __pos = { x = 0, y = 0 }');
+  hit(wow, 'SPELL_DAMAGE', '__ROGUE');
   wow.fire('PLAYER_DEAD');
   assert.strictEqual(wow.eval('WowGuildDB.war and #WowGuildDB.war.marks or 0'), '0');
 });
