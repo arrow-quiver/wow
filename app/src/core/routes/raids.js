@@ -23,6 +23,7 @@ const { notElsewhere, looseLast } = require('../identity');
 const {
   HttpError, str, int, oneOf, list, isOfficer, needGuild, needOfficer,
 } = require('../http');
+const { resistFor, ENCHANT_SLOTS } = require('../readiness');
 
 const KINDS = ['raid', 'pvp', 'event'];
 const ROLES = ['tank', 'healer', 'dps'];
@@ -75,6 +76,7 @@ function raidJson(r) {
     kind: r.kind || 'raid',
     title: r.title,
     instance: r.instance,
+    resist: resistFor(r.instance),
     starts_at: r.starts_at,
     duration_min: r.duration_min ?? 180,
     size: r.size ?? null,
@@ -87,14 +89,17 @@ function raidJson(r) {
   };
 }
 
-// Readiness flags shown next to a sign-up: no addon data, low repair, no consumables in bags.
+// Readiness flags shown next to a sign-up: no addon data, low repair, no consumables in bags, unspent talent
+// points, and gear the Enchanting profession could enchant but hasn't (null = an older addon that doesn’t check).
 function readinessFlags(ready) {
-  if (!ready) return { noData: true, lowRepair: false, noConsumables: false };
+  if (!ready) return { noData: true, lowRepair: false, noConsumables: false, unspent: false, unenchanted: null };
   const total = Object.values(ready.consumables || {}).reduce((a, b) => a + (Number(b) || 0), 0);
   return {
     noData: false,
     lowRepair: ready.durability != null && Number(ready.durability) < LOW_REPAIR,
     noConsumables: total === 0,
+    unspent: Boolean(ready.talents && ready.talents.unspent > 0),
+    unenchanted: Array.isArray(ready.unenchanted) ? ready.unenchanted.map((id) => ENCHANT_SLOTS[id]).filter(Boolean) : null,
   };
 }
 

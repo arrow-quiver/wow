@@ -85,10 +85,16 @@ test('start times: ISO with a zone, local time plus offset, and nonsense', () =>
 });
 
 test('readiness flags: no data, low repair, no consumables', () => {
-  assert.deepEqual(readinessFlags(null), { noData: true, lowRepair: false, noConsumables: false });
-  assert.deepEqual(readinessFlags({ ilvl: 60, durability: 25, consumables: {} }), { noData: false, lowRepair: true, noConsumables: true });
-  assert.deepEqual(readinessFlags({ ilvl: 60, durability: 30, consumables: { flask: 2 } }), { noData: false, lowRepair: false, noConsumables: false });
-  assert.deepEqual(readinessFlags({ ilvl: 60, durability: null, consumables: { potion: 0 } }), { noData: false, lowRepair: false, noConsumables: true });
+  const base = { unspent: false, unenchanted: null };
+  assert.deepEqual(readinessFlags(null), { noData: true, lowRepair: false, noConsumables: false, ...base });
+  assert.deepEqual(readinessFlags({ ilvl: 60, durability: 25, consumables: {} }), { noData: false, lowRepair: true, noConsumables: true, ...base });
+  assert.deepEqual(readinessFlags({ ilvl: 60, durability: 30, consumables: { flask: 2 } }), { noData: false, lowRepair: false, noConsumables: false, ...base });
+  assert.deepEqual(readinessFlags({ ilvl: 60, durability: null, consumables: { potion: 0 } }), { noData: false, lowRepair: false, noConsumables: true, ...base });
+  // Addon 0.12+: talents, resistances and unenchanted slots.
+  const f = readinessFlags({ ilvl: 62, durability: 90, consumables: { flask: 1 }, talents: { a: 0, b: 21, c: 28, unspent: 2 }, resists: { fire: 120 }, unenchanted: [9, 15] });
+  assert.equal(f.unspent, true);
+  assert.deepEqual(f.unenchanted, ['Wrist', 'Back']);
+  assert.deepEqual(readinessFlags({ consumables: {}, talents: { a: 31, b: 20, c: 0, unspent: 0 }, unenchanted: [] }).unenchanted, []);
 });
 
 // ---------------------------------------------------------------- scheduling
@@ -290,9 +296,9 @@ test('raid detail: roster with readiness flags, my characters, loot list with my
     const mine = d.signups.find((s) => s.character === 'Velanne');
     assert.equal(mine.class, 'PRIEST');
     assert.equal(mine.readiness.ilvl, 58.2);
-    assert.deepEqual(mine.flags, { noData: false, lowRepair: true, noConsumables: true });
+    assert.deepEqual(mine.flags, { noData: false, lowRepair: true, noConsumables: true, unspent: false, unenchanted: null });
     assert.equal(mine.mine, true);
-    assert.deepEqual(d.signups.find((s) => s.character === 'Mokra').flags, { noData: false, lowRepair: false, noConsumables: false });
+    assert.deepEqual(d.signups.find((s) => s.character === 'Mokra').flags, { noData: false, lowRepair: false, noConsumables: false, unspent: false, unenchanted: null });
     assert.equal(d.signups.find((s) => s.character === 'Mokra').battletag, 'Grom#3333');
     assert.deepEqual(d.signups.find((s) => s.character === 'Grim').flags.noData, false, 'readiness from their shared character');
     assert.deepEqual(d.counts, { tank: 1, healer: 1, dps: 0, tentative: 0, bench: 0, no: 1 });

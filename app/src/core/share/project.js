@@ -13,6 +13,7 @@
 const S = require('../../shared/sharing');
 const identity = require('../identity');
 const st = require('./store');
+const { raidGear } = require('../readiness');
 const War = require('../services/war');
 const Economy = require('../services/economy');
 
@@ -82,7 +83,8 @@ function applyChFields(db, gid, name, rec) {
   const c = f.consumables || {};
   const consumables = {};
   for (const k of ['flask', 'elixir', 'potion', 'food', 'bandage']) if (c[k]) consumables[k] = c[k];
-  const readiness = JSON.stringify({ ilvl: f.ilvl ?? null, durability: f.repair ?? null, consumables, at: rec.t });
+  const whole = (v) => (Number.isInteger(v) && v >= 0 ? v : null);
+  const readiness = JSON.stringify({ ilvl: f.ilvl ?? null, durability: f.repair ?? null, consumables, at: rec.t, ...raidGear(f, whole) });
   const extras = {};
   const pvp = {};
   if (f.pvp && f.pvp.rank != null) pvp.rank = f.pvp.rank;

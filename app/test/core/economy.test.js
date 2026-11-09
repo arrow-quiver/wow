@@ -324,6 +324,19 @@ test('prices: stats, what the guild holds, search with trend and change, bank st
     assert.deepEqual(r.body.results.map((x) => [x.item_id, x.name, x.latest.price]), [[99999, null, 77]]);
     assert.deepEqual((await t.api.get('/api/prices?q=nothing-like-this')).body.results, []);
 
+    // Raid consumables: every tracked item, with guild prices where scanned and Blizzard's AH where fetched.
+    r = await t.api.get('/api/prices');
+    const mana = r.body.consumables.find((x) => x.item_id === 13444);
+    assert.equal(mana.kind, 'potion');
+    assert.equal(mana.latest.price, 4000);
+    assert.equal(mana.ah, null);
+    assert.equal(r.body.consumables.find((x) => x.item_id === 13510).latest, null);
+    assert.equal(r.body.consumables[0].name, 'Flask of the Titans');
+    t.db.prepare("INSERT INTO ah_prices (guild_id, item_id, price, quantity, fetched_at) VALUES (?,?,?,?, datetime('now'))").run(t.g.guildId, 13444, 3900, 21);
+    r = await t.api.get('/api/prices');
+    assert.deepEqual({ ...r.body.consumables.find((x) => x.item_id === 13444).ah, fetched_at: 'x' }, { price: 3900, quantity: 21, fetched_at: 'x' });
+    assert.deepEqual((await t.api.get('/api/prices?q=mana')).body.consumables, []);
+
     // Only the newest 14 scan days are kept in the trend.
     const ins = t.db.prepare('INSERT OR REPLACE INTO prices (guild_id, item_id, day, price) VALUES (?,?,?,?)');
     for (let d = 1; d <= 20; d++) ins.run(t.g.guildId, 12359, dayStr(today - d), 1000 + d);

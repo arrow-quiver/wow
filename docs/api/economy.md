@@ -189,6 +189,11 @@ and bank after their next sync."`; nothing changed → `"No changes."`
   fewer than two points.
 - `bank` values the guild bank and bank characters as in `GET /api/bank`; `priced`/`unpriced` count stacks, `top`
   is the five most valuable stacks, each with the guild bank `tab` or bank `character` holding it.
+- `consumables` (without `q`; `[]` with it): every raid consumable in `core/consumables.js`, in that order, shaped
+  like `held` rows without `holders` plus `kind` (`flask`, `elixir`, `potion`, `food`, `weapon`, `other`) and
+  `ah`: Blizzard's auction house `{ price, quantity, fetched_at }` (lowest buyout per unit, units listed) or `null`.
+  `ah` comes from `services/gamedata.js` and stays `null` until Blizzard's API has the guild's game version (not yet
+  for WoW: Forever) and realm status has found the connected realm.
 
 ---
 

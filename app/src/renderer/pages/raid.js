@@ -272,6 +272,12 @@ function ReservesCard({ d, onSaved }) {
 
 // ---------- who's coming ----------
 
+const RESIST_LABEL = { fire: 'Fire', nature: 'Nature', frost: 'Frost', shadow: 'Shadow', arcane: 'Arcane' };
+// "0/21/30": talent points per tree, in the game's tree order.
+export function talentText(t) {
+  return t ? [t.a, t.b, t.c].map((n) => n || 0).join('/') : '';
+}
+
 function consumablesText(c) {
   const parts = Object.entries(c || {}).filter(([, n]) => n).map(([k, n]) => `${n} ${k}`);
   return parts.join(', ');
@@ -285,7 +291,7 @@ function RosterCard({ d }) {
   const done = d.raid.status === 'done';
   const columns = [
     {
-      key: 'character', label: 'Character', width: '34%',
+      key: 'character', label: 'Character', width: '24%',
       render: (s) => html`<span class="row">
         <${ClassName} name=${s.character} cls=${s.class} />
         ${s.level ? html`<span class="muted small">${s.level}</span>` : null}
@@ -295,16 +301,35 @@ function RosterCard({ d }) {
       </span>`,
     },
     {
-      key: 'ilvl', label: 'Item level', num: true, width: '13%',
+      key: 'ilvl', label: 'Item level', num: true, width: '9%',
       render: (s) => (s.flags.noData ? html`<span class="muted small">No addon data</span>` : s.readiness.ilvl ? Math.round(s.readiness.ilvl) : '—'),
     },
     {
-      key: 'repair', label: 'Repair', num: true, width: '10%',
+      key: 'repair', label: 'Repair', num: true, width: '8%',
       render: (s) => (s.flags.noData || s.readiness.durability == null ? html`<span class="muted">—</span>`
         : s.flags.lowRepair ? html`<${Pill} kind="warn" title="Needs a repair">${Math.round(s.readiness.durability)}%<//>` : `${Math.round(s.readiness.durability)}%`),
     },
     {
-      key: 'consumables', label: 'Consumables', width: '22%',
+      key: 'talents', label: 'Talents', width: '10%', title: 'Points in each talent tree',
+      render: (s) => (!s.readiness || !s.readiness.talents ? html`<span class="muted">—</span>`
+        : html`<span class="row nowrap">${talentText(s.readiness.talents)}
+            ${s.flags.unspent ? html`<${Pill} kind="warn" title="Talent points not spent">+${s.readiness.talents.unspent}<//>` : null}
+          </span>`),
+    },
+    ...(d.raid.resist ? [{
+      key: 'resist', label: `${RESIST_LABEL[d.raid.resist]} res.`, num: true, width: '8%',
+      title: `${RESIST_LABEL[d.raid.resist]} resistance, with the buffs they had when the addon checked`,
+      render: (s) => (s.readiness && s.readiness.resists ? s.readiness.resists[d.raid.resist] : html`<span class="muted">—</span>`),
+    }] : []),
+    {
+      key: 'enchants', label: 'Enchants', width: '11%',
+      render: (s) => (s.flags.unenchanted == null ? html`<span class="muted">—</span>`
+        : s.flags.unenchanted.length
+          ? html`<${Pill} kind="warn" title=${`Not enchanted: ${s.flags.unenchanted.join(', ')}`}>${s.flags.unenchanted.length} missing<//>`
+          : html`<span class="small">All done</span>`),
+    },
+    {
+      key: 'consumables', label: 'Consumables', width: '16%',
       render: (s) => (s.flags.noData ? html`<span class="muted">—</span>`
         : s.flags.noConsumables ? html`<${Pill} kind="warn">None in bags<//>` : html`<span class="small">${consumablesText(s.readiness.consumables)}</span>`),
     },

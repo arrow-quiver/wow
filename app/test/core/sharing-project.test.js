@@ -292,7 +292,7 @@ test('players and characters: links, BattleTag, main, class, readiness, professi
   try {
     h.imp([
       ch('Zuljinne', PIDS.Zuljinne, { alts: ['Zuljinne', 'Zulalt'], battletag: 'Zul#1234', main: true, extra: { race: 'Troll', faction: 'Horde', ilvl: 61, repair: 80, consumables: { flask: 2, potion: 5 }, professions: [{ skill: 164, rank: 225, max: 300 }], pvp: { rank: 7, hk: 900 }, addon: '0.12.0' } }),
-      ch('Zulalt', PIDS.Zuljinne),
+      ch('Zulalt', PIDS.Zuljinne, { extra: { ilvl: 58, talents: { a: 31, b: 0, c: 18, unspent: 2 }, resists: { fire: 75, frost: 10 }, unenchanted: [9, 15, 3] } }),
       ch('Jaina', PIDS.Jaina),
       ch('Thrallia', PIDS.Jaina), // a forged claim on my character
     ]);
@@ -305,6 +305,11 @@ test('players and characters: links, BattleTag, main, class, readiness, professi
     assert.deepEqual([z.class, z.race, z.level, z.faction, z.is_main], ['MAGE', 'Troll', 60, 'Horde', 1]);
     assert.deepEqual(JSON.parse(z.readiness), { ilvl: 61, durability: 80, consumables: { flask: 2, potion: 5 }, at: NOW - 3000 });
     assert.deepEqual(JSON.parse(z.extras), { pvp: { rank: 7, hk: 900 }, addonVersion: '0.12.0' });
+    // Addon 0.12+ appends talents, resistances and unenchanted slots to ch; older records have none of them.
+    const alt = JSON.parse(h.db.prepare("SELECT readiness FROM characters WHERE name = 'Zulalt'").get().readiness);
+    assert.deepEqual(alt.talents, { a: 31, b: 0, c: 18, unspent: 2 });
+    assert.deepEqual(alt.resists, { fire: 75, nature: 0, frost: 10, shadow: 0, arcane: 0 });
+    assert.deepEqual(alt.unenchanted, [9, 15], 'only slots Enchanting covers');
     assert.deepEqual(h.db.prepare('SELECT name, skill, max_skill FROM professions WHERE character_id = ?').all(z.id).map((r) => ({ ...r })), [{ name: 'Blacksmithing', skill: 225, max_skill: 300 }]);
     assert.ok(h.db.prepare('SELECT 1 FROM memberships WHERE user_id = ? AND guild_id = ?').get(u.id, h.gid), 'a guildmate is a member');
 
