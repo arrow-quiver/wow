@@ -450,7 +450,7 @@ test('Settings tab: options apply immediately, app link and update notice shown'
   assert.strictEqual(text(wow, 'WowGuildMinimapButton:IsShown()'), 'true');
   // Every option has a box, in the same order as the Blizzard options panel.
   assert.strictEqual(wow.eval(`#${page}.boxes`), wow.eval('#__ns.OPTION_LIST'));
-  assert.strictEqual(wow.eval('#__ns.OPTION_LIST'), '7');
+  assert.strictEqual(wow.eval('#__ns.OPTION_LIST'), '8');
   wow.exec('__ns.optionsPanel.scripts.OnShow()');
   assert.strictEqual(text(wow, '__ns.optionsPanel.boxes[2]:GetChecked()'), 'true');
   wow.exec('__ns.optionsPanel.boxes[2]:SetChecked(false); __click(__ns.optionsPanel.boxes[2])');
@@ -505,9 +505,32 @@ test('/wow help lists every command', () => {
   for (const cmd of ['/wow cta', '/wow share', '/wow sync', '/wow status', '/wow guide', '/wow list', '/wow coach', '/wow options', '/wow debug']) assert.ok(out.includes(cmd), cmd);
 });
 
-test('window uses the Blizzard frame and bottom tabs when available', () => {
+test('guild style by default: dark-and-gold window with text tabs, first-run welcome, what\'s new', () => {
   const wow = uiClient();
+  wow.exec('if WowGuildWelcome then WowGuildWelcome:Hide() end; __ns.db.welcomeSeen = nil; __ns.welcome.check()');
+  assert.strictEqual(wow.eval('tostring(WowGuildWelcome:IsShown())'), 'true', 'first login shows the welcome');
+  assert.match(wow.eval('WowGuildWelcome.title:GetText()'), /wow/);
+  wow.exec('__click(WowGuildWelcome.rows[2].btn)');
+  assert.strictEqual(wow.eval('tostring(WowGuildCoach.quiz:IsShown())'), 'true', 'Take the quiz opens the Coach quiz');
   wow.exec('__ns.ui.show("guild")');
+  assert.strictEqual(wow.eval('tostring(WowGuildWindow.styled)'), 'true');
+  assert.strictEqual(wow.eval('tostring(WowGuildWindow.skinned)'), 'true');
+  assert.strictEqual(wow.eval('tostring(WowGuildWindow.tabs.guild.on)'), 'true');
+  assert.strictEqual(wow.eval('tostring(WowGuildWindow.tabs.camp.on)'), 'false');
+  wow.exec('__click(WowGuildWindow.tabs.coach)');
+  assert.strictEqual(wow.eval('tostring(WowGuildWindow.pages.coach:IsShown())'), 'true');
+  assert.match(wow.eval('WowGuildWindow.title:GetText()'), /Guild Camp/);
+  // Next login: no welcome; after an update with news: what's new, once.
+  wow.exec('WowGuildWelcome:Hide(); __ns.welcome.NEWS[__ns.addonVersion()] = { "Something new" }; __ns.db.newsSeen = "0.0.1"; __ns.welcome.check()');
+  assert.strictEqual(wow.eval('WowGuildWelcome.caps:GetText()'), "WHAT'S NEW");
+  wow.exec('WowGuildWelcome:Hide(); __ns.welcome.check()');
+  assert.strictEqual(wow.eval('tostring(WowGuildWelcome:IsShown())'), 'false');
+  noError(wow);
+});
+
+test('window uses the Blizzard frame and bottom tabs when that style is picked', () => {
+  const wow = uiClient();
+  wow.exec('__ns.db.options.blizzardStyle = true; __ns.ui.show("guild")');
   assert.strictEqual(wow.eval('tostring(WowGuildWindow.native)'), 'true');
   assert.strictEqual(wow.eval('tostring(WowGuildWindow.bottomTabs)'), 'true');
   assert.strictEqual(wow.eval('WowGuildWindow.selectedTab'), '5');

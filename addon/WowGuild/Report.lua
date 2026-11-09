@@ -69,7 +69,8 @@ local function createBox()
   f:SetFrameStrata("FULLSCREEN_DIALOG")
   f:EnableMouse(true); f:SetMovable(true); f:RegisterForDrag("LeftButton")
   f:SetScript("OnDragStart", f.StartMoving); f:SetScript("OnDragStop", f.StopMovingOrSizing)
-  if f.SetBackdrop then
+  if ns.skin and ns.skin.enabled() then ns.skin.panel(f)
+  elseif f.SetBackdrop then
     f:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8x8", edgeFile = "Interface\\Buttons\\WHITE8x8", edgeSize = 2 })
     f:SetBackdropColor(0.08, 0.12, 0.11, 0.98)
     f:SetBackdropBorderColor(0.91, 0.64, 0.24, 1)

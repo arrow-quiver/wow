@@ -22,6 +22,7 @@ end
 P.money = money
 
 local function skin(f)
+  if ns.skin and ns.skin.enabled() then return ns.skin.panel(f) end
   if f.SetBackdrop then
     f:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8x8", edgeFile = "Interface\\Buttons\\WHITE8x8", edgeSize = 2 })
     f:SetBackdropColor(0.12, 0.23, 0.2, 0.96)

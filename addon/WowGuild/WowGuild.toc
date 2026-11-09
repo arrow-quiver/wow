@@ -9,6 +9,7 @@
 ## AddonCompartmentFunc: WowGuild_OnAddonCompartmentClick
 
 Core.lua
+Skin.lua
 ShareCodec.lua
 Share.lua
 ShareSync.lua
@@ -20,6 +21,7 @@ ProfUI.lua
 Options.lua
 Coach.lua
 CoachUI.lua
+Welcome.lua
 MainUI.lua
 Tooltip.lua
 Report.lua

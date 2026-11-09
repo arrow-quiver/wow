@@ -9,6 +9,7 @@ ns.OPTION_LIST = {
   { key = "autoGuide", label = "Open the skill-up guide with my profession window" },
   { key = "trackerOnLogin", label = "Show my shopping list on login when it has items" },
   { key = "collectBank", label = "Share my bank and the guild bank with the guild" },
+  { key = "blizzardStyle", label = "Use Blizzard's window style instead of the guild's dark-and-gold look (reload to apply)" },
 }
 local OPTIONS = ns.OPTION_LIST
 
