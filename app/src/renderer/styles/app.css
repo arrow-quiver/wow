@@ -1257,3 +1257,7 @@ a.wh.q0 { color: var(--q-0) !important; } a.wh.q1 { color: var(--q-1) !important
 .war-key--death { background: #e2553f; }
 .war-key--kill { background: #5fc27a; }
 .war-key--hot { border: 1.5px dashed #e2553f; }
+
+/* ---------- Donate ---------- */
+.donate-board .is-me { background: color-mix(in srgb, var(--accent) 10%, transparent); border-radius: var(--r-sm); }
+.donate-rank { display: inline-block; min-width: 2em; }

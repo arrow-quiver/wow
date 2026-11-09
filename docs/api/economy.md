@@ -306,3 +306,31 @@ Queues the drive again as closed (`DR` `c`, final), on top of the version this c
 ```
 Closing a drive that already finished changes nothing and answers the same. Unknown drive → `404 "Drive not found."`.
 Audit `drive closed` with `#<id>` (only when it was open).
+
+## Donations
+
+`GET /api/donations?days=30` (member; `days` 1–365). What guildies asked the guild bank for, with today's prices, and
+who has given what. Implemented in `services/donations.js`.
+
+- **Gifts** are the `deposit` lines of the guild bank log (`bank_log`, from whoever opened the bank with the addon,
+  shared as `gb`). Bank characters' deposits are moves, not gifts, and don't count. Each gift is valued **once**, at
+  the guild's Auctionator price index (`prices`) on the day it went in, else the newest earlier day within 14 days,
+  else what a vendor pays (`item_info.sell_price`). Gold counts as itself. A gift without a price yet is tried again
+  on every read for 30 days (`value: null` until then). Migration 21 adds `donations`.
+- **Requests** are open bank requests, priced by name (`item_names`/`item_info`) at today's price.
+
+```json
+{
+  "days": 30,
+  "requests": [{ "id": 1, "item": "Major Mana Potion", "count": 10, "note": "for MC", "created_at": "2026-11-08 18:00:00",
+                 "requester": "Shadowfen", "item_id": 13444, "unit_price": 9200, "total": 92000, "priced_from": "auction" }],
+  "toBuy": 92000, "unpricedRequests": 0,
+  "total": 3490500,
+  "board": [{ "rank": 1, "userId": 2, "who": "Thrallia", "value": 2150000, "gold": 1500000, "items": 650000, "count": 9, "me": false }],
+  "mine": { "value": 940000, "gold": 500000, "items": 440000, "count": 6, "rank": 2 },
+  "recent": [{ "id": 10, "who": "Grimtusk", "kind": "item", "item_id": 13444, "item_name": "Major Mana Potion", "quality": "COMMON",
+               "count": 8, "value": 73600, "priced_from": "auction", "at": "2026-11-09T10:00:00.000Z", "me": true }]
+}
+```
+Money is in copper. `priced_from`: `auction` | `vendor` | `gold` | null. `board`: by player (a character nobody has
+linked counts on its own), most given first, top 20.
