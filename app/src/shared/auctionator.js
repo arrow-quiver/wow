@@ -4,18 +4,37 @@
 // the last two weeks. Port of the old companion's extractPrices.
 // Zero dependencies: shared by the app, the server and the release scripts.
 
+const { decode } = require('./cbor');
+
 const EPOCH = Date.UTC(2020, 0, 1); // Auctionator counts days from 1 January 2020
 const MAX_AGE_DAYS = 14;
 
 // db: { "<realm> <faction>": { "<itemId>" | "g:<itemId>:..": { m: price, h: { [day]: price } } }, __dbversion }
 // → { items: [[itemId, copper, day]] }. For each item, the most recent day wins; on the same
 // day, the cheapest realm wins. Pet cages ("p:") and records older than 14 days are skipped.
+// Each realm's items as a table. Auctionator 8+ (__dbversion 8) keeps every realm as one CBOR string (written with
+// C_EncodingUtil.SerializeCBOR) instead of a Lua table: parse the file with parseSavedVariables(buf, { bytes: true })
+// so those strings keep their bytes, and they are decoded here. A realm that can't be decoded is skipped.
+// → [[realm, items]]
+function realmTables(db) {
+  const out = [];
+  for (const [realm, items] of Object.entries(db || {})) {
+    if (realm.startsWith('__')) continue;
+    if (typeof items === 'string') {
+      try {
+        const t = decode(items);
+        if (t && typeof t === 'object' && !Array.isArray(t)) out.push([realm, t]);
+      } catch { /* not CBOR we can read: skip the realm */ }
+    } else if (items && typeof items === 'object') out.push([realm, items]);
+  }
+  return out;
+}
+
 function extractPrices(db, now = Date.now()) {
   const today = Math.floor((now - EPOCH) / 86400000);
   const best = new Map(); // itemId → [price, day]
   if (!db || typeof db !== 'object') return { items: [] };
-  for (const [realm, items] of Object.entries(db)) {
-    if (realm.startsWith('__') || !items || typeof items !== 'object') continue;
+  for (const [realm, items] of realmTables(db)) {
     for (const [key, rec] of Object.entries(items)) {
       const m = /^(?:g:)?(\d+)/.exec(key);
       if (!m || !rec || typeof rec !== 'object') continue;
@@ -42,8 +61,7 @@ function extractMarket(db, now = Date.now(), { days = 30, maxItems = 15000, maxR
   const today = Math.floor((now - EPOCH) / 86400000);
   const out = [];
   if (!db || typeof db !== 'object') return { realms: out };
-  for (const [realm, items] of Object.entries(db)) {
-    if (realm.startsWith('__') || !items || typeof items !== 'object') continue;
+  for (const [realm, items] of realmTables(db)) {
     const rows = [];
     let newest = -1;
     for (const [key, rec] of Object.entries(items)) {
@@ -94,4 +112,4 @@ function marketParts(market, maxBytes = 12 * 1024 * 1024) {
   return parts;
 }
 
-module.exports = { extractPrices, extractMarket, marketParts };
+module.exports = { extractPrices, extractMarket, marketParts, realmTables };

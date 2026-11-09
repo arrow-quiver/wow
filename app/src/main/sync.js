@@ -464,7 +464,7 @@ function createSync({ api, store, log, wow, appVersion, coreEvents, ...opts } = 
     const key = keyOf(file);
     if (auctionatorSent.get(key) === mtime) return null;
     try {
-      const db = parseSavedVariables(fs.readFileSync(file)).AUCTIONATOR_PRICE_DATABASE;
+      const db = parseSavedVariables(fs.readFileSync(file), { bytes: true }).AUCTIONATOR_PRICE_DATABASE; // Auctionator 8+: CBOR strings
       if (!db || typeof db !== 'object') return null;
       return { key, mtime, prices: extractPrices(db, now()), market: extractMarket(db, now()) };
     } catch (err) {

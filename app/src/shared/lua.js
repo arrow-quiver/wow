@@ -14,10 +14,12 @@
 // Zero dependencies: this file is shared by the app, the server and the release scripts.
 
 // Pass the raw file Buffer (or a latin1 string) so UTF-8 names survive.
-function parseSavedVariables(input) {
+// { bytes: true } keeps every string as raw bytes (a latin1 string, one char per byte) instead: for addons that
+// store binary data in strings (Auctionator 8+ keeps each realm's prices as CBOR). Buffer.from(s, 'latin1') gives the bytes.
+function parseSavedVariables(input, { bytes = false } = {}) {
   const src = Buffer.isBuffer(input) ? input.toString('latin1') : String(input);
   const out = {};
-  const p = new Parser(src);
+  const p = new Parser(src, { bytes });
   p.ws();
   while (!p.eof()) {
     const name = p.ident();
@@ -32,7 +34,7 @@ function parseSavedVariables(input) {
 const ESCAPES = { n: '\n', t: '\t', r: '\r', a: '\x07', b: '\b', f: '\f', v: '\v', '\\': '\\', '"': '"', "'": "'", '\n': '\n' };
 
 class Parser {
-  constructor(src) { this.s = src; this.i = 0; }
+  constructor(src, { bytes = false } = {}) { this.s = src; this.i = 0; this.bytes = bytes; }
   eof() { return this.i >= this.s.length; }
   peek() { return this.s[this.i]; }
   err(msg) {
@@ -106,8 +108,8 @@ class Parser {
         out += String.fromCharCode(Number(digits));
       } else out += e;
     }
-    // The source is read byte for byte (latin1), so decode each string as UTF-8.
-    return Buffer.from(out, 'latin1').toString('utf8');
+    // The source is read byte for byte (latin1), so decode each string as UTF-8 (or keep the bytes).
+    return this.bytes ? out : Buffer.from(out, 'latin1').toString('utf8');
   }
   longString() {
     const m = /^\[(=*)\[/.exec(this.s.slice(this.i, this.i + 64));
