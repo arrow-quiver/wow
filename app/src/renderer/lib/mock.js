@@ -710,6 +710,26 @@ const methods = {
   },
   'publisher.setRepoDir': (dir) => { state.settings.repoDir = dir; return publisherStatus(); },
   'publisher.cancel': () => publisherStatus(),
+  // The live link (main/live.js) in the preview: a session in progress with one death to look at.
+  'live.state': () => {
+    if (/[?&]live=off\b/.test(location.search)) return { status: 'off', file: null, game: null, session: null, lastDeath: null,
+      hint: 'Turn on combat logging in game: type /combatlog (or /wow live on to have the addon do it at every login).' };
+    const now = Date.now();
+    return {
+      status: 'live', file: 'C:\\Program Files (x86)\\World of Warcraft\\_forever_\\Logs\\WoWCombatLog.txt', game: 'WoW Forever',
+      session: { character: 'Grimtusk', startedAt: now - 47 * 60000, lastAt: now - 20000, minutes: 47, kills: 38, pvpKills: 4, deaths: 2, pvpDeaths: 1,
+        damageDone: 182400, damageTaken: 96350, healingTaken: 21800, fights: 31, fightShare: 0.41, killsPerHour: 48.5, deathsPerHour: 2.6 },
+      lastDeath: { at: now - 6 * 60000, character: 'Grimtusk', killer: 'Shadowstep', killingBlow: { spell: 'Ambush', amount: 1287 }, pvp: true, seconds: 6.4,
+        damageTaken: 3920, healed: 0,
+        sources: [{ who: 'Shadowstep', spell: 'Ambush', player: true, amount: 1287, hits: 1 }, { who: 'Shadowstep', spell: 'Sinister Strike', player: true, amount: 1460, hits: 4 },
+          { who: 'Shadowstep', spell: 'Melee', player: true, amount: 1173, hits: 5 }],
+        myCasts: ['Battle Shout', 'Charge', 'Hamstring'] },
+      context: { death: 'Died to Shadowstep (a player), killing blow Ambush for 1287.', session: 'This play session (47 min on Grimtusk): 38 kills (4 players), 2 deaths.' },
+      hint: null,
+    };
+  },
+  'overlay.toggle': () => true,
+  'overlay.hide': () => true,
   'notify.test': () => {
     try {
       if ('Notification' in window && Notification.permission === 'granted') new Notification('Guild Camp', { body: 'Notifications are working.' });
@@ -719,7 +739,7 @@ const methods = {
 };
 
 // The channels the real preload knows (src/preload/preload.js). Like the real bridge, others throw.
-const CHANNELS = new Set(['auth', 'sync', 'addon', 'updater', 'publisher:log', 'server-event', 'navigate', 'log', 'settings']);
+const CHANNELS = new Set(['auth', 'sync', 'addon', 'updater', 'publisher:log', 'server-event', 'navigate', 'log', 'settings', 'live']);
 
 export function createMock() {
   console.info(`[mock] Guild Camp preview mode, scenario "${SCENARIO}". Use ?mock=owner|officer|member|setup|noguild (&bnet=in|out|none, &blizzard=0, &key=0, &publish=1|0, &match=never).`);

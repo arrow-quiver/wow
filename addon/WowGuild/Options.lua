@@ -10,6 +10,7 @@ ns.OPTION_LIST = {
   { key = "trackerOnLogin", label = "Show my shopping list on login when it has items" },
   { key = "collectBank", label = "Share my bank and the guild bank with the guild" },
   { key = "coachTalents", label = "Show the Coach's talent guide next to the talent window" },
+  { key = "liveLink", label = "Turn on combat logging when I log in (the Guild Camp app's live link reads it)" },
   { key = "blizzardStyle", label = "Use Blizzard's window style instead of the guild's dark-and-gold look (reload to apply)" },
 }
 local OPTIONS = ns.OPTION_LIST
