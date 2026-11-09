@@ -51,7 +51,7 @@ const fs = require('fs');
 const path = require('path');
 const { EventEmitter } = require('events');
 const { parseSavedVariables, luaAssignment } = require('../shared/lua');
-const { extractPrices, extractMarket } = require('../shared/auctionator');
+const { extractPrices, extractMarket, marketParts } = require('../shared/auctionator');
 const { tocField } = require('../shared/toc');
 const versions = require('../shared/version');
 const { writeFileAtomic } = require('./store');
@@ -518,9 +518,12 @@ function createSync({ api, store, log, wow, appVersion, coreEvents, ...opts } = 
       const result = (await api.request('POST', '/api/sync', db, { timeout: o.uploadTimeoutMs })) || {};
       if (auc) auctionatorSent.set(auc.key, auc.mtime);
       // The Deal hunter's market history goes up on its own; if it fails, everything else is still in.
+      // One realm per request, each trimmed to fit the core's request limit.
       if (auc && auc.market && auc.market.realms.length) {
-        try { await api.request('POST', '/api/market', auc.market, { timeout: o.uploadTimeoutMs }); } catch (err) {
-          say('warn', `Couldn't store the auction house history for the Deal hunter (${err.message}). Prices still uploaded.`);
+        for (const part of marketParts(auc.market)) {
+          try { await api.request('POST', '/api/market', part, { timeout: o.uploadTimeoutMs }); } catch (err) {
+            say('warn', `Couldn't store the auction house history of ${part.realms[0].key} for the Deal hunter (${err.message}). Prices still uploaded.`);
+          }
         }
       }
 

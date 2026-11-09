@@ -115,11 +115,17 @@ function findDeals(db, { realm, minProfit = 5000, maxPrice = null, budget = null
   const items = db.prepare(`SELECT a.item_id, a.current, a.current_day, n.name, i.quality, i.sell_price, i.item_class
       FROM ah_items a LEFT JOIN item_names n ON n.item_id = a.item_id LEFT JOIN item_info i ON i.item_id = a.item_id
       WHERE a.realm = ? AND a.current_day = ?`).all(pick.realm, pick.newest);
-  const daysOf = db.prepare('SELECT day, price, qty FROM ah_days WHERE realm = ? AND item_id = ? ORDER BY day');
+  // Every item's daily prices in one query, not one per item (a realm can have 15,000 items).
+  const daysOf = new Map();
+  for (const h of db.prepare('SELECT item_id, day, price, qty FROM ah_days WHERE realm = ? ORDER BY item_id, day').iterate(pick.realm)) {
+    let list = daysOf.get(h.item_id);
+    if (!list) daysOf.set(h.item_id, (list = []));
+    list.push({ day: h.day, price: h.price, qty: h.qty });
+  }
   const deals = []; const vendor = [];
   for (const it of items) {
     if (maxPrice && it.current > maxPrice) continue;
-    const j = judge(it, daysOf.all(pick.realm, it.item_id), it.sell_price ?? null, today);
+    const j = judge(it, daysOf.get(it.item_id) || [], it.sell_price ?? null, today);
     const row = { ...j, name: it.name || null, quality: it.quality ? String(it.quality).toLowerCase() : null, category: it.item_class || null };
     if (it.sell_price && it.current < it.sell_price && it.sell_price - it.current >= 100) {
       vendor.push({ ...row, profit: it.sell_price - it.current, roi: Math.round(((it.sell_price - it.current) / it.current) * 1000) / 10, confidence: 100, sure: 'certain' });
@@ -132,12 +138,15 @@ function findDeals(db, { realm, minProfit = 5000, maxPrice = null, budget = null
   const score = (d) => d.profit * (d.confidence / 100) ** 2;
   deals.sort((a, b) => score(b) - score(a));
   vendor.sort((a, b) => b.profit - a.profit);
+  const shownDeals = deals.slice(0, limit);
+  const shownVendor = vendor.slice(0, 20);
 
-  // With a budget: the best deals that fit, one of each, best first.
+  // With a budget: the best deals that fit, one of each, best first. Only from the deals returned, so every
+  // planned item is on the page.
   let plan = null;
   if (budget && budget > 0) {
     const chosen = []; let spend = 0; let profit = 0;
-    for (const d of [...vendor, ...deals]) {
+    for (const d of [...shownVendor, ...shownDeals]) {
       if (spend + d.buy > budget) continue;
       chosen.push(d.item_id); spend += d.buy; profit += d.profit;
     }
@@ -150,7 +159,7 @@ function findDeals(db, { realm, minProfit = 5000, maxPrice = null, budget = null
   if (items.length && items.every((i) => i.name == null)) notes.push('Item names fill in as Guild Camp looks them up. Hover an item for its tooltip.');
   return {
     ...base, realm: pick.realm, scan: { day: dayToDate(pick.newest), age_days: age, items: items.length },
-    deals: deals.slice(0, limit), vendor: vendor.slice(0, 20), plan, notes,
+    deals: shownDeals, vendor: shownVendor, plan, notes,
     rules: { ah_cut: AH_CUT, min_discount: MIN_DISCOUNT, min_history_days: MIN_HISTORY, min_profit: minProfit },
   };
 }

@@ -77,4 +77,21 @@ function extractMarket(db, now = Date.now(), { days = 30, maxItems = 15000, maxR
   return { realms: out.filter((r) => today - r.newest <= 14).slice(0, maxRealms) };
 }
 
-module.exports = { extractPrices, extractMarket };
+// The market split into uploads that each fit under the core's request limit (express.json 15mb): one realm per
+// upload, and a realm too big on its own keeps only its most recently seen items (they come newest first).
+// → [{ realms: [realm] }, …]
+function marketParts(market, maxBytes = 12 * 1024 * 1024) {
+  const parts = [];
+  for (const realm of (market && Array.isArray(market.realms) ? market.realms : [])) {
+    let items = realm.items;
+    let size = JSON.stringify({ realms: [{ ...realm, items }] }).length;
+    while (size > maxBytes && items.length > 1) {
+      items = items.slice(0, Math.max(1, Math.floor(items.length * (maxBytes / size) * 0.95)));
+      size = JSON.stringify({ realms: [{ ...realm, items }] }).length;
+    }
+    if (size <= maxBytes) parts.push({ realms: [{ ...realm, items }] });
+  }
+  return parts;
+}
+
+module.exports = { extractPrices, extractMarket, marketParts };

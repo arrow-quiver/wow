@@ -3,7 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { startCore, seedGuild } = require('./helpers');
-const { extractMarket } = require('../../src/shared/auctionator');
+const { extractMarket, marketParts } = require('../../src/shared/auctionator');
 const D = require('../../src/core/services/deals');
 
 const DAY0 = Date.UTC(2020, 0, 1);
@@ -56,6 +56,19 @@ test('extractMarket keeps recent realms and each item\'s daily prices', () => {
   assert.deepEqual(extractMarket(null), { realms: [] });
 });
 
+test('marketParts sends one realm per upload, trimmed to fit the size limit', () => {
+  const m = extractMarket(auctionatorDb(), NOW);
+  const parts = marketParts(m);
+  assert.deepEqual(parts.map((p) => p.realms.map((r) => r.key)), [["Zul'jin Horde"], ['Old Realm Horde']]);
+  assert.equal(parts[0].realms[0].items.length, m.realms[0].items.length);
+  const limit = 1500;
+  const small = marketParts(m, limit);
+  for (const p of small) assert.ok(JSON.stringify(p).length <= limit);
+  assert.ok(small[0].realms[0].items.length < m.realms[0].items.length);
+  assert.deepEqual(small[0].realms[0].items[0], m.realms[0].items[0], 'keeps the most recently seen first');
+  assert.deepEqual(marketParts(null), []);
+});
+
 test('findDeals: real discounts with enough history, vendor flips, flags, budget, stale scans', () => {
   const { DatabaseSync } = require('node:sqlite');
   const { open } = require('../../src/core/db');
@@ -93,6 +106,11 @@ test('findDeals: real discounts with enough history, vendor flips, flags, budget
   r = D.findDeals(db, { now: NOW, budget: 40000 });
   assert.deepEqual(r.plan.items, [4338, 14047]);
   assert.equal(r.plan.spend, 30500);
+  // The plan only picks deals the page shows.
+  r = D.findDeals(db, { now: NOW, budget: 1e9, limit: 1 });
+  const shown = new Set([...r.deals, ...r.vendor].map((x) => x.item_id));
+  assert.ok(r.plan.items.length >= 1 && r.plan.items.every((id) => shown.has(id)));
+  assert.equal(r.plan.spend, [...r.deals, ...r.vendor].reduce((s, x) => s + x.buy, 0));
   r = D.findDeals(db, { now: NOW, maxPrice: 100000 });
   assert.ok(!r.deals.some((x) => x.item_id === 13510));
 
