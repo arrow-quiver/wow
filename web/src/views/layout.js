@@ -46,13 +46,13 @@ function layout({ title, active, user, guild, body, csrf, flash }) {
 <title>${esc(title ? `${title} – wow` : 'wow')}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Alegreya:wght@500;700;800&family=Alegreya+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Alegreya:wght@500;700;800&family=Alegreya+Sans:wght@400;500;700&family=Cinzel:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/style.css">
 <link rel="stylesheet" href="/intro.css">
 <script src="/intro.js"></script>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="manifest" href="/manifest.webmanifest">
-<meta name="theme-color" content="#1f3a33">
+<meta name="theme-color" content="#0b0d12">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <script src="/app.js" defer></script>
 <script src="/wowhead-config.js" defer></script>

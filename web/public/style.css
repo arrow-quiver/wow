@@ -1,28 +1,23 @@
+/* Theme: dark fantasy, matching the loading screen and the in-game Coach. One theme for everyone. */
 :root {
-  --pine: #1f3a33;
-  --pine-2: #2c5047;
-  --ember: #e8a33d;
-  --ember-deep: #b8741a;
-  --mist: #e9edee;
-  --paper: #f7f9f9;
-  --ink: #1b2430;
-  --ink-2: #4a5663;
-  --line: #cfd8da;
-  --alarm: #b3392f;
-  --ok: #3f8a5a;
-  --radius-s: 4px;
-  --radius-m: 10px;
-  color-scheme: light;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --mist: #142420; --paper: #1b2e29; --ink: #e8ece9; --ink-2: #a9b8b2; --line: #2f4a42;
-    --pine: #0f1f1b; --pine-2: #20403a; color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
-  --mist: #142420; --paper: #1b2e29; --ink: #e8ece9; --ink-2: #a9b8b2; --line: #2f4a42;
-  --pine: #0f1f1b; --pine-2: #20403a; color-scheme: dark;
+  --pine: #090b0f;          /* sidebar */
+  --pine-2: #1c1914;        /* sidebar hover/active */
+  --ember: #e0a650;         /* gold-ember accent */
+  --ember-deep: #b77a35;
+  --gold: #d8b777;
+  --gold-soft: #d8b77733;
+  --blood: #7a2a24;
+  --mist: #0b0d12;          /* page */
+  --paper: #141821;         /* cards and inputs */
+  --paper-2: #1a1f2a;
+  --ink: #ece3d0;           /* parchment text */
+  --ink-2: #a49d91;
+  --line: #2e2a24;
+  --alarm: #e0634f;
+  --ok: #73c088;
+  --radius-s: 3px;
+  --radius-m: 6px;
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -35,8 +30,7 @@ h1, h2, h3 { font-family: "Alegreya", Georgia, serif; line-height: 1.15; margin:
 h1 { font-size: 2.4rem; font-weight: 800; letter-spacing: -.01em; }
 h2 { font-size: 1.35rem; font-weight: 700; margin-top: 2rem; }
 p { margin: 0 0 .8em; max-width: 68ch; }
-a { color: var(--pine-2); text-underline-offset: 3px; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) a { color: var(--ember); } }
+a { color: var(--ember); text-underline-offset: 3px; }
 code { font-size: .9em; background: color-mix(in srgb, var(--ink) 8%, transparent); padding: .1em .35em; border-radius: var(--radius-s); }
 .muted { color: var(--ink-2); }
 .lede { font-size: 1.15rem; color: var(--ink-2); }
@@ -90,8 +84,11 @@ label { display: flex; flex-direction: column; gap: .25rem; font-weight: 500; fo
 .btn-quiet { background: transparent; color: var(--ink-2); }
 .stack { display: flex; flex-direction: column; gap: .7rem; }
 .narrow { max-width: 360px; }
-.inline-form { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
-.inline-form input { width: auto; flex: 1 1 220px; }
+.inline-form { display: flex; gap: .5rem; align-items: flex-end; flex-wrap: wrap; }
+.inline-form > input { width: auto; flex: 1 1 220px; }
+.inline-form > label { flex: 1 1 200px; }
+.inline-form > label.check { flex: 0 0 auto; }
+.inline-form > label input { flex: none; }
 .cta-form, .req-form { display: flex; flex-wrap: wrap; gap: .6rem; align-items: flex-end; }
 .cta-form label, .req-form label { flex: 0 1 160px; }
 .cta-form label.grow, .req-form label.grow { flex: 1 1 220px; }
@@ -148,8 +145,7 @@ table { width: 100%; border-collapse: collapse; font-size: .97rem; }
 th { text-align: left; font-weight: 700; color: var(--ink-2); border-bottom: 2px solid var(--line); padding: .5rem .6rem; }
 td { border-bottom: 1px solid var(--line); padding: .5rem .6rem; white-space: nowrap; }
 .clink { text-decoration: none; }
-.cname { color: var(--cc); font-weight: 700; filter: brightness(.95); }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .cname { filter: brightness(1.45); } }
+.cname { color: var(--cc); font-weight: 700; filter: brightness(1.35); }
 .dot { display: inline-block; width: .55rem; height: .55rem; border-radius: 50%; background: var(--ok); margin-right: .4rem; vertical-align: 1px; }
 
 /* ---------- character ---------- */
@@ -272,7 +268,7 @@ a.wh:hover { text-decoration: underline; }
 [hidden] { display: none !important; }
 label.check input { flex: none; }
 .realm-line { margin: 0 0 .75rem; font-size: .95rem; }
-.realm-up { color: #2f7d4f; font-weight: 700; }
+.realm-up { color: var(--ok); font-weight: 700; }
 .realm-down { color: var(--alarm); font-weight: 700; }
 
 /* ---------- Coach ---------- */
@@ -304,3 +300,90 @@ label.check input { flex: none; }
 .steps-list { padding-left: 1.3rem; display: grid; gap: .4rem; }
 button[aria-busy="true"] { opacity: .7; cursor: progress; }
 @media (max-width: 720px) { .coach-hero, .coach-grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* ================= Dark fantasy skin ================= */
+html { background: #0a0c10; }
+body {
+  background:
+    radial-gradient(ellipse 70% 45% at 85% -5%, #a14b3826, transparent 70%),
+    radial-gradient(ellipse 50% 40% at 0% 100%, #3c716e14, transparent 70%),
+    linear-gradient(180deg, #0d1118 0%, #0a0c10 60%, #08090c 100%) fixed;
+}
+h1, h2, legend, .raid-title, .welcome h1 { font-family: "Cinzel", "Alegreya", Georgia, serif; color: #e8d3ac; letter-spacing: .03em; }
+h1 { font-weight: 700; text-shadow: 0 2px 18px #000, 0 0 30px #c48d4b22; }
+h2 { font-weight: 600; font-size: 1.25rem; }
+h3 { font-family: "Cinzel", Georgia, serif; color: var(--gold); letter-spacing: .04em; font-weight: 600; }
+.lede { color: #c0b9b0; }
+::selection { background: #e0a65055; }
+
+/* Sidebar: dark, with a gold rule and an ember marker. */
+.side { background: linear-gradient(180deg, #0c0e13, #07080b); border-right: 1px solid var(--gold-soft); }
+.side .brand { font-family: "Cinzel", serif; letter-spacing: .12em; color: #e8d3ac; text-transform: uppercase; font-size: 1.35rem; }
+body .side a.brand { color: #e8d3ac; }
+body .side a.nav-link { color: #b9b1a3; letter-spacing: .02em; }
+body .side a.nav-link:hover { color: #f1e5ce; background: #ffffff08; }
+body .side a.nav-link.is-active { color: #f1d9ac; background: linear-gradient(90deg, #e0a65022, transparent); box-shadow: inset 2px 0 0 var(--ember); }
+.who { color: #8d877d; }
+
+/* Sections become framed panels with gold corner brackets, like the loading screen. */
+.setting, .loot-card, .onboard, .drive, .coach-hero {
+  position: relative; background: linear-gradient(180deg, #151a23e6, #10141be6);
+  border: 1px solid #d8b77722; border-radius: var(--radius-s);
+  padding: 1.2rem 1.4rem 1.4rem; margin: 0 0 1.2rem; box-shadow: 0 10px 30px #0006;
+}
+.setting::before, .setting::after, .drive::before, .drive::after, .coach-hero::before, .coach-hero::after {
+  content: ""; position: absolute; width: 18px; height: 18px; pointer-events: none; border: 1px solid #d8b77799;
+}
+.setting::before, .drive::before, .coach-hero::before { top: -1px; left: -1px; border-right: 0; border-bottom: 0; }
+.setting::after, .drive::after, .coach-hero::after { bottom: -1px; right: -1px; border-left: 0; border-top: 0; }
+.officer-box { border-left: 2px solid var(--blood); }
+.onboard { border-color: #e0a65077; }
+
+/* Buttons: primary looks like "Enter Azeroth". */
+.btn { background: #ffffff06; border: 1px solid #d8b77755; color: var(--ink); border-radius: var(--radius-s); font-weight: 600; }
+.btn:hover { border-color: var(--gold); background: #d8b77714; }
+.btn-primary, body .main a.btn-primary {
+  background: linear-gradient(90deg, #56221e, #762b26); border: 1px solid #c9a56a; color: #f1d9ac;
+  font-family: "Cinzel", serif; letter-spacing: .08em; box-shadow: inset 0 0 15px #e3a85a19;
+}
+.btn-primary:hover { background: #a44b36; border-color: #e7c28b; box-shadow: 0 0 22px #b86b4255; color: #fff; }
+.btn-alarm { background: #5a1b17; border-color: var(--alarm); color: #ffd9d2; }
+.btn-alarm:hover { background: #7a241e; }
+.btn-quiet { background: transparent; border-color: transparent; color: var(--ink-2); }
+.btn-quiet:hover { border-color: #d8b77744; color: var(--ink); }
+body .main a.btn { color: var(--ink); }
+
+/* Inputs */
+input, select, textarea { background: #0c0f15; border-color: #3a342b; color: var(--ink); }
+input:focus, select:focus, textarea:focus { border-color: var(--gold); outline: none; box-shadow: 0 0 0 3px #e0a65022; }
+input::placeholder, textarea::placeholder { color: #6f6a62; }
+
+/* Tables */
+th { color: var(--gold); font-family: "Cinzel", serif; font-size: .78rem; letter-spacing: .12em; text-transform: uppercase; border-bottom: 1px solid #d8b77755; }
+td { border-bottom-color: #ffffff0d; }
+tbody tr:hover td { background: #ffffff05; }
+
+/* Bars, pills, chips */
+.bar { background: #ffffff12; }
+.bar span { background: linear-gradient(90deg, #63251f, #c47d43, #f4d49c); box-shadow: 0 0 10px #d39a5c66; }
+.pill { background: #d8b7771f; color: #f1d9ac; border: 1px solid #d8b77733; }
+.flash { background: #1b2a20; border-left-color: var(--ok); }
+code, .token { background: #0c0f15; border: 1px solid #2e2a24; }
+.token-once { background: #17140f; }
+.feed-item, .notices li, .board li, .results li, .prof-summary li, .req, .signups li, .raid-row { border-bottom-color: #ffffff0f; }
+.cta-item strong { color: #ff8a73; }
+.spark polyline { stroke: var(--ember); }
+.rolls li.top strong { color: var(--ember); }
+
+/* The camp ring sits under a night sky. */
+.ring { background: radial-gradient(circle at 50% 54%, #e0a6504d 0, transparent 46%), radial-gradient(circle at 50% 50%, #1a1d26, #0a0c11 70%); box-shadow: 0 0 0 1px #d8b77744, 0 0 60px #c47d4322; }
+.seat-dot { border-color: #e8d3ac; box-shadow: 0 0 10px #000; }
+.seat-name { background: #090b0fdd; }
+
+/* Wowhead links stay readable on dark. */
+a.wh { color: #f1e5ce; }
+
+@media (max-width: 820px) {
+  .side { border-right: 0; border-bottom: 1px solid var(--gold-soft); }
+  .setting, .drive, .coach-hero { padding: 1rem 1rem 1.2rem; }
+}
