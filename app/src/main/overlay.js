@@ -1,12 +1,13 @@
 'use strict';
-// The Coach overlay: a small always-on-top window that sits over the game (WoW runs in a window or
-// "windowed fullscreen", so an always-on-top window shows above it). A global hotkey shows and hides it.
-// It loads the renderer's /overlay page, which shows the live link, next steps and a quick Ask box.
+// The war table: an always-on-top window that sits over the game (WoW runs in a window or "windowed fullscreen", so
+// an always-on-top window shows above it). A global hotkey (Ctrl+Shift+G) shows and hides it. It loads the whole
+// app with ?overlay=1 (renderer lib/overlay.js): every page in the war-table layout, quick actions, live and spoken
+// alerts, starting on /overlay (Now: the live link, next steps, the Coach and the guild feed).
 //
 //   const overlay = createOverlay({ store, log, preload, startUrl, electron })
 //   overlay.toggle(); overlay.show(); overlay.hide(); overlay.window(); overlay.registerHotkey(); overlay.dispose()
 
-const DEFAULT_SIZE = { width: 380, height: 600 };
+const DEFAULT_SIZE = { width: 480, height: 740 };
 
 function createOverlay({ store, log, preload, startUrl, electron = require('electron') }) {
   const { BrowserWindow, globalShortcut, screen } = electron;
@@ -26,9 +27,9 @@ function createOverlay({ store, log, preload, startUrl, electron = require('elec
   function create() {
     const b = bounds();
     win = new BrowserWindow({
-      ...b, minWidth: 300, minHeight: 320, show: false, frame: false, resizable: true, skipTaskbar: true,
-      alwaysOnTop: true, fullscreenable: false, maximizable: false, minimizable: false, backgroundColor: '#10161e',
-      title: 'Guild Camp Coach',
+      ...b, minWidth: 360, minHeight: 420, show: false, frame: false, resizable: true, skipTaskbar: true,
+      alwaysOnTop: true, fullscreenable: false, maximizable: false, minimizable: false, backgroundColor: '#140f0b',
+      title: 'Guild Camp war table',
       webPreferences: { preload, contextIsolation: true, sandbox: true, nodeIntegration: false, spellcheck: true },
     });
     // Above games in windowed fullscreen too.
@@ -49,7 +50,7 @@ function createOverlay({ store, log, preload, startUrl, electron = require('elec
     wc.setWindowOpenHandler(() => ({ action: 'deny' }));
     wc.on('will-navigate', (e) => e.preventDefault());
     wc.on('before-input-event', (e, input) => { if (input.type === 'keyDown' && input.key === 'Escape') { e.preventDefault(); hide(); } });
-    win.loadURL(`${startUrl}?splash=0#/overlay`).catch((err) => log.error(`Couldn't load the overlay: ${err.message}`));
+    win.loadURL(`${startUrl}?splash=0&overlay=1#/overlay`).catch((err) => log.error(`Couldn't load the overlay: ${err.message}`));
     return win;
   }
 

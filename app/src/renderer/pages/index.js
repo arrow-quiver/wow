@@ -8,6 +8,7 @@
 export const NAV_SECTIONS = ['Play', 'Guild', 'Officers', 'App'];
 
 export const routes = [
+  { path: '/overlay', load: () => import('./overlay.js'), title: 'Now', nav: 'Play', icon: 'coach', overlayOnly: true },
   // Play
   { path: '/', load: () => import('./camp.js'), title: 'Camp', nav: 'Play', icon: 'camp' },
   { path: '/coach', load: () => import('./coach.js'), title: 'Coach', nav: 'Play', icon: 'coach' },
@@ -45,8 +46,7 @@ export const routes = [
   { path: '/raids/:id/loot', load: () => import('./raid-loot.js'), title: 'Loot screen', icon: 'loot' },
   { path: '/characters/:name', load: () => import('./character.js'), title: 'Character', icon: 'character' },
   { path: '/welcome', load: () => import('./welcome.js'), title: 'Welcome', public: true, bare: true },
-  // The Coach overlay window (main/overlay.js) shows only this page.
-  { path: '/overlay', load: () => import('./overlay.js'), title: 'Coach overlay', bare: true, overlay: true },
+  // The overlay window's home (main/overlay.js): live link, Coach, alerts. Only in the overlay's rail.
 ];
 
 // Static paths (no :params), e.g. for the smoke test that opens every page.

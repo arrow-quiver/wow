@@ -635,7 +635,8 @@ function bootstrap() {
     chat.on('celebrate', (c) => Promise.resolve().then(async () => {
       const r = await api.request('GET', '/api/coach');
       const mine = (r && Array.isArray(r.characters) ? r.characters : []).map((x) => String(x.name).toLowerCase());
-      if (!mine.includes(String(c.from).toLowerCase())) return;
+      // A guildmate's: a line in the guild feed (the overlay's live alerts); mine: Discord too.
+      if (!mine.includes(String(c.from).toLowerCase())) { await api.request('POST', '/api/celebrate/feed', c); return; }
       await api.request('POST', '/api/celebrate', c);
     }).catch((err) => log.warn(`Posting the celebration to Discord failed: ${err.message}`)));
     let overlay = null;

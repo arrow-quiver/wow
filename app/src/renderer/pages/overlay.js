@@ -1,11 +1,11 @@
-// The Coach overlay: a small always-on-top window over the game (main/overlay.js, opened with a hotkey). The live
-// link's session and last death (main/live.js through gc.live), what to do next, and a quick Ask box. Answers show
-// here at once; the game sees them after its next /reload.
-import { html, useState, useEffect, cx } from '../lib/html.js';
+// Now: the war table's home (the overlay window, main/overlay.js, Ctrl+Shift+G). The live link's session and last
+// death (main/live.js through gc.live), what to do next, a quick Ask box (the bar's "Ask" lands here, ?ask=1) and
+// the guild feed. Answers show here at once; the game sees them after its next /reload.
+import { html, useState, useEffect, useRef, cx } from '../lib/html.js';
 import { api, useApi, useAction } from '../lib/api.js';
 import { gc, useGcEvent } from '../lib/gc.js';
 import { number, plural } from '../lib/format.js';
-import { Button, Textarea, Checkbox, Pill, Spinner, Icon, Loading } from '../components/index.js';
+import { Page, Button, Textarea, Checkbox, Pill, Spinner, Icon, Loading, TimeAgo } from '../components/index.js';
 
 const STATUS = {
   live: ['ok', 'Live'],
@@ -25,25 +25,37 @@ function useLive() {
   return state;
 }
 
-export default function OverlayPage() {
+export default function OverlayPage({ query = {} }) {
   const live = useLive();
   const coach = useApi('/api/coach', { interval: 30000 });
   const [hotkey, setHotkey] = useState('');
   useEffect(() => { gc.settings.get().then((s) => setHotkey(s && s.overlayHotkey), () => {}); }, []);
   const ch = coach.data && coach.data.character;
-  return html`<div class="ovl">
-    <header class="ovl-bar">
-      <span class="ovl-title"><${Icon} name="coach" /> Coach${ch ? html` <span class="ovl-who">· ${ch.name}</span>` : null}</span>
-      <button class="ovl-x" type="button" title="Hide (Esc)" aria-label="Hide the overlay" onClick=${() => gc.overlay.hide()}>×</button>
-    </header>
-    <div class="ovl-body">
-      <${LiveCard} live=${live} />
-      ${live && live.lastDeath ? html`<${DeathCard} live=${live} ch=${ch} onAsked=${coach.reload} />` : null}
-      ${coach.data ? html`<${NextCard} data=${coach.data} />` : coach.loading ? html`<${Loading} label="Reading your Coach…" />` : null}
-      ${ch ? html`<${AskCard} data=${coach.data} live=${live} reload=${coach.reload} />` : null}
-      <p class="ovl-foot">Answers reach the game after your next /reload.${hotkey ? ` ${hotkeyLabel(hotkey)} shows or hides this.` : ''} Esc hides it.</p>
+  return html`<${Page} title=${ch ? `Now · ${ch.name}` : 'Now'} width="wide">
+    <div class="ovl-now">
+      <div class="ovl-col">
+        <${LiveCard} live=${live} />
+        ${live && live.lastDeath ? html`<${DeathCard} live=${live} ch=${ch} onAsked=${coach.reload} />` : null}
+        ${coach.data ? html`<${NextCard} data=${coach.data} />` : coach.loading ? html`<${Loading} label="Reading your Coach…" />` : null}
+      </div>
+      <div class="ovl-col">
+        ${ch ? html`<${AskCard} data=${coach.data} live=${live} reload=${coach.reload} focus=${query.ask === '1'} />` : null}
+        <${FeedCard} />
+      </div>
     </div>
-  </div>`;
+    <p class="ovl-foot">Every Guild Camp page is in the rail on the left. Answers reach the game after your next /reload.${hotkey ? ` ${hotkeyLabel(hotkey)} shows or hides the war table.` : ''} Esc hides it.</p>
+  <//>`;
+}
+
+// The guild feed: what's happened lately (the bar's live alerts pop the new ones up).
+function FeedCard() {
+  const q = useApi('/api/activity?limit=12', { interval: 15000 });
+  const rows = (q.data && q.data.activity) || [];
+  return html`<section class="ovl-card">
+    <h2 class="ovl-h">Guild feed</h2>
+    ${rows.length ? html`<ol class="ovl-feed">${rows.map((a) => html`<li key=${a.id}><span>${a.text}</span> <span class="hint"><${TimeAgo} t=${a.created_at} /></span></li>`)}</ol>`
+      : html`<p class="hint mb-0">${q.loading ? 'Reading the feed…' : 'Quiet so far.'}</p>`}
+  </section>`;
 }
 
 function LiveCard({ live }) {
@@ -112,9 +124,11 @@ function NextCard({ data }) {
   </section>`;
 }
 
-function AskCard({ data, live, reload }) {
+function AskCard({ data, live, reload, focus = false }) {
   const ch = data.character;
   const [text, setText] = useState('');
+  const box = useRef(null);
+  useEffect(() => { if (focus && box.current) { const t = box.current.querySelector('textarea'); if (t) t.focus(); } }, [focus]);
   const [useSession, setUseSession] = useState(true);
   const [last, setLast] = useState(null);
   const ask = useAction((question) => api.post('/api/coach/ask', {
@@ -132,8 +146,8 @@ function AskCard({ data, live, reload }) {
     return html`<section class="ovl-card"><p class="hint mb-0">${(data.ai && data.ai.reason) || 'Questions need your Claude API key: add it in Settings → Coach.'}</p></section>`;
   }
   const shown = last || (data.questions || []).find((q) => q.status === 'answered');
-  return html`<section class="ovl-card">
-    <h2 class="ovl-h">Ask</h2>
+  return html`<section class="ovl-card" ref=${box}>
+    <h2 class="ovl-h">Ask the Coach</h2>
     <form onSubmit=${submit} class="stack">
       <${Textarea} class="ovl-ask" rows="2" maxLength="500" value=${text} onValue=${setText} aria-label="Your question"
         placeholder="Quick question about ${ch.name}…" onKeyDown=${(e) => { if (e.key === 'Enter' && !e.shiftKey) submit(e); }} />

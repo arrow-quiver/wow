@@ -32,6 +32,16 @@ function register(app, ctx) {
     res.json({ posted });
   });
 
+  // A guildmate's moment from guild chat (the chat log): only a feed line, once (their own app posts to Discord).
+  app.post('/api/celebrate/feed', needGuild, (req, res) => {
+    const what = str(req.body && req.body.what, 255);
+    const from = str(req.body && req.body.from, 48);
+    if (!what) throw new HttpError(400, 'Say what to celebrate.');
+    if (!CtaDiscord.claim(db, req.guild.id, { character: from, zone: `feed:${what}`, message: '' })) return res.json({ added: false });
+    ctx.activity(req.guild.id, 'celebrate', Celebrate.linkName(what));
+    res.json({ added: true });
+  });
+
   async function anniversaries() {
     const me = ctx.me && ctx.me(); const g = ctx.guild && ctx.guild();
     if (!me || !g || !ctx.cfg.discordWebhook) return 0;
