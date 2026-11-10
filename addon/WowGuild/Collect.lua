@@ -904,6 +904,7 @@ function Collect.sharedRecords()
   add(ns.safely(Collect.bk))
   add(ns.safely(Collect.sh))
   if ns.war and ns.war.record then add(ns.safely(ns.war.record, myPid())) end
+  if ns.mats and ns.mats.record then add(ns.safely(ns.mats.record, myPid())) end
   return out
 end
 

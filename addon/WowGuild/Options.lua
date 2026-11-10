@@ -16,6 +16,8 @@ ns.OPTION_LIST = {
   { key = "ctaChat", label = "Also post my calls to arms in guild chat (and, with the app, on Discord)" },
   { key = "kosAlerts", label = "Warn me when a kill-on-sight or bounty target is near" },
   { key = "dungeonQuests", label = "Entering a dungeon, tell me which of its quests I have (/wow quests)" },
+  { key = "priceAlerts", label = "At the auction house, tell me when something on my buy list is cheap" },
+  { key = "matsNudges", label = "Tell me when I hold mats a guildie needs, or can craft what they want" },
   { key = "radar", label = "Tell me which guildies are in the zone when I arrive (/wow near to group up)" },
   { key = "instanceHelper", label = "In a dungeon, show guildies online the right level for it" },
   { key = "reminders", label = "Remind me to repair, empty bags, spend talents and get ready for raids" },

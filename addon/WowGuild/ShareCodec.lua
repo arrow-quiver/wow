@@ -226,6 +226,11 @@ local TYPES = {
     key = { "pid" }, max = 1024, expiry = { days = 30 },
     fields = { listParts("items", 20, { pText("name", 100), pInt("qty"), pInt("skill") }) },
   },
+  -- Mats wanted: what a shopping list is still short of (id, qty), for guildies who hold them.
+  mw = {
+    key = { "pid" }, max = 400, expiry = { days = 7 },
+    fields = { listParts("items", 15, { pInt("id"), pInt("qty") }) },
+  },
   wm = {
     key = { "pid" }, max = 1280, expiry = { days = 30 },
     fields = {

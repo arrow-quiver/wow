@@ -40,7 +40,7 @@ local guide
 
 local function createGuide()
   local f = CreateFrame("Frame", "WowGuildSkillGuide", UIParent, "BackdropTemplate")
-  f:SetSize(354, 60 + ROWS * 34)
+  f:SetSize(354, 92 + ROWS * 34)
   f:SetFrameStrata("HIGH")
   f:SetMovable(true); f:EnableMouse(true); f:RegisterForDrag("LeftButton"); f:SetClampedToScreen(true)
   f:SetScript("OnDragStart", f.StartMoving)
@@ -56,6 +56,16 @@ local function createGuide()
   local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
   close:SetPoint("TOPRIGHT", -2, -2)
   close:SetScript("OnClick", function() ui().guideHidden = true; f:Hide() end)
+  -- Plan: the cheapest way to the next few points, step by step, and all of it onto the shopping list.
+  f.planBtn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+  f.planBtn:SetSize(110, 22); f.planBtn:SetPoint("BOTTOMLEFT", 10, 8)
+  f.planBtn:SetText("Plan next points")
+  f.planBtn:SetScript("OnClick", function() P.planMode = not P.planMode; P.refreshGuide() end)
+  f.allBtn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+  f.allBtn:SetSize(150, 22); f.allBtn:SetPoint("BOTTOMRIGHT", -10, 8)
+  f.allBtn:SetText("Add the plan to my list")
+  f.allBtn:SetScript("OnClick", function() if P.lastPlan then P.planToList(P.lastPlan) end end)
+  f.allBtn:Hide()
 
   f.rows = {}
   for i = 1, ROWS do
@@ -119,6 +129,8 @@ function P.refreshGuide()
     hideRows()
     return
   end
+  if P.planMode then return P.refreshPlan() end
+  if guide.allBtn then guide.allBtn:Hide(); guide.planBtn:SetText("Plan next points") end
   local ok, ranked = pcall(P.rank, P.current.recipes, ROWS)
   if not ok then
     ns.reportError(ranked)
@@ -141,6 +153,8 @@ function P.refreshGuide()
       if r.points < 1 then bits[#bits + 1] = string.format("%d%% chance", math.floor(r.points * 100 / (r.recipe.skillUps or 1) + 0.5)) end
       row.info:SetText(table.concat(bits, "  ·  "))
       row.add.recipe = r.recipe
+      row.add:SetText("+5 list")
+      row.add:SetScript("OnClick", function(self) if self.recipe then P.addToList(self.recipe, 5) end end)
       row.make.recipe = r.recipe
       row.recipe = r.recipe
       row.icon:SetTexture(r.recipe.icon or (r.recipe.outputId and ns.items.icon(r.recipe.outputId)) or "Interface\\Icons\\INV_Misc_QuestionMark")
@@ -150,6 +164,42 @@ function P.refreshGuide()
       row:Hide()
     end
   end
+end
+
+-- The plan view of the guide: one row a step ("4 × Heavy Linen Bandage"), and what to buy, ask the bank for, or take
+-- from your alts.
+function P.refreshPlan()
+  local ok, plan = pcall(P.plan, P.current.recipes)
+  guide.planBtn:SetText("Back to the list")
+  guide.title:SetText(P.current.name .. ": the next points")
+  if not ok then ns.reportError(plan); guide.sub:SetText("|cffff6040Couldn't plan this.|r"); hideRows(); guide.allBtn:Hide(); return end
+  P.lastPlan = plan
+  if #plan.steps == 0 then
+    guide.sub:SetText(plan.goal == 0 and "You're at the top of this rank. Train the next one." or "No orange or yellow recipes: train new ones.")
+    hideRows(); guide.allBtn:Hide(); return
+  end
+  local bank, alts = 0, 0
+  for _, n in pairs(plan.bank) do bank = bank + n end
+  for _, n in pairs(plan.alts) do alts = alts + n end
+  local bits = { string.format("About %s points", tostring(plan.points)) }
+  bits[#bits + 1] = plan.unknown and "some prices unknown" or (plan.cost > 0 and (money(plan.cost) .. " to buy") or "nothing to buy")
+  if alts > 0 then bits[#bits + 1] = alts .. " mats on your alts" end
+  if bank > 0 then bits[#bits + 1] = bank .. " from the guild bank" end
+  guide.sub:SetText(table.concat(bits, " · "))
+  for i, row in ipairs(guide.rows) do
+    local s = plan.steps[i]
+    if s then
+      row.name:SetText(string.format("%d × |cff%s%s|r", s.crafts, P.COLOR[s.recipe.diff] or "ffffff", s.recipe.name))
+      row.info:SetText(string.format("about %s points", tostring(math.floor(s.points * 10 + 0.5) / 10)))
+      row.recipe = s.recipe; row.make.recipe = s.recipe; row.add.recipe = s.recipe
+      row.add:SetText("+" .. s.crafts .. " list")
+      row.add:SetScript("OnClick", function() P.addToList(s.recipe, s.crafts) end)
+      row.make:Hide()
+      row.icon:SetTexture(s.recipe.icon or (s.recipe.outputId and ns.items.icon(s.recipe.outputId)) or "Interface\\Icons\\INV_Misc_QuestionMark")
+      row:Show()
+    else row:Hide() end
+  end
+  guide.allBtn:Show()
 end
 
 function P.showGuideIfWanted()

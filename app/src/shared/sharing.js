@@ -219,6 +219,12 @@ const TYPES = {
     key: ['pid'], max: 1024, expiry: { days: 30 },
     fields: [list('items', 20, { parts: [pText('name', 100), pInt('qty'), pInt('skill')] })],
   },
+  // Mats wanted: what a player's shopping list is still short of (item id, how many), so guildies holding them
+  // get a nudge (Mats.lua).
+  mw: {
+    key: ['pid'], max: 400, expiry: { days: 7 },
+    fields: [list('items', 15, { parts: [pInt('id'), pInt('qty')] })],
+  },
   wm: {
     key: ['pid'], max: 1280, expiry: { days: 30 },
     fields: [

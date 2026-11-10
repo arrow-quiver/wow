@@ -341,3 +341,23 @@ who has given what. Implemented in `services/donations.js`.
 ```
 Money is in copper. `priced_from`: `auction` | `vendor` | `gold` | null. `board`: by player (a character nobody has
 linked counts on its own), most given first, top 20.
+
+## Leveling plan, price alerts, mats for crafts (addon)
+
+**Leveling plan** (`Professions.lua` `P.plan`, the skill-up guide's **Plan next points**)
+- Plans the next 10 points (or what's left of the rank, from `GetTradeSkillLine`) with orange and yellow recipes. Green ones are too slow.
+- At most 5 points come from one recipe, since it turns easier as you level. Open the profession again to plan further.
+- Each step picks the recipe with the lowest cost per expected point. Mats are free from your bags, then your alts, then the guild bank (`inbox.holdings`); the rest is bought at Auctionator's price, else the guild's.
+- **Add the plan to my list** puts every step on the shopping list.
+
+**Price alerts** (`PriceAlerts.lua`, option `priceAlerts`, `/wow alert <price> <item>`, `/wow alert off <item>`, `/wow alerts`)
+- Watches the buy list of the Guild Camp auction tab (shopping-list mats and guild bank requests) plus your own targets.
+- Target: yours, else 85% of the usual price.
+- Reads auction results as they come in: classic `AUCTION_ITEM_LIST_UPDATE`, modern commodity and item searches, and Auctionator's prices from the visit every 20 seconds.
+- Each item alerts once per visit, on screen and in chat. Nothing is bought here.
+
+**Mats for crafts** (`Mats.lua`, option `matsNudges`, `/wow mats`)
+- Each addon shares what its shopping list still lacks, after bags and alts, as an `mw` record (up to 15 item ids and counts). Once a list has been shared, an empty one goes out to clear it.
+- Every addon checks others' `mw` against its bags, and open crafting (`cr`) and bank (`bq`) requests against the recipes its characters know (`inbox.crafters`).
+- Each match is a chat line once a day. `/wow mats` lists them with a Whisper button (sent on your click).
+- The app stores `mw` like any record but doesn't use it.
