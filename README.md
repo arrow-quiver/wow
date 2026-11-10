@@ -96,7 +96,12 @@ pins on the in-game world map, and the **War** page with hotspots and your nemes
 <img src="docs/screenshots/crafters.png" alt="Crafters page with guild professions and a shopping list" width="900">
 
 - Search any recipe and find who in the guild can make it.
-- Post **crafting requests** and find **leveling partners**.
+- Post **crafting requests** and find **leveling partners**. **Good leveling matches** shows guildies within three
+  levels who usually play when you do.
+- **Bulletin board**: looking for group, selling, buying or help wanted, for the whole guild, in the app and in game
+  (`/wow board`).
+- **Weekly digest**: the guild's week (raids, top players, donations, kills, newcomers) on one page, posted to
+  Discord on Sunday evening.
 - Your in-game shopping list shows up here too, with what your alts already carry, what the guild bank holds and
   what it will cost.
 
@@ -147,6 +152,7 @@ The addon works on its own, and does much more with the app:
 | `/wow list` | Open the shopping list |
 | `/wow near` | Guildies online in your zone, to group up with |
 | `/wow remind` | Check repairs, bags, talents and raids now |
+| `/wow board` | The guild bulletin board; `/wow board wts Mooncloth x4 12g` puts a post up |
 | `/wow deals` | Open the Deal hunter (it also opens with the auction house) |
 | `/wow cta <where> <need> <what>` | Sound a call to arms, e.g. `/wow cta Crossroads 5 need help`: guildmates with the addon get it with a sound, guild chat sees it, and (with the app and `/wow live on`) Discord at once |
 | `/wow status` | Show what's been saved and when guild news last arrived |

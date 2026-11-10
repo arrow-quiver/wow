@@ -151,6 +151,12 @@ const TYPES = {
     key: ['pid', 'name'], max: 400, expiry: { days: 3 },
     fields: [text('character', 48), int('level'), text('zone', 60), text('when', 60), text('note', 140)],
   },
+  // Guild bulletin board: a post a guildmate puts up (looking for group, selling, buying, asking for help).
+  // Taking it down is final ('x'); a post lasts a week.
+  bb: {
+    key: ['b36x6'], max: 400, final: { field: 'state', values: 'x' }, expiry: { days: 7, finalDays: 1 },
+    fields: [text('pid', 64), text('character', 48), enm('kind', 'lswh'), text('text', 200), int('price'), enm('state', 'ox')],
+  },
   ca: {
     key: ['b36x6'], max: 300, expiry: { days: 1 },
     fields: [text('character', 48), text('zone', 60), int('needed'), text('message', 200)],

@@ -18,8 +18,10 @@ export const routes = [
   { path: '/crafters', load: () => import('./crafters.js'), title: 'Crafters', nav: 'Play', icon: 'crafters' },
   { path: '/requests', load: () => import('./requests.js'), title: 'Requests', nav: 'Play', icon: 'requests' },
   { path: '/partners', load: () => import('./partners.js'), title: 'Partners', nav: 'Play', icon: 'partners' },
+  { path: '/board', load: () => import('./board.js'), title: 'Bulletin board', nav: 'Play', icon: 'board' },
   // Guild
   { path: '/roster', load: () => import('./roster.js'), title: 'Roster', nav: 'Guild', icon: 'roster' },
+  { path: '/digest', load: () => import('./digest.js'), title: 'Weekly digest', nav: 'Guild', icon: 'digest' },
   { path: '/bank', load: () => import('./bank.js'), title: 'Bank', nav: 'Guild', icon: 'bank' },
   { path: '/store', load: () => import('./store.js'), title: 'Guild bank store', nav: 'Guild', icon: 'store' },
   { path: '/donate', load: () => import('./donate.js'), title: 'Donate', nav: 'Guild', icon: 'gift' },

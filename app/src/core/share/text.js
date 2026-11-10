@@ -61,6 +61,10 @@ function summaryOf(recIn, lookup) {
       return `${verb}: ${clip(item, 60)}`;
     }
     case 'lp': return del ? `Leveling partner post for ${segs[1] || 'a character'}: closed` : `Leveling partner post for ${f.character || segs[1]}`;
+    case 'bb': {
+      if (del) return 'Bulletin board post: removed';
+      return `Bulletin board${f.state === 'x' ? ' (taken down)' : ''}: ${clip(f.text, 60) || 'a post'}`;
+    }
     case 'ca': return removed(`Call to arms: ${clip(f.zone, 40) || 'somewhere'}`);
     case 'dg': {
       if (del) return 'Dungeon group: removed';
@@ -194,6 +198,7 @@ function discordPost(recIn, { lookup, created = false, from } = {}) {
       return [`⚔️ **Call to arms: ${f.zone}**${f.needed ? ` (need ${f.needed})` : ''}`, String(f.message || '').trim(),
         `— ${f.character || r.author}${from === 'game' ? ' (from in game)' : ''}`].filter(Boolean).join('\n');
     case 'cr': return created && f.state === 'o' ? `🔨 **Crafting request:** ${f.item}${f.notes ? ` (${f.notes})` : ''}, for ${r.author}` : null;
+    case 'bb': return created && f.state === 'o' && f.text ? `📌 **${BOARD[f.kind] || 'Bulletin board'}:** ${f.text}${f.price > 0 ? ` (${gold(f.price)})` : ''} — ${f.character || r.author}` : null;
     case 'bq': return created && f.state === 'o' ? `🏦 **Bank request:** ${f.count || 1} × ${f.item}, for ${r.author}` : null;
     case 'DR': return created && f.state !== 'c' ? `📦 **Supply drive: ${f.title}**. Goal: ${num(f.goal)} ${f.unit}. Log what you hand in under Drives in Guild Camp.` : null;
     default: return null;
@@ -201,6 +206,13 @@ function discordPost(recIn, { lookup, created = false, from } = {}) {
 }
 
 // The Discord post when my hand-in brings a supply drive to its goal (the old server's line). dr: the DR record.
+// Bulletin board kinds, and copper as "12g 50s" for posts.
+const BOARD = { l: 'Looking for group', s: 'Selling', w: 'Buying', h: 'Help wanted' };
+function gold(c) {
+  const g = Math.floor(c / 10000), s = Math.floor((c % 10000) / 100), cp = c % 100;
+  return [g ? `${g}g` : '', s ? `${s}s` : '', !g && !s ? `${cp}c` : ''].filter(Boolean).join(' ');
+}
+
 function driveGoalPost(drIn) {
   const f = (asRec(drIn) || {}).fields || {};
   return `🎉 **${f.title || 'The supply drive'}** reached its goal of ${num(f.goal)}${f.unit ? ` ${f.unit}` : ''}. Thanks everyone!`;

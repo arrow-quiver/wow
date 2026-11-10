@@ -387,3 +387,68 @@ activity line is added either way.
 Time in the guild (`memberships.joined_at`: 1, 3 and 6 months, then every year) and character birthdays
 (`characters.first_seen`, every year; migration 27). Each app posts its own player's to Discord once (checked every
 hour), and the inbox's `today` field (`{ date, lines }`) shows them as a toast at login.
+
+## Guild life
+
+Services: `services/guildlife.js`; routes: `routes/guildlife.js`; migration 28. Pages: Bulletin board (`/board`), Weekly digest
+(`/digest`), and "Good leveling matches" on Partners.
+
+### Bulletin board
+
+Posts are `bb` records ([SHARING.md](../SHARING.md)), shared like crafting requests, so guildmates without the app
+see them in game (`/wow board`). A post lasts a week. Your own new post goes to Discord when the game confirms it
+("📌 **Selling:** Mooncloth, 4 left (12g 50s) — Grimtusk").
+
+#### `GET /api/board` (guild)
+```json
+{ "posts": [{ "id": 3, "character": "Grimtusk", "class": "MAGE", "level": 60, "kind": "wts", "kindLabel": "Selling",
+    "text": "Mooncloth, 4 left", "price": 125000, "created_at": "2026-11-10 09:12:00", "mine": true }],
+  "myCharacters": [{ "name": "Grimtusk", "class": "MAGE", "level": 60 }],
+  "kinds": { "lfg": "Looking for group", "wts": "Selling", "wtb": "Buying", "help": "Help wanted" } }
+```
+
+#### `POST /api/board` (guild)
+`{ "character": "Grimtusk", "kind": "lfg|wts|wtb|help", "text": "…", "price": 125000 }` (price in copper, optional)
+→ `201 { "post": {…}, "message": "Posted to the guild. It stays up for a week." }`
+- Not my character, unknown kind or no text → `400`; no player id yet → `409`.
+
+#### `POST /api/board/:id/remove` (guild)
+Takes my post down for the guild (the record's final state `x`). → `{ "ok": true, "message": "Post taken down." }`
+- Unknown → `404`; someone else's → `403`.
+
+### Leveling matches
+
+#### `GET /api/leveling` (guild)
+For each of my characters under 60: guildmates' characters within `levelGap` (3) levels, online or seen in the
+last 14 days. Online first, then those with a partner post, then the hours of the week we're both usually on
+(`sharedHours`), then level. Hours come from roster scans (`seen_hours`: each online guildmate counts once per scan
+in the slot `weekday * 24 + hour`, this computer's time).
+```json
+{ "levelGap": 3, "characters": [{ "character": "Grimlet", "class": "ROGUE", "level": 27, "usually": "Weekday evenings",
+  "matches": [{ "name": "Rokhan", "class": "HUNTER", "level": 28, "zone": "Ashenvale", "online": true, "lastSeen": "…",
+    "sharedHours": 9, "usually": "Weekday evenings", "lookingForPartners": true }] }] }
+```
+
+### Weekly digest
+
+The guild's week, Monday 00:00 UTC to the next: who joined, raids, the week's top three in season points,
+donations, crafts made, kills and deaths, calls to arms and board posts. The Guild Master's app (membership role
+`owner`) posts it to Discord on Sunday from 18:00 (this computer's time); officers can post it by hand. Each app
+posts a week once (`digest_posts`).
+
+#### `GET /api/digest?week=YYYY-MM-DD` (guild)
+Any day of the week; this week by default.
+```json
+{ "week": "2026-11-09", "from": "…", "to": "…", "current": true, "previous": "2026-11-02", "next": null, "guild": "wow",
+  "members": { "total": 27, "joined": ["Rokhan"], "atMax": 11 },
+  "top": [{ "name": "Mokra", "points": 214 }], "points": { "gold": 120, "kills": 31, "crafts": 6, "raidNights": 18 },
+  "raids": [{ "title": "Molten Core", "startsAt": "…", "done": true, "attended": 18 }],
+  "donations": { "count": 9, "value": 1450000, "top": { "name": "Grimtusk", "value": 800000 } },
+  "crafts": 6, "war": { "kills": 31, "deaths": 12 }, "ctas": 4, "board": 7,
+  "posted": false, "canPost": true, "discord": true, "text": "📰 **wow — the week of 2026-11-09** …" }
+```
+
+#### `POST /api/digest/post` (guild, officers)
+`{ "week"?: "YYYY-MM-DD", "force"?: true }` → `{ "ok": true, "posted": true, "message": "The weekly digest is on Discord." }`
+(`posted: false` when it already went out and `force` isn't set).
+- Not an officer → `403`; no webhook → `409`; Discord refused → `502`.

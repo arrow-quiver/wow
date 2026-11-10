@@ -906,6 +906,36 @@ const MIGRATIONS = [
      at TEXT NOT NULL DEFAULT (datetime('now')),
      PRIMARY KEY (guild_id, user_id, key)
    );`,
+
+  // 28: Guild life (services/guildlife.js). bulletin_posts: the guild bulletin board, from "bb" records.
+  // seen_hours: how often each guildmate was online at each hour of the week (slot = weekday * 24 + hour, local
+  // time), from roster scans, for leveling matches. digest_posts: weekly digests this app posted to Discord.
+  `CREATE TABLE bulletin_posts (
+     id INTEGER PRIMARY KEY,
+     guild_id INTEGER NOT NULL REFERENCES guilds(id),
+     user_id INTEGER NOT NULL REFERENCES users(id),
+     character TEXT NOT NULL,
+     kind TEXT NOT NULL CHECK (kind IN ('lfg','wts','wtb','help')),
+     text TEXT NOT NULL,
+     price INTEGER,
+     share_id TEXT,
+     created_at TEXT NOT NULL DEFAULT (datetime('now'))
+   );
+   CREATE UNIQUE INDEX bulletin_share ON bulletin_posts(guild_id, share_id);
+   CREATE TABLE seen_hours (
+     guild_id INTEGER NOT NULL REFERENCES guilds(id),
+     name TEXT NOT NULL,
+     slot INTEGER NOT NULL CHECK (slot BETWEEN 0 AND 167),
+     n INTEGER NOT NULL DEFAULT 0,
+     last_scan TEXT,
+     PRIMARY KEY (guild_id, name, slot)
+   );
+   CREATE TABLE digest_posts (
+     guild_id INTEGER NOT NULL REFERENCES guilds(id),
+     week TEXT NOT NULL,
+     posted_at TEXT NOT NULL DEFAULT (datetime('now')),
+     PRIMARY KEY (guild_id, week)
+   );`,
 ];
 
 // Runs every migration the database hasn't had yet, each in its own transaction.

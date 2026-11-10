@@ -20,6 +20,7 @@ export default function PartnersPage() {
     <${Async} q=${data} loadingLabel="Looking for company…">
       ${(d) => html`
         <${PostCard} chars=${d.myCharacters} onPosted=${data.reload} />
+        <${Matches} />
         <${PostList} posts=${d.posts} chars=${d.myCharacters} reload=${data.reload} />`}
     <//>
   <//>`;
@@ -96,4 +97,26 @@ function PostList({ posts, chars, reload }) {
       <//>`;
     })}
   </div>`;
+}
+
+// Leveling matches: guildies near each of my leveling characters, who play when I do (GET /api/leveling).
+function Matches() {
+  const q = useApi('/api/leveling');
+  if (!q.data || !q.data.characters.length) return null;
+  return html`<${Card} title="Good leveling matches" sub=${`guildies within ${q.data.levelGap} levels, who are usually on when you are`}>
+    <div class="stack">
+      ${q.data.characters.map((c) => html`<div key=${c.character} class="stack stack--tight">
+        <div class="row nowrap"><${ClassName} name=${c.character} cls=${c.class} /> <${Pill} kind="muted">level ${c.level}<//>
+          ${c.usually ? html`<span class="hint">you usually play: ${c.usually.toLowerCase()}</span>` : null}</div>
+        ${c.matches.length ? html`<ol class="list-lines">${c.matches.map((m) => html`<li key=${m.name} class="row row--between nowrap">
+          <span class="ellipsis"><${ClassName} name=${m.name} cls=${m.class} /> <span class="hint">${m.level}${m.zone ? ` · ${m.zone}` : ''}${m.usually ? ` · ${m.usually.toLowerCase()}` : ''}</span></span>
+          <span class="row nowrap">
+            ${m.online ? html`<${Pill} kind="ok">online<//>` : html`<span class="hint">seen <${TimeAgo} t=${m.lastSeen} /></span>`}
+            ${m.lookingForPartners ? html`<${Pill} kind="info">looking<//>` : null}
+            ${m.sharedHours ? html`<${Pill} kind="muted">${m.sharedHours}h together<//>` : null}
+          </span></li>`)}</ol>`
+          : html`<p class="hint mb-0">Nobody in the guild within ${q.data.levelGap} levels has been on lately.</p>`}
+      </div>`)}
+    </div>
+  <//>`;
 }

@@ -154,6 +154,10 @@ function applyPayload(db, guildId, userId, payload, { trustedRanks = true, ctx =
       last_seen = CASE WHEN excluded.online = 1 THEN excluded.last_seen ELSE last_seen END,
       updated_at = excluded.updated_at`);
   const claimed = db.prepare('SELECT user_id FROM characters WHERE guild_id = ? AND name = ?');
+  // Online at this hour of the week (local time), once per roster scan: leveling matches (services/guildlife.js).
+  const seenHour = db.prepare(`INSERT INTO seen_hours (guild_id, name, slot, n, last_scan) VALUES (?,?,?,1,?)
+    ON CONFLICT (guild_id, name, slot) DO UPDATE SET n = n + 1, last_scan = excluded.last_scan WHERE last_scan IS NOT excluded.last_scan`);
+  const slotOf = (t) => { const d = new Date(t); return d.getDay() * 24 + d.getHours(); };
   const insCta = db.prepare(`INSERT OR IGNORE INTO ctas (guild_id, user_id, character, zone, message, needed, source, client_ref)
     VALUES (?,?,?,?,?,?, 'addon', ?)`);
   const activity = db.prepare('INSERT INTO activity (guild_id, kind, text) VALUES (?,?,?)');
@@ -262,6 +266,7 @@ function applyPayload(db, guildId, userId, payload, { trustedRanks = true, ctx =
           });
           stats.roster += 1;
           if (trustedRanks) stats.rankScan = true;
+          if (m.online) seenHour.run(guildId, name, slotOf(scanned), scanned);
         }
       }
     }

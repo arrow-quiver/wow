@@ -1312,3 +1312,11 @@ a.wh.q0 { color: var(--q-0) !important; } a.wh.q1 { color: var(--q-1) !important
 .week-down { color: var(--alarm); font-size: var(--fs-sm); }
 .week-labels { margin: 0 0 var(--s-2); }
 @media (max-width: 700px) { .week-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Bulletin board and weekly digest */
+.board-filter { flex-wrap: wrap; gap: 6px; margin: 12px 0; }
+.board-form { grid-template-columns: minmax(140px, 1fr) minmax(140px, 1fr) minmax(220px, 3fr) minmax(110px, 1fr); }
+.board-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.board-card.is-mine { border-color: var(--accent, currentColor); }
+.digest-text { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: 0.9em; margin: 0 0 12px; }
+@media (max-width: 720px) { .board-form { grid-template-columns: 1fr; } }

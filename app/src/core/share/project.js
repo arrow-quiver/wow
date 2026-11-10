@@ -25,7 +25,7 @@ const dayToDate = (d) => new Date(SCAN_DAY_0 + d * 86400000).toISOString().slice
 const skillName = (id) => S.SKILLS[id] || `Skill ${id}`;
 
 // Dependency order: links first (users), then settings, loot lists before raids and awards, loyalty last.
-const ORDER = ['ch', 'cfg', 'bc', 'bk', 'rc', 'll', 'raid', 'la', 'loyalty', 'cr', 'lp', 'ca', 'an', 'drive', 'dc', 'bq', 'gb', 'sh', 'pr', 'wm', 'st'];
+const ORDER = ['ch', 'cfg', 'bc', 'bk', 'rc', 'll', 'raid', 'la', 'loyalty', 'cr', 'lp', 'bb', 'ca', 'an', 'drive', 'dc', 'bq', 'gb', 'sh', 'pr', 'wm', 'st'];
 
 function tasksFor(rec, prevRec) {
   if (!rec) return [];
@@ -50,6 +50,7 @@ function tasksFor(rec, prevRec) {
     case 'cr': out.push(`cr:${rec.key}`); break;
     case 'cl': out.push(`cr:${segs[0]}`); break;
     case 'lp': out.push(`lp:${rec.key}`); break;
+    case 'bb': out.push(`bb:${rec.key}`); break;
     case 'ca': out.push(`ca:${rec.key}`); break;
     case 'AN': out.push(`an:${rec.key}`); break;
     case 'DR': out.push(`drive:${rec.key}`); break;
@@ -545,6 +546,24 @@ function projectLp(db, gid, key) {
   }
 }
 
+// bb: bulletin_posts (taken down 'x' or expired: gone)
+function projectBb(db, gid, k) {
+  const r = liveRec(st.effective(db, gid, `bb:${k}`));
+  const row = db.prepare('SELECT id FROM bulletin_posts WHERE guild_id = ? AND share_id = ?').get(gid, k);
+  const f = r ? r.fields : {};
+  if (!r || f.state === 'x' || !f.text) {
+    if (row && (!r ? !dropped(db, gid, `bb:${k}`) : true)) db.prepare('DELETE FROM bulletin_posts WHERE id = ?').run(row.id);
+    return;
+  }
+  const uid = st.userForPid(db, gid, f.pid);
+  if (!uid) return;
+  const kind = { l: 'lfg', s: 'wts', w: 'wtb', h: 'help' }[f.kind] || 'lfg';
+  const vals = [uid, f.character || r.author || '?', kind, String(f.text).slice(0, 200), Number.isInteger(f.price) && f.price > 0 ? f.price : null];
+  const t = st.iso(r.t).replace('T', ' ').slice(0, 19);
+  if (row) db.prepare('UPDATE bulletin_posts SET user_id = ?, character = ?, kind = ?, text = ?, price = ?, created_at = ? WHERE id = ?').run(...vals, t, row.id);
+  else db.prepare('INSERT INTO bulletin_posts (user_id, character, kind, text, price, created_at, guild_id, share_id) VALUES (?,?,?,?,?,?,?,?)').run(...vals, t, gid, k);
+}
+
 function projectCa(db, gid, k) {
   const ca = liveRec(st.effective(db, gid, `ca:${k}`));
   const row = db.prepare('SELECT id FROM ctas WHERE guild_id = ? AND share_id = ?').get(gid, k);
@@ -831,6 +850,7 @@ function run(db, gid, tasks, { out = {} } = {}) {
       case 'loyalty': projectLoyalty(db, gid, arg); break;
       case 'cr': projectCr(db, gid, arg); break;
       case 'lp': projectLp(db, gid, arg); break;
+      case 'bb': projectBb(db, gid, arg); break;
       case 'ca': projectCa(db, gid, arg); break;
       case 'an': projectAn(db, gid, arg); break;
       case 'drive': projectDrive(db, gid, arg); break;
