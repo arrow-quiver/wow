@@ -16,6 +16,7 @@ ShareSync.lua
 Items.lua
 Collect.lua
 Dungeons.lua
+Board.lua
 Finder.lua
 UI.lua
 Professions.lua

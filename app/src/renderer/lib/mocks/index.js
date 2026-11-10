@@ -12,3 +12,4 @@ import './war.js';
 import './donate.js';
 import './seasons.js';
 import './store.js';
+import './guildlife.js';

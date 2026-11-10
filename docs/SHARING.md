@@ -237,6 +237,7 @@ RT:k3f9a2^wzltl343^Grommash^^d^tob9c0^r^4kq1zm^tobn80^Thrallia.p4m7,d72,eim;Zulj
 | `cr` craft request | random | a character of pid | pid, item, notes, state `o`/`x`/`d` | `x`, `d` | 30 d open; 7 d after final | 400 |
 | `cl` craft claim | request`:`pid | a character of pid | state `c`/`d`/`w` (claimed, done, withdrawn), claimedAt | | with the request | 60 |
 | `lp` leveling post | pid`:`character | a character of pid | character, level, zone, when, note | | 3 d | 400 |
+| `bb` bulletin board post | random | a character of pid | pid, character, kind `l`/`s`/`w`/`h` (looking for group, selling, buying, help), text, price (copper), state `o`/`x` | `x` | 7 d; 1 d after taken down | 400 |
 | `ca` call to arms | random | any member | character, zone, needed, message | | 1 d | 300 |
 | `dg` dungeon group | random | a character of pid (the leader) | pid, character, dungeon, startsAt, leader role `t`/`h`/`d`, level, slots tank, heal, dps (leader included), note, state `o`/`x`/`d` (open, called off, done), guests `name,role,class,level;…` (players from outside the guild the leader added) | `x`, `d` | startsAt + 1 d | 700 |
 | `dj` dungeon join | group`:`pid | a character of pid | character, role `t`/`h`/`d`, status `y`/`w` (in, left), class, level, joinedAt | | with the group | 160 |
@@ -313,8 +314,8 @@ ranks may pass them on.
 **Import rules** (app). The trust decision (`how`) is the addon's, because only the addon saw the sender: a
 demoted officer's earlier records stay valid everywhere, and anything new from them is refused at first hand.
 The app adds content rules: officer-space records relayed by a member (`m`) are refused; pid-keyed records
-(`su`, `cr`, `cl`, `lp`, `dc`, `bq`, `sh`, `pr`) must come from a character linked to that pid (§3), and a new
-version of a `cr`, `dc` or `bq` must keep its pid; a `cl` not from the requester; `bk` only from a character in
+(`su`, `cr`, `cl`, `lp`, `bb`, `dc`, `bq`, `sh`, `pr`) must come from a character linked to that pid (§3), and a new
+version of a `cr`, `dc`, `bq` or `bb` must keep its pid; a `cl` not from the requester; `bk` only from a character in
 `BC`; reserves on the loot list and within srLimit; `WH` only in officers' apps. Failures stay in
 `shared_records` as `ignored`, with a reason and an audit line. Records ignored for a reason a later record can
 fix (a link, the raid, the loot list, the bank characters, my role) are tried again at every import.
@@ -355,7 +356,7 @@ modified addon can fake member data (a sign-up, a guild bank snapshot), never of
 | Share the Discord webhook | `WH` | officer, OFFICER channel, first-hand only | addon; kept only by officers' apps |
 | Sign up and reserve | `su` | member, for their own player | app (link, loot list, limit; the app's own routes also want a sign-up before reserves) |
 | Crafting request; claim | `cr`; `cl` | member; not on their own request | app |
-| Partner post, call to arms, hand-in, bank request, shopping list, prices | `lp`, `ca`, `dc`, `bq`, `sh`, `pr` | member, for their own player | app |
+| Partner post, board post, call to arms, hand-in, bank request, shopping list, prices | `lp`, `bb`, `ca`, `dc`, `bq`, `sh`, `pr` | member, for their own player | app |
 | Character, recipes, bank-character stock | `ch`, `rc`, `bk` | that character | addon (author = key), app (`BC`) |
 | Guild bank | `gb` | any member who scanned it | none beyond member |
 
@@ -652,6 +653,7 @@ confirmed with "It was me"), `share_repair` (the repair after the update ran, §
 | `LY` + closes + `LA` | loyalty, rebuilt per instance by the fold |
 | `cr` + `cl` | craft_requests (status and crafter_id derived) |
 | `lp`, `ca`, `AN` | buddy_posts, ctas (client_ref = key), announcements |
+| `bb` | bulletin_posts (taken down or expired: deleted) |
 | `dg` + `dj` | no rows: routes/dungeons.js reads the effective records and the line-up comes from `dungeonGroupState` (the leader fills a slot of their role; then the leader's guests in the order listed; then joins in joinedAt order, a tie to the smaller pid; past a role's free slots they wait). A `dj` on the leader's own group is ignored (`own group`). |
 | `DR` + `dc` | drives (status derived), drive_contribs |
 | `bq` + `BH` | bank_requests (status and handled_by derived); with no record at all (my new request cancelled or refused) the row goes |
@@ -692,6 +694,7 @@ result travels in `LA`.
 | Edit loot list; post or delete notice | `LL`; `AN` or its tombstone |
 | Request, cancel, mark done; claim, done, withdraw as crafter | `cr`; `cl` |
 | Partner post or close; call to arms | `lp` or its tombstone; `ca` |
+| Board post or take down | `bb` (state `x`) |
 | Start or close drive; hand-in | `DR`; `dc` |
 | Bank request or cancel; sent or declined | `bq`; `BH` |
 | Bank characters; officer and relay ranks (Guild Master; "Off" for officers is saved as 0, the Guild Master alone, since `CFG` can't carry "none" there); share webhook | `BC`; `CFG`; `WH` |
@@ -985,6 +988,7 @@ pid (`<name>.<4 base36>`), tab (`0`–`8`), `1`.
 | `cr` | random | pid text(64), item text(100), notes text(200), state enum `oxd` |
 | `cl` | random:pid | state enum `cdw`, claimedAt int |
 | `lp` | pid:name | character text(48), level int, zone text(60), when text(60), note text(140) |
+| `bb` | random | pid text(64), character text(48), kind enum `lswh`, text text(200), price int, state enum `ox` |
 | `ca` | random | character text(48), zone text(60), needed int, message text(200) |
 | `dg` | random | pid text(64), character text(48), dungeon text(60), startsAt int, role enum `thd`, level int, tank int, heal int, dps int, note text(140), state enum `oxd`, guests [(name text(48), role text(1), class text(20), level int)] ≤ 9 |
 | `dj` | random:pid | character text(48), role enum `thd`, status enum `yw`, class text(20), level int, joinedAt int |

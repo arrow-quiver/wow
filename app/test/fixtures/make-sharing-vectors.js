@@ -51,6 +51,8 @@ add('su from the outbox example', rec('su', 'k3f9a2:Thrallia.p4m7', 1794067800, 
 add('su bench, no reserves', rec('su', 'k3f9a2:Zuljin.a8x2', NOW - 60, 'Zuljin', { character: 'Zuljin', role: 'd', status: 'b' }));
 add('cr open', rec('cr', 'r1r1r1', NOW - 60, 'Thrallia', { pid: 'Thrallia.p4m7', item: 'Robe of the Archmage', notes: 'I bring the mats', state: 'o' }));
 add('cr cancelled (final)', rec('cr', 'r1r1r1', NOW - 30, 'Thrallia', { pid: 'Thrallia.p4m7', item: 'Robe of the Archmage', state: 'x' }, { final: true }));
+add('bb selling', rec('bb', 'b1b1b1', NOW - 60, 'Thrallia', { pid: 'Thrallia.p4m7', character: 'Thrallia', kind: 's', text: 'Mooncloth, 4 left', price: 125000, state: 'o' }));
+add('bb taken down (final)', rec('bb', 'b1b1b1', NOW - 30, 'Thrallia', { pid: 'Thrallia.p4m7', character: 'Thrallia', kind: 's', text: 'Mooncloth, 4 left', state: 'x' }, { final: true }));
 add('cr done (final)', rec('cr', 'r1r1r1', NOW - 30, 'Thrallia', { pid: 'Thrallia.p4m7', item: 'Robe of the Archmage', state: 'd' }, { final: true }));
 add('cl claim', rec('cl', 'r1r1r1:Zuljin.a8x2', NOW - 60, 'Zuljin', { state: 'c', claimedAt: NOW - 60 }));
 add('lp partner post', rec('lp', 'Thrallia.p4m7:Zuljinne', NOW - 60, 'Zuljinne', { character: 'Zuljinne', level: 24, zone: 'Stranglethorn Vale', when: 'tonight 8pm', note: 'questing; anyone?' }));

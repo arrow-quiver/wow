@@ -231,6 +231,6 @@ function fmtGoldCopper(c) {
 const badgeText = (name, badge) => `🏅 **${clean(name)}** earned the **${badge.name}** badge!`;
 
 module.exports = {
-  season, hall, badgesOf, lifetimePoints, inboxPart, announceText, donationText, badgeText, monthOf, bounds,
+  season, hall, badgesOf, lifetimePoints, inboxPart, events, members, announceText, donationText, badgeText, monthOf, bounds,
   POINTS, CATEGORIES, BADGES, STREAK_STEP, STREAK_MAX, _bestStreak: bestStreak, _streakOf: streakOf, _weekOf: weekOf,
 };

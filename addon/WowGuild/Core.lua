@@ -313,6 +313,8 @@ local function slash(input)
     ns.queueCta(rest)
   elseif cmd == "lfg" or cmd == "group" then
     if ns.lfg then ns.lfg.slash(rest) else ns.print("Dungeon groups aren't running. " .. ns.restartHint) end
+  elseif cmd == "board" then
+    if ns.board then ns.board.slash(rest) end
   elseif cmd == "share" then
     local S = ns.Share
     if type(S) == "table" and type(S.slash) == "function" then
@@ -359,6 +361,7 @@ local function slash(input)
     ns.print("/wow  open the guild panel")
     ns.print("/wow cta [zone] [number] [message]  call guildies to a fight")
     ns.print("/wow lfg  guild dungeon groups: list, new, join, leave")
+    ns.print("/wow board  the guild bulletin board (/wow board wts Mooncloth x4 12g to post)")
     ns.print("/wow share  how sharing with your guild is going")
     ns.print("/wow sync  save everything now")
     ns.print("/wow status  what's been saved")
