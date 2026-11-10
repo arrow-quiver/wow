@@ -13,8 +13,9 @@
 // Streak: weeks in a row (Monday to Sunday, UTC) with any points, up to this week or last week. Each week of streak
 // after the first adds 5% to the season's points, up to +25%.
 // Raid boss kills the guild's addons recorded count as raids attended too (services/bosskills.js), once a raid.
+// A recruit who stays a week: 25 for whoever found them (services/recruiting.js; players' `recruits`).
 // The hunt (services/hunt.js): each kill of a kill-on-sight target 8 more, and a bounty's points (bounty: n = points).
-const POINTS = { gold: 1, kill: 2, craft: 5, raid: 10, kos: 8, bounty: 1 };
+const POINTS = { gold: 1, kill: 2, craft: 5, raid: 10, kos: 8, bounty: 1, recruit: 25 };
 const STREAK_STEP = 0.05;
 const STREAK_MAX = 0.25;
 const WEEK_MS = 7 * 86400000;
@@ -75,13 +76,14 @@ function events(db, guildId, from, to) {
     out.push({ userId: a.user_id, kind: 'raid', n: 1, at: parseTime(a.starts_at) });
   out.push(...require('./bosskills').events(db, guildId, from, to));
   out.push(...require('./hunt').events(db, guildId, from, to));
+  out.push(...require('./recruiting').events(db, guildId, from, to));
   return out;
 }
 
-const tally = () => ({ gold: 0, kills: 0, crafts: 0, raids: 0, hunt: 0, base: 0 });
+const tally = () => ({ gold: 0, kills: 0, crafts: 0, raids: 0, hunt: 0, recruits: 0, base: 0 });
 function add(t, e) {
   if (e.kind === 'gold') t.gold += e.n; else if (e.kind === 'kill') t.kills += e.n; else if (e.kind === 'craft') t.crafts += e.n;
-  else if (e.kind === 'raid') t.raids += e.n; else t.hunt += e.n * POINTS[e.kind];
+  else if (e.kind === 'raid') t.raids += e.n; else if (e.kind === 'recruit') t.recruits += e.n; else t.hunt += e.n * POINTS[e.kind];
   t.base += e.n * POINTS[e.kind];
 }
 
@@ -117,7 +119,7 @@ function season(db, guildId, { month, now = Date.now() } = {}) {
     const bonus = bonusOf(streak);
     return {
       userId: p.userId, name: p.name, class: p.class,
-      gold: Math.round(p.gold * 100) / 100, kills: p.kills, crafts: p.crafts, raids: p.raids, hunt: p.hunt,
+      gold: Math.round(p.gold * 100) / 100, kills: p.kills, crafts: p.crafts, raids: p.raids, hunt: p.hunt, recruits: p.recruits,
       base: Math.round(p.base), streak, bonus, score: Math.round(p.base * (1 + bonus)), titles: [],
     };
   }).filter((p) => p.base > 0 || p.streak > 0)

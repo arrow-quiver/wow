@@ -14,3 +14,4 @@ import './seasons.js';
 import './store.js';
 import './guildlife.js';
 import './hunt.js';
+import './recruiting.js';

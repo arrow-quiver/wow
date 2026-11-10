@@ -312,6 +312,8 @@ local function slash(input)
     if ns.lfg then ns.lfg.slash(rest) else ns.print("Dungeon groups aren't running. " .. ns.restartHint) end
   elseif cmd == "alert" or cmd == "alerts" then
     if ns.priceAlerts then ns.priceAlerts.slash(rest) end
+  elseif cmd == "recruit" then
+    if ns.recruit then ns.recruit.slash(rest) end
   elseif cmd == "mats" then
     if ns.mats then ns.mats.show() end
   elseif cmd == "quests" then
@@ -372,6 +374,7 @@ local function slash(input)
     ns.print("/wow  open the guild panel")
     ns.print("/wow cta [zone] [number] [message]  call guildies to a fight")
     ns.print("/wow lfg  guild dungeon groups: list, new, join, leave")
+    ns.print("/wow recruit  the recruiting desk: /who scan, message players without a guild, post the ad")
     ns.print("/wow alert <price> <item>  a price alert at the auction house  ·  /wow mats  mats and crafts guildies want")
     ns.print("/wow quests [dungeon]  the dungeon quest checklist (and who in your group has each)")
     ns.print("/wow kos  the kill-on-sight list (/wow kos add <name> [reason])  ·  /wow bounties  open bounties")

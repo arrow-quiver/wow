@@ -91,6 +91,14 @@ after a death in a PvP area calls the guild to arms in one click; the overlay an
 **Call for help** button for Discord. Every death and honorable kill in the open world goes on the guild's war map:
 pins on the in-game world map, and the **War** page with hotspots and your nemeses (the players who keep killing you).
 
+**Recruiting desk.** `/wow recruit` in game: each **Scan** click runs the next `/who` search and keeps players with
+no guild that nobody in the guild has contacted, wanted classes first. **Message** fills in your chat box with the
+officers' message (you press Enter, up to 30 a day so nobody reports it as spam). A "yes" back gives online officers
+an Invite button, and **Post ad** puts the officers' ad in LookingForGroup (every 15 minutes at most). The app's
+Recruiting page shows every recruit from contacted to joined, the top recruiters, and the ad editor for officers.
+Whoever found a recruit gets 25 season points once they've stayed a week. Everything is one click per step, as
+Blizzard requires.
+
 **Leveling plan, price alerts and mats for crafts.** In the skill-up guide, **Plan next points** works out the
 cheapest way to your next skill points with the recipes you know: mats from your bags first, then your alts, then
 the guild bank, buying the rest. One click puts the plan on your shopping list. At the auction house, anything on
@@ -170,6 +178,7 @@ The addon works on its own, and does much more with the app:
 | `/wow coach` | Open the Coach |
 | `/wow season` | This month's guild season: the top five and your place |
 | `/wow quests [dungeon]` | The dungeon quest checklist: yours, ones to pick up, and who in your group has each |
+| `/wow recruit` | The recruiting desk: `/who` scan, message players without a guild, post the ad |
 | `/wow alert <price> <item>` | A price alert at the auction house (`/wow alerts` lists them) |
 | `/wow mats` | Mats guildies are short of that you hold, and crafts they want that you can make |
 | `/wow kos` | The kill-on-sight list; `/wow kos add Name reason`, `/wow kos remove Name` |

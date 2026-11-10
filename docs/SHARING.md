@@ -238,6 +238,7 @@ RT:k3f9a2^wzltl343^Grommash^^d^tob9c0^r^4kq1zm^tobn80^Thrallia.p4m7,d72,eim;Zulj
 | `cl` craft claim | request`:`pid | a character of pid | state `c`/`d`/`w` (claimed, done, withdrawn), claimedAt | | with the request | 60 |
 | `lp` leveling post | pid`:`character | a character of pid | character, level, zone, when, note | | 3 d | 400 |
 | `ek` raid boss kill | from boss, day and raid leader (the same for every raider) | any member | enc (encounter id), boss, instance, at, size, names (guild raiders, up to 40) | | 120 d | 1280 |
+| `rk` recruit | their name | any member | pid (who found them: credit only when they wrote it), level, class, zone, state `c`/`i`/`n`/`j` (contacted, interested, no thanks, joined), at | | 60 d | 300 |
 | `ko` kill on sight | the enemy's name | any member | pid, reason, state `o`/`x` (taken off) | | 90 d | 300 |
 | `kk` a kill that counts | random | a character of pid | pid, target, zone, at, kos (1: on the list), bounty (a `BT` key) | | 45 d | 260 |
 | `bb` bulletin board post | random | a character of pid | pid, character, kind `l`/`s`/`w`/`h` (looking for group, selling, buying, help), text, price (copper), state `o`/`x` | `x` | 7 d; 1 d after taken down | 400 |
@@ -257,6 +258,7 @@ RT:k3f9a2^wzltl343^Grommash^^d^tob9c0^r^4kq1zm^tobn80^Thrallia.p4m7,d72,eim;Zulj
 | `LA` loot award | random | officer | raid, instance key, item key, item name, character, pid, kind `s`/`m`/`o`/`f`, roll, bonus | | 180 d, not before folded | 300 |
 | `LL` loot list | instance key | officer | instance name, bosses `;`, items `itemKey,bossIndex,name;…` (≤ 150) | | never | 8 KB |
 | `LY` SR+ checkpoint | instance key | officer's app, automatically | upto, bonuses `pid,itemKey,bonus;…` | | never | 3 KB |
+| `RA` recruiting | `1` | officer | ad (channel), msg (to a player, `{name}`), classes wanted, minLevel, maxLevel | | never | 800 |
 | `BT` bounty | random | officer | target (a player) or zone, points, cap (kills paid, zone bounties), ends (unix), note, state `o`/`x` | `x` | 7 d after it ends | 400 |
 | `AN` notice | random | officer; any officer may delete | body | | 60 d | 600 |
 | `DR` supply drive | random | officer | title, unit, goal, notes, state `o`/`c` | `c` | 60 d after closed; 180 d at most | 500 |
@@ -660,6 +662,7 @@ confirmed with "It was me"), `share_repair` (the repair after the update ran, §
 | `lp`, `ca`, `AN` | buddy_posts, ctas (client_ref = key), announcements |
 | `bb` | bulletin_posts (taken down or expired: deleted) |
 | `ek` | boss_kills |
+| `rk`, `RA` | recruits, recruit_settings |
 | `ko`, `kk`, `BT` | kos (taken off: deleted), hunt_kills, bounties |
 | `dg` + `dj` | no rows: routes/dungeons.js reads the effective records and the line-up comes from `dungeonGroupState` (the leader fills a slot of their role; then the leader's guests in the order listed; then joins in joinedAt order, a tie to the smaller pid; past a role's free slots they wait). A `dj` on the leader's own group is ignored (`own group`). |
 | `DR` + `dc` | drives (status derived), drive_contribs |
@@ -996,6 +999,7 @@ pid (`<name>.<4 base36>`), tab (`0`–`8`), `1`.
 | `cl` | random:pid | state enum `cdw`, claimedAt int |
 | `lp` | pid:name | character text(48), level int, zone text(60), when text(60), note text(140) |
 | `ek` | random (derived) | enc int, boss text(60), instance text(60), at int, size int, names list(40) of text(24) |
+| `rk` | name | pid text(64), level int, class text(16), zone text(60), state enum `cinj`, at int |
 | `ko` | name | pid text(64), reason text(100), state enum `ox` |
 | `kk` | random | pid text(64), target text(24), zone text(60), at int, kos int, bounty text(6) |
 | `bb` | random | pid text(64), character text(48), kind enum `lswh`, text text(200), price int, state enum `ox` |
@@ -1017,6 +1021,7 @@ pid (`<name>.<4 base36>`), tab (`0`–`8`), `1`.
 | `LA` | random | raid text(8), instance text(8), item text(12) (item key), itemName text(100), character text(48), pid text(64), kind enum `smof`, roll int, bonus int |
 | `LL` | random (instance key) | name text(60), bosses [text(60)] ≤ 40, items [(item text(12), boss int (1-based index, 0 = none), name text(100))] ≤ 150 |
 | `LY` | random (instance key) | upto int, bonuses [(pid text(64), item text(12), bonus int)] ≤ 200 |
+| `RA` | one | ad text(255), msg text(200), classes text(80), minLevel int, maxLevel int |
 | `BT` | random | target text(24), zone text(60), points int, cap int, ends int, note text(100), state enum `ox` |
 | `AN` | random | body text(500) |
 | `DR` | random | title text(80), unit text(40), goal int, notes text(300), state enum `oc` |

@@ -35,6 +35,7 @@ BossKills.lua
 DungeonQuests.lua
 PriceAlerts.lua
 Mats.lua
+Recruit.lua
 Seasons.lua
 Celebrate.lua
 Welcome.lua

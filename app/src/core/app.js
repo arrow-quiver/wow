@@ -11,7 +11,7 @@ const { HttpError, ver } = require('./http');
 const identity = require('./identity');
 
 // Route files, in order. Each exports register(app, ctx).
-const ROUTES = ['core', 'sync', 'community', 'dungeons', 'raids', 'economy', 'coach', 'admin', 'calendar', 'share', 'war', 'seasons', 'store', 'play', 'celebrate', 'guildlife', 'hunt'];
+const ROUTES = ['core', 'sync', 'community', 'dungeons', 'raids', 'economy', 'coach', 'admin', 'calendar', 'share', 'war', 'seasons', 'store', 'play', 'celebrate', 'guildlife', 'hunt', 'recruiting'];
 
 // Constant-time string comparison (hashes both sides first, so different lengths are safe too).
 function safeEqual(a, b) {

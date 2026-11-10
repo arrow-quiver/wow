@@ -53,6 +53,8 @@ add('cr open', rec('cr', 'r1r1r1', NOW - 60, 'Thrallia', { pid: 'Thrallia.p4m7',
 add('cr cancelled (final)', rec('cr', 'r1r1r1', NOW - 30, 'Thrallia', { pid: 'Thrallia.p4m7', item: 'Robe of the Archmage', state: 'x' }, { final: true }));
 add('ek boss kill', rec('ek', 'e4e4e4', NOW - 95, 'Thrallia', { enc: 672, boss: 'Ragnaros', instance: 'Molten Core', at: NOW - 95, size: 40, names: ['Thrallia', 'Zuljinne', 'Jaina'] }));
 add('mw mats wanted', rec('mw', 'Thrallia.p4m7', NOW - 85, 'Thrallia', { items: [{ id: 14342, qty: 4 }, { id: 2589, qty: 20 }] }));
+add('rk contacted', rec('rk', 'Newblood', NOW - 88, 'Thrallia', { pid: 'Thrallia.p4m7', level: 22, class: 'WARRIOR', zone: 'The Barrens', state: 'c', at: NOW - 88 }));
+add('RA recruiting', rec('RA', '1', NOW - 87, 'Thrallia', { ad: 'wow (Horde PvP) is recruiting! Friendly, raids, war parties. /w me', msg: 'Hey {name}! Want to join a friendly Horde PvP guild?', classes: 'PRIEST,SHAMAN', minLevel: 10, maxLevel: 60 }));
 add('ko added', rec('ko', 'Gankalot', NOW - 90, 'Thrallia', { pid: 'Thrallia.p4m7', reason: 'Camps the Crossroads', state: 'o' }));
 add('kk bounty kill', rec('kk', 'k1k1k1', NOW - 80, 'Thrallia', { pid: 'Thrallia.p4m7', target: 'Gankalot', zone: 'The Barrens', at: NOW - 80, kos: 1, bounty: 'b2b2b2' }));
 add('BT player bounty', rec('BT', 'b2b2b2', NOW - 70, 'Thrallia', { target: 'Gankalot', zone: '', points: 50, cap: 1, ends: NOW + 86400, note: 'Ganking lowbies', state: 'o' }));

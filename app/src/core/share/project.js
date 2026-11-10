@@ -25,7 +25,7 @@ const dayToDate = (d) => new Date(SCAN_DAY_0 + d * 86400000).toISOString().slice
 const skillName = (id) => S.SKILLS[id] || `Skill ${id}`;
 
 // Dependency order: links first (users), then settings, loot lists before raids and awards, loyalty last.
-const ORDER = ['ch', 'cfg', 'bc', 'bk', 'rc', 'll', 'raid', 'la', 'loyalty', 'cr', 'lp', 'ek', 'ko', 'kk', 'bb', 'ca', 'an', 'bt', 'drive', 'dc', 'bq', 'gb', 'sh', 'pr', 'wm', 'st'];
+const ORDER = ['ch', 'cfg', 'bc', 'bk', 'rc', 'll', 'raid', 'la', 'loyalty', 'cr', 'lp', 'ek', 'rk', 'ko', 'kk', 'bb', 'ca', 'an', 'bt', 'ra', 'drive', 'dc', 'bq', 'gb', 'sh', 'pr', 'wm', 'st'];
 
 function tasksFor(rec, prevRec) {
   if (!rec) return [];
@@ -52,6 +52,8 @@ function tasksFor(rec, prevRec) {
     case 'lp': out.push(`lp:${rec.key}`); break;
     case 'bb': out.push(`bb:${rec.key}`); break;
     case 'ek': out.push(`ek:${rec.key}`); break;
+    case 'rk': out.push(`rk:${rec.key}`); break;
+    case 'RA': out.push('ra:1'); break;
     case 'ko': out.push(`ko:${rec.key}`); break;
     case 'kk': out.push(`kk:${rec.key}`); break;
     case 'BT': out.push(`bt:${rec.key}`); break;
@@ -580,6 +582,34 @@ function projectEk(db, gid, k) {
     .run(gid, k, Number.isInteger(f.enc) ? f.enc : null, f.boss, f.instance || null, Number.isInteger(f.at) ? f.at : r.t, Number.isInteger(f.size) ? f.size : null, JSON.stringify(names));
 }
 
+// rk: recruits. The recruiter is whoever found them first (kept as others move the state on); joined_at is when
+// the row first said joined. Expired: gone.
+function projectRk(db, gid, k) {
+  const e = st.effective(db, gid, `rk:${k}`);
+  if (!e && dropped(db, gid, `rk:${k}`)) return;
+  const r = liveRec(e);
+  const f = r ? r.fields : {};
+  if (!r || !'cinj'.includes(f.state || '-')) { db.prepare('DELETE FROM recruits WHERE guild_id = ? AND name = ?').run(gid, k); return; }
+  const row = db.prepare('SELECT * FROM recruits WHERE guild_id = ? AND name = ?').get(gid, k);
+  // Credit only when the writer is that player (the first one to find them; others moving the state on keep it).
+  const by = f.pid && st.isLinked(db, gid, r.author, f.pid) ? st.userForPid(db, gid, f.pid) : null;
+  const at = Number.isInteger(f.at) ? f.at : r.t;
+  const joinedAt = f.state === 'j' ? (row && row.joined_at) || at : (row ? row.joined_at : null);
+  db.prepare(`INSERT INTO recruits (guild_id, name, recruiter, level, class, zone, state, at, joined_at) VALUES (?,?,?,?,?,?,?,?,?)
+    ON CONFLICT (guild_id, name) DO UPDATE SET recruiter = COALESCE(recruits.recruiter, excluded.recruiter), level = excluded.level,
+      class = excluded.class, zone = excluded.zone, state = excluded.state, at = excluded.at, joined_at = excluded.joined_at`)
+    .run(gid, k, row && row.recruiter ? row.recruiter : by, Number.isInteger(f.level) ? f.level : null, f.class || null, f.zone || null, f.state, at, joinedAt);
+}
+
+// RA: recruit_settings, replaced as a whole
+function projectRa(db, gid) {
+  const r = liveRec(st.effective(db, gid, 'RA:1'));
+  if (!r) { db.prepare('DELETE FROM recruit_settings WHERE guild_id = ?').run(gid); return; }
+  const f = r.fields;
+  db.prepare('INSERT OR REPLACE INTO recruit_settings (guild_id, ad, msg, classes, min_level, max_level) VALUES (?,?,?,?,?,?)')
+    .run(gid, f.ad || null, f.msg || null, f.classes || null, Number.isInteger(f.minLevel) ? f.minLevel : null, Number.isInteger(f.maxLevel) ? f.maxLevel : null);
+}
+
 // ko: kos (taken off 'x' or expired: gone)
 function projectKo(db, gid, k) {
   const r = liveRec(st.effective(db, gid, `ko:${k}`));
@@ -901,6 +931,8 @@ function run(db, gid, tasks, { out = {} } = {}) {
       case 'lp': projectLp(db, gid, arg); break;
       case 'bb': projectBb(db, gid, arg); break;
       case 'ek': projectEk(db, gid, arg); break;
+      case 'rk': projectRk(db, gid, arg); break;
+      case 'ra': projectRa(db, gid); break;
       case 'ko': projectKo(db, gid, arg); break;
       case 'kk': projectKk(db, gid, arg); break;
       case 'bt': projectBt(db, gid, arg); break;

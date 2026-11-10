@@ -169,6 +169,11 @@ local TYPES = {
     key = { "b36x6" }, max = 1280, expiry = { days = 120 },
     fields = { int("enc"), text("boss", 60), text("instance", 60), int("at"), int("size"), listOf("names", 40, 24) },
   },
+  -- A recruit (keyed by their name; pid is who found them): c contacted, i interested, n no thanks, j joined.
+  rk = {
+    key = { "name" }, max = 300, expiry = { days = 60 },
+    fields = { text("pid", 64), int("level"), text("class", 16), text("zone", 60), enm("state", "cinj"), int("at") },
+  },
   -- Kill on sight (keyed by the enemy's name; any member adds or takes off) and kills that count (by the killer).
   ko = {
     key = { "name" }, max = 300, expiry = { days = 90 },
@@ -287,6 +292,11 @@ local TYPES = {
     fields = { text("title", 80), text("unit", 40), int("goal"), text("notes", 300), enm("state", "oc") },
   },
   BH = { key = { "b36x6" }, max = 40, expiry = { parent = "bq", seg = 1 }, fields = { enm("state", "sd") } },
+  -- Recruiting (officers): the channel ad, the recruiters' message, classes wanted, level range.
+  RA = {
+    key = { "one" }, max = 800, expiry = { never = true },
+    fields = { text("ad", 255), text("msg", 200), text("classes", 80), int("minLevel"), int("maxLevel") },
+  },
   ST = {
     key = { "one" }, max = 1400, expiry = { never = true },
     fields = { listParts("items", 25, { pText("key", 6), pText("item", 60), pInt("id"), pInt("cost"), pInt("stock") }) },
