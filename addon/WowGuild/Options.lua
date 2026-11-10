@@ -12,6 +12,7 @@ ns.OPTION_LIST = {
   { key = "ahTab", label = "Show the Guild Camp list (shopping list and guild requests) at the auction house" },
   { key = "dealsPanel", label = "Show the Deal hunter next to the auction house" },
   { key = "coachTalents", label = "Show the Coach's talent guide next to the talent window" },
+  { key = "seasonTooltips", label = "Show guildies' season titles and badges on their tooltips" },
   { key = "warMap", label = "Show the guild's deaths and kills of the last week on the world map" },
   { key = "warHelp", label = "When I die to players, offer to call the guild for help" },
   { key = "liveLink", label = "Turn on combat logging when I log in (the Guild Camp app's live link reads it)" },

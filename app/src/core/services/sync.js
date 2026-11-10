@@ -30,6 +30,7 @@
 const { applyCoach, inboxPart } = require('./coach');
 const { applyEconomy, latestPrices } = require('./economy');
 const deals = require('./deals');
+const seasons = require('./seasons');
 const { toLua } = require('../../shared/lua');
 const sharing = require('../sharing');
 const readiness = require('../readiness');
@@ -369,6 +370,8 @@ function buildInbox(db, guildId, userId, { ctx = null } = {}) {
     coach: inboxPart(db, guildId, userId),
     // Deal hunter: the best buys from my newest scan, for the addon's auction house panel.
     deals: inboxDeals(db, guildId),
+    // Seasons: titles and badges by character name, for the addon's player tooltips (services/seasons.js).
+    seasons: seasons.inboxPart(db, guildId),
     // Sharing (docs/SHARING.md §9): changes for the addon to send, who I am, and a seed for a store far behind.
     outbox: sharing.exportOutbox(db),
     me: sharing.exportMe(db),
@@ -383,7 +386,7 @@ function emptyInbox() {
   return {
     guild: '', prices: [], stock: [], holdings: [], crafters: [], raids: [], generatedAt: Math.floor(Date.now() / 1000),
     announcements: [], canCraft: [], myRequests: [], buddies: [], coach: { plans: {}, answers: [], pending: 0, enabled: false }, outbox: [],
-    seed: [],
+    seasons: { month: '', players: {} }, seed: [],
   };
 }
 

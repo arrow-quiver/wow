@@ -69,6 +69,12 @@ death, **Why did I die?** sends the death's recap (who hit you, with what, how m
 The live link reads the game's own combat log file as you play, like Warcraft Logs' uploader does; type `/wow live on`
 once and the addon turns combat logging on at every login. Answers reach the game's Coach after your next /reload.
 
+**Guild seasons.** Every month the guild starts a new leaderboard from what people actually do: gold and items given
+to the guild bank (valued at that day's Auctionator price), kills in the open world, crafting requests filled and raids.
+Leaders get titles (Quartermaster, Warlord, Master Crafter, Stalwart, MVP), weeks in a row build a streak bonus,
+lifetime badges show on your tooltip in game, and officers announce the winners to Discord when the month ends.
+Gifts and new badges get an automatic thank-you on Discord. See the **Seasons** page or type `/wow season`.
+
 **War alerts and the war map.** Die to players and the app posts it to the guild's Discord at once ("⚔️ Grom died to
 Sneaky and 2 more in Hillsbrad Foothills. Anyone near?"), so whoever's close can come and help. In game, a popup
 after a death in a PvP area calls the guild to arms in one click; the overlay and the **War** page have a
@@ -116,6 +122,7 @@ The addon works on its own, and does much more with the app:
 | --- | --- |
 | `/wow` or `/guildcamp` | Open the Guild Camp window |
 | `/wow coach` | Open the Coach |
+| `/wow season` | This month's guild season: the top five and your place |
 | `/wow war` | Your war map marks; `/wow war off` hides the guild's deaths and kills on the world map |
 | `/wow live on` | Turn on combat logging at every login, for the app's live link and Coach overlay (`/wow live off` stops it) |
 | `/wow guide` | Open the skill-up guide |

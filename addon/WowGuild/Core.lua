@@ -124,7 +124,7 @@ function ns.updateAvailable()
 end
 
 -- Options (Settings → AddOns → Guild Camp). Defaults are on.
-ns.DEFAULTS = { blizzardStyle = false, ahTab = true, dealsPanel = true, coachTalents = true, liveLink = false, warMap = true, warHelp = true, tooltips = true, minimapButton = true, loginNews = true, autoGuide = true, trackerOnLogin = true, collectBank = true, updateNotice = true }
+ns.DEFAULTS = { blizzardStyle = false, ahTab = true, dealsPanel = true, coachTalents = true, liveLink = false, warMap = true, warHelp = true, seasonTooltips = true, tooltips = true, minimapButton = true, loginNews = true, autoGuide = true, trackerOnLogin = true, collectBank = true, updateNotice = true }
 function ns.opt(key)
   local o = ns.db and ns.db.options
   if o and o[key] ~= nil then return o[key] end
@@ -317,6 +317,8 @@ local function slash(input)
     ns.prof.toggleGuide()
   elseif cmd == "list" then
     if rest == "clear" then ns.prof.clearList() else ns.prof.toggleTracker() end
+  elseif cmd == "season" then
+    ns.seasons.slash()
   elseif cmd == "war" then
     ns.war.slash(rest)
   elseif cmd == "live" then
@@ -342,6 +344,7 @@ local function slash(input)
     ns.print("/wow list  show or hide your shopping list;  /wow list clear  empties it")
     ns.print("/wow coach  your play style, build plan and next steps (/wow coach ask to ask a question)")
     ns.print("/wow deals  the Deal hunter: what to buy on the auction house and sell again")
+    ns.print("/wow season  this month's guild season: the top five and you")
     ns.print("/wow war  your war map marks (/wow war off hides the guild's deaths and kills on the world map)")
     ns.print("/wow live on  turn on combat logging at every login, for the Guild Camp app's live link and Coach overlay")
     ns.print("/wow options  addon settings")
