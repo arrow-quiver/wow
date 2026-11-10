@@ -365,3 +365,25 @@ Queues the post's tombstone. A post from before sharing just closes here.
 { "ok": true, "message": "Post removed." }
 ```
 - Unknown → `404 "That post no longer exists."`; someone else's → `403 "You can only remove your own posts."`
+
+## Celebrations
+
+`addon/WowGuild/Celebrate.lua` and `services/celebrate.js`. The addon says a player's big moments in guild chat as
+`[Guild Camp] <what> — from <name>` (option `celebrate`, never inside dungeons or battlegrounds, each once per
+character): levels 20, 30, 40, 50 and 60; an epic or legendary item looted; a profession reaching 150, 225 or 300;
+learning to ride; a new PvP rank. Guildmates' addons show a toast, and at level 60 a huge Horde banner across the
+screen ("LOK'TAR OGAR!"). When someone joins the guild, everyone gets a toast with **Say welcome**; officers also get
+**Welcome kit**, which whispers the newcomer the guide and the app download, picks a guild buddy (the online
+guildmate closest in level) and says the welcome in guild chat.
+
+### `POST /api/celebrate` (guild)
+From the app itself: one of my own lines, read from the chat log (`main/live.js`). `{ what, from }` → `{ posted }`.
+Discord gets e.g. `🎉 **Grom** reached **level 40**! Grats!`, at 60 `🔥 **LOK'TAR OGAR!** 🔥 … The Horde grows
+stronger. Blood and thunder!`, `💜 **Grom** looted **Thunderfury**!`, `🔨 **Grom** reached **300 Blacksmithing**!`,
+`👋 Welcome to the guild, **Newbie**! Your guild buddy: **Mokra**.` The same line within 15 minutes posts once; an
+activity line is added either way.
+
+### Anniversaries
+Time in the guild (`memberships.joined_at`: 1, 3 and 6 months, then every year) and character birthdays
+(`characters.first_seen`, every year; migration 27). Each app posts its own player's to Discord once (checked every
+hour), and the inbox's `today` field (`{ date, lines }`) shows them as a toast at login.

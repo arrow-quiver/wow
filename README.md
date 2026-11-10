@@ -69,6 +69,11 @@ death, **Why did I die?** sends the death's recap (who hit you, with what, how m
 The live link reads the game's own combat log file as you play, like Warcraft Logs' uploader does; type `/wow live on`
 once and the addon turns combat logging on at every login. Answers reach the game's Coach after your next /reload.
 
+**Celebrations.** Hit level 20, 30, 40 or 50, loot an epic, max a profession, learn to ride or rank up in PvP, and
+Guild Camp says it in guild chat, guildmates get a toast and the guild's Discord cheers. Level 60 gets the full Horde
+treatment: a LOK'TAR OGAR banner across every guildie's screen. New members get the welcome wagon (officers send a
+welcome kit and a guild buddy), and guild anniversaries and character birthdays are celebrated on the day.
+
 **Guild seasons.** Every month the guild starts a new leaderboard from what people actually do: gold and items given
 to the guild bank (valued at that day's Auctionator price), kills in the open world, crafting requests filled and raids.
 Leaders get titles (Quartermaster, Warlord, Master Crafter, Stalwart, MVP), weeks in a row build a streak bonus,

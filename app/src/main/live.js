@@ -147,6 +147,13 @@ function parseCta(line) {
   return { character: m[2].split('-')[0], zone: body[1], needed: body[2] ? Number(body[2]) : null, message: body[3] || '' };
 }
 
+// Any other Guild Camp line (Celebrate.lua): "[Guild Camp] Grom reached level 40! — from Grom" → { what, from }.
+const ANY = /\[Guild Camp\] (.+?) — from ([^\s—]+)\s*$/;
+function parseGuildCamp(line) {
+  const m = ANY.exec(String(line || '').replace(/\r$/, ''));
+  return m ? { what: m[1], from: m[2].split('-')[0] } : null;
+}
+
 function newestChatLog(installs) {
   let best = null;
   for (const inst of installs || []) {
@@ -187,7 +194,12 @@ function createChatWatch({ findInstalls, log = console, pollMs = 2000, rescanMs 
       current.offset += len;
       const lines = (partial + buf.toString('utf8')).split('\n');
       partial = lines.pop();
-      for (const line of lines) { const c = parseCta(line); if (c) em.emit('cta', c); }
+      for (const line of lines) {
+        const c = parseCta(line);
+        if (c) { em.emit('cta', c); continue; }
+        const g = parseGuildCamp(line);
+        if (g) em.emit('celebrate', g);
+      }
     } catch (err) { log.warn(`Couldn't read the chat log: ${err.message}`); }
   }
   return {
@@ -203,4 +215,4 @@ function createChatWatch({ findInstalls, log = console, pollMs = 2000, rescanMs 
   };
 }
 
-module.exports = { createLive, newestLog, createChatWatch, parseCta, newestChatLog };
+module.exports = { createLive, newestLog, createChatWatch, parseCta, parseGuildCamp, newestChatLog };
