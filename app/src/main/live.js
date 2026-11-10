@@ -140,12 +140,14 @@ function createLive({ findInstalls, myNames = async () => [], log = console, now
 // "[Guild Camp] Call to arms: Hillsbrad Foothills (3 needed): help at the mill! — from Grom" (Core.lua ns.ctaText).
 // While chat logging is on (/chatlog, or /wow live on) the game writes it to Logs/WoWChatLog*.txt.
 const CTA = /\[Guild Camp\] Call to arms: (.+?) — from ([^\s—]+)\s*$/;
-// The sender, when the line has one ("[Guild] Grom-Zuljin: [Guild Camp] …"): it must be who the line says it's from,
-// so a guildmate typing "[Guild Camp] … — from <my character>" can't post to my Discord.
-const SENDER = /([^\s:\]]+): \[Guild Camp\]/;
+// The sender: the chat log's line is "<date> <time>  [Guild] Grom-Zuljin: [Guild Camp] …", and the first name after
+// the channel tag must be who the line says it's from, with the Guild Camp text right after it. So a guildmate typing
+// "[Guild Camp] … — from <my character>" (or "Grom: [Guild Camp] …" inside their own message) can't post to my
+// Discord. A line without a sender is refused.
+const SENDER = /^(?:\S+ \S+\s+)?\[[^\]]+\] ([^\s:]+): \[Guild Camp\] /;
 function senderOk(line, from) {
-  const s = SENDER.exec(line);
-  return !s || s[1].split('-')[0].toLowerCase() === String(from).split('-')[0].toLowerCase();
+  const s = SENDER.exec(String(line || ''));
+  return Boolean(s) && s[1].split('-')[0].toLowerCase() === String(from).split('-')[0].toLowerCase();
 }
 
 function parseCta(line) {
