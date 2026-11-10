@@ -82,6 +82,18 @@ test('pre-claiming: 30 credited contacts a day, and a join more than 30 days aft
   assert.strictEqual(R.events(db, gid, 0, Date.now() + 1e9).length, 0);
 });
 
+test('recruiting your own alt pays nothing', async (t) => {
+  const h = await setupShare(t);
+  const { db, gid } = h;
+  h.linkAll();
+  h.imp([h.rec('rk', 'Altie', h.NOW - 100, 'Jaina', { pid: PIDS.Jaina, level: 1, class: '', zone: '', state: 'j', at: h.NOW - 100 })]);
+  const now = Math.floor(Date.now() / 1000);
+  const jaina = db.prepare('SELECT recruiter FROM recruits WHERE name = ?').get('Altie').recruiter;
+  db.prepare('UPDATE recruits SET contacted_at = ?, joined_at = ? WHERE name = ?').run(now - 10 * 86400, now - 9 * 86400, 'Altie');
+  db.prepare('INSERT INTO characters (guild_id, name, level, user_id, first_seen) VALUES (?, ?, 5, ?, ?)').run(gid, 'Altie', jaina, new Date((now - 9 * 86400) * 1000).toISOString());
+  assert.strictEqual(R.events(db, gid, 0, Date.now() + 1e9).length, 0);
+});
+
 test('settings: officers only, no links, classes checked; the defaults before', async (t) => {
   const member = await setupShare(t);
   assert.strictEqual((await member.srv.api.get('/api/recruiting')).body.settings.custom, false);

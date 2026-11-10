@@ -36,8 +36,10 @@ const unix = (s) => Math.floor(Date.parse(/[zZ]|[+-]\d\d:?\d\d$/.test(String(s))
 // Still in the guild: the roster has the character here. → its first_seen (unix), or 0.
 function stillHere(db, gid) {
   const here = identity.notElsewhere('c');
-  const q = db.prepare(`SELECT c.first_seen FROM characters c WHERE c.guild_id = ? AND lower(c.name) = lower(?) AND (c.in_official_roster IS NULL OR c.in_official_roster = 1) AND ${here}`);
-  return (name) => { const r = q.get(gid, name); return r ? unix(r.first_seen) || 1 : 0; };
+  const q = db.prepare(`SELECT c.first_seen, c.user_id FROM characters c WHERE c.guild_id = ? AND lower(c.name) = lower(?) AND (c.in_official_roster IS NULL OR c.in_official_roster = 1) AND ${here}`);
+  const fn = (name) => { const r = q.get(gid, name); return r ? unix(r.first_seen) || 1 : 0; };
+  fn.owner = (name) => { const r = q.get(gid, name); return r ? r.user_id : null; };
+  return fn;
 }
 
 // A real recruit: on the roster now, first seen there after they were contacted (an hour's slack), and joined within
@@ -45,6 +47,8 @@ function stillHere(db, gid) {
 const JOIN_DAYS = 30;
 function counts(r, here) {
   const first = here(r.name);
+  // Not their own alt: a character that turns out to be the recruiter's own account pays nothing.
+  if (r.recruiter && here.owner && here.owner(r.name) === r.recruiter) return false;
   return Boolean(first) && first >= r.contacted_at - 3600 && (r.joined_at || 0) - r.contacted_at <= JOIN_DAYS * DAY;
 }
 

@@ -487,7 +487,7 @@ still have them, and their character must have first shown up on it after they w
 (`characters.first_seen`), so marking an old guildie as a recruit earns nothing. When they were contacted and when
 they joined come from this app's clock when it first saw each, never the writer's. Credit goes to the first finder,
 and only when the record's writer is that player, for at most 30 contacts a recruiter a day; a recruit who joins more than
-30 days after contact pays nothing. Joined recruits stay after the record expires, so past seasons keep
+30 days after contact, or turns out to be the recruiter's own alt, pays nothing. Joined recruits stay after the record expires, so past seasons keep
 their points. Season rows get `recruits`.
 
 ### `GET /api/recruiting` (guild)
