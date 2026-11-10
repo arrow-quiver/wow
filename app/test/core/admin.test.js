@@ -645,12 +645,12 @@ test('background jobs start only when timers are on, and stop on close', async (
     // backups (start + hourly), Blizzard (start + daily), game data (start + hourly + realm every 5 min),
     // raid reminders and the Coach (every minute), and season shout-outs (every 5 minutes).
     const on = await startCore({ dataDir: dir, timers: true, credentials: BNET, fetch: offline });
-    assert.equal(on.ctx.timers.length, 11);
+    assert.equal(on.ctx.timers.length, 12);
     await on.close();
     assert.equal(on.ctx.timers.length, 0);
     // No built-in Battle.net app → no Blizzard or game data timers; no database file → no backups.
     const mem = await startCore({ timers: true, fetch: offline });
-    try { assert.equal(mem.ctx.timers.length, 4); } finally { await mem.close(); }
+    try { assert.equal(mem.ctx.timers.length, 5); } finally { await mem.close(); }
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 

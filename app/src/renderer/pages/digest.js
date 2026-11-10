@@ -7,7 +7,7 @@ import { number } from '../lib/format.js';
 
 export default function DigestPage() {
   const [week, setWeek] = useState('');
-  const q = useApi(`/api/digest${week ? `?week=${week}` : ''}`);
+  const q = useApi(`/api/digest?week=${week}`);
   return html`<${Page} title="Weekly digest"
       lede="The guild's week at a glance. It goes to Discord on Sunday evening.">
     <${Async} q=${q} loadingLabel="Putting the week together…">${(d) => html`<${Digest} d=${d} setWeek=${setWeek} reload=${q.reload} />`}<//>
