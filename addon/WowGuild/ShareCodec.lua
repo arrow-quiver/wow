@@ -258,6 +258,10 @@ local TYPES = {
     fields = { text("title", 80), text("unit", 40), int("goal"), text("notes", 300), enm("state", "oc") },
   },
   BH = { key = { "b36x6" }, max = 40, expiry = { parent = "bq", seg = 1 }, fields = { enm("state", "sd") } },
+  ST = {
+    key = { "one" }, max = 1400, expiry = { never = true },
+    fields = { listParts("items", 25, { pText("key", 6), pText("item", 60), pInt("id"), pInt("cost"), pInt("stock") }) },
+  },
   BC = { key = { "one" }, max = 700, expiry = { never = true }, fields = { listOf("names", 50, 48) } },
   CFG = {
     key = { "one" }, max = 40, rank = "gm", expiry = { never = true },

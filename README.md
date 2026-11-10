@@ -74,6 +74,7 @@ to the guild bank (valued at that day's Auctionator price), kills in the open wo
 Leaders get titles (Quartermaster, Warlord, Master Crafter, Stalwart, MVP), weeks in a row build a streak bonus,
 lifetime badges show on your tooltip in game, and officers announce the winners to Discord when the month ends.
 Gifts and new badges get an automatic thank-you on Discord. See the **Seasons** page or type `/wow season`.
+Points buy things in the **guild bank store**: officers put items up for points, guildies order, officers mail them.
 
 **War alerts and the war map.** Die to players and the app posts it to the guild's Discord at once ("⚔️ Grom died to
 Sneaky and 2 more in Hillsbrad Foothills. Anyone near?"), so whoever's close can come and help. In game, a popup

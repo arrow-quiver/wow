@@ -852,6 +852,19 @@ const MIGRATIONS = [
      posted_at TEXT NOT NULL DEFAULT (datetime('now')),
      PRIMARY KEY (guild_id, month)
    );`,
+
+  // 24: The guild bank store (services/store.js): items officers put up for season points, from the "ST" record.
+  // An order is a bank request (bank_requests) whose note starts "[store:<key>:<cost>]".
+  `CREATE TABLE store_items (
+     guild_id INTEGER NOT NULL REFERENCES guilds(id),
+     key TEXT NOT NULL,
+     item TEXT NOT NULL,
+     item_id INTEGER,
+     cost INTEGER NOT NULL,
+     stock INTEGER NOT NULL DEFAULT 0,
+     pos INTEGER NOT NULL DEFAULT 0,
+     PRIMARY KEY (guild_id, key)
+   );`,
 ];
 
 // Runs every migration the database hasn't had yet, each in its own transaction.

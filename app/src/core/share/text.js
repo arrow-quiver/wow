@@ -87,6 +87,7 @@ function summaryOf(recIn, lookup) {
     case 'sh': return removed('Shopping list');
     case 'pr': return 'Auction prices';
     case 'wm': return removed('War map: deaths and kills in the open world');
+    case 'ST': return `Guild bank store: ${(f.items || []).length} item${(f.items || []).length === 1 ? '' : 's'}`;
     case 'RD': return removed(`${f.title || 'Raid'}: scheduled`);
     case 'RT': return `${raidTitle(r.key, lookup)}: ${del ? 'status removed' : f.status === 'o' ? 'open' : (RAID_STATUS[f.status] || 'open')}`;
     case 'LA': return removed(`${clip(f.itemName, 60) || 'Loot'} to ${f.character || 'someone'}`);

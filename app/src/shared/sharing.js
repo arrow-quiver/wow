@@ -248,6 +248,10 @@ const TYPES = {
   },
   BH: { key: ['b36x6'], max: 40, expiry: { parent: 'bq', seg: 1 }, fields: [enm('state', 'sd')] },
   BC: { key: ['one'], max: 700, expiry: { never: true }, fields: [list('names', 50, { of: { k: 'text', max: 48 } })] },
+  ST: {
+    key: ['one'], max: 1400, expiry: { never: true },
+    fields: [list('items', 25, { parts: [pText('key', 6), pText('item', 60), pInt('id'), pInt('cost'), pInt('stock')] })],
+  },
   CFG: {
     key: ['one'], max: 40, rank: 'gm', expiry: { never: true },
     fields: [int('officerRankMax'), int('relayRankMax', { dash: true })],
