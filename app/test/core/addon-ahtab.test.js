@@ -28,8 +28,6 @@ __ns.Share = {
 }
 C_Item = C_Item or {}
 C_Item.GetItemInfoInstant = function(name) local ids = { ["Major Mana Potion"] = 13444, ["Runecloth"] = 14047 } return ids[name] end
-__popupData = nil
-StaticPopup_Show = function(which, a, b, data) __popupWhich = which; __popupText = a; __popupData = data end
 `;
 const MODERN = `
 __ah = { searches = {}, starts = {}, confirms = {}, bids = {} }
@@ -75,16 +73,17 @@ test('the list: missing mats (ticked) and open guild requests (not ticked), with
 test('nothing is bought without the confirm prompt; the prompt shows the total and sets the spend cap', () => {
   const wow = client(MODERN);
   wow.exec('__ns.ahTab.show(); WowGuildAuctionTab.go:GetScript("OnClick")()');
-  assert.strictEqual(wow.eval('__popupWhich'), 'WOWGUILD_AH_BUY');
-  assert.strictEqual(wow.eval('__popupText'), '1 item for about 3g 0s');
-  assert.strictEqual(wow.eval('__popupData.cap'), '36000');
+  assert.strictEqual(wow.eval('tostring(WowGuildAhConfirm:IsShown())'), 'true');
+  assert.strictEqual(wow.eval('WowGuildAhConfirm.what'), '1 item for about 3g 0s');
+  assert.strictEqual(wow.eval('WowGuildAhConfirm.data.cap'), '36000');
+  assert.strictEqual(wow.eval('tostring(StaticPopupDialogs and StaticPopupDialogs.WOWGUILD_AH_BUY)'), 'nil', 'not Blizzard\'s StaticPopup');
   assert.strictEqual(wow.eval('#__ah.searches'), '0', 'no search before the OK');
   assert.strictEqual(wow.eval('tostring(__ns.ahTab.run)'), 'nil');
 });
 
 test('modern auction house: commodity Buy, price check, Confirm; then an item, cheapest auction per click', () => {
   const wow = client(MODERN);
-  wow.exec('__ns.ahTab.picked["gaaaaaa"] = true; __ns.ahTab.confirm(); StaticPopupDialogs.WOWGUILD_AH_BUY.OnAccept(nil, __popupData)');
+  wow.exec('__ns.ahTab.picked["gaaaaaa"] = true; __ns.ahTab.confirm(); WowGuildAhConfirm.yes:GetScript("OnClick")()');
   assert.strictEqual(wow.eval('__ah.searches[1]'), '14047');
   wow.fire('COMMODITY_SEARCH_RESULTS_UPDATED', 14047);
   assert.strictEqual(wow.eval('__ns.ahTab.buttonText()'), 'Buy 30 × Runecloth (1 of 2)');
@@ -117,7 +116,7 @@ test('modern auction house: commodity Buy, price check, Confirm; then an item, c
 
 test('a commodity priced over the guard is cancelled before Confirm', () => {
   const wow = client(MODERN);
-  wow.exec('__ns.ahTab.confirm(); StaticPopupDialogs.WOWGUILD_AH_BUY.OnAccept(nil, __popupData)');
+  wow.exec('__ns.ahTab.confirm(); WowGuildAhConfirm.yes:GetScript("OnClick")()');
   wow.fire('COMMODITY_SEARCH_RESULTS_UPDATED', 14047);
   wow.exec('__ns.ahTab.click()');
   wow.fire('COMMODITY_PRICE_UPDATED', 2000, 60000);
@@ -139,7 +138,7 @@ test('classic auction house: search by name, cheapest buyout I can use, one auct
     end
     PlaceAuctionBid = function(list, i, amount) table.insert(__bids, i .. ":" .. amount) end
     C_AuctionHouse = nil`);
-  wow.exec('__ns.ahTab.confirm(); StaticPopupDialogs.WOWGUILD_AH_BUY.OnAccept(nil, __popupData)');
+  wow.exec('__ns.ahTab.confirm(); WowGuildAhConfirm.yes:GetScript("OnClick")()');
   assert.strictEqual(wow.eval('__q[1]'), 'Runecloth');
   wow.fire('AUCTION_ITEM_LIST_UPDATE');
   assert.strictEqual(wow.eval('__ns.ahTab.buttonText()'), 'Buy 10 × Runecloth for 90s 0c', 'cheapest per unit; 40 is more than needed');
@@ -154,7 +153,7 @@ test('classic auction house: search by name, cheapest buyout I can use, one auct
 
 test('closing the auction house stops buying', () => {
   const wow = client(MODERN);
-  wow.exec('__ns.ahTab.confirm(); StaticPopupDialogs.WOWGUILD_AH_BUY.OnAccept(nil, __popupData)');
+  wow.exec('__ns.ahTab.confirm(); WowGuildAhConfirm.yes:GetScript("OnClick")()');
   wow.fire('AUCTION_HOUSE_CLOSED');
   assert.strictEqual(wow.eval('tostring(__ns.ahTab.run)'), 'nil');
   assert.match(wow.printed(), /The auction house closed, so buying stopped/);

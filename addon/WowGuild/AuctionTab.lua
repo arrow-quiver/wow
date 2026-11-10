@@ -262,16 +262,25 @@ ns.on("AUCTION_HOUSE_CLOSED", function()
 end)
 
 -- ---------- start: the confirm prompt ----------
-StaticPopupDialogs["WOWGUILD_AH_BUY"] = {
-  text = "Buy %s?\n\nYou'll click once for each purchase. Guild Camp skips anything more than 20%% over its expected price, and stops before going over this total.",
-  button1 = "Start buying",
-  button2 = "Cancel",
-  OnAccept = function(_, data) if data then A.start(data.lines, data.cap) end end,
-  timeout = 0,
-  whileDead = false,
-  hideOnEscape = true,
-  preferredIndex = 3,
-}
+-- Our own confirm dialog, not Blizzard's StaticPopup: an addon popup in StaticPopup's shared frames can taint them,
+-- and the game then blocks Blizzard's own popups and blames this addon.
+local ask
+local function confirmDialog()
+  if ask then return ask end
+  local f = CreateFrame("Frame", "WowGuildAhConfirm", UIParent)
+  f:SetSize(340, 140); f:SetPoint("CENTER", 0, 120); f:SetFrameStrata("DIALOG")
+  S.panel(f)
+  f.text = S.text(f, "body", ""); f.text:SetPoint("TOP", 0, -14); f.text:SetWidth(312)
+  if f.text.SetWordWrap then f.text:SetWordWrap(true) end
+  f.yes = CreateFrame("Button", nil, f, "UIPanelButtonTemplate"); f.yes:SetSize(150, 24); f.yes:SetPoint("BOTTOMLEFT", 14, 12)
+  f.yes:SetText("Start buying")
+  f.yes:SetScript("OnClick", function() f:Hide(); if f.data then A.start(f.data.lines, f.data.cap) end end)
+  f.no = CreateFrame("Button", nil, f, "UIPanelButtonTemplate"); f.no:SetSize(150, 24); f.no:SetPoint("BOTTOMRIGHT", -14, 12)
+  f.no:SetText("Cancel"); f.no:SetScript("OnClick", function() f:Hide() end)
+  f:Hide()
+  ask = f
+  return f
+end
 
 function A.confirm()
   local lines, t = {}, nil
@@ -281,7 +290,11 @@ function A.confirm()
   local what = string.format("%d item%s for about %s", t.count, t.count == 1 and "" or "s", money(t.est))
   if t.unpriced > 0 then what = what .. string.format(" (+%d without a price: you'll see it before you pay)", t.unpriced) end
   local cap = t.unpriced == 0 and math.floor(t.est * A.PRICE_GUARD) or nil
-  if StaticPopup_Show then ns.try(StaticPopup_Show, "WOWGUILD_AH_BUY", what, nil, { lines = lines, cap = cap }) end
+  local f = confirmDialog()
+  f.data = { lines = lines, cap = cap }
+  f.what = what
+  f.text:SetText("Buy " .. what .. "?\n\nYou'll click once for each purchase. Guild Camp skips anything more than 20% over its expected price, and stops before going over this total.")
+  f:Show()
   return true, t
 end
 
