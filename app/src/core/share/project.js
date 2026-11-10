@@ -582,23 +582,28 @@ function projectEk(db, gid, k) {
     .run(gid, k, Number.isInteger(f.enc) ? f.enc : null, f.boss, f.instance || null, Number.isInteger(f.at) ? f.at : r.t, Number.isInteger(f.size) ? f.size : null, JSON.stringify(names));
 }
 
-// rk: recruits. The recruiter is whoever found them first (kept as others move the state on); joined_at is when
-// the row first said joined. Expired: gone.
+// rk: recruits. The recruiter is whoever found them first, and only when they wrote it themselves (kept as others
+// move the state on). contacted_at and joined_at are this app's clock when it first saw each, never the writer's.
+// Expired or dropped: gone, unless they joined (past seasons keep the points).
 function projectRk(db, gid, k) {
   const e = st.effective(db, gid, `rk:${k}`);
+  const row = db.prepare('SELECT * FROM recruits WHERE guild_id = ? AND name = ?').get(gid, k);
   if (!e && dropped(db, gid, `rk:${k}`)) return;
   const r = liveRec(e);
   const f = r ? r.fields : {};
-  if (!r || !'cinj'.includes(f.state || '-')) { db.prepare('DELETE FROM recruits WHERE guild_id = ? AND name = ?').run(gid, k); return; }
-  const row = db.prepare('SELECT * FROM recruits WHERE guild_id = ? AND name = ?').get(gid, k);
-  // Credit only when the writer is that player (the first one to find them; others moving the state on keep it).
+  if (!r || !'cinj'.includes(f.state || '-')) {
+    if (row && row.state !== 'j') db.prepare('DELETE FROM recruits WHERE guild_id = ? AND name = ?').run(gid, k);
+    return;
+  }
+  const seen = Math.floor(Date.now() / 1000);
   const by = f.pid && st.isLinked(db, gid, r.author, f.pid) ? st.userForPid(db, gid, f.pid) : null;
   const at = Number.isInteger(f.at) ? f.at : r.t;
-  const joinedAt = f.state === 'j' ? (row && row.joined_at) || at : (row ? row.joined_at : null);
-  db.prepare(`INSERT INTO recruits (guild_id, name, recruiter, level, class, zone, state, at, joined_at) VALUES (?,?,?,?,?,?,?,?,?)
+  const joinedAt = f.state === 'j' ? (row && row.joined_at) || seen : (row ? row.joined_at : null);
+  db.prepare(`INSERT INTO recruits (guild_id, name, recruiter, level, class, zone, state, at, contacted_at, joined_at) VALUES (?,?,?,?,?,?,?,?,?,?)
     ON CONFLICT (guild_id, name) DO UPDATE SET recruiter = COALESCE(recruits.recruiter, excluded.recruiter), level = excluded.level,
       class = excluded.class, zone = excluded.zone, state = excluded.state, at = excluded.at, joined_at = excluded.joined_at`)
-    .run(gid, k, row && row.recruiter ? row.recruiter : by, Number.isInteger(f.level) ? f.level : null, f.class || null, f.zone || null, f.state, at, joinedAt);
+    .run(gid, k, row && row.recruiter ? row.recruiter : by, Number.isInteger(f.level) ? f.level : null, f.class || null, f.zone || null, f.state, at,
+      row ? row.contacted_at : seen, joinedAt);
 }
 
 // RA: recruit_settings, replaced as a whole

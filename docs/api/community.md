@@ -482,9 +482,12 @@ opens the chat box filled in and the player presses Enter, at most 30 a day. The
   an officer's addon, marks them joined (`j`).
 - **Post ad:** the officers' ad to LookingForGroup, else General, at most every 15 minutes.
 
-**Season points.** 25 (`recruit`) to whoever found the recruit, once they've been in the guild 7 days (the roster still
-has them). Credit goes to the first finder, and only when the record's writer is that player. Season rows get
-`recruits`.
+**Season points.** 25 (`recruit`) to whoever found the recruit, once they've been in the guild 7 days. The roster must
+still have them, and their character must have first shown up on it after they were contacted
+(`characters.first_seen`), so marking an old guildie as a recruit earns nothing. When they were contacted and when
+they joined come from this app's clock when it first saw each, never the writer's. Credit goes to the first finder,
+and only when the record's writer is that player. Joined recruits stay after the record expires, so past seasons keep
+their points. Season rows get `recruits`.
 
 ### `GET /api/recruiting` (guild)
 ```json
@@ -498,4 +501,5 @@ has them). Credit goes to the first finder, and only when the record's writer is
 
 ### `PUT /api/recruiting/settings` (guild, officers)
 `{ "ad", "msg", "classes": ["PRIEST"] or "PRIEST,SHAMAN", "minLevel", "maxLevel" }` → `{ "ok": true, "settings" }`.
-Not an officer → `403`; no ad or message, or a link in either → `400`.
+Not an officer → `403`; no ad or message, or anything that reads as a link (http, www, "discord", or a web address,
+even with spaces around the dot) → `400`.

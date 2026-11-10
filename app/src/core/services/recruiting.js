@@ -3,7 +3,9 @@
 // ("Recruiting").
 //
 // A recruiter earns RECRUIT_POINTS when someone they found joins and is still in the guild STAY_DAYS later (the
-// roster still has the character, here in this guild). The points land on that day.
+// roster still has the character, here in this guild). The points land on that day. The character must have
+// first shown up on the roster after they were contacted (characters.first_seen), so marking an old guildie as a
+// recruit earns nothing. Times are this app's own (contacted_at, joined_at), not the writer's.
 const identity = require('../identity');
 
 const RECRUIT_POINTS = 25;
@@ -11,7 +13,7 @@ const STAY_DAYS = 7;
 const DAY = 86400;
 const STATES = { c: 'contacted', i: 'interested', n: 'no thanks', j: 'joined' };
 const DEFAULTS = {
-  ad: 'wow is recruiting! A friendly Horde PvP guild: war parties, raids, a guild bank and a desktop app that helps you level. All levels welcome. /w me',
+  ad: 'wow is recruiting! A friendly Horde PvP guild: war parties, raids and a guild bank. All levels welcome. /w me',
   msg: 'Hey {name}! I saw you\'re not in a guild. We\'re a friendly Horde PvP guild with raids, war parties and a guild bank. Want an invite?',
   classes: '', minLevel: 10, maxLevel: 60,
 };
@@ -29,18 +31,26 @@ function nameOf(db, gid) {
   return (id) => (id ? m.get(id) || null : null);
 }
 
-// Still in the guild: the roster has the character here.
+const unix = (s) => Math.floor(Date.parse(/[zZ]|[+-]\d\d:?\d\d$/.test(String(s)) ? s : `${String(s).replace(' ', 'T')}Z`) / 1000);
+
+// Still in the guild: the roster has the character here. → its first_seen (unix), or 0.
 function stillHere(db, gid) {
   const here = identity.notElsewhere('c');
-  const q = db.prepare(`SELECT 1 FROM characters c WHERE c.guild_id = ? AND lower(c.name) = lower(?) AND (c.in_official_roster IS NULL OR c.in_official_roster = 1) AND ${here}`);
-  return (name) => Boolean(q.get(gid, name));
+  const q = db.prepare(`SELECT c.first_seen FROM characters c WHERE c.guild_id = ? AND lower(c.name) = lower(?) AND (c.in_official_roster IS NULL OR c.in_official_roster = 1) AND ${here}`);
+  return (name) => { const r = q.get(gid, name); return r ? unix(r.first_seen) || 1 : 0; };
+}
+
+// A real recruit: on the roster now, and first seen there after they were contacted (an hour's slack).
+function counts(r, here) {
+  const first = here(r.name);
+  return Boolean(first) && first >= r.contacted_at - 3600;
 }
 
 function list(db, gid, { now = Math.floor(Date.now() / 1000) } = {}) {
   const who = nameOf(db, gid);
   const here = stillHere(db, gid);
   return db.prepare('SELECT * FROM recruits WHERE guild_id = ? ORDER BY at DESC').all(gid).map((r) => {
-    const stays = r.state === 'j' && r.joined_at && here(r.name);
+    const stays = r.state === 'j' && r.joined_at && counts(r, here);
     return {
       name: r.name, level: r.level, class: r.class, zone: r.zone, state: r.state, stateLabel: STATES[r.state], at: r.at,
       recruiter: who(r.recruiter), joinedAt: r.joined_at,
@@ -53,9 +63,9 @@ function list(db, gid, { now = Math.floor(Date.now() / 1000) } = {}) {
 function events(db, gid, from, to) {
   const here = stillHere(db, gid);
   const out = [];
-  for (const r of db.prepare("SELECT name, recruiter, joined_at FROM recruits WHERE guild_id = ? AND state = 'j' AND recruiter IS NOT NULL AND joined_at IS NOT NULL").all(gid)) {
+  for (const r of db.prepare("SELECT name, recruiter, contacted_at, joined_at FROM recruits WHERE guild_id = ? AND state = 'j' AND recruiter IS NOT NULL AND joined_at IS NOT NULL").all(gid)) {
     const at = (r.joined_at + STAY_DAYS * DAY) * 1000;
-    if (at >= from && at < to && at <= Date.now() && here(r.name)) out.push({ userId: r.recruiter, kind: 'recruit', n: 1, at });
+    if (at >= from && at < to && at <= Date.now() && counts(r, here)) out.push({ userId: r.recruiter, kind: 'recruit', n: 1, at });
   }
   return out;
 }
@@ -64,7 +74,7 @@ function stats(db, gid) {
   const who = nameOf(db, gid);
   const rows = list(db, gid);
   const by = new Map();
-  for (const r of db.prepare('SELECT recruiter, state, name, joined_at FROM recruits WHERE guild_id = ? AND recruiter IS NOT NULL').all(gid)) {
+  for (const r of db.prepare('SELECT recruiter, state, name, contacted_at, joined_at FROM recruits WHERE guild_id = ? AND recruiter IS NOT NULL').all(gid)) {
     const s = by.get(r.recruiter) || { name: who(r.recruiter), contacted: 0, interested: 0, joined: 0, stayed: 0 };
     s.contacted += 1;
     if (r.state === 'i') s.interested += 1;

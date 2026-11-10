@@ -7,6 +7,8 @@ const R = require('../services/recruiting');
 const sharing = require('../sharing');
 const { HttpError, str, int, needGuild, isOfficer } = require('../http');
 
+// Anything that reads as a link or a web address: "http", "www", "discord", or "word.tld" (spaces around the dot too).
+const LINK = /https?:|www\s*\.|discord|\b[a-z0-9-]+\s*\.\s*(com|gg|net|org|io|co|za|tv|me|us|uk|eu|xyz|app|dev|link|ly)\b/i;
 const CLASSES = ['WARRIOR', 'PALADIN', 'HUNTER', 'ROGUE', 'PRIEST', 'SHAMAN', 'MAGE', 'WARLOCK', 'DRUID'];
 
 function register(app, ctx) {
@@ -23,7 +25,7 @@ function register(app, ctx) {
     const ad = str(b.ad, 255);
     const msg = str(b.msg, 200);
     if (!ad || !msg) throw new HttpError(400, 'Write both the channel ad and the message recruiters send.');
-    if (/https?:\/\/|www\.|discord\.gg/i.test(`${ad} ${msg}`)) throw new HttpError(400, 'No links in game: Blizzard counts them as advertising. Give your Discord once they join.');
+    if (LINK.test(`${ad} ${msg}`)) throw new HttpError(400, 'No links in game: Blizzard counts them as advertising. Give your Discord once they join.');
     const classes = (Array.isArray(b.classes) ? b.classes : String(b.classes || '').split(','))
       .map((c) => String(c).trim().toUpperCase()).filter((c) => CLASSES.includes(c));
     const minLevel = int(b.minLevel, 1, 60) || 1;

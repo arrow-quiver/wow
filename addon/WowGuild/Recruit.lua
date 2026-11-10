@@ -18,7 +18,7 @@ R.KEEP = 3 * 86400
 R.MAX_QUEUE = 100
 R.ROWS = 8
 R.DEFAULTS = {
-  ad = "wow is recruiting! A friendly Horde PvP guild: war parties, raids, a guild bank and a desktop app that helps you level. All levels welcome. /w me",
+  ad = "wow is recruiting! A friendly Horde PvP guild: war parties, raids and a guild bank. All levels welcome. /w me",
   msg = "Hey {name}! I saw you're not in a guild. We're a friendly Horde PvP guild with raids, war parties and a guild bank. Want an invite?",
   classes = "", minLevel = 10, maxLevel = 60,
 }
