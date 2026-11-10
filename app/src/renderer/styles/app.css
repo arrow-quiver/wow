@@ -1303,3 +1303,12 @@ a.wh.q0 { color: var(--q-0) !important; } a.wh.q1 { color: var(--q-1) !important
 .store-edit-row { display: grid; grid-template-columns: 1fr 84px 72px 28px; gap: var(--s-2); align-items: center; }
 .store-x { border: 0; background: none; color: var(--muted); font-size: 1.2rem; cursor: pointer; }
 .store-x:hover { color: var(--alarm); }
+
+/* ---------- Coach: your week ---------- */
+.week-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--s-3); margin-bottom: var(--s-3); }
+.week-grid > div { display: flex; flex-direction: column; gap: 2px; }
+.week-grid b { font-size: var(--fs-lg); }
+.week-up { color: var(--ok, #4caf50); font-size: var(--fs-sm); }
+.week-down { color: var(--alarm); font-size: var(--fs-sm); }
+.week-labels { margin: 0 0 var(--s-2); }
+@media (max-width: 700px) { .week-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

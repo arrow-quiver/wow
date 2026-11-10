@@ -865,6 +865,23 @@ const MIGRATIONS = [
      pos INTEGER NOT NULL DEFAULT 0,
      PRIMARY KEY (guild_id, key)
    );`,
+
+  // 25: How I actually play (services/playstyle.js): each play session the app's live link followed in the combat
+  // log, one row per character and start (times in ms), updated while the session runs. Only this computer has them.
+  `CREATE TABLE play_sessions (
+     id INTEGER PRIMARY KEY,
+     user_id INTEGER NOT NULL REFERENCES users(id),
+     character TEXT NOT NULL,
+     started_at INTEGER NOT NULL,
+     last_at INTEGER NOT NULL,
+     minutes INTEGER NOT NULL DEFAULT 0,
+     kills INTEGER NOT NULL DEFAULT 0, pvp_kills INTEGER NOT NULL DEFAULT 0,
+     deaths INTEGER NOT NULL DEFAULT 0, pvp_deaths INTEGER NOT NULL DEFAULT 0,
+     damage_done INTEGER NOT NULL DEFAULT 0, damage_taken INTEGER NOT NULL DEFAULT 0, healing_taken INTEGER NOT NULL DEFAULT 0,
+     fights INTEGER NOT NULL DEFAULT 0, fight_share REAL NOT NULL DEFAULT 0,
+     UNIQUE (user_id, character, started_at)
+   );
+   CREATE INDEX play_sessions_user ON play_sessions(user_id, last_at);`,
 ];
 
 // Runs every migration the database hasn't had yet, each in its own transaction.

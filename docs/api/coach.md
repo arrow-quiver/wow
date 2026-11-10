@@ -191,3 +191,30 @@ Errors:
 - No coach data for me → `400 "No character data yet. Log in with the addon and sync once."`
 - No key → `503` (as above). Switched off, budget, or `"You've reached today's limit of 5 build plans. It resets at midnight (UTC)."` → `403`
 - Claude failed or returned something that isn't a plan → `502` (`"Claude API 500: …"`, `"Could not reach the Claude API. Try again in a minute."`, `"The Coach didn't return a plan. Try again."`)
+
+## Weekly report: how I actually play
+
+The app's live link (`main/live.js`, reading the game's combat log file) saves each play session to
+`POST /api/play/session` about once a minute while it changes (`play_sessions`, migration 25; only this computer
+has them). `services/playstyle.js` measures the style from them: aggression (time in combat, fights with players)
+and survival (deaths an hour), as 0–100 scores and plain labels. The Coach's prompt gets the last 4 weeks
+("How they actually play, measured from the combat log …") for plans and answers, ahead of the quiz answers.
+
+### GET /api/coach/report?char=
+This week (the last 7 days) against the week before, for one of my characters (the most recently played by default).
+```json
+{
+  "character": "Grimtusk", "from": 1794000000000, "to": 1794600000000,
+  "week": { "sessions": 5, "hours": 9.5, "kills": 312, "pvpKills": 11, "deaths": 9, "pvpDeaths": 7, "fights": 280,
+            "fightShare": 0.46, "killsPerHour": 32.8, "deathsPerHour": 0.9, "pvpPerHour": 1.9, "damageDone": 0, "damageTaken": 0 },
+  "lastWeek": { "...": "the same shape" },
+  "style": { "aggression": 70, "survival": 78, "labels": ["Goes looking for fights", "Dies now and then"] },
+  "deaths": { "total": 9, "pvp": 7, "killers": [{ "name": "Sneaky", "n": 3 }], "spells": [{ "name": "Eviscerate", "n": 3 }],
+              "zones": [{ "name": "Hillsbrad Foothills", "n": 5 }], "medianSeconds": 4.2, "unhealed": 5 },
+  "tips": ["Eviscerate killed you 3 times. Ask the Coach how your class counters it."],
+  "text": "My week on Grimtusk (from the combat log): …"
+}
+```
+`style` is null under 30 minutes of play. `tips` are rule-based (more deaths than last week, quick deaths, the
+spell and player that killed you most, deaths with no healing, fighting a lot while dying a lot). The Coach page's
+**Ask the Coach about my week** sends `text` as the `live` context of a fresh question.

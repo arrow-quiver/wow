@@ -163,6 +163,25 @@ function view({ query, state }) {
 
 addMockRoutes({
   'GET /api/coach': view,
+  // The weekly report (docs/api/coach.md): &week=none shows the "turn on the live link" state.
+  'GET /api/coach/report': () => {
+    const none = typeof location !== 'undefined' && new URLSearchParams(location.search).get('week') === 'none';
+    if (none) return { character: 'Grimtusk', week: { sessions: 0, hours: 0 }, lastWeek: { sessions: 0 }, style: null, deaths: { total: 0, killers: [], spells: [], zones: [] }, tips: ['Play a little with the live link on (Settings → Overlay & live, and /wow live on in game), and the Coach can measure how you play.'], text: '' };
+    return {
+      character: 'Grimtusk',
+      week: { sessions: 5, hours: 9.5, kills: 312, pvpKills: 11, deaths: 9, pvpDeaths: 7, fights: 280, fightShare: 0.46, killsPerHour: 32.8, deathsPerHour: 0.9, pvpPerHour: 1.9 },
+      lastWeek: { sessions: 4, hours: 7, kills: 250, pvpKills: 6, deaths: 4, pvpDeaths: 2, fights: 200, fightShare: 0.41, killsPerHour: 35.7, deathsPerHour: 0.6, pvpPerHour: 1.1 },
+      style: { aggression: 70, survival: 78, labels: ['Goes looking for fights', 'Dies now and then', 'Wins more PvP fights than it loses (11:7)'] },
+      deaths: { total: 9, pvp: 7, killers: [{ name: 'Sneakypete', n: 3 }], spells: [{ name: 'Eviscerate', n: 3 }, { name: 'Frostbolt', n: 2 }], zones: [{ name: 'Hillsbrad Foothills', n: 5 }], medianSeconds: 4.2, unhealed: 5 },
+      tips: [
+        'You died 0.9 times an hour this week, up from 0.6. Slow down when you pull more than one enemy, and keep an escape ready.',
+        'Most deaths took under 5 seconds from first hit: you were caught out. Fight with your defensive cooldowns up, and watch for stealthed classes in contested zones.',
+        'Eviscerate killed you 3 times. Ask the Coach how your class counters it.',
+        'Sneakypete got you 3 times. Group up or call the guild (Call for help) when they are around.',
+      ],
+      text: 'My week on Grimtusk (from the combat log): 9.5 hours over 5 sessions…',
+    };
+  },
   'POST /api/coach/ask': ({ body = {}, state }) => {
     needGuild(state);
     const question = String(body.question || '').trim().slice(0, 500);

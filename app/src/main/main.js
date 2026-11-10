@@ -662,6 +662,15 @@ function bootstrap() {
     registerAppProtocol(path.join(__dirname, '..', 'renderer'), log.scope('protocol'));
     createWindow();
     live.on('update', (state) => broadcast('live', state));
+    // How I actually play: save the session (at most once a minute, when it changed) for the Coach's weekly report.
+    let sessionSent = { at: 0, last: null };
+    live.on('update', (state) => {
+      const x = state && state.session;
+      if (!x || !x.character || !x.startedAt || x.lastAt === sessionSent.last || Date.now() - sessionSent.at < 60000) return;
+      sessionSent = { at: Date.now(), last: x.lastAt };
+      Promise.resolve().then(() => api.request('POST', '/api/play/session', x))
+        .catch((err) => log.warn(`Saving the play session failed: ${err.message}`));
+    });
     // War alerts: every death goes to the local core (the War page, the Coach's report); a death to players is posted
     // to the guild's Discord when War alerts are on (core/routes/war.js decides and limits).
     live.on('death', (d) => Promise.resolve().then(() => api.request('POST', '/api/war/death', {
