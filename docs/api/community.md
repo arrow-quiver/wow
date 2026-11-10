@@ -461,3 +461,46 @@ Any day of the week; this week by default.
   post to your Discord by typing a Guild Camp line in your name. The same line twice makes one activity entry, and a
   failed Discord post can be tried again at once.
 - The weekly digest posted on Sunday evening is the week of the local Sunday, also west of UTC.
+
+## Recruiting
+
+Service `services/recruiting.js`; routes `routes/recruiting.js`; migration 31; page Recruiting (`/recruiting`); addon
+`Recruit.lua` (`/wow recruit`). Records `rk` (recruits, any member) and `RA` (settings, officers).
+
+**Blizzard's rules.** `/who` (`C_FriendList.SendWho`), guild invites and channel posts need a click each, and bulk
+unrequested whispers get reported as spam (then a silence). So every step is one click by the player. Message
+opens the chat box filled in and the player presses Enter, at most 30 a day. There are no links in the ad or message
+(the settings route refuses them). Nothing runs from a timer or an invisible frame.
+
+**In game.**
+- **Scan:** each click runs the next `/who` search over the level brackets in the officers' range. Players with no
+  guild that the guild hasn't contacted (`rk` records within 60 days, plus your own Skip list) go in the queue for 3
+  days, wanted classes first.
+- **Message:** marks the recruit contacted for the whole guild (`rk` state `c`, with your pid).
+- **Replies:** a whisper back with a yes word marks them interested (`i`), a no word marks no thanks (`n`).
+  Officers' addons announce interested recruits and show an Invite button. A "has joined the guild" line, seen by
+  an officer's addon, marks them joined (`j`).
+- **Post ad:** the officers' ad to LookingForGroup, else General, at most every 15 minutes.
+
+**Season points.** 25 (`recruit`) to whoever found the recruit, once they've been in the guild 7 days. The roster must
+still have them, and their character must have first shown up on it after they were contacted
+(`characters.first_seen`), so marking an old guildie as a recruit earns nothing. When they were contacted and when
+they joined come from this app's clock when it first saw each, never the writer's. Credit goes to the first finder,
+and only when the record's writer is that player, for at most 30 contacts a recruiter a day; a recruit who joins more than
+30 days after contact, or turns out to be the recruiter's own alt, pays nothing. Joined recruits stay after the record expires, so past seasons keep
+their points. Season rows get `recruits`.
+
+### `GET /api/recruiting` (guild)
+```json
+{ "recruits": [{ "name": "Grakhul", "level": 24, "class": "SHAMAN", "zone": "Stonetalon Mountains", "state": "i",
+    "stateLabel": "interested", "at": 1762900000, "recruiter": "Mokra", "joinedAt": null, "stayed": false, "left": false }],
+  "stats": { "counts": { "c": 1, "i": 1, "n": 0, "j": 1 },
+    "recruiters": [{ "name": "Mokra", "contacted": 9, "interested": 1, "joined": 1, "stayed": 1 }] },
+  "settings": { "ad": "…", "msg": "Hey {name}! …", "classes": "PRIEST,SHAMAN", "minLevel": 10, "maxLevel": 60, "custom": true },
+  "canEdit": true, "points": 25, "stayDays": 7, "classes": ["WARRIOR", "…"] }
+```
+
+### `PUT /api/recruiting/settings` (guild, officers)
+`{ "ad", "msg", "classes": ["PRIEST"] or "PRIEST,SHAMAN", "minLevel", "maxLevel" }` → `{ "ok": true, "settings" }`.
+Not an officer → `403`; no ad or message, or anything that reads as a link (http, www, "discord", or a web address,
+even with spaces around the dot) → `400`.

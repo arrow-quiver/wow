@@ -22,6 +22,7 @@ export const routes = [
   { path: '/board', load: () => import('./board.js'), title: 'Bulletin board', nav: 'Play', icon: 'board' },
   // Guild
   { path: '/roster', load: () => import('./roster.js'), title: 'Roster', nav: 'Guild', icon: 'roster' },
+  { path: '/recruiting', load: () => import('./recruiting.js'), title: 'Recruiting', nav: 'Guild', icon: 'partners' },
   { path: '/digest', load: () => import('./digest.js'), title: 'Weekly digest', nav: 'Guild', icon: 'digest' },
   { path: '/bank', load: () => import('./bank.js'), title: 'Bank', nav: 'Guild', icon: 'bank' },
   { path: '/store', load: () => import('./store.js'), title: 'Guild bank store', nav: 'Guild', icon: 'store' },

@@ -157,6 +157,13 @@ const TYPES = {
     key: ['b36x6'], max: 1280, expiry: { days: 120 },
     fields: [int('enc'), text('boss', 60), text('instance', 60), int('at'), int('size'), list('names', 40, { of: { k: 'text', max: 24 } })],
   },
+  // A recruit: a player someone in the guild got in touch with, so nobody else whispers them again. Keyed by their
+  // name. pid is who found them (it stays when others move the state on): c contacted, i interested (they said
+  // yes), n no thanks, j joined.
+  rk: {
+    key: ['name'], max: 300, expiry: { days: 60 },
+    fields: [text('pid', 64), int('level'), text('class', 16), text('zone', 60), enm('state', 'cinj'), int('at')],
+  },
   // Kill on sight: an Alliance player the guild hunts. Keyed by their name; any member adds one or takes it off
   // (state 'x'), and the last change wins.
   ko: {
@@ -283,6 +290,11 @@ const TYPES = {
   },
   BH: { key: ['b36x6'], max: 40, expiry: { parent: 'bq', seg: 1 }, fields: [enm('state', 'sd')] },
   BC: { key: ['one'], max: 700, expiry: { never: true }, fields: [list('names', 50, { of: { k: 'text', max: 48 } })] },
+  // Recruiting (officers): the channel ad, the message recruiters send, the classes wanted and the level range.
+  RA: {
+    key: ['one'], max: 800, expiry: { never: true },
+    fields: [text('ad', 255), text('msg', 200), text('classes', 80), int('minLevel'), int('maxLevel')],
+  },
   ST: {
     key: ['one'], max: 1400, expiry: { never: true },
     fields: [list('items', 25, { parts: [pText('key', 6), pText('item', 60), pInt('id'), pInt('cost'), pInt('stock')] })],

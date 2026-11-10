@@ -99,6 +99,8 @@ function summaryOf(recIn, lookup) {
     case 'LY': return 'SR+ checkpoint';
     case 'AN': return del ? 'Notice: removed' : `Notice: ${clip(f.body, 50)}`;
     case 'mw': return del ? 'Mats wanted: removed' : `Mats wanted: ${num((f.items || []).length)} item${(f.items || []).length === 1 ? '' : 's'}`;
+    case 'rk': return del ? 'Recruit: removed' : `Recruit: ${r.key} (${{ c: 'contacted', i: 'interested', n: 'no thanks', j: 'joined' }[f.state] || f.state})`;
+    case 'RA': return del ? 'Recruiting: removed' : 'Recruiting: the ad and message';
     case 'ek': return del ? 'Boss kill: removed' : `Boss kill: ${f.boss || '?'}${f.instance ? ` (${f.instance})` : ''}`;
     case 'ko': return del ? 'Kill on sight: removed' : `Kill on sight: ${r.key}${f.state === 'x' ? ' (taken off)' : ''}`;
     case 'kk': return del ? 'Kill: removed' : `Kill: ${f.target || 'someone'}${f.bounty ? ' (bounty)' : f.kos ? ' (kill on sight)' : ''}`;
@@ -129,6 +131,7 @@ function auditSentence(recIn, lookup) {
     case 'LL': return `${a} ${r.del ? 'removed' : 'edited'} the loot list${f.name ? ` for ${f.name}` : ''}`;
     case 'LY': return `${a}'s app saved an SR+ checkpoint`;
     case 'AN': return r.del ? `${a} deleted a notice` : `${a} posted a notice`;
+    case 'RA': return r.del ? `${a} removed the recruiting settings` : `${a} changed the recruiting ad`;
     case 'BT': return r.del ? `${a} removed a bounty` : f.state === 'x' ? `${a} closed the bounty on ${f.target || f.zone}` : `${a} put a ${num(f.points || 0)}-point bounty on ${f.target || f.zone}`;
     case 'DR': return r.del ? `${a} removed a supply drive` : f.state === 'c' ? `${a} closed the drive ${f.title}` : `${a} started the drive ${f.title}`;
     case 'BH': {

@@ -988,6 +988,28 @@ const MIGRATIONS = [
      PRIMARY KEY (guild_id, share_id)
    );
    CREATE INDEX boss_kills_at ON boss_kills(guild_id, at);`,
+
+  // 31: Recruiting (services/recruiting.js): recruits from "rk" records (recruiter: who found them), and the officers'
+  // recruiting settings from "RA". contacted_at and joined_at are this app's own clock when it first saw the
+  // contact and the joining (a writer can't back-date them); joined rows stay after the record expires, so past
+  // seasons keep their points.
+  `CREATE TABLE recruits (
+     guild_id INTEGER NOT NULL REFERENCES guilds(id),
+     name TEXT NOT NULL,
+     recruiter INTEGER REFERENCES users(id),
+     level INTEGER,
+     class TEXT,
+     zone TEXT,
+     state TEXT NOT NULL CHECK (state IN ('c','i','n','j')),
+     at INTEGER NOT NULL,
+     contacted_at INTEGER NOT NULL,
+     joined_at INTEGER,
+     PRIMARY KEY (guild_id, name)
+   );
+   CREATE TABLE recruit_settings (
+     guild_id INTEGER PRIMARY KEY REFERENCES guilds(id),
+     ad TEXT, msg TEXT, classes TEXT, min_level INTEGER, max_level INTEGER
+   );`,
 ];
 
 // Runs every migration the database hasn't had yet, each in its own transaction.
