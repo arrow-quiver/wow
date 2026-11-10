@@ -334,7 +334,8 @@ function killTree(child) {
   if (IS_WIN && child && child.pid) {
     execFile('taskkill', ['/pid', String(child.pid), '/T', '/F'], { windowsHide: true }, () => {});
   } else {
-    try { child.kill('SIGTERM'); } catch { /* already gone */ }
+    // The build runs as its own process group (detached): signal the whole group, npm and what it started.
+    try { process.kill(-child.pid, 'SIGTERM'); } catch { try { child.kill('SIGTERM'); } catch { /* already gone */ } }
   }
 }
 
@@ -345,7 +346,8 @@ function killTree(child) {
 // Aborting `signal` stops the whole build. On Windows npm runs under cmd.exe, and killing cmd.exe
 // alone would leave npm and electron-builder running, so the abort kills the process tree with
 // taskkill /T /F. The signal isn't handed to spawn there: if Node killed cmd.exe first, the tree
-// would already be orphaned before taskkill could walk it.
+// would already be orphaned before taskkill could walk it. Elsewhere the build starts as its own process group, and
+// the abort signals the group: killing npm alone leaves electron-builder running and the output pipe open.
 function buildApp(appDir, { onLog, onWarn, signal, env, bnet } = {}) {
   const log = logger(onLog);
   const warn = typeof onWarn === 'function' ? onWarn : log;
@@ -369,7 +371,7 @@ function buildApp(appDir, { onLog, onWarn, signal, env, bnet } = {}) {
       // there: Node warns about (and doesn't escape) separate arguments with shell: true.
       child = IS_WIN
         ? spawn('npm run dist', { ...options, shell: true })
-        : spawn('npm', ['run', 'dist'], options);
+        : spawn('npm', ['run', 'dist'], { ...options, detached: true });
     } catch (e) {
       reject(new ReleaseError(`Couldn't start npm (${e.message}). Install Node.js and make sure npm is on your PATH.`, { code: 'NO_NPM' }));
       return;

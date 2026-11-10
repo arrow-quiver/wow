@@ -63,6 +63,13 @@ function importRule(db, gid, rec, how, prevOk) {
     } else if (!rec.del) return 'link';
   }
   if (rec.del) return null;
+  // A raid boss kill: written by a raider in it, about now, and only they can change it later.
+  if (rec.type === 'ek') {
+    const lower = (n) => String(n || '').split('-')[0].toLowerCase();
+    if (!(rec.fields.names || []).map(lower).includes(lower(rec.author))) return 'raider';
+    if (!Number.isInteger(rec.fields.at) || Math.abs(rec.fields.at - rec.t) > 86400) return 'time';
+    if (prevOk && !prevOk.del && lower(prevOk.author) !== lower(rec.author)) return 'owner';
+  }
   if (rec.type === 'cl') {
     const cr = st.live(db, gid, `cr:${seg(rec, 0)}`);
     if (cr && cr.rec.fields.pid === seg(rec, 1)) return 'own request';

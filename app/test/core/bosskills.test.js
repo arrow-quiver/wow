@@ -13,7 +13,7 @@ test('boss kills: the raid they belong to, attendance points once, the raid page
   const h = await setupShare(t, { role: 'officer' });
   const { db, gid, me } = h;
   h.linkAll();
-  const start = Math.floor(Date.now() / 1000) - 3 * 3600;
+  const start = h.NOW - 3 * 3600;
   db.prepare("INSERT INTO raids (guild_id, title, instance, starts_at, status) VALUES (?, 'MC night', 'Molten Core', ?, 'open')").run(gid, new Date(start * 1000).toISOString());
   const raidId = db.prepare('SELECT id FROM raids WHERE guild_id = ?').get(gid).id;
   h.imp([
@@ -26,7 +26,7 @@ test('boss kills: the raid they belong to, attendance points once, the raid page
   assert.deepStrictEqual(kills.map((k) => [k.boss, k.raidId]), [['Onyxia', null], ['Magmadar', raidId], ['Lucifron', raidId]]);
   assert.strictEqual(kills[2].userIds.length, 2, 'Pugguy is no guildie');
   // Season: Thrallia 1 raid (MC), Jaina 2 (MC + Onyxia).
-  let s = Seasons.season(db, gid);
+  let s = Seasons.season(db, gid, { now: h.NOW * 1000 });
   assert.strictEqual(s.players.find((p) => p.userId === me).raids, 1);
   assert.strictEqual(s.players.find((p) => p.name === 'Jaina').raids, 2);
   // The raid page: its kills, and who they saw (for the close dialog).
@@ -35,8 +35,14 @@ test('boss kills: the raid they belong to, attendance points once, the raid page
   assert.strictEqual(r.body.bossKills.seen.length, 2);
   // An officer closes the raid with both: still one raid each.
   db.prepare('INSERT INTO attendance (raid_id, user_id) VALUES (?, ?)').run(raidId, me);
-  s = Seasons.season(db, gid);
+  s = Seasons.season(db, gid, { now: h.NOW * 1000 });
   assert.strictEqual(s.players.find((p) => p.userId === me).raids, 1);
+  // A kill written by someone who wasn't in the raid, or stamped far from when it was written: ignored.
+  h.imp([
+    h.rec('ek', 'e00009', h.NOW - 70, 'Zuljinne', { enc: 1, boss: 'Fake', instance: 'Molten Core', at: start, size: 40, names: ['Thrallia'] }),
+    h.rec('ek', 'e00008', h.NOW - 60, 'Jaina', { enc: 2, boss: 'Old', instance: 'Molten Core', at: start - 5 * 86400, size: 40, names: ['Jaina'] }),
+  ]);
+  assert.ok(!BK.kills(db, gid).some((k) => k.boss === 'Fake' || k.boss === 'Old'));
   // The digest names the bosses.
   const d = G.digest(db, gid, { week: new Date((start + 1800) * 1000).toISOString().slice(0, 10) });
   assert.match(G.discordText(d), /💀 Bosses down: Lucifron/);

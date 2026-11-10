@@ -28,6 +28,11 @@ function claim(db, guildId, c) {
   return now;
 }
 
+// Gives a claim back (the post failed), so the next try can post.
+function release(db, guildId, c, at) {
+  db.prepare('DELETE FROM cta_discord WHERE guild_id = ? AND fp = ? AND at = ?').run(guildId, fp(c), at);
+}
+
 async function post(db, ctx, guildId, c) {
   if (!ctx.cfg.discordWebhook || !c || !c.zone) return false;
   const at = claim(db, guildId, c);
@@ -50,4 +55,4 @@ async function sweep(db, ctx, guildId, userId) {
   return n;
 }
 
-module.exports = { post, sweep, claim, text, fp, SAME_MS };
+module.exports = { post, sweep, claim, text, fp, SAME_MS, release };

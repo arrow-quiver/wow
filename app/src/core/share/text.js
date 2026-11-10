@@ -154,6 +154,8 @@ const REASONS = {
   rank: 'only officers can make that change',
   'officers only': 'only officers keep a shared webhook',
   owner: 'only the person who made it can change it',
+  raider: 'a boss kill must be written by someone who was in the raid',
+  time: 'the time is too far from when it was written',
 };
 const reasonText = (code) => REASONS[code] || 'it broke a guild rule';
 

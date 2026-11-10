@@ -433,7 +433,8 @@ test('raids page data through the API: the projected raid shows like any other',
   h.imp([...CHS, LL, RD, SU_Z, RT_L]);
   const list = await h.srv.api.get('/api/raids');
   assert.equal(list.status, 200);
-  const raid = list.body.upcoming.find((r) => r.title === 'Molten Core Thursday');
+  // The record's time is from the helpers' fixed clock (NOW): by today's date it can be past or upcoming.
+  const raid = [...list.body.upcoming, ...list.body.past].find((r) => r.title === 'Molten Core Thursday');
   assert.ok(raid);
   assert.equal(raid.status, 'locked');
   const one = await h.srv.api.get(`/api/raids/${raid.id}`);

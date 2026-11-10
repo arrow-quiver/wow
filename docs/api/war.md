@@ -71,7 +71,8 @@ Services: `services/hunt.js`; routes: `routes/hunt.js`; migration 29; page: The 
 Records: `ko` (kill on sight, any member), `BT` (bounties, officers), `kk` (a kill that counts, by the killer's
 addon). See [SHARING.md](../SHARING.md).
 
-Season points ([seasons.md](seasons.md)): each kill of a kill-on-sight target 8 (`kos`), and a bounty's points
+Season points ([seasons.md](seasons.md)): each kill of a kill-on-sight target 8 (`kos`; the target must be on the
+list, once an hour per killer and target, at most 10 a day per killer), and a bounty's points
 (`bounty`), on top of the usual 2 for a kill. A player bounty pays the first kill made while it was up (from 5
 minutes before it was posted, for clock differences, to `ends`); a zone bounty pays each kill in its zone, in kill
 order, up to `cap` kills. Players' season rows carry `hunt`: the points from these.

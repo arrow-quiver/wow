@@ -96,7 +96,8 @@ local function idOf(text)
   local id = tonumber(string.match(text or "", "item:(%d+)"))
   if id then return id end
   local get = (C_Item and C_Item.GetItemInfoInstant) or GetItemInfoInstant
-  local n = get and ns.try(get, (text or ""):gsub("^%s+", ""):gsub("%s+$", ""))
+  local name = string.gsub(string.gsub(text or "", "^%s+", ""), "%s+$", "")
+  local n = get and ns.try(get, name)
   return type(n) == "number" and n or nil
 end
 
@@ -117,7 +118,9 @@ function PA.slash(rest)
     if id and targets()[id] then targets()[id] = nil; ns.print("Price alert removed."); return true end
     ns.print("No price alert for that item."); return false
   end
-  local price, what = string.match(rest, "^(%S+)%s+(.+)$")
+  -- The price may be two words ("1g 50s Wool Cloth").
+  local price, what = string.match(rest, "^(%d+[%.%d]*g%s+%d+s)%s+(.+)$")
+  if not price then price, what = string.match(rest, "^(%S+)%s+(.+)$") end
   local copper, id = PA.parseMoney(price), idOf(what)
   if rest == "" or not copper or not id then
     local list, n = PA.watch(), 0

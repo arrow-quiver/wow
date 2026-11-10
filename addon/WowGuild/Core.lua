@@ -294,7 +294,9 @@ end
 -- Offers a reload so the app gets the latest data (our own dialog: see ns.confirm in Skin.lua).
 function ns.offerReload()
   return ns.confirm("Reload now so the Guild Camp app gets your latest data?\nIt takes a few seconds.", "Reload now", "Later",
-    function() if not (InCombatLockdown and InCombatLockdown()) then ReloadUI() end end, 20)
+    function()
+      if InCombatLockdown and InCombatLockdown() then ns.print("Can't reload in combat. Try again when the fight's over.") else ReloadUI() end
+    end, 20)
 end
 
 -- ---------- slash commands ----------

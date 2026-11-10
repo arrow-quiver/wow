@@ -64,6 +64,7 @@ GetAuctionItemInfo = function() return "Linen Cloth", nil, 20, nil, nil, nil, ni
   wow.exec('__ns.priceAlerts.reset()');
   assert.strictEqual(wow.eval('__ns.priceAlerts.parseMoney("1g 50s")'), '15000');
   assert.strictEqual(wow.eval('__ns.priceAlerts.parseMoney("75s")'), '7500');
+  assert.strictEqual(wow.eval('__ns.priceAlerts.slash("1g 50s |cffffffff|Hitem:2589::::::::|h[Linen Cloth]|h|r")'), '15000');
   assert.strictEqual(wow.eval('__ns.priceAlerts.slash("50s |cffffffff|Hitem:2592::::::::|h[Wool Cloth]|h|r")'), '5000');
   assert.match(wow.eval('__ns.priceAlerts.seen(2592, 4500, 1)'), /your target 50s 0c/);
   wow.exec('WowGuildDB.options.priceAlerts = false; __ns.priceAlerts.reset()');

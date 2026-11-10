@@ -39,14 +39,31 @@ function C.text(what, from)
   return text .. tail
 end
 
--- Says it in guild chat (not in dungeons or battlegrounds, not with the option off). → the line, or nil.
+-- Says it in guild chat (not with the option off). In a dungeon or battleground it waits, and goes out when you
+-- leave (C.flush), so a moment reached inside isn't lost. → the line, or nil (not said, or not yet).
+C.MAX_PENDING = 5
 function C.say(what)
-  if ns.opt("celebrate") == false or inInstance() then return nil end
+  if ns.opt("celebrate") == false then return nil end
   if IsInGuild and not IsInGuild() then return nil end
+  if inInstance() then
+    ns.db.celebratePending = ns.db.celebratePending or {}
+    if #ns.db.celebratePending < C.MAX_PENDING then table.insert(ns.db.celebratePending, what) end
+    return nil
+  end
   local send = (C_ChatInfo and C_ChatInfo.SendChatMessage) or SendChatMessage
   if not send then return nil end
   local line = C.text(what)
   if pcall(send, line, "GUILD") then return line end
+end
+
+-- Out of the instance: what waited goes out now.
+function C.flush()
+  local q = ns.db and ns.db.celebratePending
+  if not q or #q == 0 or inInstance() then return 0 end
+  ns.db.celebratePending = nil
+  local n = 0
+  for _, what in ipairs(q) do if C.say(what) then n = n + 1 end end
+  return n
 end
 
 -- Once per character: remembers what was already celebrated (so a /reload never repeats it).
@@ -139,9 +156,17 @@ end
 local EPIC = { "|cffa335ee", "|cffff8000" } -- epic, legendary
 function C.looted(msg)
   if type(msg) ~= "string" then return nil end
+  -- The game's own (translated) "You receive loot: %s." lines; only loot, not quest rewards or crafts.
   local ok, mine = pcall(function()
-    return LOOT_ITEM_SELF and string.find(msg, "^" .. string.gsub(string.gsub(LOOT_ITEM_SELF, "%%s", ""), "([%(%)%.%-%+%[%]%?%^%$])", "%%%1"))
-      or string.find(msg, "^You receive")
+    for _, fmt in ipairs({ LOOT_ITEM_SELF or false, LOOT_ITEM_SELF_MULTIPLE or false }) do
+      if type(fmt) == "string" then
+        local p = string.gsub(fmt, "([%(%)%.%-%+%[%]%?%^%$%*])", "%%%1")
+        p = string.gsub(p, "%%s", "(.+)")
+        p = string.gsub(p, "%%d", "%%d+")
+        if string.find(msg, "^" .. p .. "$") then return true end
+      end
+    end
+    return not LOOT_ITEM_SELF and string.find(msg, "^You receive loot:") ~= nil
   end)
   if not ok or not mine then return nil end
   local link = string.match(msg, "(|c%x+|Hitem:.-|h%[.-%]|h|r)")
@@ -207,6 +232,15 @@ end
 
 -- ---------- welcome wagon ----------
 -- A guild buddy for a newcomer: the online guildmate closest in level (not me, not them).
+-- A guildmate's level from the roster, or nil (a newcomer may not be in it yet).
+function C.levelOf(name)
+  if not GetNumGuildMembers or not GetGuildRosterInfo then return nil end
+  for i = 1, (ns.try(GetNumGuildMembers) or 0) do
+    local n, _, _, lvl = ns.try(GetGuildRosterInfo, i)
+    if n and (string.match(n, "^([^%-]+)") or n) == name and type(lvl) == "number" then return lvl end
+  end
+end
+
 function C.buddy(newcomer, level)
   if not GetNumGuildMembers or not GetGuildRosterInfo then return nil end
   local best, bestGap
@@ -223,7 +257,7 @@ end
 
 function C.welcomeKit(newcomer)
   local whisper = (C_ChatInfo and C_ChatInfo.SendChatMessage) or SendChatMessage
-  local buddy = C.buddy(newcomer)
+  local buddy = C.buddy(newcomer, C.levelOf(newcomer))
   local lines = {
     string.format("Welcome to the guild, %s! Type /wow for the guild window: calls to arms, raids, crafters and more.", newcomer),
     "Ask an officer if you'd like a hand finding your feet. Good to have you!",
@@ -284,4 +318,4 @@ function C.today()
   for _, l in ipairs(t.lines) do ns.print(l) end
   return #t.lines
 end
-ns.on("PLAYER_ENTERING_WORLD", function() ns.safely(C.today) end)
+ns.on("PLAYER_ENTERING_WORLD", function() ns.safely(C.today); ns.safely(C.flush) end)

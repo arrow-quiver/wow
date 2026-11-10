@@ -140,9 +140,17 @@ function createLive({ findInstalls, myNames = async () => [], log = console, now
 // "[Guild Camp] Call to arms: Hillsbrad Foothills (3 needed): help at the mill! — from Grom" (Core.lua ns.ctaText).
 // While chat logging is on (/chatlog, or /wow live on) the game writes it to Logs/WoWChatLog*.txt.
 const CTA = /\[Guild Camp\] Call to arms: (.+?) — from ([^\s—]+)\s*$/;
+// The sender, when the line has one ("[Guild] Grom-Zuljin: [Guild Camp] …"): it must be who the line says it's from,
+// so a guildmate typing "[Guild Camp] … — from <my character>" can't post to my Discord.
+const SENDER = /([^\s:\]]+): \[Guild Camp\]/;
+function senderOk(line, from) {
+  const s = SENDER.exec(line);
+  return !s || s[1].split('-')[0].toLowerCase() === String(from).split('-')[0].toLowerCase();
+}
+
 function parseCta(line) {
   const m = CTA.exec(String(line || '').replace(/\r$/, ''));
-  if (!m) return null;
+  if (!m || !senderOk(line, m[2])) return null;
   const body = /^(.*?)(?: \((\d+) needed\))?(?:: (.*))?$/.exec(m[1]);
   return { character: m[2].split('-')[0], zone: body[1], needed: body[2] ? Number(body[2]) : null, message: body[3] || '' };
 }
@@ -151,7 +159,7 @@ function parseCta(line) {
 const ANY = /\[Guild Camp\] (.+?) — from ([^\s—]+)\s*$/;
 function parseGuildCamp(line) {
   const m = ANY.exec(String(line || '').replace(/\r$/, ''));
-  return m ? { what: m[1], from: m[2].split('-')[0] } : null;
+  return m && senderOk(line, m[2]) ? { what: m[1], from: m[2].split('-')[0] } : null;
 }
 
 function newestChatLog(installs) {

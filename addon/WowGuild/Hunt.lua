@@ -35,7 +35,23 @@ local function same(a, b)
 end
 
 -- ---------- the lists ----------
-function HU.kos()
+-- Both lists are rebuilt at most every CACHE seconds: nameplates and mouseovers ask many times a second.
+HU.CACHE = 5
+local cache = {}
+function HU.invalidate() cache = {} end
+local function cached(name, build)
+  local c = cache[name]
+  local t = (GetTime and ns.try(GetTime)) or now()
+  if c and t - c.at < HU.CACHE then return c.list end
+  local list = build()
+  cache[name] = { at = t, list = list }
+  return list
+end
+
+function HU.kos() return cached("kos", HU.buildKos) end
+function HU.bounties() return cached("bounties", HU.buildBounties) end
+
+function HU.buildKos()
   local sh, out = S(), {}
   if not sh then return out end
   for _, r in ipairs(sh.list("ko")) do
@@ -46,12 +62,20 @@ function HU.kos()
   return out
 end
 
-function HU.bounties()
+-- Open bounties, without the claimed ones: a player bounty pays its first kill, a zone bounty `cap` kills (the
+-- guild's kk records naming it; the app checks each the same way before paying).
+function HU.buildBounties()
   local sh, out, t = S(), {}, now()
   if not sh then return out end
+  local claims = {}
+  for _, k in ipairs(sh.list("kk")) do
+    local b = k.fields and k.fields.bounty
+    if b and b ~= "" then claims[b] = (claims[b] or 0) + 1 end
+  end
   for _, r in ipairs(sh.list("BT")) do
     local f = r.fields or {}
-    if f.state == "o" and (f.points or 0) > 0 and (f.ends or 0) > t and ((f.target or "") ~= "" or (f.zone or "") ~= "") then
+    local cap = (f.target or "") ~= "" and 1 or math.max(1, f.cap or 1)
+    if f.state == "o" and (f.points or 0) > 0 and (f.ends or 0) > t and ((f.target or "") ~= "" or (f.zone or "") ~= "") and (claims[r.key] or 0) < cap then
       out[#out + 1] = { key = r.key, target = f.target ~= "" and f.target or nil, zone = f.zone ~= "" and f.zone or nil,
         points = f.points, cap = f.cap or 1, ends = f.ends, note = f.note, t = r.t or 0 }
     end
@@ -88,10 +112,11 @@ function HU.check(unit)
   if UnitIsEnemy and not ns.try(UnitIsEnemy, "player", unit) then return nil end
   local okN, name = pcall(UnitName, unit)
   if not okN or type(name) ~= "string" then return nil end
+  local okK, key = pcall(function() return string.lower(proper(name) or name) end)
+  if not okK then return nil end
+  if alerted[key] and now() - alerted[key] < HU.ALERT_EVERY then return nil end
   local k, b = HU.onList(name), HU.bountyOn(name)
   if not k and not b then return nil end
-  local key = string.lower(proper(name) or name)
-  if alerted[key] and now() - alerted[key] < HU.ALERT_EVERY then return nil end
   alerted[key] = now()
   local lvl = UnitLevel and ns.try(UnitLevel, unit)
   local cls = UnitClass and ns.try(UnitClass, unit)
@@ -161,8 +186,9 @@ function HU.killed(text)
   local pid = sh.myPid and ns.try(sh.myPid)
   if not pid then return nil end
   local f = { pid = pid, target = victim, zone = string.sub(zone or "", 1, 60), at = now(), kos = k and 1 or 0, bounty = b and b.key or "" }
-  local ok = pcall(sh.putLocal, "kk", ns.randomKey(), f)
-  if not ok then return nil end
+  local called, res = pcall(sh.putLocal, "kk", ns.randomKey(), f)
+  if not called or not res then return nil end
+  HU.invalidate()
   local pts = (k and HU.KOS_POINTS or 0) + (b and b.points or 0)
   if ns.notice then ns.notice(string.format("%s slain! +%d season points%s", victim, pts, b and " (bounty)" or ""), 6) end
   ns.print(GOLD .. string.format("%s slain%s: +%d season points.", victim, b and (b.target and ", bounty claimed" or ", zone bounty") or " (kill on sight)", pts) .. "|r")
@@ -175,7 +201,9 @@ function HU.add(name, reason)
   local sh = S()
   local pid = sh and sh.myPid and ns.try(sh.myPid)
   if not name or not sh or not pid or type(sh.putLocal) ~= "function" then ns.print("Couldn't add that. Guild sharing starts a little after login: try again in a minute."); return false end
-  local ok = pcall(sh.putLocal, "ko", name, { pid = pid, reason = string.sub(reason or "", 1, 100), state = "o" })
+  local called, res = pcall(sh.putLocal, "ko", name, { pid = pid, reason = string.sub(reason or "", 1, 100), state = "o" })
+  local ok = called and res ~= nil and res ~= false
+  HU.invalidate()
   ns.print(ok and string.format("%s%s is now kill on sight for the guild.|r", RED, name) or "Couldn't add that name (letters only, no realm).")
   return ok
 end
@@ -186,7 +214,9 @@ function HU.remove(name)
   local sh = S()
   local pid = sh and sh.myPid and ns.try(sh.myPid)
   if not k or not pid then ns.print((name or "That player") .. " isn't on the kill-on-sight list."); return false end
-  local ok = pcall(sh.putLocal, "ko", k.name, { pid = pid, reason = k.reason or "", state = "x" })
+  local called, res = pcall(sh.putLocal, "ko", k.name, { pid = pid, reason = k.reason or "", state = "x" })
+  local ok = called and res ~= nil and res ~= false
+  HU.invalidate()
   ns.print(ok and (k.name .. " is off the list.") or "Couldn't change the list.")
   return ok
 end
@@ -239,3 +269,11 @@ ns.on("NAME_PLATE_UNIT_ADDED", function(unit) ns.safely(HU.check, unit) end)
 ns.on("PLAYER_TARGET_CHANGED", function() ns.safely(HU.check, "target") end)
 ns.on("UPDATE_MOUSEOVER_UNIT", function() ns.safely(HU.check, "mouseover") end)
 ns.on("CHAT_MSG_COMBAT_HONOR_GAIN", function(text) ns.safely(HU.killed, text) end)
+-- Guildmates' changes to the lists arrive through the sharing engine.
+ns.on("ADDON_LOADED", function(name)
+  if name ~= ADDON then return end
+  local sh = ns.Share
+  if type(sh) == "table" and type(sh.onRecord) == "function" then
+    sh.onRecord(function(rec) if type(rec) == "table" and (rec.type == "ko" or rec.type == "BT" or rec.type == "kk") then HU.invalidate() end end)
+  end
+end)

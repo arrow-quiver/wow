@@ -92,4 +92,8 @@ test('chat log: other Guild Camp lines (celebrations) come through as well', () 
   const { parseGuildCamp } = require('../src/main/live');
   assert.deepStrictEqual(parseGuildCamp('11/10 12:30:01.123  [Guild] Grom: [Guild Camp] Grom reached level 60! — from Grom-Zuljin'), { what: 'Grom reached level 60!', from: 'Grom' });
   assert.strictEqual(parseGuildCamp('[Guild] Grom: gz'), null);
+  // Someone else typing a Guild Camp line "from" me: not mine, nothing posted.
+  assert.strictEqual(parseGuildCamp('11/10 12:30:01.123  [Guild] Sneaky: [Guild Camp] Grom reached level 60! — from Grom'), null);
+  const { parseCta } = require('../src/main/live');
+  assert.strictEqual(parseCta('11/10 12:30:01.123  [Guild] Sneaky-Zuljin: [Guild Camp] Call to arms: Tarren Mill — from Grom'), null);
 });

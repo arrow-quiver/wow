@@ -148,3 +148,16 @@ test('the digest posts itself on Sunday evening from the Guild Master\'s app onl
   assert.strictEqual(await gm.ctx.services.guildlife.autoDigest(new Date(2026, 10, 15, 19, 0)), 'posted');
   assert.strictEqual(await gm.ctx.services.guildlife.autoDigest(new Date(2026, 10, 15, 20, 0)), 'already');
 });
+
+test('the digest on Sunday evening west of UTC is the week that is ending, not the new one', async (t) => {
+  const tz = process.env.TZ;
+  process.env.TZ = 'America/Los_Angeles';
+  t.after(() => { process.env.TZ = tz; });
+  const gm = await setupShare(t, { role: 'owner', webhook: 'https://discord.com/api/webhooks/1/x' });
+  gm.db.prepare("UPDATE memberships SET role = 'owner'").run();
+  // Sunday 15 November 2026, 19:00 in Los Angeles = Monday 03:00 UTC.
+  const sunday = new Date(2026, 10, 15, 19, 0);
+  assert.strictEqual(sunday.getUTCDay(), 1);
+  assert.strictEqual(await gm.ctx.services.guildlife.autoDigest(sunday), 'posted');
+  assert.deepStrictEqual(gm.db.prepare('SELECT week FROM digest_posts').all().map((r) => r.week), ['2026-11-09']);
+});
