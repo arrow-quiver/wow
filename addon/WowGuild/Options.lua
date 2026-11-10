@@ -9,6 +9,7 @@ ns.OPTION_LIST = {
   { key = "autoGuide", label = "Open the skill-up guide with my profession window" },
   { key = "trackerOnLogin", label = "Show my shopping list on login when it has items" },
   { key = "collectBank", label = "Share my bank and the guild bank with the guild" },
+  { key = "ahTab", label = "Show the Guild Camp list (shopping list and guild requests) at the auction house" },
   { key = "dealsPanel", label = "Show the Deal hunter next to the auction house" },
   { key = "coachTalents", label = "Show the Coach's talent guide next to the talent window" },
   { key = "seasonTooltips", label = "Show guildies' season titles and badges on their tooltips" },

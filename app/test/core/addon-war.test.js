@@ -25,22 +25,15 @@ __ns.Share = {
   get = function() return nil end,
 }`;
 
-// The combat log as the game hands it out: CombatLogGetCurrentEventInfo() during COMBAT_LOG_EVENT_UNFILTERED.
-// A fake GetTime so the "hurt by a player in the last 10 s" window can be stepped through.
+// The game's death recap (C_DeathRecap.GetRecapEvents) and the PvP flag: how War.lua tells a death to players.
 const COMBAT = `
-__now = 1000
-GetTime = function() return __now end
-__myGuid = "Player-4395-0A1B2C3D"
-UnitGUID = function(unit) if unit == "player" then return __myGuid end end
-__cl = {}
-CombatLogGetCurrentEventInfo = function() return unpack(__cl) end
-function __hit(sub, srcGuid, srcName, srcFlags)
-  __cl = { __now, sub, false, srcGuid, srcName, srcFlags, 0, __myGuid, "Grom", 0x511, 0 }
-  __fire("COMBAT_LOG_EVENT_UNFILTERED")
-end
-__ROGUE = { "Player-4395-0F0F0F0F", "Sneaky-Zuljin", 0x548 }
-__WOLF = { "Pet-0-4395-0-1-1234-0100ABCDEF", "Fang", 0x1148 }
-__OGRE = { "Creature-0-4395-0-1-2287-000ABC", "Crushridge Ogre", 0x10a48 }
+__flagged = true
+UnitIsPVP = function(unit) return __flagged end
+__recap = nil
+C_DeathRecap = { GetRecapEvents = function() return __recap end }
+__ROGUE = { sourceGUID = "Player-4395-0F0F0F0F", sourceName = "Sneaky" }
+__WOLF = { sourceGUID = "Pet-0-4395-0-1-1234-0100ABCDEF", sourceName = "Fang" }
+__OGRE = { sourceGUID = "Creature-0-4395-0-1-2287-000ABC", sourceName = "Crushridge Ogre" }
 `;
 
 function client() {
@@ -49,66 +42,68 @@ function client() {
   wow.login();
   wow.exec(SHARE);
   wow.exec(COMBAT);
+  wow.exec('__asks = 0; local orig = __ns.war.askForHelp; __ns.war.askForHelp = function(z) __asks = __asks + 1; orig(z) end');
   return wow;
 }
-const hit = (wow, sub, who) => wow.exec(`__hit("${sub}", unpack(${who}))`);
+
+test('no addon file registers the combat log event (the game refuses it as the addon loads and blocks the addon)', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const { ADDON_DIR, readToc } = require('./wowsim');
+  for (const f of readToc().files) {
+    const src = fs.readFileSync(path.join(ADDON_DIR, f), 'utf8').replace(/--[^\n]*/g, '');
+    assert.ok(!/COMBAT_LOG_EVENT/.test(src), `${f} must not use COMBAT_LOG_EVENT(_UNFILTERED)`);
+    assert.ok(!/CombatLogGetCurrentEventInfo/.test(src), `${f} must not read the combat log`);
+  }
+  const wow = new WowClient();
+  wow.login();
+  assert.strictEqual(wow.eval('tostring(__ns.war.combatEvent)'), 'nil');
+});
 
 test('dying to players in the open world marks the spot and offers to call the guild', () => {
   const wow = client();
-  const before = Number(wow.eval('__popups'));
-  hit(wow, 'SPELL_DAMAGE', '__ROGUE');
-  wow.exec('__now = __now + 3');
+  wow.exec('__recap = { __OGRE, __ROGUE }');
   wow.fire('PLAYER_DEAD');
   assert.strictEqual(wow.eval('#WowGuildDB.war.marks'), '1');
   assert.strictEqual(wow.eval('WowGuildDB.war.marks[1].x .. "," .. WowGuildDB.war.marks[1].y .. "," .. WowGuildDB.war.marks[1].kind'), '452,381,d');
   assert.strictEqual(wow.eval('WowGuildDB.war.maps[1424]'), 'Hillsbrad Foothills');
-  assert.strictEqual(Number(wow.eval('__popups')), before + 1);
-  // Accepting the popup sends a call to arms with the zone.
-  wow.exec('StaticPopupDialogs.WOWGUILD_CALL_HELP.OnAccept(nil, { zone = "Hillsbrad Foothills" })');
-  assert.strictEqual(wow.eval('__lastPut.type .. ":" .. __lastPut.fields.zone .. ":" .. __lastPut.fields.message'), 'ca:Hillsbrad Foothills:Died to players here. Help!');
-  // A player's pet counts as the player; a mob's last hit after it still makes it a death to players.
-  wow.exec('__now = __now + 120');
-  hit(wow, 'SWING_DAMAGE', '__WOLF');
-  wow.exec('__now = __now + 2');
-  hit(wow, 'SWING_DAMAGE', '__OGRE');
+  assert.strictEqual(wow.eval('__asks'), '1');
+  // Our own dialog, never Blizzard's StaticPopup (that taints Release Spirit and gets the addon blocked).
+  assert.strictEqual(wow.eval('tostring(StaticPopupDialogs and StaticPopupDialogs.WOWGUILD_CALL_HELP)'), 'nil');
+  assert.strictEqual(wow.eval('tostring(WowGuildHelpPrompt:IsShown())'), 'true');
+  wow.exec('WowGuildHelpPrompt.yes:GetScript("OnClick")()');
+  assert.strictEqual(wow.eval('tostring(WowGuildHelpPrompt:IsShown())'), 'false');
+  assert.strictEqual(wow.eval('__lastPut.type .. ":" .. __lastPut.fields.zone .. ":" .. __lastPut.fields.message'), 'ca:The Barrens:Died to players here. Help!', 'the zone the game says you are in');
+  // A player's pet counts as the player.
+  wow.exec('__recap = { __WOLF }');
   wow.fire('PLAYER_DEAD');
   assert.strictEqual(wow.eval('#WowGuildDB.war.marks'), '2');
-  assert.strictEqual(Number(wow.eval('__popups')), before + 2);
-  // warHelp off: the mark, no popup.
-  wow.exec('__now = __now + 120; WowGuildDB.options.warHelp = false');
-  hit(wow, 'RANGE_DAMAGE', '__ROGUE');
+  // No recap: flagged in a contested zone counts.
+  wow.exec('__recap = nil');
   wow.fire('PLAYER_DEAD');
-  assert.strictEqual(Number(wow.eval('__popups')), before + 2);
   assert.strictEqual(wow.eval('#WowGuildDB.war.marks'), '3');
+  assert.strictEqual(wow.eval('__asks'), '3');
+  // warHelp off: the mark, no dialog.
+  wow.exec('WowGuildDB.options.warHelp = false; __recap = { __ROGUE }');
+  wow.fire('PLAYER_DEAD');
+  assert.strictEqual(wow.eval('__asks'), '3');
+  assert.strictEqual(wow.eval('#WowGuildDB.war.marks'), '4');
   assert.strictEqual(wow.eval('__ns.debugError'), null);
 });
 
-test('dying to a mob in a contested zone is no PvP death: no mark, no popup', () => {
+test('dying to a mob, or unflagged, or in a sanctuary is no PvP death: no mark, no dialog', () => {
   const wow = client();
-  const before = Number(wow.eval('__popups'));
-  hit(wow, 'SWING_DAMAGE', '__OGRE');
+  wow.exec('__recap = { __OGRE }');
   wow.fire('PLAYER_DEAD');
-  // A player hit me, but over 10 s before the mob finished me.
-  wow.exec('__now = __now + 60');
-  hit(wow, 'SPELL_DAMAGE', '__ROGUE');
-  wow.exec('__now = __now + 11');
-  hit(wow, 'SWING_DAMAGE', '__OGRE');
+  wow.exec('__recap = nil; __flagged = false');
   wow.fire('PLAYER_DEAD');
-  // A player's heal on me, or my own damage, isn't a fight either.
-  wow.exec('__now = __now + 60');
-  hit(wow, 'SPELL_HEAL', '__ROGUE');
-  wow.exec('__cl = { __now, "SPELL_DAMAGE", false, __myGuid, "Grom", 0x511, 0, __myGuid, "Grom", 0x511, 0 }; __fire("COMBAT_LOG_EVENT_UNFILTERED")');
+  wow.exec('__flagged = true; __pvp = "sanctuary"');
   wow.fire('PLAYER_DEAD');
-  // Damage a player did to someone else.
-  wow.exec('__cl = { __now, "SPELL_DAMAGE", false, __ROGUE[1], __ROGUE[2], __ROGUE[3], 0, "Player-1-2", "Other", 0x511, 0 }; __fire("COMBAT_LOG_EVENT_UNFILTERED")');
+  // A recap the game won't let us read (secret values) falls back to the flag and zone.
+  wow.exec('__pvp = "friendly"; C_DeathRecap.GetRecapEvents = function() error("secret") end');
   wow.fire('PLAYER_DEAD');
   assert.strictEqual(wow.eval('WowGuildDB.war and #WowGuildDB.war.marks or 0'), '0');
-  assert.strictEqual(Number(wow.eval('__popups')), before);
-  // Without the combat log API (an old client), deaths are simply not marked.
-  wow.exec('CombatLogGetCurrentEventInfo = nil');
-  hit(wow, 'SPELL_DAMAGE', '__ROGUE');
-  wow.fire('PLAYER_DEAD');
-  assert.strictEqual(wow.eval('WowGuildDB.war and #WowGuildDB.war.marks or 0'), '0');
+  assert.strictEqual(wow.eval('__asks'), '0');
   assert.strictEqual(wow.eval('__ns.debugError'), null);
 });
 
@@ -136,11 +131,9 @@ test('honorable kills are read with the game\'s own (translated) honor strings',
 
 test('no mark inside an instance or without a position', () => {
   const wow = client();
-  wow.exec('__inInstance = true; __instanceType = "pvp"');
-  hit(wow, 'SPELL_DAMAGE', '__ROGUE');
+  wow.exec('__recap = { __ROGUE }; __inInstance = true; __instanceType = "pvp"');
   wow.fire('PLAYER_DEAD');
   wow.exec('__inInstance = false; __pos = { x = 0, y = 0 }');
-  hit(wow, 'SPELL_DAMAGE', '__ROGUE');
   wow.fire('PLAYER_DEAD');
   assert.strictEqual(wow.eval('WowGuildDB.war and #WowGuildDB.war.marks or 0'), '0');
 });
@@ -179,8 +172,8 @@ test("the world map shows the guild's marks of the last week for the map on scre
       { author = "Grommash", fields = { marks = { { map = 1424, x = 500, y = 500, at = t - 60, kind = "d" }, { map = 1440, x = 1, y = 1, at = t - 60, kind = "k" } } } },
       { author = "Jaina", fields = { marks = { { map = 1424, x = 100, y = 200, at = t - 3600, kind = "k" }, { map = 1424, x = 9, y = 9, at = t - 9 * 86400, kind = "d" } } } },
     }
-    WowGuildWarPins.GetWidth = function() return 1000 end
-    WowGuildWarPins.GetHeight = function() return 667 end
+    WorldMapFrame.canvas.GetWidth = function() return 1000 end
+    WorldMapFrame.canvas.GetHeight = function() return 667 end
     WorldMapFrame:Show()`);
   assert.strictEqual(wow.eval('#__ns.war.marksFor(1424)'), '2');
   assert.strictEqual(wow.eval('__ns.war.marksFor(1424)[1].who'), 'Grommash');

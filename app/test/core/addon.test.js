@@ -450,7 +450,7 @@ test('Settings tab: options apply immediately, app link and update notice shown'
   assert.strictEqual(text(wow, 'WowGuildMinimapButton:IsShown()'), 'true');
   // Every option has a box, in the same order as the Blizzard options panel.
   assert.strictEqual(wow.eval(`#${page}.boxes`), wow.eval('#__ns.OPTION_LIST'));
-  assert.strictEqual(wow.eval('#__ns.OPTION_LIST'), '14');
+  assert.strictEqual(wow.eval('#__ns.OPTION_LIST'), '15');
   wow.exec('__ns.optionsPanel.scripts.OnShow()');
   assert.strictEqual(text(wow, '__ns.optionsPanel.boxes[2]:GetChecked()'), 'true');
   wow.exec('__ns.optionsPanel.boxes[2]:SetChecked(false); __click(__ns.optionsPanel.boxes[2])');
