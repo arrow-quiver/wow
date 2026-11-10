@@ -87,3 +87,9 @@ test('chat log: my calls to arms are read as they are written', () => {
   w.tick();
   assert.deepStrictEqual(seen, [{ character: 'Grom', zone: 'Southshore', needed: null, message: 'ganked' }]);
 });
+
+test('chat log: other Guild Camp lines (celebrations) come through as well', () => {
+  const { parseGuildCamp } = require('../src/main/live');
+  assert.deepStrictEqual(parseGuildCamp('11/10 12:30:01.123  [Guild] Grom: [Guild Camp] Grom reached level 60! — from Grom-Zuljin'), { what: 'Grom reached level 60!', from: 'Grom' });
+  assert.strictEqual(parseGuildCamp('[Guild] Grom: gz'), null);
+});

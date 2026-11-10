@@ -31,6 +31,7 @@ const { applyCoach, inboxPart } = require('./coach');
 const { applyEconomy, latestPrices } = require('./economy');
 const deals = require('./deals');
 const seasons = require('./seasons');
+const celebrate = require('./celebrate');
 const { toLua } = require('../../shared/lua');
 const sharing = require('../sharing');
 const readiness = require('../readiness');
@@ -372,6 +373,8 @@ function buildInbox(db, guildId, userId, { ctx = null } = {}) {
     deals: inboxDeals(db, guildId),
     // Seasons: titles and badges by character name, for the addon's player tooltips (services/seasons.js).
     seasons: seasons.inboxPart(db, guildId),
+    // Today's anniversaries in the guild, for a toast at login (services/celebrate.js).
+    today: celebrate.inboxPart(db, guildId),
     // Sharing (docs/SHARING.md §9): changes for the addon to send, who I am, and a seed for a store far behind.
     outbox: sharing.exportOutbox(db),
     me: sharing.exportMe(db),
@@ -386,7 +389,7 @@ function emptyInbox() {
   return {
     guild: '', prices: [], stock: [], holdings: [], crafters: [], raids: [], generatedAt: Math.floor(Date.now() / 1000),
     announcements: [], canCraft: [], myRequests: [], buddies: [], coach: { plans: {}, answers: [], pending: 0, enabled: false }, outbox: [],
-    seasons: { month: '', players: {} }, seed: [],
+    seasons: { month: '', players: {} }, today: { date: '', lines: [] }, seed: [],
   };
 }
 
