@@ -110,7 +110,11 @@ end
 H.lastZoneNote = {}
 function H.zoneChanged()
   if ns.opt("radar") == false then return nil end
-  if GuildRoster then ns.try(GuildRoster) elseif C_GuildInfo and C_GuildInfo.GuildRoster then ns.try(C_GuildInfo.GuildRoster) end
+  -- Ask the server for a fresh roster at most once a minute (the game throttles it too).
+  if not H.rosterAt or now() - H.rosterAt >= 60 then
+    H.rosterAt = now()
+    if C_GuildInfo and C_GuildInfo.GuildRoster then ns.try(C_GuildInfo.GuildRoster) elseif GuildRoster then ns.try(GuildRoster) end
+  end
   local list, zone = H.nearby()
   if #list == 0 or (H.lastZoneNote[zone] and now() - H.lastZoneNote[zone] < 600) then return nil end
   H.lastZoneNote[zone] = now()
@@ -169,7 +173,7 @@ local function remind(key, text)
   if reminded[key] and now() - reminded[key] < H.REMIND_EVERY then return false end
   reminded[key] = now()
   ns.print("|cffe8a33dReminder:|r " .. text)
-  if UIErrorsFrame and UIErrorsFrame.AddMessage then ns.try(UIErrorsFrame.AddMessage, UIErrorsFrame, text, 1, 0.82, 0.3) end
+  if ns.notice then ns.notice(text) end
   return true
 end
 H.remind = remind

@@ -134,7 +134,7 @@ function pages.camp(page)
   sync:SetPoint("BOTTOMLEFT", 0, 0)
   sync:SetScript("OnClick", function()
     ns.collectAll("button")
-    StaticPopup_Show("WOWGUILD_RELOAD_NOW")
+    ns.offerReload()
   end)
   local hint = label(page, "Saves everything and reloads so the Guild Camp app uploads it.", "GameFontDisableSmall")
   hint:SetPoint("LEFT", sync, "RIGHT", 10, 0)
@@ -214,7 +214,7 @@ function pages.prof(page)
   local trackBtn = button(page, "Show shopping list", 160); trackBtn:SetPoint("LEFT", guideBtn, "RIGHT", 8, 0)
   trackBtn:SetScript("OnClick", function() P.toggleTracker(); page.refresh() end)
   local clearBtn = button(page, "Clear list", 100); clearBtn:SetPoint("LEFT", trackBtn, "RIGHT", 8, 0)
-  clearBtn:SetScript("OnClick", function() StaticPopup_Show("WOWGUILD_CLEAR_LIST") end)
+  clearBtn:SetScript("OnClick", function() ns.confirm("Empty your shopping list?", "Empty it", "Keep it", function() ns.prof.clearList() end) end)
 
   local head = label(page, "Shopping list", "GameFontNormal"); head:SetPoint("TOPLEFT", 0, -84)
   page.rows = {}
@@ -461,13 +461,6 @@ function W.refreshIfShown()
   if win and win:IsShown() and W.current then win.pages[W.current].refresh() end
 end
 
-StaticPopupDialogs["WOWGUILD_CLEAR_LIST"] = {
-  text = "Empty your shopping list?",
-  button1 = "Empty it",
-  button2 = "Keep it",
-  OnAccept = function() ns.prof.clearList() end,
-  timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
-}
 
 -- ---------- minimap button ----------
 local mini

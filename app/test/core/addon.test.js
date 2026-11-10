@@ -359,10 +359,18 @@ test('Sync now saves and offers the reload', () => {
   const wow = uiClient();
   wow.exec('__ns.ui.show("camp"); __popups = 0; WowGuildDB.roster = { members = {} }');
   wow.click('WowGuildWindow.pages.camp.sync');
-  assert.strictEqual(wow.eval('__popups'), '1');
+  // Our own dialog, never Blizzard's StaticPopup.
+  assert.strictEqual(wow.eval('__popups'), '0');
+  assert.strictEqual(text(wow, 'WowGuildConfirm:IsShown()'), 'true');
+  assert.match(wow.eval('WowGuildConfirm.text:GetText()'), /^Reload now so the Guild Camp app gets your latest data\?/);
+  wow.exec('__reloads = 0; ReloadUI = function() __reloads = __reloads + 1 end');
+  wow.click('WowGuildConfirm.yes');
+  assert.strictEqual(wow.eval('__reloads'), '1');
   assert.strictEqual(wow.eval('#WowGuildDB.roster.members'), '3', 'everything saved first');
   wow.slash('sync');
-  assert.strictEqual(wow.eval('__popups'), '2');
+  assert.strictEqual(text(wow, 'WowGuildConfirm:IsShown()'), 'true');
+  wow.click('WowGuildConfirm.no');
+  assert.strictEqual(wow.eval('__reloads'), '1', 'Later: no reload');
   assert.match(wow.printed(), /Data saved\. Reload or log out and the Guild Camp app will upload it\./);
 });
 

@@ -291,16 +291,11 @@ function ns.ctaArrived(rec, how, from)
   if ns.ui and ns.ui.refreshIfShown then ns.ui.refreshIfShown() end
 end
 
-StaticPopupDialogs["WOWGUILD_RELOAD_NOW"] = {
-  text = "Reload now so the Guild Camp app gets your latest data?\nIt takes a few seconds.",
-  button1 = "Reload now",
-  button2 = "Later",
-  OnAccept = function() if not InCombatLockdown() then ReloadUI() end end,
-  timeout = 20,
-  whileDead = true,
-  hideOnEscape = true,
-  preferredIndex = 3,
-}
+-- Offers a reload so the app gets the latest data (our own dialog: see ns.confirm in Skin.lua).
+function ns.offerReload()
+  return ns.confirm("Reload now so the Guild Camp app gets your latest data?\nIt takes a few seconds.", "Reload now", "Later",
+    function() if not (InCombatLockdown and InCombatLockdown()) then ReloadUI() end end, 20)
+end
 
 -- ---------- slash commands ----------
 SLASH_WOWGUILD1 = "/wow"
@@ -325,7 +320,7 @@ local function slash(input)
   elseif cmd == "sync" then
     ns.collectAll("manual")
     ns.print("Data saved. Reload or log out and the Guild Camp app will upload it.")
-    StaticPopup_Show("WOWGUILD_RELOAD_NOW")
+    ns.offerReload()
   elseif cmd == "status" then
     local c = ns.db.characters[ns.charKey()] or {}
     local profs = c.professions and #c.professions or 0

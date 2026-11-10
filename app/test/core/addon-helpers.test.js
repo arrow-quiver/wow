@@ -76,10 +76,14 @@ C_Container.GetContainerNumFreeSlots = function(bag) return bag == 0 and 1 or 0 
 GetUnspentTalentPoints = function() return 2 end`);
   wow.exec('__ns.helpers.resetReminders(); __r = __ns.helpers.check()');
   assert.strictEqual(wow.eval('table.concat(__r, ",")'), 'raid,repair,bags,talents');
-  assert.ok(wow.notices.some((n) => /^Onyxia starts in 40 minutes/.test(n.text)));
-  assert.ok(wow.notices.some((n) => n.text === 'Your gear is at 10%: repair before it breaks.'));
-  assert.ok(wow.notices.some((n) => n.text === 'Only 1 bag slot left.'));
-  assert.ok(wow.notices.some((n) => /^You have 2 talent points to spend/.test(n.text)));
+  const said = wow.printed();
+  assert.match(said, /Reminder:.*Onyxia starts in 40 minutes/);
+  assert.match(said, /Reminder:.*Your gear is at 10%: repair before it breaks\./);
+  assert.match(said, /Reminder:.*Only 1 bag slot left\./);
+  assert.match(said, /Reminder:.*You have 2 talent points to spend/);
+  // On screen in our own frame, never Blizzard's error frame.
+  assert.strictEqual(wow.eval('WowGuildNotice:IsShown() and "yes" or "no"'), 'yes');
+  assert.strictEqual(wow.notices.length, 0);
   assert.strictEqual(wow.eval('#__ns.helpers.check()'), '0');
   wow.exec('__ns.helpers.resetReminders(); WowGuildDB.options.reminders = false');
   assert.strictEqual(wow.eval('#__ns.helpers.check()'), '0');

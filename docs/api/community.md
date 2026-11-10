@@ -373,7 +373,7 @@ Queues the post's tombstone. A post from before sharing just closes here.
 character): levels 20, 30, 40, 50 and 60; an epic or legendary item looted; a profession reaching 150, 225 or 300;
 learning to ride; a new PvP rank. Guildmates' addons show a toast, and at level 60 a huge Horde banner across the
 screen ("LOK'TAR OGAR!"). When someone joins the guild, everyone gets a toast with **Say welcome**; officers also get
-**Welcome kit**, which whispers the newcomer the guide and the app download, picks a guild buddy (the online
+**Welcome kit**, which whispers the newcomer how to open the guild window (no links or ads), picks a guild buddy (the online
 guildmate closest in level) and says the welcome in guild chat.
 
 ### `POST /api/celebrate` (guild)
