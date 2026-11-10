@@ -92,32 +92,39 @@ function W.record(pid)
 end
 
 -- ---------- dying to players: the mark, and a call for help ----------
--- A death counts as PvP when a player, or something a player controls (a pet, a totem), hurt me in the last
--- PVP_WINDOW seconds: in a contested zone most deaths are still to mobs. Remembered from the combat log.
-W.PVP_WINDOW = 10
-local TYPE_PLAYER = COMBATLOG_OBJECT_TYPE_PLAYER or 0x400
-local CONTROL_PLAYER = COMBATLOG_OBJECT_CONTROL_PLAYER or 0x100
-local lastPlayerHit -- GetTime() of the last damage a player-controlled source did to me
-
--- Bit test without the bit library (flags are small positive integers; a bit is a power of two).
-local function hasFlag(flags, bitValue)
-  return type(flags) == "number" and math.floor(flags / bitValue) % 2 == 1
+-- Was this death to players? Addons can't read the combat log here: registering COMBAT_LOG_EVENT_UNFILTERED is
+-- refused outright ("blocked from an action only available to the Blizzard UI", as the addon loads). So:
+--   1. the game's death recap, when it has one: a player, or a player's pet, among what hit me;
+--   2. else: I'm flagged for PvP in a zone where players fight (contested, enemy or combat zones).
+-- The app's live link reads the combat log file the game writes and knows exactly; this is the in-game best guess.
+local function isPlayerGuid(g)
+  if type(g) ~= "string" then return false end
+  local ok, yes = pcall(function() return string.find(g, "^Player%-") ~= nil or string.find(g, "^Pet%-") ~= nil end)
+  return ok and yes
 end
 
-local function clock() return (GetTime and ns.try(GetTime)) or time() end
+local function recapSays()
+  local dr = C_DeathRecap
+  if not dr or not dr.GetRecapEvents then return nil end
+  local ok, events = pcall(dr.GetRecapEvents)
+  if not ok or type(events) ~= "table" or #events == 0 then return nil end
+  for _, e in ipairs(events) do
+    if type(e) == "table" and (isPlayerGuid(e.sourceGUID) or isPlayerGuid(e.srcGUID)) then return true end
+  end
+  return false
+end
 
-function W.combatEvent()
-  if not CombatLogGetCurrentEventInfo then return end
-  -- This runs for every line of the combat log around me: the cheapest test (is it about me?) first.
-  local _, sub, _, srcGUID, _, srcFlags, _, dstGUID = CombatLogGetCurrentEventInfo()
-  local me = UnitGUID and UnitGUID("player")
-  if not me or dstGUID ~= me or srcGUID == me then return end
-  if type(sub) ~= "string" or not string.find(sub, "_DAMAGE$") then return end
-  if hasFlag(srcFlags, TYPE_PLAYER) or hasFlag(srcFlags, CONTROL_PLAYER) then lastPlayerHit = clock() end
+local function pvpArea()
+  if not (UnitIsPVP and ns.try(UnitIsPVP, "player")) then return false end
+  local get = (C_PvP and C_PvP.GetZonePVPInfo) or GetZonePVPInfo
+  local kind = get and ns.try(get)
+  return kind == "contested" or kind == "hostile" or kind == "combat"
 end
 
 function W.killedByPlayers()
-  return lastPlayerHit ~= nil and clock() - lastPlayerHit <= W.PVP_WINDOW
+  local r = recapSays()
+  if r ~= nil then return r end
+  return pvpArea()
 end
 
 -- Our own small dialog, not Blizzard's StaticPopup: an addon popup in StaticPopup's shared frames can taint them, and
@@ -158,7 +165,6 @@ end
 -- → the mark, or nil (not killed by players, or outside the open world).
 function W.died()
   if not W.killedByPlayers() then return nil end
-  lastPlayerHit = nil
   local m = W.mark("d")
   if not m or ns.opt("warHelp") == false then return m end
   local zone = (GetZoneText and ns.try(GetZoneText)) or mapName(m.map) or "the open world"
@@ -190,7 +196,6 @@ function W.isHonorKill(text)
   return not known and string.find(string.lower(text), "honorable kill", 1, true) ~= nil
 end
 
-ns.on("COMBAT_LOG_EVENT_UNFILTERED", function() ns.safely(W.combatEvent) end)
 ns.on("PLAYER_DEAD", function() ns.safely(W.died) end)
 ns.on("CHAT_MSG_COMBAT_HONOR_GAIN", function(text)
   if W.isHonorKill(text) then ns.safely(W.mark, "k") end
