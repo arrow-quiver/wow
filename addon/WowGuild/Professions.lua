@@ -225,6 +225,109 @@ function P.rank(recipes, limit)
   return out
 end
 
+-- ---------- the leveling plan ----------
+-- The cheapest way to the next PLAN_POINTS skill points with the recipes you know, step by step. Mats count as
+-- free from your bags first, then your alts, then the guild bank (ask for them), and are bought for the rest.
+-- Orange and yellow recipes only, and at most PER_RECIPE points from one (it turns easier as you level, so the
+-- plan is for the next few points: open the profession again to plan the next ones).
+P.PLAN_POINTS = 10
+P.PER_RECIPE = 5
+
+-- → rank, max of the open profession (classic GetTradeSkillLine), or nil.
+function P.skillRank()
+  if GetTradeSkillLine then
+    local _, rank, max = ns.try(GetTradeSkillLine)
+    if type(rank) == "number" and type(max) == "number" then return rank, max end
+  end
+end
+
+local function pools(recipes, stockOf)
+  local pool = {}
+  for _, r in ipairs(recipes) do
+    for _, g in ipairs(r.reagents or {}) do
+      if not pool[g.id] then
+        local s = stockOf(g.id)
+        pool[g.id] = { bags = P.owned(g.id), alts = s and s.alts or 0, bank = s and s.guildBank or 0 }
+      end
+    end
+  end
+  return pool
+end
+
+-- One craft's cost with what's left in the pool (nothing taken). → copper to buy, unknown?
+local function oneCost(r, pool)
+  local cost, unknown = 0, false
+  for _, g in ipairs(r.reagents or {}) do
+    local p = pool[g.id]
+    local free = p and (p.bags + p.alts + p.bank) or 0
+    local buy = math.max(0, g.qty - free)
+    if buy > 0 then
+      local price = P.price(g.id)
+      if price then cost = cost + price * buy else unknown = true end
+    end
+  end
+  return cost, unknown
+end
+
+local function take(r, pool, out)
+  for _, g in ipairs(r.reagents or {}) do
+    local p = pool[g.id] or { bags = 0, alts = 0, bank = 0 }
+    local left = g.qty
+    for _, src in ipairs({ "bags", "alts", "bank" }) do
+      local n = math.min(left, p[src]); p[src] = p[src] - n; left = left - n
+      if n > 0 and src ~= "bags" then out[src][g.id] = (out[src][g.id] or 0) + n end
+    end
+    if left > 0 then
+      out.buy[g.id] = (out.buy[g.id] or 0) + left
+      local price = P.price(g.id)
+      if price then out.cost = out.cost + price * left else out.unknown = true end
+    end
+    out.names[g.id] = out.names[g.id] or g.name
+  end
+end
+
+-- → { goal, points, cost, unknown, steps = { { recipe, crafts, points } }, buy, alts, bank, names }
+function P.plan(recipes, goal)
+  local rank, max = P.skillRank()
+  goal = goal or P.PLAN_POINTS
+  if rank and max then goal = math.max(0, math.min(goal, max - rank)) end
+  local cands = {}
+  for _, r in ipairs(recipes or {}) do
+    local pts = (P.EXPECT[r.diff] or 0) * (r.skillUps or 1)
+    if pts > 0 and (r.diff or 3) <= 1 then cands[#cands + 1] = { recipe = r, per = pts, got = 0, crafts = 0 } end
+  end
+  local out = { goal = goal, points = 0, cost = 0, unknown = false, steps = {}, buy = {}, alts = {}, bank = {}, names = {} }
+  local pool = pools(recipes or {}, function(id) return P.stockElsewhere and P.stockElsewhere(id) end)
+  local guard = 0
+  while out.points < goal - 1e-9 and guard < 200 do
+    guard = guard + 1
+    local best, bestCost, bestUnknown
+    for _, c in ipairs(cands) do
+      if c.got < P.PER_RECIPE then
+        local cost, unknown = oneCost(c.recipe, pool)
+        local per = cost / c.per
+        if not best or (unknown ~= bestUnknown and not unknown) or (unknown == bestUnknown and per < bestCost) then
+          best, bestCost, bestUnknown = c, per, unknown
+        end
+      end
+    end
+    if not best then break end
+    take(best.recipe, pool, out)
+    best.crafts = best.crafts + 1
+    best.got = best.got + best.per
+    out.points = out.points + best.per
+    if best.crafts == 1 then out.steps[#out.steps + 1] = best end
+  end
+  for i, c in ipairs(out.steps) do out.steps[i] = { recipe = c.recipe, crafts = c.crafts, points = c.got } end
+  out.points = math.floor(out.points * 10 + 0.5) / 10
+  return out
+end
+
+-- Every step of a plan onto the shopping list.
+function P.planToList(plan)
+  for _, s in ipairs((plan and plan.steps) or {}) do P.addToList(s.recipe, s.crafts) end
+end
+
 -- ---------- shopping list ----------
 function P.list()
   ns.db.shopping = ns.db.shopping or {}
@@ -292,6 +395,8 @@ local function stockElsewhere(id)
   end
   return inboxStock[id]
 end
+
+P.stockElsewhere = stockElsewhere
 
 -- { {id, name, need, have, alts, guildBank, done} } sorted with unfinished first.
 function P.remaining()

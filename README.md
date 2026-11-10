@@ -91,6 +91,13 @@ after a death in a PvP area calls the guild to arms in one click; the overlay an
 **Call for help** button for Discord. Every death and honorable kill in the open world goes on the guild's war map:
 pins on the in-game world map, and the **War** page with hotspots and your nemeses (the players who keep killing you).
 
+**Leveling plan, price alerts and mats for crafts.** In the skill-up guide, **Plan next points** works out the
+cheapest way to your next skill points with the recipes you know: mats from your bags first, then your alts, then
+the guild bank, buying the rest. One click puts the plan on your shopping list. At the auction house, anything on
+your buy list (shopping-list mats and guild bank requests) listed under its usual price lights up, or under your
+own target (`/wow alert 50s Wool Cloth`). If you hold mats a guildie's shopping list is short of, or can craft
+something a guildie asked for, you hear about it once a day; `/wow mats` lists them with a whisper button.
+
 **Raid boss kills and attendance.** When a raid boss dies, your addon records who of the guild was in the raid (one
 record per kill, however many raiders have the addon). That counts as raid attendance for season points at once,
 shows on the raid's page, ticks the right people when an officer closes the raid, and cheers on Discord
@@ -163,6 +170,8 @@ The addon works on its own, and does much more with the app:
 | `/wow coach` | Open the Coach |
 | `/wow season` | This month's guild season: the top five and your place |
 | `/wow quests [dungeon]` | The dungeon quest checklist: yours, ones to pick up, and who in your group has each |
+| `/wow alert <price> <item>` | A price alert at the auction house (`/wow alerts` lists them) |
+| `/wow mats` | Mats guildies are short of that you hold, and crafts they want that you can make |
 | `/wow kos` | The kill-on-sight list; `/wow kos add Name reason`, `/wow kos remove Name` |
 | `/wow bounties` | Open bounties |
 | `/wow war` | Your war map marks; `/wow war off` hides the guild's deaths and kills on the world map |

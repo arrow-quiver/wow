@@ -33,6 +33,8 @@ War.lua
 Hunt.lua
 BossKills.lua
 DungeonQuests.lua
+PriceAlerts.lua
+Mats.lua
 Seasons.lua
 Celebrate.lua
 Welcome.lua

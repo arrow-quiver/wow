@@ -95,7 +95,7 @@ test('the Lua type table and constants mirror sharing.js', () => {
   const L = luaCodec();
   assert.equal(L.text(`local n = 0 for _ in pairs(SC.TYPES) do n = n + 1 end return string.format("%d", n)`), String(Object.keys(S.TYPES).length));
   // Every type of §4.3 is present, in the right space.
-  const spec = ['ch', 'rc', 'su', 'cr', 'cl', 'lp', 'ek', 'ko', 'kk', 'bb', 'ca', 'dg', 'dj', 'dc', 'bq', 'gb', 'bk', 'sh', 'pr', 'wm', 'RD', 'RT', 'LA', 'LL', 'LY', 'BT', 'AN', 'DR', 'BH', 'BC', 'ST', 'CFG', 'WH'];
+  const spec = ['ch', 'rc', 'su', 'cr', 'cl', 'lp', 'ek', 'ko', 'kk', 'bb', 'ca', 'dg', 'dj', 'dc', 'bq', 'gb', 'bk', 'sh', 'mw', 'pr', 'wm', 'RD', 'RT', 'LA', 'LL', 'LY', 'BT', 'AN', 'DR', 'BH', 'BC', 'ST', 'CFG', 'WH'];
   assert.deepEqual(Object.keys(S.TYPES).sort(), spec.slice().sort());
   for (const t of spec) assert.equal(S.TYPES[t].space, t === t.toUpperCase() ? 'officer' : 'member');
   assert.equal(S.bucket('WH:1'), null, 'WH has no bucket');

@@ -98,6 +98,7 @@ function summaryOf(recIn, lookup) {
     case 'LL': return removed(`Loot list for ${clip(f.name, 50) || 'an instance'}`);
     case 'LY': return 'SR+ checkpoint';
     case 'AN': return del ? 'Notice: removed' : `Notice: ${clip(f.body, 50)}`;
+    case 'mw': return del ? 'Mats wanted: removed' : `Mats wanted: ${num((f.items || []).length)} item${(f.items || []).length === 1 ? '' : 's'}`;
     case 'ek': return del ? 'Boss kill: removed' : `Boss kill: ${f.boss || '?'}${f.instance ? ` (${f.instance})` : ''}`;
     case 'ko': return del ? 'Kill on sight: removed' : `Kill on sight: ${r.key}${f.state === 'x' ? ' (taken off)' : ''}`;
     case 'kk': return del ? 'Kill: removed' : `Kill: ${f.target || 'someone'}${f.bounty ? ' (bounty)' : f.kos ? ' (kill on sight)' : ''}`;

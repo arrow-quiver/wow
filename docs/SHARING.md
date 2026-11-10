@@ -249,6 +249,7 @@ RT:k3f9a2^wzltl343^Grommash^^d^tob9c0^r^4kq1zm^tobn80^Thrallia.p4m7,d72,eim;Zulj
 | `gb` guild bank | tab `0`–`8` | any member who scanned | tab 0: scannedAt, money, tab names, last 25 log lines; tabs 1–8: `id,count;…` | | 30 d | 1.5 KB |
 | `bk` bank character stock | name | that character, while listed in `BC` | bags and bank `id,count;…` | | 30 d | 2 KB |
 | `sh` shopping list | pid | a character of pid | `name,qty,skill;…` (≤ 20) | | 30 d | 1 KB |
+| `mw` mats wanted | pid | that player | items (id, qty): what the shopping list still lacks, up to 15 | | 7 d | 400 |
 | `wm` war marks | pid | a character of pid; at most every 5 min | marks `map,x,y,at,kind,n;…` (≤ 30; x, y in thousandths, kind `d`/`k`), maps `id,name;…` (≤ 12) | | 30 d | 1.25 KB |
 | `pr` prices | pid | a character of pid | scan day, `id,copper;…` (≤ 60 reagents and bank items) | | 14 d | 800 |
 | `RD` raid or event | random | officer; never rewritten | kind `r`/`p`/`e`, title, instance, startsAt, minutes, size, srLimit, notes | | startsAt + 45 d | 600 |
@@ -1007,6 +1008,7 @@ pid (`<name>.<4 base36>`), tab (`0`–`8`), `1`.
 | `gb` | tab `1`–`8` | items [(id, count: int)] ≤ 98 |
 | `bk` | name | bags [(id, count: int)] ≤ 200, bank [(id, count: int)] ≤ 300 |
 | `sh` | pid | items [(name text(100), qty int, skill int)] ≤ 20 |
+| `mw` | pid | items list(15) of id int, qty int |
 | `wm` | pid | marks [(map int, x int, y int, at int, kind text(1), n int)] ≤ 30, maps [(id int, name text(40))] ≤ 12 |
 | `ST` | one | items [(key text(6), item text(60), id int, cost int, stock int)] ≤ 25 |
 | `pr` | pid | day int, prices [(id, copper: int)] ≤ 60 |
