@@ -245,7 +245,7 @@ Windows is the main target.
 
 ```bash
 npm install                    # at the repo root; also installs app/
-GUILDCAMP_NO_SCAN=1 npm test   # every test: node --test "app/test/**/*.test.{js,mjs}"
+GUILDCAMP_NO_SCAN=1 npm test   # every test: node --max-old-space-size=4096 --test (the simulated-guild tests need the memory)
 ```
 
 Run the app from `app/`, always with a scratch profile and without scanning your real game folders:

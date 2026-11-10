@@ -452,3 +452,12 @@ Any day of the week; this week by default.
 `{ "week"?: "YYYY-MM-DD", "force"?: true }` → `{ "ok": true, "posted": true, "message": "The weekly digest is on Discord." }`
 (`posted: false` when it already went out and `force` isn't set).
 - Not an officer → `403`; no webhook → `409`; Discord refused → `502`.
+
+### Celebrations: safeguards
+- A moment reached in a dungeon or battleground waits (up to 5) and goes to guild chat when you leave, so it isn't lost.
+- Only real loot lines count as looted (the game's own `LOOT_ITEM_SELF` strings), not quest rewards or crafts.
+- The welcome kit's buddy is the online guildmate closest in level to the newcomer.
+- The app posts a chat-log line to Discord only when its sender is the character it says it's from, so nobody can
+  post to your Discord by typing a Guild Camp line in your name. The same line twice makes one activity entry, and a
+  failed Discord post can be tried again at once.
+- The weekly digest posted on Sunday evening is the week of the local Sunday, also west of UTC.

@@ -88,7 +88,8 @@ function register(app, ctx) {
     const g = ctx.guild && ctx.guild();
     const m = identity.myMembership(db);
     if (!g || !m || m.role !== 'owner') return null;
-    return G.post(db, ctx, g.id, G.weekOf(now.getTime()));
+    // The week of the local Sunday (west of UTC, Sunday evening is already Monday in UTC).
+    return G.post(db, ctx, g.id, G.weekOf(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())));
   }
   ctx.services.guildlife = { autoDigest };
   if (ctx.cfg.timers) {

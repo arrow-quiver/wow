@@ -109,3 +109,15 @@ __ns.Share.putLocal = function(ty, key, f) table.insert(__puts, ty .. "|" .. f.i
   assert.strictEqual(wow.eval('__ns.helpers.showCrafters("|cffffffff|Hitem:1::::::::|h[Nothing Special]|h|r")'), '0');
   assert.strictEqual(wow.eval('__ns.debugError'), null);
 });
+
+test('who can craft this: no request stored (sharing not open yet) means no whisper and no "sent"', () => {
+  const wow = new WowClient({ inbox: { crafters: [{ name: 'Mooncloth Robe', who: 'Zuljin' }] } });
+  wow.login();
+  wow.exec(`${ROSTER}
+__ns.Share = __ns.Share or {}
+__ns.Share.myPid = function() return "p1" end
+__ns.Share.putLocal = function() return nil, "guild" end`);
+  assert.strictEqual(wow.eval('tostring(__ns.helpers.requestCraft("Mooncloth Robe", "Zuljin"))'), 'false');
+  assert.strictEqual(wow.eval('#__said'), '0');
+  assert.match(wow.printed(), /Couldn't add the request/);
+});

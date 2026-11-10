@@ -12,7 +12,7 @@
     "smoke": "electron . --smoke",
     "dist": "electron-builder --win --publish never",
     "vendor": "node ../scripts/vendor.js",
-    "test": "node --test \"test/**/*.test.{js,mjs}\""
+    "test": "node --max-old-space-size=4096 --test \"test/**/*.test.{js,mjs}\""
   },
   "dependencies": {
     "electron-updater": "^6.8.11",

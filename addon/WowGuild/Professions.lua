@@ -121,6 +121,7 @@ function P.scan()
       end
     end
   end
+  if not P.current or P.current.name ~= prof then P.planMode = false end
   P.current = { name = prof, skill = skillOf(prof, skill), recipes = recipes, at = ns.now() }
   P.lastScan = { at = ns.now(), prof = prof, recipes = #recipes,
     method = (C_TradeSkillUI and C_TradeSkillUI.GetAllRecipeIDs) and "modern" or (GetNumTradeSkills and "classic" or "none") }

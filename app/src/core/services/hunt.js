@@ -6,6 +6,7 @@
 // Kills that count ("kk", by the killer's addon, table hunt_kills): an honorable kill of a kill-on-sight target or
 // a bounty's. Season points (services/seasons.js): KOS_POINTS for each kill-on-sight kill, plus the bounty's points.
 const KOS_POINTS = 8;
+const KOS_PER_DAY = 10;
 const DAY = 86400;
 
 const parseTime = (s) => {
@@ -39,8 +40,22 @@ function payouts(db, gid) {
 // Season events (ms times): kill-on-sight kills and bounty payouts.
 function events(db, gid, from, to) {
   const out = [];
-  for (const k of db.prepare('SELECT user_id, at FROM hunt_kills WHERE guild_id = ? AND kos = 1 AND user_id IS NOT NULL AND at >= ? AND at < ?')
-    .all(gid, Math.floor(from / 1000), Math.ceil(to / 1000))) out.push({ userId: k.user_id, kind: 'kos', n: 1, at: k.at * 1000 });
+  // Kill-on-sight kills count when the target is on the list, at most once an hour per killer and target, and at
+  // most KOS_PER_DAY a day per killer (an addon could write any number of them).
+  const onList = new Set(db.prepare('SELECT lower(name) AS n FROM kos WHERE guild_id = ?').all(gid).map((r) => r.n));
+  const last = new Map();
+  const perDay = new Map();
+  for (const k of db.prepare('SELECT user_id, target, at FROM hunt_kills WHERE guild_id = ? AND kos = 1 AND user_id IS NOT NULL AND at < ? ORDER BY at')
+    .all(gid, Math.ceil(to / 1000))) {
+    if (!onList.has(lower(k.target))) continue;
+    const pair = `${k.user_id}|${lower(k.target)}`;
+    if (last.has(pair) && k.at - last.get(pair) < 3600) continue;
+    const d = `${k.user_id}|${Math.floor(k.at / DAY)}`;
+    if ((perDay.get(d) || 0) >= KOS_PER_DAY) continue;
+    last.set(pair, k.at);
+    perDay.set(d, (perDay.get(d) || 0) + 1);
+    if (k.at * 1000 >= from) out.push({ userId: k.user_id, kind: 'kos', n: 1, at: k.at * 1000 });
+  }
   for (const p of payouts(db, gid)) if (p.at * 1000 >= from && p.at * 1000 < to) out.push({ userId: p.userId, kind: 'bounty', n: p.points, at: p.at * 1000 });
   return out;
 }

@@ -62,7 +62,17 @@ function importRule(db, gid, rec, how, prevOk) {
       if (prevOk && !prevOk.del && ['cr', 'dc', 'bq', 'dg', 'bb', 'kk'].includes(rec.type) && !rec.del && prevOk.fields.pid !== pid) return 'owner';
     } else if (!rec.del) return 'link';
   }
+  // Deleting someone's boss kill is theirs to do too.
+  if (rec.type === 'ek' && rec.del && prevOk && !prevOk.del
+    && String(prevOk.author || '').split('-')[0].toLowerCase() !== String(rec.author || '').split('-')[0].toLowerCase()) return 'owner';
   if (rec.del) return null;
+  // A raid boss kill: written by a raider in it, about now, and only they can change it later.
+  if (rec.type === 'ek') {
+    const lower = (n) => String(n || '').split('-')[0].toLowerCase();
+    if (!(rec.fields.names || []).map(lower).includes(lower(rec.author))) return 'raider';
+    if (!Number.isInteger(rec.fields.at) || Math.abs(rec.fields.at - rec.t) > 86400) return 'time';
+    if (prevOk && !prevOk.del && lower(prevOk.author) !== lower(rec.author)) return 'owner';
+  }
   if (rec.type === 'cl') {
     const cr = st.live(db, gid, `cr:${seg(rec, 0)}`);
     if (cr && cr.rec.fields.pid === seg(rec, 1)) return 'own request';

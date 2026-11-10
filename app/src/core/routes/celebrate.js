@@ -18,11 +18,17 @@ function register(app, ctx) {
     if (!what) throw new HttpError(400, 'Say what to celebrate.');
     const text = Celebrate.discordText({ what, from });
     if (!text) return res.json({ posted: false });
-    ctx.activity(req.guild.id, 'celebrate', Celebrate.linkName(what));
+    // The same line again (the chat log read twice, a second app): nothing new.
+    const c = { character: from, zone: `celebrate:${what}`, message: '' };
+    const at = CtaDiscord.claim(db, req.guild.id, c);
+    if (!at) return res.json({ posted: false, duplicate: true });
     let posted = false;
-    if (ctx.cfg.discordWebhook && CtaDiscord.claim(db, req.guild.id, { character: from, zone: `celebrate:${what}`, message: '' })) {
+    if (ctx.cfg.discordWebhook) {
       posted = Boolean(await ctx.discord(null, text));
+      // Failed: give the claim back so a retry posts it; the activity entry waits for that.
+      if (!posted) { CtaDiscord.release(db, req.guild.id, c, at); return res.json({ posted }); }
     }
+    ctx.activity(req.guild.id, 'celebrate', Celebrate.linkName(what));
     res.json({ posted });
   });
 

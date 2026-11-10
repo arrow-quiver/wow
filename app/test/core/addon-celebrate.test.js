@@ -81,7 +81,7 @@ test('welcome wagon: everyone can say welcome; officers send the kit with a budd
   const wow = client(`ERR_GUILD_JOIN_S = "%s has joined the guild."
     GetNumGuildMembers = function() return 3 end
     GetGuildRosterInfo = function(i)
-      local r = { { "Newbie-Realm", 12, true }, { "Mokra-Realm", 15, true }, { "Grom-Realm", 60, true } }
+      local r = { { "Newbie-Realm", 12, true }, { "Grom-Realm", 60, true }, { "Mokra-Realm", 15, true } }
       return r[i][1], nil, nil, r[i][2], nil, nil, nil, nil, r[i][3] end
     CanGuildInvite = function() return true end`);
   wow.fire('CHAT_MSG_SYSTEM', 'Newbie has joined the guild.');
@@ -102,4 +102,26 @@ test('today\'s anniversaries: a toast once a day', () => {
   assert.strictEqual(wow.eval('__ns.celebrate.today()'), '1');
   assert.match(wow.eval('WowGuildToast.text:GetText()'), /Mokra has been in the guild for 3 months!/);
   assert.strictEqual(wow.eval('tostring(__ns.celebrate.today())'), 'nil', 'once');
+});
+
+test('a milestone reached in a dungeon waits, and goes out once you leave; loot lines only (not quest rewards)', () => {
+  const wow = client('LOOT_ITEM_SELF = "You receive loot: %s."; LOOT_ITEM_SELF_MULTIPLE = "You receive loot: %sx%d."');
+  wow.exec('__inInstance = true; __instanceType = "party"');
+  wow.fire('PLAYER_LEVEL_UP', 30);
+  const link = '|cffa335ee|Hitem:12345::::::::30:::::|h[Big Epic]|h|r';
+  wow.fire('CHAT_MSG_LOOT', `You receive loot: ${link}.`);
+  assert.strictEqual(wow.eval('#__said'), '0', 'not in a dungeon');
+  wow.exec('__inInstance = false; __instanceType = "none"');
+  wow.fire('PLAYER_ENTERING_WORLD');
+  assert.strictEqual(wow.eval('#__said'), '2');
+  assert.match(wow.eval('__said[1]'), /reached level 30!/);
+  assert.match(wow.eval('__said[2]'), /looted .*Big Epic/);
+  wow.fire('PLAYER_ENTERING_WORLD');
+  assert.strictEqual(wow.eval('#__said'), '2', 'said once');
+  // A quest reward is not loot; several of an epic is.
+  wow.fire('CHAT_MSG_LOOT', `You receive item: ${link.replace('12345', '12346')}.`);
+  assert.strictEqual(wow.eval('#__said'), '2');
+  wow.fire('CHAT_MSG_LOOT', `You receive loot: ${link.replace('12345', '12347')}x2.`);
+  assert.strictEqual(wow.eval('#__said'), '3');
+  assert.strictEqual(wow.eval('__ns.debugError'), null);
 });

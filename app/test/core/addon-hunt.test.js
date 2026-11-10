@@ -80,6 +80,8 @@ test('my honorable kills: kill on sight, a bounty, a zone bounty; anyone else no
   assert.strictEqual(wow.eval('__kk[1].fields.bounty'), 'z3z3z3');
   assert.match(wow.printed(), /Gankalot slain, zone bounty: \+13 season points\./);
   assert.strictEqual(wow.eval('__ns.hunt.killed("Stabby dies, honorable kill Rank: Grunt (Estimated Honor Points: 9)").bounty'), 'b2b2b2');
+  // Claimed now: no longer an open bounty, no alert, no promise of points.
+  assert.strictEqual(wow.eval('__ns.hunt.bountyOn("Stabby")'), null);
   wow.exec('GetRealZoneText = function() return "Ashenvale" end');
   assert.strictEqual(wow.eval('__ns.hunt.killed("Randomguy dies, honorable kill Rank: Scout (Estimated Honor Points: 5)")'), null);
   assert.strictEqual(Number(wow.eval('#__recs')), before + 2);

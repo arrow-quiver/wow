@@ -23,7 +23,7 @@ test('POST /api/celebrate posts once; anniversaries and birthdays today', async 
   t.after(() => c.close());
   const g = seedGuild(c.db, { character: 'Mychar' });
   assert.deepStrictEqual((await c.api.post('/api/celebrate', { what: 'Mychar reached level 40!', from: 'Mychar' })).body, { posted: true });
-  assert.deepStrictEqual((await c.api.post('/api/celebrate', { what: 'Mychar reached level 40!', from: 'Mychar' })).body, { posted: false });
+  assert.deepStrictEqual((await c.api.post('/api/celebrate', { what: 'Mychar reached level 40!', from: 'Mychar' })).body, { posted: false, duplicate: true });
   assert.deepStrictEqual((await c.api.post('/api/celebrate', { what: 'hello', from: 'Mychar' })).body, { posted: false });
   assert.strictEqual(discord.calls.length, 1);
   assert.strictEqual((await c.api.post('/api/celebrate', {})).status, 400);

@@ -40,6 +40,7 @@ test('bounties: officers only; first kill claims a player bounty; zone bounties 
   db.prepare("UPDATE bounties SET created_at = datetime('now', '-1 minute')").run();
   h.linkAll();
   const now = Math.floor(Date.now() / 1000);
+  h.imp([h.rec('ko', 'Stabby', h.NOW - 40, 'Jaina', { pid: PIDS.Jaina, reason: '', state: 'o' })]);
   h.imp([
     h.rec('kk', 'k00001', h.NOW - 20, 'Jaina', { pid: PIDS.Jaina, target: 'Stabby', zone: 'Ashenvale', at: now - 20, kos: 1, bounty: playerKey }),
     h.rec('kk', 'k00002', h.NOW - 10, 'Zuljinne', { pid: PIDS.Zuljinne, target: 'Stabby', zone: 'Ashenvale', at: now - 10, kos: 0, bounty: playerKey }),
@@ -81,4 +82,18 @@ test('the hunt on Discord', () => {
   const bt = { type: 'BT', key: 'b2', author: 'Mokra', fields: { target: '', zone: 'Hillsbrad Foothills', points: 5, cap: 10, ends: 1, note: '', state: 'o' } };
   assert.strictEqual(text.discordPost(bt, { created: true }), '💰 **Bounty:** 5 points a kill in Hillsbrad Foothills (10 kills)');
   assert.strictEqual(text.summaryOf(bt), 'Bounty: Hillsbrad Foothills, 5 points');
+});
+
+test('kill-on-sight points: only targets on the list, once an hour per target, ten a day', async (t) => {
+  const h = await setupShare(t);
+  const { db, gid } = h;
+  h.linkAll();
+  h.imp([h.rec('ko', 'Stabby', h.NOW - 9000, 'Jaina', { pid: PIDS.Jaina, reason: '', state: 'o' })]);
+  const at = h.NOW - 8000;
+  const recs = [h.rec('kk', 'n00001', h.NOW - 50, 'Jaina', { pid: PIDS.Jaina, target: 'Nobody', zone: '', at, kos: 1, bounty: '' })];
+  for (let i = 0; i < 4; i += 1) recs.push(h.rec('kk', `s0000${i}`, h.NOW - 40 + i, 'Jaina', { pid: PIDS.Jaina, target: 'Stabby', zone: '', at: at + i * 1200, kos: 1, bounty: '' }));
+  h.imp(recs);
+  const ev = H.events(db, gid, 0, (h.NOW + 100) * 1000).filter((e) => e.kind === 'kos');
+  // Stabby at +0, +20 and +40 min are within the hour: one; +60 min counts again.
+  assert.strictEqual(ev.length, 2);
 });

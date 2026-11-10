@@ -372,12 +372,14 @@ Service: `services/bosskills.js`; migration 30; addon: `BossKills.lua`; record `
 
 When a raid boss dies (`ENCOUNTER_END`, success, in a raid instance), a raider's addon reads the raid roster a few
 seconds later and writes the guild members in it. The record's key comes from the encounter, the UTC day and the
-raid leader, so every raider's addon makes the same one; an addon that already has it writes nothing.
+raid leader, so every raider's addon makes the same one; an addon that already has it writes nothing. The app only
+takes one written by a raider named in it, with `at` within a day of when it was written, and only its author can
+change it later (share/import.js).
 
 - **Which raid:** a scheduled raid of the same instance that started up to 6 hours before the kill (or up to 2 hours
   after it).
 - **Attendance and season points:** everyone the kills saw gets one raid (10 points) per raid, or per instance and
-  UTC day when nothing was scheduled. A raid an officer closed counts through its attendance, never twice.
+  UTC day when nothing was scheduled, and at most two a day from kills. A raid an officer closed counts through its attendance, never twice.
 - **`GET /api/raids/:id`** adds `bossKills: { kills: [{ boss, at, size }], seen: [userId] }`. Closing the raid ticks
   `seen` by default.
 - **Weekly digest:** `bosses: [{ boss, instance, at }]`, and "💀 Bosses down: …" on Discord.

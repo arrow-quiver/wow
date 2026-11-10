@@ -159,9 +159,11 @@ function H.enteredInstance()
   local sub = #rows > 0 and string.format("Guildies online the right level (%d-%d) for it:", d.min, d.max)
     or string.format("No guildies online at level %d-%d right now.", d.min, d.max)
   H.show(d.name, sub, rows, { "Ask the Coach for tips", function()
-    if ns.coach and ns.coach.ask and ns.coach.ask(string.format("Tips for %s at my level: which bosses and pulls to watch, what to bring?", d.name)) then
+    if not (ns.coach and ns.coach.ask) then ns.print("Ask the Coach in the Guild Camp app: " .. d.name .. " tips."); return end
+    -- ns.coach.ask says itself when the question can't be queued.
+    if ns.coach.ask(string.format("Tips for %s at my level: which bosses and pulls to watch, what to bring?", d.name)) then
       ns.print("Asked the Coach about " .. d.name .. ". The answer comes after your next /reload (with the Guild Camp app running): /wow coach ask.")
-    else ns.print("Ask the Coach in the Guild Camp app: " .. d.name .. " tips.") end
+    end
   end })
   return #rows
 end
@@ -228,8 +230,12 @@ function H.requestCraft(name, crafter)
   local S2 = ns.Share
   local pid = S2 and S2.myPid and ns.try(S2.myPid)
   local ok = false
-  if S2 and S2.putLocal and pid then ok = pcall(S2.putLocal, "cr", ns.randomKey(), { pid = pid, item = name, notes = crafter and ("for " .. crafter) or "", state = "o" }) end
-  if crafter then whisper(string.format("Hi %s! Could you craft %s for me? I've put in a guild crafting request. I can bring the mats.", crafter, name), crafter) end
+  if S2 and S2.putLocal and pid then
+    -- putLocal returns the stored record, or nil and a reason (sharing not open yet, …).
+    local called, res = pcall(S2.putLocal, "cr", ns.randomKey(), { pid = pid, item = name, notes = crafter and ("for " .. crafter) or "", state = "o" })
+    ok = called and res ~= nil and res ~= false
+  end
+  if ok and crafter then whisper(string.format("Hi %s! Could you craft %s for me? I've put in a guild crafting request. I can bring the mats.", crafter, name), crafter) end
   ns.print(ok and string.format("Crafting request for %s sent to the guild%s.", name, crafter and (", and " .. crafter .. " knows") or "")
     or string.format("Couldn't add the request. Whisper %s or use the guild window.", crafter or "a crafter"))
   return ok
