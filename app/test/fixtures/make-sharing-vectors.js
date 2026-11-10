@@ -68,6 +68,7 @@ add('gb tab 0', rec('gb', '0', NOW - 60, 'Zuljinne', {
 add('gb tab 3', rec('gb', '3', NOW - 60, 'Zuljinne', { items: [{ id: 2589, count: 200 }, { id: 4306, count: 40 }, { id: 0, count: 5 }] }));
 add('bk bank character', rec('bk', 'Bankalt', NOW - 60, 'Bankalt', { bags: [{ id: 2589, count: 20 }], bank: [{ id: 14047, count: 100 }, { id: 4338, count: 60 }] }));
 add('sh shopping list', rec('sh', 'Thrallia.p4m7', NOW - 60, 'Thrallia', { items: [{ name: 'Bolt of Silk Cloth', qty: 4, skill: 197 }, { name: 'Iron Bar', qty: 10, skill: 164 }] }));
+add('ST store items', rec('ST', '1', NOW - 60, 'Thrallia', { items: [{ key: 'a1b2c3', item: 'Major Mana Potion', id: 13444, cost: 40, stock: 10 }, { key: 'd4e5f6', item: 'Runecloth Bag', id: 14046, cost: 120, stock: 2 }] }));
 add('wm war marks', rec('wm', 'Thrallia.p4m7', NOW - 60, 'Thrallia', { marks: [{ map: 1424, x: 452, y: 381, at: NOW - 600, kind: 'd' }, { map: 1424, x: 460, y: 377, at: NOW - 300, kind: 'k', n: 2 }], maps: [{ id: 1424, name: 'Hillsbrad Foothills' }] }));
 add('pr prices', rec('pr', 'Thrallia.p4m7', NOW - 60, 'Thrallia', { day: 20765, prices: [{ id: 2589, copper: 150 }, { id: 14047, copper: 2400 }] }));
 add('RD pvp, no notes', rec('RD', 'pvp001', NOW - 60, 'Varok', { kind: 'p', title: 'Warsong Friday', instance: 'Warsong Gulch', startsAt: NOW + 3 * D, minutes: 120, size: 10, srLimit: 0 }));

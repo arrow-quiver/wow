@@ -61,3 +61,35 @@ Every 5 minutes, with a Discord webhook set, the app posts its own player's news
 The inbox's `seasons` field (`{ month, players: { [character]: { title, rank, score, streak, badges, best } } }`)
 puts a line on guildies' player tooltips ("Guild Camp: MVP · #1 this season · 3-week streak · 2 badges") and
 `/wow season` prints the top five and your place (addon option `seasonTooltips`).
+
+## The guild bank store
+
+Spend season points on what officers put up. `services/store.js`, `routes/store.js`.
+
+- **Items** are one shared officer record `ST` (key `1`): up to 25 `key,item,id,cost,stock` entries
+  ([SHARING.md](../SHARING.md)), projected into `store_items` (migration 24). `left` = stock minus orders open or sent.
+- **An order is a guild bank request** (`bq`) whose note starts `[store:<key>:<cost>]`, so it travels, shows in
+  game and is handled like any other request: officers mark it sent or declined (`POST /api/bank/requests/:id/sent|declined`),
+  the buyer can cancel it.
+- **Balance**: `earned` = lifetime season points without streak bonuses; `held` = orders still open; `spent` = orders
+  sent; `available` = earned − held − spent. Declined and cancelled orders give the points back.
+
+### GET /api/store
+```json
+{
+  "items": [{ "key": "a1b2c3", "item": "Major Mana Potion", "itemId": 13444, "cost": 40, "stock": 20, "left": 14 }],
+  "balance": { "earned": 512, "spent": 160, "held": 80, "available": 272 },
+  "mine": [{ "id": 7, "key": "a1b2c3", "item": "Major Mana Potion", "count": 2, "cost": 40, "total": 80, "note": "raid night",
+             "status": "open", "requesterId": 1, "requester": "Grimtusk", "created_at": "2026-11-10 08:00:00" }],
+  "pending": [], "canEdit": false
+}
+```
+`pending` (officers): open orders, each with the buyer's `balance`.
+
+### PUT /api/store
+Officer. `{ items: [{ key?, item, itemId?, cost, stock }] }` replaces the whole list (keys kept, new ones made).
+400 for a missing name or price or more than 25 items.
+
+### POST /api/store/order
+`{ key, count?, note? }` → 201 with the store view and a `message`. 404 unknown item; 409 not enough points, sold
+out, or no character yet.

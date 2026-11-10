@@ -255,6 +255,7 @@ RT:k3f9a2^wzltl343^Grommash^^d^tob9c0^r^4kq1zm^tobn80^Thrallia.p4m7,d72,eim;Zulj
 | `AN` notice | random | officer; any officer may delete | body | | 60 d | 600 |
 | `DR` supply drive | random | officer | title, unit, goal, notes, state `o`/`c` | `c` | 60 d after closed; 180 d at most | 500 |
 | `BH` bank request handled | request | officer | state `s`/`d` (sent, declined) | | with the request | 40 |
+| `ST` guild bank store | `1` | officer | items `key,item,id,cost,stock;…` (≤ 25) | | never | 1.4 KB |
 | `BC` bank characters | `1` | officer | names (≤ 50) | | never | 700 |
 | `CFG` guild settings | `1` | Guild Master (rank 0) only | officer_rank_max, relay_rank_max (`-` = none) | | never | 40 |
 | `WH` Discord webhook | `1` | officer; OFFICER channel only; in no digest; its author re-sends it once a day at login | url | | never | 300 |
@@ -658,6 +659,7 @@ confirmed with "It was me"), `share_repair` (the repair after the update ran, §
 | `BC`, `bk` | characters.is_bank (no record: no bank characters); inventory of bank characters |
 | `sh`, `pr` | shopping_lists; prices (the lower price kept for the same item and day) |
 | `wm` | war_marks, replaced per player (mine too), and war_maps (map names); see [api/war.md](api/war.md) |
+| `ST` | store_items, replaced as a whole; orders are `bq` requests whose note starts `[store:<key>:<cost>]` ([api/seasons.md](api/seasons.md)) |
 | `CFG` | guilds.officer_rank_max and relay_rank_max (no record: the defaults, 1 and none), then identity.syncRanks |
 | `WH` | app_settings `shared_webhook`, officers only; Settings offers "Grommash shared a Discord webhook. Use it?" |
 
@@ -993,6 +995,7 @@ pid (`<name>.<4 base36>`), tab (`0`–`8`), `1`.
 | `bk` | name | bags [(id, count: int)] ≤ 200, bank [(id, count: int)] ≤ 300 |
 | `sh` | pid | items [(name text(100), qty int, skill int)] ≤ 20 |
 | `wm` | pid | marks [(map int, x int, y int, at int, kind text(1), n int)] ≤ 30, maps [(id int, name text(40))] ≤ 12 |
+| `ST` | one | items [(key text(6), item text(60), id int, cost int, stock int)] ≤ 25 |
 | `pr` | pid | day int, prices [(id, copper: int)] ≤ 60 |
 | `RD` | random | kind enum `rpe`, title text(60), instance text(60), startsAt int, minutes int, size int, srLimit int, notes text(300) |
 | `RT` | random (the raid) | status enum `olxd`, lockedAt int, kind enum `rpe`, instance text(8) (instance key), closedAt int, attendees [(pid text(64), items text(12)…)] ≤ 60 (≤ 20 items each), noShows [text(64)] ≤ 60 |

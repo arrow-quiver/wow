@@ -162,6 +162,13 @@ function badgesOf(db, guildId, now = Date.now()) {
   return out;
 }
 
+// Lifetime points per player (no streak bonus): what the guild bank store spends. → { [userId]: points }
+function lifetimePoints(db, guildId, now = Date.now()) {
+  const out = {};
+  for (const [userId, x] of lifetime(db, guildId, now)) out[userId] = Math.round(x.base);
+  return out;
+}
+
 function hall(db, guildId, { months = 6, now = Date.now() } = {}) {
   const out = [];
   const d = new Date(now);
@@ -224,6 +231,6 @@ function fmtGoldCopper(c) {
 const badgeText = (name, badge) => `🏅 **${clean(name)}** earned the **${badge.name}** badge!`;
 
 module.exports = {
-  season, hall, badgesOf, inboxPart, announceText, donationText, badgeText, monthOf, bounds,
+  season, hall, badgesOf, lifetimePoints, inboxPart, announceText, donationText, badgeText, monthOf, bounds,
   POINTS, CATEGORIES, BADGES, STREAK_STEP, STREAK_MAX, _bestStreak: bestStreak, _streakOf: streakOf, _weekOf: weekOf,
 };

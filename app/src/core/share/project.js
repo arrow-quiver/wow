@@ -25,7 +25,7 @@ const dayToDate = (d) => new Date(SCAN_DAY_0 + d * 86400000).toISOString().slice
 const skillName = (id) => S.SKILLS[id] || `Skill ${id}`;
 
 // Dependency order: links first (users), then settings, loot lists before raids and awards, loyalty last.
-const ORDER = ['ch', 'cfg', 'bc', 'bk', 'rc', 'll', 'raid', 'la', 'loyalty', 'cr', 'lp', 'ca', 'an', 'drive', 'dc', 'bq', 'gb', 'sh', 'pr', 'wm'];
+const ORDER = ['ch', 'cfg', 'bc', 'bk', 'rc', 'll', 'raid', 'la', 'loyalty', 'cr', 'lp', 'ca', 'an', 'drive', 'dc', 'bq', 'gb', 'sh', 'pr', 'wm', 'st'];
 
 function tasksFor(rec, prevRec) {
   if (!rec) return [];
@@ -61,6 +61,7 @@ function tasksFor(rec, prevRec) {
     case 'sh': out.push(`sh:${rec.key}`); break;
     case 'pr': out.push(`pr:${rec.key}`); break;
     case 'wm': out.push(`wm:${rec.key}`); break;
+    case 'ST': out.push('st:1'); break;
     case 'CFG': out.push('cfg'); break;
     default: break;
   }
@@ -752,6 +753,19 @@ function projectSh(db, gid, pid) {
     .run(uid, JSON.stringify(items), st.iso(r.t).replace('T', ' ').slice(0, 19));
 }
 
+// ST: the guild bank store's items (officers set them), replaced as a whole
+function projectSt(db, gid) {
+  const e = st.effective(db, gid, 'ST:1');
+  const r = e ? liveRec(e) : null;
+  db.prepare('DELETE FROM store_items WHERE guild_id = ?').run(gid);
+  const put = db.prepare('INSERT OR IGNORE INTO store_items (guild_id, key, item, item_id, cost, stock, pos) VALUES (?,?,?,?,?,?,?)');
+  (r && Array.isArray(r.fields.items) ? r.fields.items : []).forEach((x, i) => {
+    if (x && /^[0-9a-z]{6}$/.test(String(x.key || '')) && x.item && Number.isInteger(x.cost) && x.cost > 0) {
+      put.run(gid, x.key, String(x.item).slice(0, 60), Number.isInteger(x.id) && x.id > 0 ? x.id : null, x.cost, Number.isInteger(x.stock) ? Math.max(0, x.stock) : 0, i);
+    }
+  });
+}
+
 // wm: the guild's open-world deaths and kills, one list per player account (mine included: the War page shows all)
 function projectWm(db, gid, pid) {
   if (!S.pidOk(pid)) return;
@@ -826,6 +840,7 @@ function run(db, gid, tasks, { out = {} } = {}) {
       case 'sh': projectSh(db, gid, arg); break;
       case 'pr': projectPr(db, gid, arg); break;
       case 'wm': projectWm(db, gid, arg); break;
+      case 'st': projectSt(db, gid); break;
       default: break;
     }
   }
