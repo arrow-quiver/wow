@@ -72,9 +72,10 @@ test('chat log: my calls to arms are read as they are written', () => {
   const { parseCta, createChatWatch } = require('../src/main/live');
   assert.deepStrictEqual(parseCta('11/10 12:30:01.123  [Guild] Grom-Zuljin: [Guild Camp] Call to arms: Hillsbrad Foothills (3 needed): help at the mill! — from Grom'),
     { character: 'Grom', zone: 'Hillsbrad Foothills', needed: 3, message: 'help at the mill!' });
-  assert.deepStrictEqual(parseCta('[Guild] Grom: [Guild Camp] Call to arms: Tarren Mill — from Grom\r'), { character: 'Grom', zone: 'Tarren Mill', needed: null, message: '' });
+  assert.deepStrictEqual(parseCta('11/10 12:30:01.123  [Guild] Grom: [Guild Camp] Call to arms: Tarren Mill — from Grom\r'), { character: 'Grom', zone: 'Tarren Mill', needed: null, message: '' });
   // No sender, or a name hidden inside someone else's message: refused.
   assert.strictEqual(parseCta('[Guild Camp] Call to arms: Tarren Mill — from Grom'), null);
+  assert.strictEqual(parseCta('[Guild] Mallory: [x] Grom: [Guild Camp] Call to arms: X — from Grom'), null);
   assert.strictEqual(parseCta('11/10 12:30:01.123  [Guild] Mallory: Grom: [Guild Camp] Call to arms: X — from Grom'), null);
   assert.strictEqual(parseCta('[Guild] Grom: anyone up for MC?'), null);
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gc-chat-'));

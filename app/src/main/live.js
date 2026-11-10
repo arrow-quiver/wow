@@ -144,7 +144,7 @@ const CTA = /\[Guild Camp\] Call to arms: (.+?) — from ([^\s—]+)\s*$/;
 // the channel tag must be who the line says it's from, with the Guild Camp text right after it. So a guildmate typing
 // "[Guild Camp] … — from <my character>" (or "Grom: [Guild Camp] …" inside their own message) can't post to my
 // Discord. A line without a sender is refused.
-const SENDER = /^(?:\S+ \S+\s+)?\[[^\]]+\] ([^\s:]+): \[Guild Camp\] /;
+const SENDER = /^\d+\/\d+ [\d:.]+\s+\[[^\]]+\] ([^\s:]+): \[Guild Camp\] /;
 function senderOk(line, from) {
   const s = SENDER.exec(String(line || ''));
   return Boolean(s) && s[1].split('-')[0].toLowerCase() === String(from).split('-')[0].toLowerCase();
