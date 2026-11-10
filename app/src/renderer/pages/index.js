@@ -13,6 +13,7 @@ export const routes = [
   { path: '/coach', load: () => import('./coach.js'), title: 'Coach', nav: 'Play', icon: 'coach' },
   { path: '/seasons', load: () => import('./seasons.js'), title: 'Seasons', nav: 'Play', icon: 'trophy' },
   { path: '/war', load: () => import('./war.js'), title: 'War', nav: 'Play', icon: 'war' },
+  { path: '/hunt', load: () => import('./hunt.js'), title: 'The hunt', nav: 'Play', icon: 'target' },
   { path: '/raids', load: () => import('./raids.js'), title: 'Raids', nav: 'Play', icon: 'raids' },
   { path: '/dungeons', load: () => import('./dungeons.js'), title: 'Dungeons', nav: 'Play', icon: 'dungeons' },
   { path: '/crafters', load: () => import('./crafters.js'), title: 'Crafters', nav: 'Play', icon: 'crafters' },

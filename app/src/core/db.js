@@ -936,6 +936,43 @@ const MIGRATIONS = [
      posted_at TEXT NOT NULL DEFAULT (datetime('now')),
      PRIMARY KEY (guild_id, week)
    );`,
+
+  // 29: War: kill on sight (from "ko" records), bounties ("BT", officers) and the kills that count ("kk", by the
+  // killer), for season points and the war page (services/hunt.js).
+  `CREATE TABLE kos (
+     guild_id INTEGER NOT NULL REFERENCES guilds(id),
+     name TEXT NOT NULL,
+     reason TEXT,
+     added_by INTEGER REFERENCES users(id),
+     added_at TEXT NOT NULL,
+     PRIMARY KEY (guild_id, name)
+   );
+   CREATE TABLE bounties (
+     id INTEGER PRIMARY KEY,
+     guild_id INTEGER NOT NULL REFERENCES guilds(id),
+     share_id TEXT NOT NULL,
+     target TEXT,
+     zone TEXT,
+     points INTEGER NOT NULL,
+     cap INTEGER NOT NULL DEFAULT 1,
+     until INTEGER NOT NULL,
+     note TEXT,
+     state TEXT NOT NULL DEFAULT 'o' CHECK (state IN ('o','x')),
+     created_at TEXT NOT NULL
+   );
+   CREATE UNIQUE INDEX bounties_share ON bounties(guild_id, share_id);
+   CREATE TABLE hunt_kills (
+     guild_id INTEGER NOT NULL REFERENCES guilds(id),
+     share_id TEXT NOT NULL,
+     user_id INTEGER REFERENCES users(id),
+     target TEXT NOT NULL,
+     zone TEXT,
+     at INTEGER NOT NULL,
+     kos INTEGER NOT NULL DEFAULT 0,
+     bounty TEXT,
+     PRIMARY KEY (guild_id, share_id)
+   );
+   CREATE INDEX hunt_kills_at ON hunt_kills(guild_id, at);`,
 ];
 
 // Runs every migration the database hasn't had yet, each in its own transaction.

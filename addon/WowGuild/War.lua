@@ -121,6 +121,24 @@ local function pvpArea()
   return kind == "contested" or kind == "hostile" or kind == "combat"
 end
 
+-- → the name of the player (or player's pet's owner, when the recap names the player) who hit me last, or nil.
+function W.killerName()
+  local dr = C_DeathRecap
+  if not dr or not dr.GetRecapEvents then return nil end
+  local ok, events = pcall(dr.GetRecapEvents)
+  if not ok or type(events) ~= "table" then return nil end
+  for i = #events, 1, -1 do
+    local e = events[i]
+    if type(e) == "table" then
+      local g = e.sourceGUID or e.srcGUID
+      local okP, isP = pcall(function() return type(g) == "string" and string.find(g, "^Player%-") ~= nil end)
+      local name = e.sourceName or e.srcName
+      if okP and isP and type(name) == "string" and name ~= "" then return string.match(name, "^([^%-]+)") or name end
+    end
+  end
+  return nil
+end
+
 function W.killedByPlayers()
   local r = recapSays()
   if r ~= nil then return r end
@@ -135,7 +153,7 @@ local prompt
 local function helpPrompt()
   if prompt then return prompt end
   local f = CreateFrame("Frame", "WowGuildHelpPrompt", UIParent)
-  f:SetSize(300, 96); f:SetPoint("TOP", 0, -180); f:SetFrameStrata("DIALOG")
+  f:SetSize(300, 126); f:SetPoint("TOP", 0, -180); f:SetFrameStrata("DIALOG")
   if ns.skin and ns.skin.panel then ns.skin.panel(f) end
   f.text = ns.skin and ns.skin.text and ns.skin.text(f, "body", "") or f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
   f.text:SetPoint("TOP", 0, -14); f.text:SetWidth(272)
@@ -144,6 +162,13 @@ local function helpPrompt()
   f.yes:SetScript("OnClick", function() f:Hide(); ns.addCta(f.zone, nil, "Died to players here. Help!") end)
   f.no = CreateFrame("Button", nil, f, "UIPanelButtonTemplate"); f.no:SetSize(130, 24); f.no:SetPoint("BOTTOMRIGHT", -14, 12)
   f.no:SetText("No"); f.no:SetScript("OnClick", function() f:Hide() end)
+  -- Who killed me (from the death recap): one click puts them on the guild's kill-on-sight list.
+  f.kos = CreateFrame("Button", nil, f, "UIPanelButtonTemplate"); f.kos:SetSize(272, 22); f.kos:SetPoint("BOTTOM", 0, 42)
+  f.kos:SetScript("OnClick", function()
+    f.kos:Hide()
+    if f.killer and ns.hunt then ns.hunt.add(f.killer, "Killed " .. ((UnitName and UnitName("player")) or "a guildie") .. " in " .. (f.zone or "the open world")) end
+  end)
+  f.kos:Hide()
   f:SetScript("OnUpdate", function(self, elapsed)
     self.left = (self.left or 0) - (elapsed or 0)
     if self.left <= 0 then self:Hide() end
@@ -154,9 +179,11 @@ local function helpPrompt()
 end
 W.helpPrompt = helpPrompt
 
-function W.askForHelp(zone)
+function W.askForHelp(zone, killer)
   local f = helpPrompt()
   f.zone = zone
+  f.killer = killer
+  if killer and ns.hunt and not ns.hunt.onList(killer) then f.kos:SetText("Kill on sight: " .. killer); f.kos:Show() else f.kos:Hide() end
   f.text:SetText(string.format("You died in %s.\nCall your guild for help?", zone or "the open world"))
   f.left = W.HELP_TIMEOUT
   f:Show()
@@ -168,7 +195,7 @@ function W.died()
   local m = W.mark("d")
   if not m or ns.opt("warHelp") == false then return m end
   local zone = (GetZoneText and ns.try(GetZoneText)) or mapName(m.map) or "the open world"
-  ns.safely(W.askForHelp, zone)
+  ns.safely(W.askForHelp, zone, W.killerName())
   return m
 end
 

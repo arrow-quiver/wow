@@ -164,6 +164,15 @@ local TYPES = {
     key = { "pid", "name" }, max = 400, expiry = { days = 3 },
     fields = { text("character", 48), int("level"), text("zone", 60), text("when", 60), text("note", 140) },
   },
+  -- Kill on sight (keyed by the enemy's name; any member adds or takes off) and kills that count (by the killer).
+  ko = {
+    key = { "name" }, max = 300, expiry = { days = 90 },
+    fields = { text("pid", 64), text("reason", 100), enm("state", "ox") },
+  },
+  kk = {
+    key = { "b36x6" }, max = 260, expiry = { days = 45 },
+    fields = { text("pid", 64), text("target", 24), text("zone", 60), int("at"), int("kos"), text("bounty", 6) },
+  },
   -- Guild bulletin board: lfg/selling/buying/help posts; taking one down ('x') is final.
   bb = {
     key = { "b36x6" }, max = 400, final = { field = "state", values = "x" }, expiry = { days = 7, finalDays = 1 },
@@ -256,6 +265,11 @@ local TYPES = {
   LY = {
     key = { "b36x6" }, max = 3072, expiry = { never = true },
     fields = { int("upto"), listParts("bonuses", 200, { pText("pid", 64), pText("item", 12), pInt("bonus") }) },
+  },
+  -- A bounty (officers): points for one Alliance player, or for each kill in a zone up to cap; closing is final.
+  BT = {
+    key = { "b36x6" }, max = 400, final = { field = "state", values = "x" }, expiry = { field = "ends", days = 7 },
+    fields = { text("target", 24), text("zone", 60), int("points"), int("cap"), int("ends"), text("note", 100), enm("state", "ox") },
   },
   AN = { key = { "b36x6" }, max = 600, expiry = { days = 60 }, fields = { text("body", 500) } },
   DR = {

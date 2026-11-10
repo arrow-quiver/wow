@@ -64,3 +64,43 @@ Discord: `🆘 **Grom** needs help in **Hillsbrad Foothills**: 2 enemies (Sneaky
 - `hotspots`: map cells of 5% × 5% with two or more marks, busiest first (at most 6), at the cell's average spot.
 - `who`: the player's main character (or highest), else their BattleTag name.
 - `alerts`: whether a Discord webhook is set.
+
+## Kill on sight and bounties
+
+Services: `services/hunt.js`; routes: `routes/hunt.js`; migration 29; page: The hunt (`/hunt`); addon: `Hunt.lua`.
+Records: `ko` (kill on sight, any member), `BT` (bounties, officers), `kk` (a kill that counts, by the killer's
+addon). See [SHARING.md](../SHARING.md).
+
+Season points ([seasons.md](seasons.md)): each kill of a kill-on-sight target 8 (`kos`), and a bounty's points
+(`bounty`), on top of the usual 2 for a kill. A player bounty pays the first kill made while it was up (from 5
+minutes before it was posted, for clock differences, to `ends`); a zone bounty pays each kill in its zone, in kill
+order, up to `cap` kills. Players' season rows carry `hunt`: the points from these.
+
+### `GET /api/hunt` (guild)
+```json
+{ "canPost": true, "kosPoints": 8,
+  "kos": [{ "name": "Gankalot", "reason": "Camps the Crossroads", "addedBy": "Mokra", "addedAt": "…", "kills": 4, "lastKill": 1762800000 }],
+  "bounties": [{ "id": 3, "key": "z3z3z3", "target": null, "zone": "Hillsbrad Foothills", "points": 5, "cap": 10,
+    "ends": 1763200000, "note": "Take back Tarren Mill", "createdAt": "…", "status": "open|claimed|expired|closed",
+    "claims": [{ "name": "Mokra", "target": "Lightbro", "at": 1762900000, "points": 5 }], "left": 9 }] }
+```
+
+### `POST /api/kos` (guild)
+`{ "name": "Gankalot", "reason"?: "…" }` → `201 { "ok": true, "message": "Gankalot is now kill on sight for the guild." }`.
+The name is fixed up ("gankalot-Realm" → "Gankalot"); not a valid name → `400`.
+
+### `POST /api/kos/:name/remove` (guild)
+→ `{ "ok": true }`; not on the list → `404`.
+
+### `POST /api/bounties` (guild, officers)
+`{ "target": "Stabby" }` or `{ "zone": "Hillsbrad Foothills", "cap": 10 }`, plus `"points"` (1–1000), `"days"` (1–30,
+default 7), `"note"`. → `201 { "ok": true, "key": "…", "message": "…" }`. Not an officer → `403`; no target or
+zone, or no points → `400`.
+
+### `POST /api/bounties/:id/close` (guild, officers)
+Closes it for good (`BT` state `x`); kills already made still count. → `{ "ok": true }`.
+
+### Discord
+Each app posts its own: a new kill-on-sight entry ("☠️ **Kill on sight:** Gankalot — Camps the Crossroads"), a new
+bounty ("💰 **Bounty:** 50 points for killing Stabby"), and the player's own kills that count ("🎯 **Mokra** slew
+Stabby in Ashenvale and claims the bounty! For the Horde!").

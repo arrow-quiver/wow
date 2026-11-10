@@ -98,6 +98,9 @@ function summaryOf(recIn, lookup) {
     case 'LL': return removed(`Loot list for ${clip(f.name, 50) || 'an instance'}`);
     case 'LY': return 'SR+ checkpoint';
     case 'AN': return del ? 'Notice: removed' : `Notice: ${clip(f.body, 50)}`;
+    case 'ko': return del ? 'Kill on sight: removed' : `Kill on sight: ${r.key}${f.state === 'x' ? ' (taken off)' : ''}`;
+    case 'kk': return del ? 'Kill: removed' : `Kill: ${f.target || 'someone'}${f.bounty ? ' (bounty)' : f.kos ? ' (kill on sight)' : ''}`;
+    case 'BT': return del ? 'Bounty: removed' : `Bounty: ${f.target || f.zone || '?'}, ${num(f.points || 0)} points${f.state === 'x' ? ' (closed)' : ''}`;
     case 'DR': return removed(`Supply drive: ${clip(f.title, 50)}${f.state === 'c' ? ' (closed)' : ''}`);
     case 'BH': {
       const bq = typeof lookup === 'function' ? asRec(lookup(`bq:${r.key}`)) : null;
@@ -124,6 +127,7 @@ function auditSentence(recIn, lookup) {
     case 'LL': return `${a} ${r.del ? 'removed' : 'edited'} the loot list${f.name ? ` for ${f.name}` : ''}`;
     case 'LY': return `${a}'s app saved an SR+ checkpoint`;
     case 'AN': return r.del ? `${a} deleted a notice` : `${a} posted a notice`;
+    case 'BT': return r.del ? `${a} removed a bounty` : f.state === 'x' ? `${a} closed the bounty on ${f.target || f.zone}` : `${a} put a ${num(f.points || 0)}-point bounty on ${f.target || f.zone}`;
     case 'DR': return r.del ? `${a} removed a supply drive` : f.state === 'c' ? `${a} closed the drive ${f.title}` : `${a} started the drive ${f.title}`;
     case 'BH': {
       const bq = typeof lookup === 'function' ? asRec(lookup(`bq:${r.key}`)) : null;
@@ -193,6 +197,9 @@ function discordPost(recIn, { lookup, created = false, from } = {}) {
     }
     case 'LA': return created ? `💎 **${f.itemName}** → ${f.character || 'someone'} (${AWARD[f.kind] || 'MS'}, ${raidTitle(f.raid, lookup)})` : null;
     case 'AN': return created ? `📜 **Notice**\n${f.body}` : null;
+    case 'ko': return created && f.state === 'o' ? `☠️ **Kill on sight:** ${r.key}${f.reason ? ` — ${f.reason}` : ''}` : null;
+    case 'kk': return created && f.target ? `🎯 **${r.author}** slew ${f.target}${f.zone ? ` in ${f.zone}` : ''}${f.bounty ? ' and claims the bounty!' : ' (kill on sight).'} For the Horde!` : null;
+    case 'BT': return created && f.state === 'o' ? `💰 **Bounty:** ${num(f.points)} points ${f.target ? `for killing ${f.target}` : `a kill in ${f.zone} (${num(f.cap || 1)} kills)`}${f.note ? ` — ${f.note}` : ''}` : null;
     case 'ca':
       if (!created) return null;
       return [`⚔️ **Call to arms: ${f.zone}**${f.needed ? ` (need ${f.needed})` : ''}`, String(f.message || '').trim(),

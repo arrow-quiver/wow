@@ -91,6 +91,13 @@ after a death in a PvP area calls the guild to arms in one click; the overlay an
 **Call for help** button for Discord. Every death and honorable kill in the open world goes on the guild's war map:
 pins on the in-game world map, and the **War** page with hotspots and your nemeses (the players who keep killing you).
 
+**The hunt: kill on sight and bounties.** Put Alliance gankers on the guild's kill-on-sight list (in the app, with
+`/wow kos add Name reason`, or one click on the death popup for whoever just killed you). Officers put **bounties**
+on a player (first kill claims it) or on a zone (points for every kill there, up to a number of kills). When one is
+near (nameplate, target or mouseover) your addon warns you on screen with a sound, and their tooltip says so. Your
+honorable kills of them count for the guild: 8 season points for a kill-on-sight target, plus the bounty's points,
+and a cheer on Discord.
+
 ### 🛠️ Crafters, requests and partners
 
 <img src="docs/screenshots/crafters.png" alt="Crafters page with guild professions and a shopping list" width="900">
@@ -146,6 +153,8 @@ The addon works on its own, and does much more with the app:
 | `/wow` or `/guildcamp` | Open the Guild Camp window |
 | `/wow coach` | Open the Coach |
 | `/wow season` | This month's guild season: the top five and your place |
+| `/wow kos` | The kill-on-sight list; `/wow kos add Name reason`, `/wow kos remove Name` |
+| `/wow bounties` | Open bounties |
 | `/wow war` | Your war map marks; `/wow war off` hides the guild's deaths and kills on the world map |
 | `/wow live on` | Turn on combat logging at every login, for the app's live link and Coach overlay (`/wow live off` stops it) |
 | `/wow guide` | Open the skill-up guide |
