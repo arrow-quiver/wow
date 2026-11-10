@@ -40,10 +40,12 @@ function stillHere(db, gid) {
   return (name) => { const r = q.get(gid, name); return r ? unix(r.first_seen) || 1 : 0; };
 }
 
-// A real recruit: on the roster now, and first seen there after they were contacted (an hour's slack).
+// A real recruit: on the roster now, first seen there after they were contacted (an hour's slack), and joined within
+// JOIN_DAYS of it (a name claimed long before doesn't pay).
+const JOIN_DAYS = 30;
 function counts(r, here) {
   const first = here(r.name);
-  return Boolean(first) && first >= r.contacted_at - 3600;
+  return Boolean(first) && first >= r.contacted_at - 3600 && (r.joined_at || 0) - r.contacted_at <= JOIN_DAYS * DAY;
 }
 
 function list(db, gid, { now = Math.floor(Date.now() / 1000) } = {}) {
@@ -72,6 +74,7 @@ function events(db, gid, from, to) {
 
 function stats(db, gid) {
   const who = nameOf(db, gid);
+  const stayed = new Set(list(db, gid).filter((x) => x.stayed).map((x) => x.name));
   const rows = list(db, gid);
   const by = new Map();
   for (const r of db.prepare('SELECT recruiter, state, name, contacted_at, joined_at FROM recruits WHERE guild_id = ? AND recruiter IS NOT NULL').all(gid)) {
@@ -79,7 +82,7 @@ function stats(db, gid) {
     s.contacted += 1;
     if (r.state === 'i') s.interested += 1;
     if (r.state === 'j') s.joined += 1;
-    if (rows.find((x) => x.name === r.name && x.stayed)) s.stayed += 1;
+    if (stayed.has(r.name)) s.stayed += 1;
     by.set(r.recruiter, s);
   }
   const counts = { c: 0, i: 0, n: 0, j: 0 };

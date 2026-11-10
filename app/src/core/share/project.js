@@ -596,7 +596,12 @@ function projectRk(db, gid, k) {
     return;
   }
   const seen = Math.floor(Date.now() / 1000);
-  const by = f.pid && st.isLinked(db, gid, r.author, f.pid) ? st.userForPid(db, gid, f.pid) : null;
+  let by = f.pid && st.isLinked(db, gid, r.author, f.pid) ? st.userForPid(db, gid, f.pid) : null;
+  // At most 30 contacts a day count for one recruiter (the addon's own cap): claiming every name earns nothing more.
+  if (by && !(row && row.recruiter)) {
+    const n = db.prepare('SELECT COUNT(*) AS n FROM recruits WHERE guild_id = ? AND recruiter = ? AND contacted_at >= ?').get(gid, by, seen - 86400).n;
+    if (n >= 30) by = null;
+  }
   const at = Number.isInteger(f.at) ? f.at : r.t;
   const joinedAt = f.state === 'j' ? (row && row.joined_at) || seen : (row ? row.joined_at : null);
   db.prepare(`INSERT INTO recruits (guild_id, name, recruiter, level, class, zone, state, at, contacted_at, joined_at) VALUES (?,?,?,?,?,?,?,?,?,?)
