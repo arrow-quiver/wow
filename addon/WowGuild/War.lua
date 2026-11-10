@@ -92,55 +92,83 @@ function W.record(pid)
 end
 
 -- ---------- dying to players: the mark, and a call for help ----------
--- A death counts as PvP when a player, or something a player controls (a pet, a totem), hurt me in the last
--- PVP_WINDOW seconds: in a contested zone most deaths are still to mobs. Remembered from the combat log.
-W.PVP_WINDOW = 10
-local TYPE_PLAYER = COMBATLOG_OBJECT_TYPE_PLAYER or 0x400
-local CONTROL_PLAYER = COMBATLOG_OBJECT_CONTROL_PLAYER or 0x100
-local lastPlayerHit -- GetTime() of the last damage a player-controlled source did to me
-
--- Bit test without the bit library (flags are small positive integers; a bit is a power of two).
-local function hasFlag(flags, bitValue)
-  return type(flags) == "number" and math.floor(flags / bitValue) % 2 == 1
+-- Was this death to players? Addons can't read the combat log here: registering COMBAT_LOG_EVENT_UNFILTERED is
+-- refused outright ("blocked from an action only available to the Blizzard UI", as the addon loads). So:
+--   1. the game's death recap, when it has one: a player, or a player's pet, among what hit me;
+--   2. else: I'm flagged for PvP in a zone where players fight (contested, enemy or combat zones).
+-- The app's live link reads the combat log file the game writes and knows exactly; this is the in-game best guess.
+local function isPlayerGuid(g)
+  if type(g) ~= "string" then return false end
+  local ok, yes = pcall(function() return string.find(g, "^Player%-") ~= nil or string.find(g, "^Pet%-") ~= nil end)
+  return ok and yes
 end
 
-local function clock() return (GetTime and ns.try(GetTime)) or time() end
+local function recapSays()
+  local dr = C_DeathRecap
+  if not dr or not dr.GetRecapEvents then return nil end
+  local ok, events = pcall(dr.GetRecapEvents)
+  if not ok or type(events) ~= "table" or #events == 0 then return nil end
+  for _, e in ipairs(events) do
+    if type(e) == "table" and (isPlayerGuid(e.sourceGUID) or isPlayerGuid(e.srcGUID)) then return true end
+  end
+  return false
+end
 
-function W.combatEvent()
-  if not CombatLogGetCurrentEventInfo then return end
-  -- This runs for every line of the combat log around me: the cheapest test (is it about me?) first.
-  local _, sub, _, srcGUID, _, srcFlags, _, dstGUID = CombatLogGetCurrentEventInfo()
-  local me = UnitGUID and UnitGUID("player")
-  if not me or dstGUID ~= me or srcGUID == me then return end
-  if type(sub) ~= "string" or not string.find(sub, "_DAMAGE$") then return end
-  if hasFlag(srcFlags, TYPE_PLAYER) or hasFlag(srcFlags, CONTROL_PLAYER) then lastPlayerHit = clock() end
+local function pvpArea()
+  if not (UnitIsPVP and ns.try(UnitIsPVP, "player")) then return false end
+  local get = (C_PvP and C_PvP.GetZonePVPInfo) or GetZonePVPInfo
+  local kind = get and ns.try(get)
+  return kind == "contested" or kind == "hostile" or kind == "combat"
 end
 
 function W.killedByPlayers()
-  return lastPlayerHit ~= nil and clock() - lastPlayerHit <= W.PVP_WINDOW
+  local r = recapSays()
+  if r ~= nil then return r end
+  return pvpArea()
 end
 
-StaticPopupDialogs["WOWGUILD_CALL_HELP"] = {
-  text = "You died in %s.\nCall your guild for help?",
-  button1 = "Call the guild",
-  button2 = "No",
-  OnAccept = function(_, data)
-    ns.addCta(data and data.zone, nil, "Died to players here. Help!")
-  end,
-  timeout = 30,
-  whileDead = true,
-  hideOnEscape = true,
-  preferredIndex = 3,
-}
+-- Our own small dialog, not Blizzard's StaticPopup: an addon popup in StaticPopup's shared frames can taint them, and
+-- the game then blocks Blizzard's own popups that share them (Release Spirit right after a death, among others) and
+-- blames this addon. Closes by itself after HELP_TIMEOUT seconds.
+W.HELP_TIMEOUT = 30
+local prompt
+local function helpPrompt()
+  if prompt then return prompt end
+  local f = CreateFrame("Frame", "WowGuildHelpPrompt", UIParent)
+  f:SetSize(300, 96); f:SetPoint("TOP", 0, -180); f:SetFrameStrata("DIALOG")
+  if ns.skin and ns.skin.panel then ns.skin.panel(f) end
+  f.text = ns.skin and ns.skin.text and ns.skin.text(f, "body", "") or f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  f.text:SetPoint("TOP", 0, -14); f.text:SetWidth(272)
+  f.yes = CreateFrame("Button", nil, f, "UIPanelButtonTemplate"); f.yes:SetSize(130, 24); f.yes:SetPoint("BOTTOMLEFT", 14, 12)
+  f.yes:SetText("Call the guild")
+  f.yes:SetScript("OnClick", function() f:Hide(); ns.addCta(f.zone, nil, "Died to players here. Help!") end)
+  f.no = CreateFrame("Button", nil, f, "UIPanelButtonTemplate"); f.no:SetSize(130, 24); f.no:SetPoint("BOTTOMRIGHT", -14, 12)
+  f.no:SetText("No"); f.no:SetScript("OnClick", function() f:Hide() end)
+  f:SetScript("OnUpdate", function(self, elapsed)
+    self.left = (self.left or 0) - (elapsed or 0)
+    if self.left <= 0 then self:Hide() end
+  end)
+  f:Hide()
+  prompt = f
+  return f
+end
+W.helpPrompt = helpPrompt
+
+function W.askForHelp(zone)
+  local f = helpPrompt()
+  f.zone = zone
+  f.text:SetText(string.format("You died in %s.\nCall your guild for help?", zone or "the open world"))
+  f.left = W.HELP_TIMEOUT
+  f:Show()
+end
 
 -- → the mark, or nil (not killed by players, or outside the open world).
 function W.died()
   if not W.killedByPlayers() then return nil end
-  lastPlayerHit = nil
   local m = W.mark("d")
   if not m or ns.opt("warHelp") == false then return m end
   local zone = (GetZoneText and ns.try(GetZoneText)) or mapName(m.map) or "the open world"
-  if StaticPopup_Show then ns.try(StaticPopup_Show, "WOWGUILD_CALL_HELP", zone, nil, { zone = zone }) end
+  ns.safely(W.askForHelp, zone)
   return m
 end
 
@@ -168,7 +196,6 @@ function W.isHonorKill(text)
   return not known and string.find(string.lower(text), "honorable kill", 1, true) ~= nil
 end
 
-ns.on("COMBAT_LOG_EVENT_UNFILTERED", function() ns.safely(W.combatEvent) end)
 ns.on("PLAYER_DEAD", function() ns.safely(W.died) end)
 ns.on("CHAT_MSG_COMBAT_HONOR_GAIN", function(text)
   if W.isHonorKill(text) then ns.safely(W.mark, "k") end
@@ -224,11 +251,13 @@ end
 function W.refreshPins()
   local map = WorldMapFrame
   if not layer or not map or not map.IsShown or not map:IsShown() then return 0 end
+  layer:Show()
   for _, p in ipairs(pins) do p:Hide() end
   if ns.opt("warMap") == false then return 0 end
   local id = map.GetMapID and ns.try(map.GetMapID, map)
   if type(id) ~= "number" then return 0 end
-  local w, h = layer:GetWidth(), layer:GetHeight()
+  local canvas = layer.canvas
+  local w, h = canvas:GetWidth(), canvas:GetHeight()
   if not w or w <= 0 or not h or h <= 0 then return 0 end
   local shown = 0
   for i, m in ipairs(W.marksFor(id)) do
@@ -236,7 +265,7 @@ function W.refreshPins()
     p.mark = m
     p.dot:SetColorTexture(m.kind == "k" and 0.35 or 0.95, m.kind == "k" and 0.85 or 0.25, m.kind == "k" and 0.4 or 0.2, 0.9)
     p:ClearAllPoints()
-    p:SetPoint("CENTER", layer, "TOPLEFT", w * m.x / 1000, -h * m.y / 1000)
+    p:SetPoint("CENTER", canvas, "TOPLEFT", w * m.x / 1000, -h * m.y / 1000)
     p:Show()
     shown = shown + 1
   end
@@ -248,10 +277,20 @@ function W.attach()
   if layer or not map then return end
   local canvas = (map.GetCanvas and ns.try(map.GetCanvas, map)) or (map.ScrollContainer and map.ScrollContainer.Child)
   if not canvas then return end
-  layer = CreateFrame("Frame", "WowGuildWarPins", canvas)
-  layer:SetAllPoints(canvas)
-  if layer.SetFrameLevel and canvas.GetFrameLevel then layer:SetFrameLevel((canvas:GetFrameLevel() or 1) + 20) end
-  map:HookScript("OnShow", function() ns.safely(W.refreshPins) end)
+  -- Our own layer, laid over the map: nothing is added to Blizzard's map frames (that taints them, and the game then
+  -- blocks the map's own protected calls in combat and blames this addon). It covers the map's visible area and clips
+  -- the pins to it; each pin is placed on the map canvas (anchoring to a Blizzard frame doesn't change it).
+  layer = CreateFrame("Frame", "WowGuildWarPins", UIParent)
+  layer.canvas = canvas
+  local view = map.ScrollContainer or canvas
+  layer:SetAllPoints(view)
+  if layer.SetClipsChildren then layer:SetClipsChildren(true) end
+  if layer.EnableMouse then layer:EnableMouse(false) end
+  if layer.SetFrameStrata and map.GetFrameStrata then layer:SetFrameStrata(map:GetFrameStrata() or "HIGH") end
+  if layer.SetFrameLevel and map.GetFrameLevel then layer:SetFrameLevel((map:GetFrameLevel() or 1) + 50) end
+  layer:Hide()
+  map:HookScript("OnShow", function() layer:Show(); ns.safely(W.refreshPins) end)
+  map:HookScript("OnHide", function() layer:Hide() end)
   if hooksecurefunc and map.OnMapChanged then
     hooksecurefunc(map, "OnMapChanged", function() ns.safely(W.refreshPins) end)
   end

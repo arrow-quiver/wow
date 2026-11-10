@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HowBowWoW · Guild Camp</title>
+<meta name="description" content="HowBowWoW: a casual World of Warcraft guild for dungeons and PvP. Download the Guild Camp desktop app.">
+<link rel="icon" href="/logo.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Alegreya:wght@700;800&family=Alegreya+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --pine: #18222e; --pine-2: #1a5d8f; --frame-2: #223142; --frame-line: #2a3a4c;
+    --ember: #eaa93a; --ember-soft: #f2bd5c; --on-accent: #231505;
+    --cream: #efe8d8; --text-2: #a9b6c3; --text-3: #7d8c9b;
+    --bg: #111922; --surface: #18222e;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--cream);
+    font: 400 17px/1.55 "Alegreya Sans", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3 { font-family: "Alegreya", Georgia, serif; line-height: 1.15; margin: 0 0 .4em; }
+  a { color: var(--ember-soft); text-underline-offset: 3px; }
+  :focus-visible { outline: 2px solid var(--ember); outline-offset: 3px; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 0 16px; }
+
+  header.hero {
+    position: relative; overflow: hidden;
+    background:
+      radial-gradient(ellipse 60% 70% at 50% 0%, rgba(234,169,58,.20), transparent 70%),
+      linear-gradient(180deg, var(--pine) 0%, var(--bg) 100%);
+    border-bottom: 1px solid var(--frame-line);
+    padding: 56px 0 64px; text-align: center;
+  }
+  .logo { width: 72px; height: 84px; filter: drop-shadow(0 0 24px rgba(234,169,58,.55)); animation: flicker 3.2s ease-in-out infinite; }
+  @keyframes flicker { 0%,100% { transform: scale(1); } 40% { transform: scale(1.04) rotate(-1deg); } 70% { transform: scale(.98) rotate(1deg); } }
+  @media (prefers-reduced-motion: reduce) { .logo { animation: none; } }
+  .eyebrow { margin: 18px 0 6px; font-size: 13px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--text-2); }
+  h1 { font-size: clamp(44px, 9vw, 84px); font-weight: 800; letter-spacing: -.01em; margin-bottom: .15em; }
+  h1 span { color: var(--ember); }
+  .tagline { font-size: clamp(18px, 2.6vw, 22px); color: var(--text-2); max-width: 36ch; margin: 0 auto 30px; }
+  .pills { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 0 0 34px; padding: 0; list-style: none; }
+  .pills li { border: 1px solid var(--frame-line); background: rgba(255,255,255,.03); border-radius: 999px; padding: 6px 14px; font-weight: 500; }
+
+  .download { display: inline-flex; align-items: center; gap: 12px; background: var(--ember); color: var(--on-accent);
+    text-decoration: none; font-weight: 700; font-size: 20px; padding: 16px 30px; border-radius: 12px;
+    box-shadow: 0 10px 30px -8px rgba(234,169,58,.55); transition: background .15s, transform .15s; }
+  .download:hover { background: var(--ember-soft); transform: translateY(-1px); }
+  .download svg { width: 22px; height: 22px; flex: none; }
+  .meta { margin: 14px 0 0; font-size: 14px; color: var(--text-3); }
+  .meta a { color: var(--text-2); }
+
+  section { padding: 56px 0; }
+  section h2 { font-size: clamp(28px, 4vw, 36px); text-align: center; }
+  .lead { text-align: center; color: var(--text-2); max-width: 60ch; margin: 0 auto 32px; }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+  .card { background: var(--surface); border: 1px solid var(--frame-line); border-radius: 14px; padding: 22px; }
+  .card .ico { font-size: 26px; line-height: 1; margin-bottom: 10px; }
+  .card h3 { font-size: 22px; }
+  .card p { margin: 0; color: var(--text-2); }
+
+  .shot { margin: 0; border-radius: 14px; overflow: hidden; border: 1px solid var(--frame-line); box-shadow: 0 30px 60px -30px rgba(0,0,0,.8); }
+  .shot img { display: block; width: 100%; height: auto; }
+  .shot figcaption { background: var(--surface); padding: 10px 16px; font-size: 14px; color: var(--text-3); }
+
+  ol.steps { counter-reset: s; list-style: none; padding: 0; margin: 0 auto; max-width: 720px; display: grid; gap: 12px; }
+  ol.steps li { counter-increment: s; position: relative; background: var(--surface); border: 1px solid var(--frame-line); border-radius: 12px; padding: 16px 18px 16px 64px; }
+  ol.steps li::before { content: counter(s); position: absolute; left: 16px; top: 14px; width: 32px; height: 32px; border-radius: 50%;
+    background: var(--pine-2); color: #fff; font-weight: 700; display: grid; place-items: center; }
+  ol.steps strong { color: var(--cream); }
+  ol.steps span { color: var(--text-2); }
+  code { background: var(--frame-2); border: 1px solid var(--frame-line); border-radius: 5px; padding: .05em .35em; font-size: .9em; }
+
+  .cta { text-align: center; background: linear-gradient(180deg, var(--bg), var(--pine)); border-top: 1px solid var(--frame-line); }
+  footer { text-align: center; padding: 26px 16px 36px; font-size: 13px; color: var(--text-3); background: var(--pine); }
+
+  @media (max-width: 520px) {
+    header.hero { padding: 40px 0 48px; }
+    .download { width: 100%; justify-content: center; font-size: 18px; padding: 15px 20px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <img class="logo" src="/logo.svg" alt="" width="72" height="84">
+    <p class="eyebrow">World of Warcraft guild</p>
+    <h1>HowBow<span>WoW</span></h1>
+    <p class="tagline">A casual crew for dungeon runs and PvP brawls. No pressure, just good times.</p>
+    <ul class="pills" aria-label="What we do">
+      <li>🏕️ Casual</li><li>🗝️ Dungeons</li><li>⚔️ PvP</li>
+    </ul>
+    <a class="download" id="dl" href="https://github.com/arrow-quiver/wow/releases/latest">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m6 10 6 6 6-6"/><path d="M4 21h16"/></svg>
+      <span id="dl-label">Download the desktop app</span>
+    </a>
+    <p class="meta"><span id="dl-meta">Guild Camp for Windows</span> · <a href="https://github.com/arrow-quiver/wow/releases">all versions</a></p>
+  </div>
+</header>
+
+<main>
+  <section>
+    <div class="wrap">
+      <h2>Your guild, in one app</h2>
+      <p class="lead">Guild Camp is our desktop app. It sits next to the game and keeps the whole guild in one place: who's online, what's coming up and who needs a hand.</p>
+      <div class="cards">
+        <div class="card"><div class="ico">🔥</div><h3>Camp</h3><p>See who's online around the fire, and sound a call to arms when someone's getting ganked.</p></div>
+        <div class="card"><div class="ico">🗝️</div><h3>Dungeons &amp; raids</h3><p>Sign up for runs, pick your role, and soft-reserve the loot you're after.</p></div>
+        <div class="card"><div class="ico">⚔️</div><h3>PvP</h3><p>Premades, war alerts to Discord and a war map of where the fighting is.</p></div>
+        <div class="card"><div class="ico">🧭</div><h3>Coach</h3><p>Talent plans, upgrade tips on tooltips and an overlay you can pull up mid-game.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section style="padding-top:0">
+    <div class="wrap">
+      <figure class="shot">
+        <img src="/camp.png" alt="The Guild Camp app: guildmates around the campfire, calls to arms and upcoming raids" width="1602" height="1028" loading="lazy">
+        <figcaption>The Camp page in Guild Camp</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>Get set up in a minute</h2>
+      <p class="lead">The app does the fiddly bits for you, including the addon.</p>
+      <ol class="steps">
+        <li><strong>Download and run the installer.</strong> <span>If Windows SmartScreen pops up, click <em>More info</em> → <em>Run anyway</em>.</span></li>
+        <li><strong>Open Guild Camp.</strong> <span>It finds your WoW folder and installs the guild addon for you.</span></li>
+        <li><strong>Log in to WoW and play.</strong> <span>Guild info shares in game through the addon. Type <code>/reload</code> if the app's waiting for fresh data.</span></li>
+      </ol>
+      <p class="lead" style="margin-top:20px">The app and addon keep themselves up to date.</p>
+    </div>
+  </section>
+
+  <section class="cta">
+    <div class="wrap">
+      <h2>See you around the fire</h2>
+      <p class="lead">Whisper an officer in game for an invite.</p>
+      <a class="download" id="dl2" href="https://github.com/arrow-quiver/wow/releases/latest">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m6 10 6 6 6-6"/><path d="M4 21h16"/></svg>
+        <span>Download Guild Camp</span>
+      </a>
+    </div>
+  </section>
+</main>
+
+<footer>HowBowWoW · Guild Camp is a fan-made guild tool, not affiliated with Blizzard Entertainment.</footer>
+
+<script>
+  // Point the buttons straight at the newest installer on GitHub.
+  // Falls back to the GitHub "latest release" page if the lookup fails.
+  (function () {
+    fetch('https://api.github.com/repos/arrow-quiver/wow/releases/latest', { headers: { Accept: 'application/vnd.github+json' } })
+      .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+      .then(function (rel) {
+        var exe = (rel.assets || []).filter(function (a) { return /\.exe$/i.test(a.name); })[0];
+        if (!exe) return;
+        ['dl', 'dl2'].forEach(function (id) { document.getElementById(id).href = exe.browser_download_url; });
+        var ver = (rel.tag_name || '').replace(/^v/, '');
+        var mb = Math.round(exe.size / 1048576);
+        document.getElementById('dl-meta').textContent = 'Guild Camp ' + ver + ' for Windows · ' + mb + ' MB';
+      })
+      .catch(function () {});
+  })();
+</script>
+</body>
+</html>

@@ -121,10 +121,16 @@ function T.glow(nextRow)
   end
   local button = scan(frame, 1)
   if not button then return end
-  button.wgCoachGlow = button.wgCoachGlow or button:CreateTexture(nil, "OVERLAY")
-  glowTex = button.wgCoachGlow
-  glowTex:SetTexture("Interface\\Buttons\\CheckButtonHilight")
-  if glowTex.SetBlendMode then glowTex:SetBlendMode("ADD") end
+  -- The glow is a frame of ours laid over the button, never something added to Blizzard's talent button: writing to
+  -- a Blizzard frame taints it, and the game then blocks learning talents and blames this addon.
+  glowTex = glowTex or CreateFrame("Frame", "WowGuildCoachGlow", UIParent)
+  if glowTex.SetFrameStrata and frame.GetFrameStrata then glowTex:SetFrameStrata(frame:GetFrameStrata() or "HIGH") end
+  if glowTex.SetFrameLevel and button.GetFrameLevel then glowTex:SetFrameLevel((button:GetFrameLevel() or 1) + 5) end
+  if glowTex.EnableMouse then glowTex:EnableMouse(false) end
+  glowTex.tex = glowTex.tex or glowTex:CreateTexture(nil, "OVERLAY")
+  glowTex.tex:SetAllPoints()
+  glowTex.tex:SetTexture("Interface\\Buttons\\CheckButtonHilight")
+  if glowTex.tex.SetBlendMode then glowTex.tex:SetBlendMode("ADD") end
   glowTex:ClearAllPoints(); glowTex:SetPoint("TOPLEFT", button, -6, 6); glowTex:SetPoint("BOTTOMRIGHT", button, 6, -6)
   glowTex:Show()
   T.glowing = nextRow.name

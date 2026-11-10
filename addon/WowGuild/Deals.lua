@@ -172,7 +172,9 @@ function DH.show()
   local f = DH.panel()
   local ah = ahFrame()
   f:ClearAllPoints()
-  if ah and ah.IsShown and ah:IsShown() then f:SetPoint("TOPLEFT", ah, "TOPRIGHT", 6, 0) else f:SetPoint("CENTER", 300, 0) end
+  local gc = ns.ahTab and ns.ahTab.frame
+  if gc and gc:IsShown() then f:SetPoint("TOPLEFT", gc, "TOPRIGHT", 6, 0)
+  elseif ah and ah.IsShown and ah:IsShown() then f:SetPoint("TOPLEFT", ah, "TOPRIGHT", 6, 0) else f:SetPoint("CENTER", 300, 0) end
   DH.refresh()
   f:Show()
 end

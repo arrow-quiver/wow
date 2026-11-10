@@ -124,7 +124,7 @@ function ns.updateAvailable()
 end
 
 -- Options (Settings → AddOns → Guild Camp). Defaults are on.
-ns.DEFAULTS = { blizzardStyle = false, dealsPanel = true, coachTalents = true, liveLink = false, warMap = true, warHelp = true, seasonTooltips = true, tooltips = true, minimapButton = true, loginNews = true, autoGuide = true, trackerOnLogin = true, collectBank = true, updateNotice = true }
+ns.DEFAULTS = { blizzardStyle = false, ahTab = true, dealsPanel = true, coachTalents = true, liveLink = false, warMap = true, warHelp = true, seasonTooltips = true, tooltips = true, minimapButton = true, loginNews = true, autoGuide = true, trackerOnLogin = true, collectBank = true, updateNotice = true }
 function ns.opt(key)
   local o = ns.db and ns.db.options
   if o and o[key] ~= nil then return o[key] end
