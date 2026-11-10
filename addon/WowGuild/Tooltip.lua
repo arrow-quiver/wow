@@ -19,6 +19,8 @@ local function build()
   for _, p in ipairs(inbox.prices or {}) do prices[p.id] = p.price end
 end
 function T.reset() holdings = nil end
+-- "Name1,Name2" of guild crafters for an item name, or nil.
+function T.craftersFor(name) build(); return name and crafters[string.lower(name)] or nil end
 
 -- Lines to add for an item, as { left, right } pairs. Kept separate from the hook so it can be tested.
 function T.linesFor(id, name)
