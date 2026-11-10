@@ -76,6 +76,10 @@ lifetime badges show on your tooltip in game, and officers announce the winners 
 Gifts and new badges get an automatic thank-you on Discord. See the **Seasons** page or type `/wow season`.
 Points buy things in the **guild bank store**: officers put items up for points, guildies order, officers mail them.
 
+**Your week.** The Coach measures how you actually play from the combat log (time in fights, deaths, PvP wins
+and losses) instead of guessing, and the Coach page shows this week against last week with tips: what killed you
+most, who keeps getting you, whether you die in seconds. **Ask the Coach about my week** gets advice on it.
+
 **War alerts and the war map.** Die to players and the app posts it to the guild's Discord at once ("⚔️ Grom died to
 Sneaky and 2 more in Hillsbrad Foothills. Anyone near?"), so whoever's close can come and help. In game, a popup
 after a death in a PvP area calls the guild to arms in one click; the overlay and the **War** page have a

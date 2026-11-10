@@ -102,6 +102,7 @@ function CoachBody({ data, reload }) {
     ${!ch ? html`<${GettingStarted} />` : html`
       ${data.characters.length > 1 ? html`<${CharacterPicker} characters=${data.characters} current=${ch.name} />` : null}
       <${StyleCard} ch=${ch} />
+      <${WeekCard} ch=${ch} ai=${data.ai} reload=${reload} />
       <div class="cols coach-cols">
         <${PlanCard} data=${data} reload=${reload} />
         <div class="stack">
@@ -476,3 +477,37 @@ function QuestionItem({ q }) {
 
 // For tests.
 export const _test = { score, stepKey, ARCHETYPES };
+
+// ---------- the weekly report: how I actually played (the live link), against last week ----------
+function trend(cur, prev, lowerIsBetter) {
+  if (cur == null || prev == null || cur === prev) return null;
+  const better = lowerIsBetter ? cur < prev : cur > prev;
+  return html`<span class=${better ? 'week-up' : 'week-down'}>${cur > prev ? '▲' : '▼'} ${Math.abs(Math.round((cur - prev) * 10) / 10)}</span>`;
+}
+
+function WeekCard({ ch, ai, reload }) {
+  const q = useApi(`/api/coach/report?char=${encodeURIComponent(ch.name)}`);
+  const ask = useAction((text) => api.post('/api/coach/ask', {
+    char: ch.name, fresh: true, live: text, question: 'Here is my week. What should I work on first, and how?',
+  }), { success: 'Asked. The answer shows under Ask.' });
+  const r = q.data;
+  if (!r) return null;
+  const w = r.week; const p = r.lastWeek;
+  if (!w.sessions) {
+    return html`<${Card} title="Your week" sub="measured from the combat log">
+      <p class="hint mb-0">${r.tips[0] || 'Turn on the live link (Settings → Overlay & live) and type /wow live on in game: the Coach then measures how you actually play.'}</p>
+    <//>`;
+  }
+  return html`<${Card} title="Your week" sub=${`${w.hours} hours over ${w.sessions} session${w.sessions === 1 ? '' : 's'}, measured from the combat log`}
+      actions=${ai && ai.available && r.text ? html`<${Button} size="sm" variant="primary" icon="spark" busy=${ask.busy}
+        onClick=${async () => { if ((await ask.run(r.text)).ok) reload(); }}>Ask the Coach about my week<//>` : null}>
+    <div class="week-grid">
+      <div><span class="hint">Kills / hour</span><b>${w.killsPerHour ?? '–'}</b>${trend(w.killsPerHour, p.killsPerHour, false)}</div>
+      <div><span class="hint">Deaths / hour</span><b>${w.deathsPerHour ?? '–'}</b>${trend(w.deathsPerHour, p.deathsPerHour, true)}</div>
+      <div><span class="hint">PvP won : lost</span><b>${w.pvpKills} : ${w.pvpDeaths}</b></div>
+      <div><span class="hint">In combat</span><b>${Math.round(w.fightShare * 100)}%</b></div>
+    </div>
+    ${r.style ? html`<p class="week-labels">${r.style.labels.map((l) => html`<${Pill} key=${l} kind="muted">${l}<//> `)}</p>` : null}
+    <ul class="list-tight">${r.tips.map((t) => html`<li key=${t}>${t}</li>`)}</ul>
+  <//>`;
+}
