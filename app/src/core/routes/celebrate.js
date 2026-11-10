@@ -22,12 +22,13 @@ function register(app, ctx) {
     const c = { character: from, zone: `celebrate:${what}`, message: '' };
     const at = CtaDiscord.claim(db, req.guild.id, c);
     if (!at) return res.json({ posted: false, duplicate: true });
-    ctx.activity(req.guild.id, 'celebrate', Celebrate.linkName(what));
     let posted = false;
     if (ctx.cfg.discordWebhook) {
       posted = Boolean(await ctx.discord(null, text));
-      if (!posted) CtaDiscord.release(db, req.guild.id, c, at);
+      // Failed: give the claim back so a retry posts it; the activity entry waits for that.
+      if (!posted) { CtaDiscord.release(db, req.guild.id, c, at); return res.json({ posted }); }
     }
+    ctx.activity(req.guild.id, 'celebrate', Celebrate.linkName(what));
     res.json({ posted });
   });
 

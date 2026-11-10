@@ -62,6 +62,9 @@ function importRule(db, gid, rec, how, prevOk) {
       if (prevOk && !prevOk.del && ['cr', 'dc', 'bq', 'dg', 'bb', 'kk'].includes(rec.type) && !rec.del && prevOk.fields.pid !== pid) return 'owner';
     } else if (!rec.del) return 'link';
   }
+  // Deleting someone's boss kill is theirs to do too.
+  if (rec.type === 'ek' && rec.del && prevOk && !prevOk.del
+    && String(prevOk.author || '').split('-')[0].toLowerCase() !== String(rec.author || '').split('-')[0].toLowerCase()) return 'owner';
   if (rec.del) return null;
   // A raid boss kill: written by a raider in it, about now, and only they can change it later.
   if (rec.type === 'ek') {

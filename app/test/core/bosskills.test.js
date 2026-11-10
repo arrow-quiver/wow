@@ -43,6 +43,9 @@ test('boss kills: the raid they belong to, attendance points once, the raid page
     h.rec('ek', 'e00008', h.NOW - 60, 'Jaina', { enc: 2, boss: 'Old', instance: 'Molten Core', at: start - 5 * 86400, size: 40, names: ['Jaina'] }),
   ]);
   assert.ok(!BK.kills(db, gid).some((k) => k.boss === 'Fake' || k.boss === 'Old'));
+  // Someone who didn't write it can't delete it either.
+  h.imp([h.rec('ek', 'e00001', h.NOW - 50, 'Zuljinne', null, { del: true })]);
+  assert.ok(BK.kills(db, gid).some((k) => k.boss === 'Lucifron'));
   // The digest names the bosses.
   const d = G.digest(db, gid, { week: new Date((start + 1800) * 1000).toISOString().slice(0, 10) });
   assert.match(G.discordText(d), /💀 Bosses down: Lucifron/);
