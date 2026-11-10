@@ -25,7 +25,7 @@ const dayToDate = (d) => new Date(SCAN_DAY_0 + d * 86400000).toISOString().slice
 const skillName = (id) => S.SKILLS[id] || `Skill ${id}`;
 
 // Dependency order: links first (users), then settings, loot lists before raids and awards, loyalty last.
-const ORDER = ['ch', 'cfg', 'bc', 'bk', 'rc', 'll', 'raid', 'la', 'loyalty', 'cr', 'lp', 'bb', 'ca', 'an', 'drive', 'dc', 'bq', 'gb', 'sh', 'pr', 'wm', 'st'];
+const ORDER = ['ch', 'cfg', 'bc', 'bk', 'rc', 'll', 'raid', 'la', 'loyalty', 'cr', 'lp', 'ko', 'kk', 'bb', 'ca', 'an', 'bt', 'drive', 'dc', 'bq', 'gb', 'sh', 'pr', 'wm', 'st'];
 
 function tasksFor(rec, prevRec) {
   if (!rec) return [];
@@ -51,6 +51,9 @@ function tasksFor(rec, prevRec) {
     case 'cl': out.push(`cr:${segs[0]}`); break;
     case 'lp': out.push(`lp:${rec.key}`); break;
     case 'bb': out.push(`bb:${rec.key}`); break;
+    case 'ko': out.push(`ko:${rec.key}`); break;
+    case 'kk': out.push(`kk:${rec.key}`); break;
+    case 'BT': out.push(`bt:${rec.key}`); break;
     case 'ca': out.push(`ca:${rec.key}`); break;
     case 'AN': out.push(`an:${rec.key}`); break;
     case 'DR': out.push(`drive:${rec.key}`); break;
@@ -564,6 +567,39 @@ function projectBb(db, gid, k) {
   else db.prepare('INSERT INTO bulletin_posts (user_id, character, kind, text, price, created_at, guild_id, share_id) VALUES (?,?,?,?,?,?,?,?)').run(...vals, t, gid, k);
 }
 
+// ko: kos (taken off 'x' or expired: gone)
+function projectKo(db, gid, k) {
+  const r = liveRec(st.effective(db, gid, `ko:${k}`));
+  if (!r || r.fields.state === 'x') { db.prepare('DELETE FROM kos WHERE guild_id = ? AND name = ?').run(gid, k); return; }
+  const by = r.fields.pid ? st.userForPid(db, gid, r.fields.pid) : null;
+  db.prepare(`INSERT INTO kos (guild_id, name, reason, added_by, added_at) VALUES (?,?,?,?,?)
+    ON CONFLICT (guild_id, name) DO UPDATE SET reason = excluded.reason, added_by = excluded.added_by, added_at = excluded.added_at`)
+    .run(gid, k, r.fields.reason || null, by, st.iso(r.t));
+}
+
+// kk: hunt_kills (expired: gone)
+function projectKk(db, gid, k) {
+  const e = st.effective(db, gid, `kk:${k}`);
+  if (!e && dropped(db, gid, `kk:${k}`)) return;
+  const r = liveRec(e);
+  const f = r ? r.fields : {};
+  if (!r || !f.target) { db.prepare('DELETE FROM hunt_kills WHERE guild_id = ? AND share_id = ?').run(gid, k); return; }
+  const uid = st.userForPid(db, gid, f.pid);
+  db.prepare('INSERT OR REPLACE INTO hunt_kills (guild_id, share_id, user_id, target, zone, at, kos, bounty) VALUES (?,?,?,?,?,?,?,?)')
+    .run(gid, k, uid || null, f.target, f.zone || null, Number.isInteger(f.at) ? f.at : r.t, f.kos ? 1 : 0, f.bounty || null);
+}
+
+// BT: bounties (expired: gone; closed: state x)
+function projectBt(db, gid, k) {
+  const r = liveRec(st.effective(db, gid, `BT:${k}`));
+  const f = r ? r.fields : {};
+  if (!r || (!f.target && !f.zone) || !(f.points > 0)) { db.prepare('DELETE FROM bounties WHERE guild_id = ? AND share_id = ?').run(gid, k); return; }
+  const vals = [f.target || null, f.zone || null, f.points, Math.max(1, f.cap || 1), f.ends || 0, f.note || null, f.state === 'x' ? 'x' : 'o'];
+  const row = db.prepare('SELECT id FROM bounties WHERE guild_id = ? AND share_id = ?').get(gid, k);
+  if (row) db.prepare('UPDATE bounties SET target = ?, zone = ?, points = ?, cap = ?, until = ?, note = ?, state = ? WHERE id = ?').run(...vals, row.id);
+  else db.prepare('INSERT INTO bounties (target, zone, points, cap, until, note, state, guild_id, share_id, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)').run(...vals, gid, k, st.iso(r.t));
+}
+
 function projectCa(db, gid, k) {
   const ca = liveRec(st.effective(db, gid, `ca:${k}`));
   const row = db.prepare('SELECT id FROM ctas WHERE guild_id = ? AND share_id = ?').get(gid, k);
@@ -851,6 +887,9 @@ function run(db, gid, tasks, { out = {} } = {}) {
       case 'cr': projectCr(db, gid, arg); break;
       case 'lp': projectLp(db, gid, arg); break;
       case 'bb': projectBb(db, gid, arg); break;
+      case 'ko': projectKo(db, gid, arg); break;
+      case 'kk': projectKk(db, gid, arg); break;
+      case 'bt': projectBt(db, gid, arg); break;
       case 'ca': projectCa(db, gid, arg); break;
       case 'an': projectAn(db, gid, arg); break;
       case 'drive': projectDrive(db, gid, arg); break;

@@ -1320,3 +1320,11 @@ a.wh.q0 { color: var(--q-0) !important; } a.wh.q1 { color: var(--q-1) !important
 .board-card.is-mine { border-color: var(--accent, currentColor); }
 .digest-text { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: 0.9em; margin: 0 0 12px; }
 @media (max-width: 720px) { .board-form { grid-template-columns: 1fr; } }
+
+/* The hunt */
+.hunt-form { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+.hunt-name { color: var(--danger, #e05a4f); }
+.hunt-points { font-size: 1.25em; color: var(--accent, currentColor); }
+.hunt-list { list-style: none; padding: 0; margin: 0; }
+.hunt-bounty { border-bottom: 1px solid var(--line, rgba(127,127,127,.2)); padding-bottom: 10px; }
+.hunt-bounty:last-child { border-bottom: 0; padding-bottom: 0; }

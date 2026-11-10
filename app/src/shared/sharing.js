@@ -151,6 +151,17 @@ const TYPES = {
     key: ['pid', 'name'], max: 400, expiry: { days: 3 },
     fields: [text('character', 48), int('level'), text('zone', 60), text('when', 60), text('note', 140)],
   },
+  // Kill on sight: an Alliance player the guild hunts. Keyed by their name; any member adds one or takes it off
+  // (state 'x'), and the last change wins.
+  ko: {
+    key: ['name'], max: 300, expiry: { days: 90 },
+    fields: [text('pid', 64), text('reason', 100), enm('state', 'ox')],
+  },
+  // A kill that counts: a kill-on-sight target or a bounty's. Written by the killer; pays season points.
+  kk: {
+    key: ['b36x6'], max: 260, expiry: { days: 45 },
+    fields: [text('pid', 64), text('target', 24), text('zone', 60), int('at'), int('kos'), text('bounty', 6)],
+  },
   // Guild bulletin board: a post a guildmate puts up (looking for group, selling, buying, asking for help).
   // Taking it down is final ('x'); a post lasts a week.
   bb: {
@@ -246,6 +257,12 @@ const TYPES = {
   LY: {
     key: ['b36x6'], max: 3072, expiry: { never: true },
     fields: [int('upto'), list('bonuses', 200, { parts: [pText('pid', 64), pText('item', 12), pInt('bonus')] })],
+  },
+  // A bounty: points for killing one Alliance player (target), or for each kill in a zone (up to cap kills), until
+  // a time (ends). Closing ('x') is final.
+  BT: {
+    key: ['b36x6'], max: 400, final: { field: 'state', values: 'x' }, expiry: { field: 'ends', days: 7 },
+    fields: [text('target', 24), text('zone', 60), int('points'), int('cap'), int('ends'), text('note', 100), enm('state', 'ox')],
   },
   AN: { key: ['b36x6'], max: 600, expiry: { days: 60 }, fields: [text('body', 500)] },
   DR: {

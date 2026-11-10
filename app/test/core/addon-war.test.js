@@ -42,7 +42,7 @@ function client() {
   wow.login();
   wow.exec(SHARE);
   wow.exec(COMBAT);
-  wow.exec('__asks = 0; local orig = __ns.war.askForHelp; __ns.war.askForHelp = function(z) __asks = __asks + 1; orig(z) end');
+  wow.exec('__asks = 0; local orig = __ns.war.askForHelp; __ns.war.askForHelp = function(z, k) __asks = __asks + 1; orig(z, k) end');
   return wow;
 }
 

@@ -111,7 +111,7 @@ I.CFG = CFG
 local MULTI = { RT = true, LL = true, BC = true, DR = true, LY = true, CFG = true }
 -- Records keyed by a player id: where the pid sits (key segment, or a field).
 local PIDKEY = { su = { seg = 2 }, cl = { seg = 2 }, dj = { seg = 2 }, lp = { seg = 1 }, sh = { seg = 1 }, pr = { seg = 1 }, wm = { seg = 1 },
-  cr = { field = "pid" }, dc = { field = "pid" }, bq = { field = "pid" }, dg = { field = "pid" }, bb = { field = "pid" } }
+  cr = { field = "pid" }, dc = { field = "pid" }, bq = { field = "pid" }, dg = { field = "pid" }, bb = { field = "pid" }, kk = { field = "pid" } }
 
 local SAY = {
   newer = "A guildmate has a newer Guild Camp addon. Update it from the Guild Camp app.",

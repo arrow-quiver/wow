@@ -237,6 +237,8 @@ RT:k3f9a2^wzltl343^Grommash^^d^tob9c0^r^4kq1zm^tobn80^Thrallia.p4m7,d72,eim;Zulj
 | `cr` craft request | random | a character of pid | pid, item, notes, state `o`/`x`/`d` | `x`, `d` | 30 d open; 7 d after final | 400 |
 | `cl` craft claim | request`:`pid | a character of pid | state `c`/`d`/`w` (claimed, done, withdrawn), claimedAt | | with the request | 60 |
 | `lp` leveling post | pid`:`character | a character of pid | character, level, zone, when, note | | 3 d | 400 |
+| `ko` kill on sight | the enemy's name | any member | pid, reason, state `o`/`x` (taken off) | | 90 d | 300 |
+| `kk` a kill that counts | random | a character of pid | pid, target, zone, at, kos (1: on the list), bounty (a `BT` key) | | 45 d | 260 |
 | `bb` bulletin board post | random | a character of pid | pid, character, kind `l`/`s`/`w`/`h` (looking for group, selling, buying, help), text, price (copper), state `o`/`x` | `x` | 7 d; 1 d after taken down | 400 |
 | `ca` call to arms | random | any member | character, zone, needed, message | | 1 d | 300 |
 | `dg` dungeon group | random | a character of pid (the leader) | pid, character, dungeon, startsAt, leader role `t`/`h`/`d`, level, slots tank, heal, dps (leader included), note, state `o`/`x`/`d` (open, called off, done), guests `name,role,class,level;…` (players from outside the guild the leader added) | `x`, `d` | startsAt + 1 d | 700 |
@@ -253,6 +255,7 @@ RT:k3f9a2^wzltl343^Grommash^^d^tob9c0^r^4kq1zm^tobn80^Thrallia.p4m7,d72,eim;Zulj
 | `LA` loot award | random | officer | raid, instance key, item key, item name, character, pid, kind `s`/`m`/`o`/`f`, roll, bonus | | 180 d, not before folded | 300 |
 | `LL` loot list | instance key | officer | instance name, bosses `;`, items `itemKey,bossIndex,name;…` (≤ 150) | | never | 8 KB |
 | `LY` SR+ checkpoint | instance key | officer's app, automatically | upto, bonuses `pid,itemKey,bonus;…` | | never | 3 KB |
+| `BT` bounty | random | officer | target (a player) or zone, points, cap (kills paid, zone bounties), ends (unix), note, state `o`/`x` | `x` | 7 d after it ends | 400 |
 | `AN` notice | random | officer; any officer may delete | body | | 60 d | 600 |
 | `DR` supply drive | random | officer | title, unit, goal, notes, state `o`/`c` | `c` | 60 d after closed; 180 d at most | 500 |
 | `BH` bank request handled | request | officer | state `s`/`d` (sent, declined) | | with the request | 40 |
@@ -654,6 +657,7 @@ confirmed with "It was me"), `share_repair` (the repair after the update ran, §
 | `cr` + `cl` | craft_requests (status and crafter_id derived) |
 | `lp`, `ca`, `AN` | buddy_posts, ctas (client_ref = key), announcements |
 | `bb` | bulletin_posts (taken down or expired: deleted) |
+| `ko`, `kk`, `BT` | kos (taken off: deleted), hunt_kills, bounties |
 | `dg` + `dj` | no rows: routes/dungeons.js reads the effective records and the line-up comes from `dungeonGroupState` (the leader fills a slot of their role; then the leader's guests in the order listed; then joins in joinedAt order, a tie to the smaller pid; past a role's free slots they wait). A `dj` on the leader's own group is ignored (`own group`). |
 | `DR` + `dc` | drives (status derived), drive_contribs |
 | `bq` + `BH` | bank_requests (status and handled_by derived); with no record at all (my new request cancelled or refused) the row goes |
@@ -988,6 +992,8 @@ pid (`<name>.<4 base36>`), tab (`0`–`8`), `1`.
 | `cr` | random | pid text(64), item text(100), notes text(200), state enum `oxd` |
 | `cl` | random:pid | state enum `cdw`, claimedAt int |
 | `lp` | pid:name | character text(48), level int, zone text(60), when text(60), note text(140) |
+| `ko` | name | pid text(64), reason text(100), state enum `ox` |
+| `kk` | random | pid text(64), target text(24), zone text(60), at int, kos int, bounty text(6) |
 | `bb` | random | pid text(64), character text(48), kind enum `lswh`, text text(200), price int, state enum `ox` |
 | `ca` | random | character text(48), zone text(60), needed int, message text(200) |
 | `dg` | random | pid text(64), character text(48), dungeon text(60), startsAt int, role enum `thd`, level int, tank int, heal int, dps int, note text(140), state enum `oxd`, guests [(name text(48), role text(1), class text(20), level int)] ≤ 9 |
@@ -1006,6 +1012,7 @@ pid (`<name>.<4 base36>`), tab (`0`–`8`), `1`.
 | `LA` | random | raid text(8), instance text(8), item text(12) (item key), itemName text(100), character text(48), pid text(64), kind enum `smof`, roll int, bonus int |
 | `LL` | random (instance key) | name text(60), bosses [text(60)] ≤ 40, items [(item text(12), boss int (1-based index, 0 = none), name text(100))] ≤ 150 |
 | `LY` | random (instance key) | upto int, bonuses [(pid text(64), item text(12), bonus int)] ≤ 200 |
+| `BT` | random | target text(24), zone text(60), points int, cap int, ends int, note text(100), state enum `ox` |
 | `AN` | random | body text(500) |
 | `DR` | random | title text(80), unit text(40), goal int, notes text(300), state enum `oc` |
 | `BH` | random (the request) | state enum `sd` |

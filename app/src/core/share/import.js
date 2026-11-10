@@ -33,6 +33,7 @@ const PID_OF = {
   su: (r) => seg(r, 1), cl: (r) => seg(r, 1), dj: (r) => seg(r, 1), dg: (r) => r.fields && r.fields.pid, lp: (r) => seg(r, 0), sh: (r) => r.key, pr: (r) => r.key, wm: (r) => r.key,
   cr: (r) => r.fields && r.fields.pid, dc: (r) => r.fields && r.fields.pid, bq: (r) => r.fields && r.fields.pid,
   bb: (r) => r.fields && r.fields.pid,
+  kk: (r) => r.fields && r.fields.pid,
 };
 
 // via = "<first sender>,<time>,<how>" (the addon writes "<me>,<time>,d" for what it made itself);
@@ -58,7 +59,7 @@ function importRule(db, gid, rec, how, prevOk) {
     if (!pid && rec.del && prevOk && !prevOk.del) pid = pidOf(prevOk);
     if (pid) {
       if (!st.isLinked(db, gid, rec.author, pid)) return 'link';
-      if (prevOk && !prevOk.del && ['cr', 'dc', 'bq', 'dg', 'bb'].includes(rec.type) && !rec.del && prevOk.fields.pid !== pid) return 'owner';
+      if (prevOk && !prevOk.del && ['cr', 'dc', 'bq', 'dg', 'bb', 'kk'].includes(rec.type) && !rec.del && prevOk.fields.pid !== pid) return 'owner';
     } else if (!rec.del) return 'link';
   }
   if (rec.del) return null;
