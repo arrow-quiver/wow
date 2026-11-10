@@ -15,6 +15,7 @@ const { HttpError, str, int, parseJson, needGuild, needOfficer, isOfficer } = re
 const C = require('../services/community');
 const identity = require('../identity');
 const sharing = require('../sharing');
+const CtaDiscord = require('../services/ctaDiscord');
 
 const shortName = (battletag) => String(battletag || '').split('#')[0];
 const CTA_WINDOW = "datetime('now','-1 day')";
@@ -169,8 +170,33 @@ function register(app, ctx) {
     const main = q.main.get(req.guild.id, req.user.id);
     const key = sharing.newKey();
     sharing.queue(db, ctx, { type: 'ca', key, fields: { character: main ? main.name : '', zone, needed, message } });
+    // And on the guild's Discord, at once (services/ctaDiscord.js; never twice).
+    const row = q.cta.get(req.guild.id, key);
+    if (row) {
+      db.prepare('UPDATE ctas SET discord_posted = 1 WHERE id = ?').run(row.id);
+      CtaDiscord.post(db, ctx, req.guild.id, { character: main ? main.name : String(req.user.battletag || '').split('#')[0], zone, needed, message })
+        .catch((err) => (ctx.log || console).warn(`Posting the call to arms to Discord failed: ${err.message}`));
+    }
     res.status(201).json({ cta: { ...q.cta.get(req.guild.id, key), battletag: req.user.battletag, class: main ? main.class : null }, message: 'Call to arms posted.' });
   });
+
+  // A call to arms of mine the app read from the chat log (main/live.js createChatWatch): to Discord at once.
+  app.post('/api/ctas/discord', needGuild, async (req, res) => {
+    const b = req.body || {};
+    const c = { character: str(b.character, 48), zone: str(b.zone, 60), needed: b.needed == null ? null : int(b.needed, 1, 40), message: str(b.message, 200) || '' };
+    if (!c.zone) throw new HttpError(400, 'Say where the fight is.');
+    res.json({ posted: await CtaDiscord.post(db, ctx, req.guild.id, c) });
+  });
+
+  // My calls to arms that arrived with an upload (made in game while the chat log was off): to Discord, every minute.
+  if (ctx.cfg.timers) {
+    const h = setInterval(() => {
+      const me = ctx.me && ctx.me(); const g = ctx.guild && ctx.guild();
+      if (me && g) CtaDiscord.sweep(db, ctx, g.id, me.id).catch((err) => (ctx.log || console).warn(`Calls to arms on Discord: ${err.message}`));
+    }, 60 * 1000);
+    if (h.unref) h.unref();
+    ctx.timers.push(h);
+  }
 
   // ---- Notices (officers) ----
   app.post('/api/announcements', needOfficer, (req, res) => {

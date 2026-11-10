@@ -14,6 +14,7 @@
 // character in a guild is accepted and stores nothing; the reply says so in plain words (`noGuild`).
 // Roles follow the in-game ranks of the roster rows the upload brought (identity.syncRanks).
 const { HttpError, ver } = require('../http');
+const CtaDiscord = require('../services/ctaDiscord');
 const { applyPayload, buildInbox, emptyInbox } = require('../services/sync');
 const deals = require('../services/deals');
 const coach = require('../services/coach');
@@ -106,6 +107,7 @@ function register(app, ctx) {
     // so these only fire once per call. A call without a message just skips that line.
     for (const c of stats.ctas) {
       const message = String(c.message || '').trim();
+      if (ctx.cfg.discordWebhook && !CtaDiscord.claim(db, guildId, { character: c.character, zone: c.zone, message })) continue; // posted already
       await ctx.discord(req.guild, [
         `⚔️ **Call to arms: ${c.zone}**${c.needed ? ` (need ${c.needed})` : ''}`,
         message,

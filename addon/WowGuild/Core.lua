@@ -124,7 +124,7 @@ function ns.updateAvailable()
 end
 
 -- Options (Settings → AddOns → Guild Camp). Defaults are on.
-ns.DEFAULTS = { blizzardStyle = false, ahTab = true, dealsPanel = true, coachTalents = true, liveLink = false, warMap = true, warHelp = true, seasonTooltips = true, tooltips = true, minimapButton = true, loginNews = true, autoGuide = true, trackerOnLogin = true, collectBank = true, updateNotice = true }
+ns.DEFAULTS = { blizzardStyle = false, ahTab = true, dealsPanel = true, coachTalents = true, liveLink = false, warMap = true, warHelp = true, seasonTooltips = true, ctaChat = true, tooltips = true, minimapButton = true, loginNews = true, autoGuide = true, trackerOnLogin = true, collectBank = true, updateNotice = true }
 function ns.opt(key)
   local o = ns.db and ns.db.options
   if o and o[key] ~= nil then return o[key] end
@@ -233,6 +233,7 @@ function ns.addCta(zone, needed, msg)
     return false
   end
   rememberCta({ character = character, zone = zone, needed = needed, message = msg, at = now(), mine = true })
+  if not inInstance() and ns.opt("ctaChat") ~= false then ns.safely(ns.ctaChat, zone, needed, msg, character) end
   if inInstance() then
     ns.print(string.format("Call to arms for %s saved. Waiting until you leave the dungeon.", zone))
   elseif InCombatLockdown and InCombatLockdown() then
@@ -242,6 +243,27 @@ function ns.addCta(zone, needed, msg)
   end
   if ns.ui and ns.ui.refreshIfShown then ns.ui.refreshIfShown() end
   return true
+end
+
+-- The call to arms in guild chat too, for guildmates without the addon. The Guild Camp app reads its own line
+-- from the chat log (Logs/WoWChatLog.txt, while chat logging is on: /wow live on) and posts it to the guild's
+-- Discord at once; keep the "[Guild Camp] Call to arms: … — from <name>" shape, the app looks for it.
+-- → the line sent, or nil.
+function ns.ctaText(zone, needed, msg, character)
+  local text = "[Guild Camp] Call to arms: " .. (zone or "?")
+  if needed then text = text .. string.format(" (%d needed)", needed) end
+  if msg and msg ~= "" then text = text .. ": " .. msg end
+  local tail = " — from " .. (character or "?")
+  if #text + #tail > 255 then text = string.sub(text, 1, 255 - #tail - 3) .. "..." end
+  return text .. tail
+end
+
+function ns.ctaChat(zone, needed, msg, character)
+  local send = (C_ChatInfo and C_ChatInfo.SendChatMessage) or SendChatMessage
+  if not send or (IsInGuild and not IsInGuild()) then return nil end
+  local text = ns.ctaText(zone, needed, msg, character)
+  local ok = pcall(send, text, "GUILD")
+  return ok and text or nil
 end
 
 -- A record the sharing engine stored (ns.Share.onRecord). A fresh call to arms from a guildmate

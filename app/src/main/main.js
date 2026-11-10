@@ -318,7 +318,7 @@ function bootstrap() {
   const { createIpc, buildMethods, forwardEvents } = require('./ipc');
   const { registerScheme, registerAppProtocol, createMainWindow, showWindow, findIcon, START_URL } = require('./window');
   const { createOverlay } = require('./overlay');
-  const { createLive } = require('./live');
+  const { createLive, createChatWatch } = require('./live');
   const { createTray } = require('./tray');
   const { createCore } = require('../core');
 
@@ -466,7 +466,7 @@ function bootstrap() {
     for (const t of timers) clearInterval(t);
     if (!services || coreClosed) return;
     try { services.sync.stop(); } catch { /* quitting anyway */ }
-    try { services.live.stop(); } catch { /* quitting anyway */ }
+    try { services.live.stop(); if (services.chat) services.chat.stop(); } catch { /* quitting anyway */ }
     try { if (services.overlay) services.overlay.dispose(); } catch { /* quitting anyway */ }
     if (!services.core) return;
     event.preventDefault();
@@ -617,9 +617,23 @@ function bootstrap() {
         return (r && Array.isArray(r.characters) ? r.characters : []).map((c) => c.name).filter(Boolean);
       },
     });
+    // My calls to arms in the chat log (the addon says them in guild chat): straight to the guild's Discord.
+    const findInstallsForLive = () => {
+      const s = store.get();
+      if (process.env.GUILDCAMP_NO_SCAN === '1' && !(s.extraWowFolders || []).length) return [];
+      return wow.findInstalls({ extraRoots: s.extraWowFolders || [], scanDefaults: process.env.GUILDCAMP_NO_SCAN !== '1', otherFolders: s.otherGameFolders || [] })
+        .filter((i) => i && i.inUse !== false);
+    };
+    const chat = createChatWatch({ log: log.scope('live'), findInstalls: findInstallsForLive });
+    chat.on('cta', (c) => Promise.resolve().then(async () => {
+      const r = await api.request('GET', '/api/coach');
+      const mine = (r && Array.isArray(r.characters) ? r.characters : []).map((x) => String(x.name).toLowerCase());
+      if (!mine.includes(String(c.character).toLowerCase())) return; // a guildmate's: their own app posts it
+      await api.request('POST', '/api/ctas/discord', c);
+    }).catch((err) => log.warn(`Posting the call to arms to Discord failed: ${err.message}`)));
     let overlay = null;
 
-    services = { log, store, api, auth, core, session: userSession, wow, sync, addon, updater, publisher, notify, startup, iconPath, ipc: null, live, overlay: null };
+    services = { log, store, api, auth, core, session: userSession, wow, sync, addon, updater, publisher, notify, startup, iconPath, ipc: null, live, chat, overlay: null };
 
     if (!store.secretsEncrypted()) log.warn('Secure storage is not available. Your Battle.net sign-in and API key are saved without encryption.');
 
@@ -712,10 +726,10 @@ function bootstrap() {
     overlay = createOverlay({ store, log: log.scope('overlay'), preload: path.join(__dirname, '..', 'preload', 'preload.js'), startUrl: START_URL });
     services.overlay = overlay;
     overlay.registerHotkey();
-    if (store.get().liveLink) background(() => live.start(), 'Live link failed to start');
+    if (store.get().liveLink) { background(() => live.start(), 'Live link failed to start'); chat.start(); }
     store.on('change', (s, keys) => {
       if (!keys.includes('liveLink')) return;
-      if (s.liveLink) background(() => live.start(), 'Live link failed to start'); else live.stop();
+      if (s.liveLink) { background(() => live.start(), 'Live link failed to start'); chat.start(); } else { live.stop(); chat.stop(); }
     });
     // Only while the token is still good: refresh() with an expired token signs the person out.
     if (auth.state().canRefresh) background(() => auth.refresh(), "Couldn't read your Battle.net characters");

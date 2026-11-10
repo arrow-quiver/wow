@@ -7,6 +7,7 @@
 //   records whose "ok" arrived; services/sync.js sends them after the transaction (afterImport). `ctas`
 //   are my own calls to arms written in game ({ id, zone, character, message, needed }, as stats.ctas).
 const S = require('../../shared/sharing');
+const CtaDiscord = require('../services/ctaDiscord');
 const identity = require('../identity');
 const { rememberNames } = require('../services/economy');
 const st = require('./store');
@@ -198,7 +199,9 @@ function processAcks(db, gid, sent, run) {
         }
         for (const t of project.tasksFor(rec, before && before.rec)) tasks.add(t);
         const post = text.discordPost(rec, { lookup, created: !row.base });
-        if (post) result.posts.push(post);
+        // A call to arms already posted by the app or from the chat log (services/ctaDiscord.js) doesn't go twice.
+        const ca = rec.type === 'ca' && rec.fields ? { character: rec.fields.character || rec.author, zone: rec.fields.zone, message: rec.fields.message } : null;
+        if (post && (!ca || CtaDiscord.claim(db, gid, ca))) result.posts.push(post);
         if (wrote && driveKey && !goals.has(driveKey)) goals.set(driveKey, driveBefore);
       }
       for (const t of project.tasksFor(prov, null)) tasks.add(t);

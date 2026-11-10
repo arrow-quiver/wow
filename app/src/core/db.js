@@ -882,6 +882,16 @@ const MIGRATIONS = [
      UNIQUE (user_id, character, started_at)
    );
    CREATE INDEX play_sessions_user ON play_sessions(user_id, last_at);`,
+
+  // 26: Calls to arms on Discord (services/ctaDiscord.js): what this app posted, by character, zone and message,
+  // so one call goes out once whichever way it arrives (the app, the chat log, or the next upload).
+  `CREATE TABLE cta_discord (
+     guild_id INTEGER NOT NULL REFERENCES guilds(id),
+     fp TEXT NOT NULL,
+     at INTEGER NOT NULL,
+     PRIMARY KEY (guild_id, fp)
+   );
+   ALTER TABLE ctas ADD COLUMN discord_posted INTEGER NOT NULL DEFAULT 0;`,
 ];
 
 // Runs every migration the database hasn't had yet, each in its own transaction.
