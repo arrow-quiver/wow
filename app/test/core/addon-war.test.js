@@ -55,17 +55,22 @@ const hit = (wow, sub, who) => wow.exec(`__hit("${sub}", unpack(${who}))`);
 
 test('dying to players in the open world marks the spot and offers to call the guild', () => {
   const wow = client();
-  const before = Number(wow.eval('__popups'));
+  wow.exec('__asks = 0; local orig = __ns.war.askForHelp; __ns.war.askForHelp = function(z) __asks = __asks + 1; orig(z) end');
+  const before = 0;
   hit(wow, 'SPELL_DAMAGE', '__ROGUE');
   wow.exec('__now = __now + 3');
   wow.fire('PLAYER_DEAD');
   assert.strictEqual(wow.eval('#WowGuildDB.war.marks'), '1');
   assert.strictEqual(wow.eval('WowGuildDB.war.marks[1].x .. "," .. WowGuildDB.war.marks[1].y .. "," .. WowGuildDB.war.marks[1].kind'), '452,381,d');
   assert.strictEqual(wow.eval('WowGuildDB.war.maps[1424]'), 'Hillsbrad Foothills');
-  assert.strictEqual(Number(wow.eval('__popups')), before + 1);
+  assert.strictEqual(Number(wow.eval('__asks')), before + 1);
   // Accepting the popup sends a call to arms with the zone.
-  wow.exec('StaticPopupDialogs.WOWGUILD_CALL_HELP.OnAccept(nil, { zone = "Hillsbrad Foothills" })');
-  assert.strictEqual(wow.eval('__lastPut.type .. ":" .. __lastPut.fields.zone .. ":" .. __lastPut.fields.message'), 'ca:Hillsbrad Foothills:Died to players here. Help!');
+  // Our own dialog, never Blizzard's StaticPopup (that taints Release Spirit and gets the addon blocked).
+  assert.strictEqual(wow.eval('tostring(StaticPopupDialogs and StaticPopupDialogs.WOWGUILD_CALL_HELP)'), 'nil');
+  assert.strictEqual(wow.eval('tostring(WowGuildHelpPrompt:IsShown())'), 'true');
+  wow.exec('WowGuildHelpPrompt.yes:GetScript("OnClick")()');
+  assert.strictEqual(wow.eval('tostring(WowGuildHelpPrompt:IsShown())'), 'false');
+  assert.strictEqual(wow.eval('__lastPut.type .. ":" .. __lastPut.fields.zone .. ":" .. __lastPut.fields.message'), 'ca:The Barrens:Died to players here. Help!', 'the zone the game says you are in');
   // A player's pet counts as the player; a mob's last hit after it still makes it a death to players.
   wow.exec('__now = __now + 120');
   hit(wow, 'SWING_DAMAGE', '__WOLF');
@@ -73,19 +78,20 @@ test('dying to players in the open world marks the spot and offers to call the g
   hit(wow, 'SWING_DAMAGE', '__OGRE');
   wow.fire('PLAYER_DEAD');
   assert.strictEqual(wow.eval('#WowGuildDB.war.marks'), '2');
-  assert.strictEqual(Number(wow.eval('__popups')), before + 2);
+  assert.strictEqual(Number(wow.eval('__asks')), before + 2);
   // warHelp off: the mark, no popup.
   wow.exec('__now = __now + 120; WowGuildDB.options.warHelp = false');
   hit(wow, 'RANGE_DAMAGE', '__ROGUE');
   wow.fire('PLAYER_DEAD');
-  assert.strictEqual(Number(wow.eval('__popups')), before + 2);
+  assert.strictEqual(Number(wow.eval('__asks')), before + 2);
   assert.strictEqual(wow.eval('#WowGuildDB.war.marks'), '3');
   assert.strictEqual(wow.eval('__ns.debugError'), null);
 });
 
 test('dying to a mob in a contested zone is no PvP death: no mark, no popup', () => {
   const wow = client();
-  const before = Number(wow.eval('__popups'));
+  wow.exec('__asks = 0; local orig = __ns.war.askForHelp; __ns.war.askForHelp = function(z) __asks = __asks + 1; orig(z) end');
+  const before = 0;
   hit(wow, 'SWING_DAMAGE', '__OGRE');
   wow.fire('PLAYER_DEAD');
   // A player hit me, but over 10 s before the mob finished me.
@@ -103,7 +109,7 @@ test('dying to a mob in a contested zone is no PvP death: no mark, no popup', ()
   wow.exec('__cl = { __now, "SPELL_DAMAGE", false, __ROGUE[1], __ROGUE[2], __ROGUE[3], 0, "Player-1-2", "Other", 0x511, 0 }; __fire("COMBAT_LOG_EVENT_UNFILTERED")');
   wow.fire('PLAYER_DEAD');
   assert.strictEqual(wow.eval('WowGuildDB.war and #WowGuildDB.war.marks or 0'), '0');
-  assert.strictEqual(Number(wow.eval('__popups')), before);
+  assert.strictEqual(Number(wow.eval('__asks')), before);
   // Without the combat log API (an old client), deaths are simply not marked.
   wow.exec('CombatLogGetCurrentEventInfo = nil');
   hit(wow, 'SPELL_DAMAGE', '__ROGUE');
@@ -179,8 +185,8 @@ test("the world map shows the guild's marks of the last week for the map on scre
       { author = "Grommash", fields = { marks = { { map = 1424, x = 500, y = 500, at = t - 60, kind = "d" }, { map = 1440, x = 1, y = 1, at = t - 60, kind = "k" } } } },
       { author = "Jaina", fields = { marks = { { map = 1424, x = 100, y = 200, at = t - 3600, kind = "k" }, { map = 1424, x = 9, y = 9, at = t - 9 * 86400, kind = "d" } } } },
     }
-    WowGuildWarPins.GetWidth = function() return 1000 end
-    WowGuildWarPins.GetHeight = function() return 667 end
+    WorldMapFrame.canvas.GetWidth = function() return 1000 end
+    WorldMapFrame.canvas.GetHeight = function() return 667 end
     WorldMapFrame:Show()`);
   assert.strictEqual(wow.eval('#__ns.war.marksFor(1424)'), '2');
   assert.strictEqual(wow.eval('__ns.war.marksFor(1424)[1].who'), 'Grommash');
