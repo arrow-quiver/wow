@@ -631,6 +631,13 @@ function bootstrap() {
       if (!mine.includes(String(c.character).toLowerCase())) return; // a guildmate's: their own app posts it
       await api.request('POST', '/api/ctas/discord', c);
     }).catch((err) => log.warn(`Posting the call to arms to Discord failed: ${err.message}`)));
+    // My celebrations (a level milestone, an epic, a welcome I gave…): the same way, to Discord.
+    chat.on('celebrate', (c) => Promise.resolve().then(async () => {
+      const r = await api.request('GET', '/api/coach');
+      const mine = (r && Array.isArray(r.characters) ? r.characters : []).map((x) => String(x.name).toLowerCase());
+      if (!mine.includes(String(c.from).toLowerCase())) return;
+      await api.request('POST', '/api/celebrate', c);
+    }).catch((err) => log.warn(`Posting the celebration to Discord failed: ${err.message}`)));
     let overlay = null;
 
     services = { log, store, api, auth, core, session: userSession, wow, sync, addon, updater, publisher, notify, startup, iconPath, ipc: null, live, chat, overlay: null };
