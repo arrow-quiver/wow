@@ -124,7 +124,7 @@ function ns.updateAvailable()
 end
 
 -- Options (Settings → AddOns → Guild Camp). Defaults are on.
-ns.DEFAULTS = { blizzardStyle = false, ahTab = true, dealsPanel = true, coachTalents = true, liveLink = false, warMap = true, warHelp = true, seasonTooltips = true, ctaChat = true, kosAlerts = true, celebrate = true, radar = true, instanceHelper = true, reminders = true, craftLookup = true, tooltips = true, minimapButton = true, loginNews = true, autoGuide = true, trackerOnLogin = true, collectBank = true, updateNotice = true }
+ns.DEFAULTS = { blizzardStyle = false, ahTab = true, dealsPanel = true, coachTalents = true, liveLink = false, warMap = true, warHelp = true, seasonTooltips = true, ctaChat = true, kosAlerts = true, dungeonQuests = true, celebrate = true, radar = true, instanceHelper = true, reminders = true, craftLookup = true, tooltips = true, minimapButton = true, loginNews = true, autoGuide = true, trackerOnLogin = true, collectBank = true, updateNotice = true }
 function ns.opt(key)
   local o = ns.db and ns.db.options
   if o and o[key] ~= nil then return o[key] end
@@ -308,6 +308,8 @@ local function slash(input)
     ns.queueCta(rest)
   elseif cmd == "lfg" or cmd == "group" then
     if ns.lfg then ns.lfg.slash(rest) else ns.print("Dungeon groups aren't running. " .. ns.restartHint) end
+  elseif cmd == "quests" then
+    if ns.dungeonQuests then ns.dungeonQuests.slash(rest) end
   elseif cmd == "kos" then
     if ns.hunt then ns.hunt.slash(rest) end
   elseif cmd == "bounties" or cmd == "bounty" then
@@ -364,6 +366,7 @@ local function slash(input)
     ns.print("/wow  open the guild panel")
     ns.print("/wow cta [zone] [number] [message]  call guildies to a fight")
     ns.print("/wow lfg  guild dungeon groups: list, new, join, leave")
+    ns.print("/wow quests [dungeon]  the dungeon quest checklist (and who in your group has each)")
     ns.print("/wow kos  the kill-on-sight list (/wow kos add <name> [reason])  ·  /wow bounties  open bounties")
     ns.print("/wow board  the guild bulletin board (/wow board wts Mooncloth x4 12g to post)")
     ns.print("/wow share  how sharing with your guild is going")

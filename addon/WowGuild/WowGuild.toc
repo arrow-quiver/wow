@@ -31,6 +31,8 @@ CoachTalents.lua
 Live.lua
 War.lua
 Hunt.lua
+BossKills.lua
+DungeonQuests.lua
 Seasons.lua
 Celebrate.lua
 Welcome.lua

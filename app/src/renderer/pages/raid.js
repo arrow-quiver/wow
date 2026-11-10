@@ -60,6 +60,7 @@ export default function RaidPage({ params }) {
         <${RosterCard} d=${d} />
         <${BoardCard} board=${d.board} />
         <${LootGivenCard} loot=${d.loot} />
+        <${BossKillsCard} bk=${d.bossKills} />
       </div>
       <div class="stack stack--loose">
         <${SignupCard} d=${d} onSaved=${q.reload} />
@@ -388,6 +389,15 @@ export function AwardHow({ a }) {
   </span>`;
 }
 
+// Boss kills the raiders' addons recorded for this raid.
+function BossKillsCard({ bk }) {
+  if (!bk || !bk.kills.length) return null;
+  return html`<${Card} title="Bosses down" sub=${`${bk.seen.length} guildies seen`}>
+    <ol class="list-lines">${bk.kills.map((k) => html`<li key=${`${k.boss}${k.at}`} class="row row--between nowrap">
+      <span>💀 <b>${k.boss}</b></span><span class="hint"><${LocalTime} t=${new Date(k.at * 1000).toISOString()} />${k.size ? ` · ${k.size} raiders` : ''}</span></li>`)}</ol>
+  <//>`;
+}
+
 function LootGivenCard({ loot }) {
   if (!loot.length) return null;
   const columns = [
@@ -437,7 +447,10 @@ function LeaderCard({ d, onChanged }) {
 function CloseRaidModal({ open, d, onClose, onDone }) {
   const { raid } = d;
   const people = d.signups.filter((s) => s.status !== 'no');
-  const defaults = () => new Set(people.filter((s) => s.status === 'yes' || s.status === 'bench').map((s) => s.user_id));
+  // Who the boss kills saw (raiders' addons), else who signed up as coming or bench.
+  const seen = new Set((d.bossKills && d.bossKills.seen) || []);
+  const defaults = () => (seen.size ? new Set(people.filter((s) => seen.has(s.user_id)).map((s) => s.user_id))
+    : new Set(people.filter((s) => s.status === 'yes' || s.status === 'bench').map((s) => s.user_id)));
   const [ticked, setTicked] = useState(defaults);
   useEffect(() => { if (open) setTicked(defaults()); }, [open]);
   const save = useAction((ids) => api.post(`/api/raids/${raid.id}/close`, { attendee_user_ids: ids }), { success: (r) => r.message });
@@ -454,6 +467,7 @@ function CloseRaidModal({ open, d, onClose, onDone }) {
         <${Button} variant="ghost" onClick=${onClose} disabled=${save.busy}>Not yet<//>
         <${Button} variant="primary" busy=${save.busy} onClick=${submit}>${isRaid ? 'Close raid and update bonuses' : 'Close and record attendance'}<//>`}>
     <div class="stack">
+      ${seen.size ? html`<${Notice} kind="info">Ticked from the boss kills your guild's addons recorded: ${d.bossKills.kills.map((k) => k.boss).join(', ')}.<//>` : null}
       <p>Tick who was there.${isRaid ? ' Attending with a reserve adds +10 to that item’s bonus. Signing up “Coming” and not showing resets it.' : ''} This can’t be undone.</p>
       ${people.length
         ? html`<div class="row raid-close-tools">

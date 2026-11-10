@@ -71,3 +71,12 @@ my main. Errors: `400` "Name the dungeon.", "Pick your role: tank, healer or dps
 - `done` / `cancel` (the leader): the group's `dg` with state `d` / `x` (final); it leaves the board. `403` for anyone else.
 
 `404` "That group no longer exists." for an unknown or malformed key.
+
+## Dungeon quest checklist (addon)
+
+`DungeonQuests.lua`, option `dungeonQuests`, `/wow quests [dungeon]`. A list of the Horde quests for each dungeon from
+Ragefire Chasm to Maraudon (`Q.DATA`: title and where to get it), matched against your quest log by title. Quests in
+your log that mention the dungeon by name are added too, so one missing from the list still shows. Party members'
+addons share which of the list's quests they have over the party's addon channel (prefix `WowGuildQ`, "D<dungeon>:<one
+bit per quest>", a leading `?` asks for an answer). Only those bits go out, no free text. Entering a dungeon prints
+a one-line summary; the panel is our own frame.

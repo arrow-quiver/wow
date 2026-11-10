@@ -25,7 +25,7 @@ const dayToDate = (d) => new Date(SCAN_DAY_0 + d * 86400000).toISOString().slice
 const skillName = (id) => S.SKILLS[id] || `Skill ${id}`;
 
 // Dependency order: links first (users), then settings, loot lists before raids and awards, loyalty last.
-const ORDER = ['ch', 'cfg', 'bc', 'bk', 'rc', 'll', 'raid', 'la', 'loyalty', 'cr', 'lp', 'ko', 'kk', 'bb', 'ca', 'an', 'bt', 'drive', 'dc', 'bq', 'gb', 'sh', 'pr', 'wm', 'st'];
+const ORDER = ['ch', 'cfg', 'bc', 'bk', 'rc', 'll', 'raid', 'la', 'loyalty', 'cr', 'lp', 'ek', 'ko', 'kk', 'bb', 'ca', 'an', 'bt', 'drive', 'dc', 'bq', 'gb', 'sh', 'pr', 'wm', 'st'];
 
 function tasksFor(rec, prevRec) {
   if (!rec) return [];
@@ -51,6 +51,7 @@ function tasksFor(rec, prevRec) {
     case 'cl': out.push(`cr:${segs[0]}`); break;
     case 'lp': out.push(`lp:${rec.key}`); break;
     case 'bb': out.push(`bb:${rec.key}`); break;
+    case 'ek': out.push(`ek:${rec.key}`); break;
     case 'ko': out.push(`ko:${rec.key}`); break;
     case 'kk': out.push(`kk:${rec.key}`); break;
     case 'BT': out.push(`bt:${rec.key}`); break;
@@ -567,6 +568,18 @@ function projectBb(db, gid, k) {
   else db.prepare('INSERT INTO bulletin_posts (user_id, character, kind, text, price, created_at, guild_id, share_id) VALUES (?,?,?,?,?,?,?,?)').run(...vals, t, gid, k);
 }
 
+// ek: boss_kills (expired: gone, unless the store dropped it)
+function projectEk(db, gid, k) {
+  const e = st.effective(db, gid, `ek:${k}`);
+  if (!e && dropped(db, gid, `ek:${k}`)) return;
+  const r = liveRec(e);
+  const f = r ? r.fields : {};
+  if (!r || !f.boss) { db.prepare('DELETE FROM boss_kills WHERE guild_id = ? AND share_id = ?').run(gid, k); return; }
+  const names = (Array.isArray(f.names) ? f.names : []).filter((n) => typeof n === 'string' && n).slice(0, 40);
+  db.prepare('INSERT OR REPLACE INTO boss_kills (guild_id, share_id, encounter, boss, instance, at, size, names) VALUES (?,?,?,?,?,?,?,?)')
+    .run(gid, k, Number.isInteger(f.enc) ? f.enc : null, f.boss, f.instance || null, Number.isInteger(f.at) ? f.at : r.t, Number.isInteger(f.size) ? f.size : null, JSON.stringify(names));
+}
+
 // ko: kos (taken off 'x' or expired: gone)
 function projectKo(db, gid, k) {
   const r = liveRec(st.effective(db, gid, `ko:${k}`));
@@ -887,6 +900,7 @@ function run(db, gid, tasks, { out = {} } = {}) {
       case 'cr': projectCr(db, gid, arg); break;
       case 'lp': projectLp(db, gid, arg); break;
       case 'bb': projectBb(db, gid, arg); break;
+      case 'ek': projectEk(db, gid, arg); break;
       case 'ko': projectKo(db, gid, arg); break;
       case 'kk': projectKk(db, gid, arg); break;
       case 'bt': projectBt(db, gid, arg); break;
