@@ -161,9 +161,9 @@ test('a game session reaches the local core through the app, and the guild news 
 
   // 3. The local core has the data.
   const chars = db.prepare('SELECT name, user_id, online FROM characters WHERE guild_id = ? ORDER BY name').all(guildId);
-  assert.deepStrictEqual(chars.map((c) => c.name), ['Grommash Hellscream', 'Grommy', 'Thrallia', 'Zuljinne'], 'Grommy is a guildmate\'s shared character');
+  assert.deepStrictEqual(chars.map((c) => c.name), ['Grommash', 'Grommy', 'Thrallia', 'Zuljinne'], 'Grommy is a guildmate\'s shared character');
   assert.strictEqual(chars.find((c) => c.name === 'Thrallia').user_id, thrall.id, 'own character is linked to me');
-  assert.strictEqual(chars.find((c) => c.name === 'Grommash Hellscream').user_id, null, 'roster entries are not claimed');
+  assert.strictEqual(chars.find((c) => c.name === 'Grommash').user_id, null, 'roster entries are not claimed');
   assert.strictEqual(chars.filter((c) => c.online).length, 2);
   assert.deepStrictEqual(db.prepare('SELECT name FROM recipes ORDER BY name').all().map((r) => r.name), ['Copper Chain Vest', 'Rough Sharpening Stone']);
   assert.deepStrictEqual(db.prepare('SELECT item_id, price FROM prices').all().map((p) => [p.item_id, p.price]), [[2589, 120]]);

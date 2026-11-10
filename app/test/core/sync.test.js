@@ -155,11 +155,11 @@ test('the first upload from the game sets the guild up: characters, roster, reci
 
   // Own character is linked to me; roster entries are not claimed.
   const chars = db.prepare('SELECT name, user_id, online, level, class, rank, rank_index, zone, money FROM characters WHERE guild_id = ? ORDER BY name').all(s.guildId);
-  assert.deepStrictEqual(chars.map((c) => c.name), ['Grommash Hellscream', 'Thrallia', 'Zuljinne']);
+  assert.deepStrictEqual(chars.map((c) => c.name), ['Grommash', 'Thrallia', 'Zuljinne']);
   const me = chars.find((c) => c.name === 'Thrallia');
   assert.deepStrictEqual([me.user_id, me.level, me.class, me.zone, me.money, me.rank, me.rank_index], [s.me, 23, 'SHAMAN', 'The Barrens', 123456, 'Guild Master', 0]);
-  assert.strictEqual(chars.find((c) => c.name === 'Grommash Hellscream').rank_index, 1, 'my own scan is trusted: ranks are kept');
-  assert.strictEqual(chars.find((c) => c.name === 'Grommash Hellscream').user_id, null, 'roster entries are not claimed');
+  assert.strictEqual(chars.find((c) => c.name === 'Grommash').rank_index, 1, 'my own scan is trusted: ranks are kept');
+  assert.strictEqual(chars.find((c) => c.name === 'Grommash').user_id, null, 'roster entries are not claimed');
   assert.strictEqual(chars.filter((c) => c.online).length, 2);
   const profs = db.prepare('SELECT p.name, p.skill, p.max_skill FROM professions p JOIN characters c ON c.id = p.character_id WHERE c.name = ? ORDER BY p.name').all('Thrallia');
   assert.deepStrictEqual(profs.map((p) => [p.name, p.skill, p.max_skill]), [['Blacksmithing', 120, 150], ['Cooking', 80, 150], ['Fishing', 40, 75]]);
