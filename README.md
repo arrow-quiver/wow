@@ -100,6 +100,10 @@ pins on the in-game world map, and the **War** page with hotspots and your nemes
 - **Deal hunter**: finds items listed well under their usual price in your own Auctionator scans, with the profit
   after the auction house cut, how sure it is, vendor flips, and what to buy with a budget. In game it sits beside
   the auction house and searches each deal with one click.
+- **Guild Camp at the auction house**: one list of what to buy, your shopping list's missing mats and what guildies
+  asked the guild bank for (to donate), each with its price and the total. **Buy selected…** asks once with the
+  total, then the button buys one thing per click (the game needs a click for every purchase). It skips anything over
+  20% above its expected price and never spends past the total you agreed to. **Stop** ends it at once.
 - Run **supply drives** (fire resistance potions for Molten Core, thorium for the guild blacksmith) and track
   every hand-in.
 
