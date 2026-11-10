@@ -10,3 +10,4 @@ import './app.js';
 import './share.js';
 import './war.js';
 import './donate.js';
+import './seasons.js';

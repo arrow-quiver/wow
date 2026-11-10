@@ -835,6 +835,23 @@ const MIGRATIONS = [
      fetched_at TEXT NOT NULL,
      PRIMARY KEY (guild_id, item_id)
    );`,
+
+  // 23: Seasons (services/seasons.js). Shout-outs this app posted to Discord, so each goes out once: a donation
+  // (donations.shouted) or a badge (my_badges); and the months whose winners this app announced (season_posts).
+  `ALTER TABLE donations ADD COLUMN shouted INTEGER NOT NULL DEFAULT 0;
+   CREATE TABLE my_badges (
+     guild_id INTEGER NOT NULL REFERENCES guilds(id),
+     user_id INTEGER NOT NULL REFERENCES users(id),
+     badge TEXT NOT NULL,
+     seen_at TEXT NOT NULL DEFAULT (datetime('now')),
+     PRIMARY KEY (guild_id, user_id, badge)
+   );
+   CREATE TABLE season_posts (
+     guild_id INTEGER NOT NULL REFERENCES guilds(id),
+     month TEXT NOT NULL,
+     posted_at TEXT NOT NULL DEFAULT (datetime('now')),
+     PRIMARY KEY (guild_id, month)
+   );`,
 ];
 
 // Runs every migration the database hasn't had yet, each in its own transaction.

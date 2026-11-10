@@ -134,4 +134,4 @@ function permutations(list) {
   return out;
 }
 
-module.exports = { setupShare, lightDb, rec, permutations, NOW, D, G, PIDS, ME_PID, ROSTER };
+module.exports = { fakeDiscord, setupShare, lightDb, rec, permutations, NOW, D, G, PIDS, ME_PID, ROSTER };
