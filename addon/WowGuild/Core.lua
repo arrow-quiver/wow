@@ -124,7 +124,7 @@ function ns.updateAvailable()
 end
 
 -- Options (Settings → AddOns → Guild Camp). Defaults are on.
-ns.DEFAULTS = { blizzardStyle = false, ahTab = true, dealsPanel = true, coachTalents = true, liveLink = false, warMap = true, warHelp = true, seasonTooltips = true, ctaChat = true, celebrate = true, tooltips = true, minimapButton = true, loginNews = true, autoGuide = true, trackerOnLogin = true, collectBank = true, updateNotice = true }
+ns.DEFAULTS = { blizzardStyle = false, ahTab = true, dealsPanel = true, coachTalents = true, liveLink = false, warMap = true, warHelp = true, seasonTooltips = true, ctaChat = true, celebrate = true, radar = true, instanceHelper = true, reminders = true, craftLookup = true, tooltips = true, minimapButton = true, loginNews = true, autoGuide = true, trackerOnLogin = true, collectBank = true, updateNotice = true }
 function ns.opt(key)
   local o = ns.db and ns.db.options
   if o and o[key] ~= nil then return o[key] end
@@ -349,6 +349,10 @@ local function slash(input)
     ns.welcome.showWelcome()
   elseif cmd == "deals" then
     ns.deals.toggle()
+  elseif cmd == "near" then
+    ns.helpers.showNearby()
+  elseif cmd == "remind" then
+    ns.helpers.resetReminders(); if #ns.helpers.check() == 0 then ns.print("Nothing to remind you of right now.") end
   elseif cmd == "coach" then
     if rest == "" then ns.coachUI.toggle() else ns.coachUI.show(rest == "ask" and "ask" or rest == "build" and "build" or "steps") end
   elseif cmd == "options" or cmd == "config" then
@@ -366,6 +370,8 @@ local function slash(input)
     ns.print("/wow list  show or hide your shopping list;  /wow list clear  empties it")
     ns.print("/wow coach  your play style, build plan and next steps (/wow coach ask to ask a question)")
     ns.print("/wow deals  the Deal hunter: what to buy on the auction house and sell again")
+    ns.print("/wow near  guildies online in your zone, to group up with")
+    ns.print("/wow remind  check repairs, bags, talents and raids now (Alt-click an item link: who can craft it)")
     ns.print("/wow season  this month's guild season: the top five and you")
     ns.print("/wow war  your war map marks (/wow war off hides the guild's deaths and kills on the world map)")
     ns.print("/wow live on  turn on combat logging at every login, for the Guild Camp app's live link and Coach overlay")

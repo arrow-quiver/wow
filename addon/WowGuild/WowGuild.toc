@@ -34,4 +34,5 @@ Celebrate.lua
 Welcome.lua
 MainUI.lua
 Tooltip.lua
+Helpers.lua
 Report.lua
