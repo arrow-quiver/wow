@@ -69,6 +69,11 @@ death, **Why did I die?** sends the death's recap (who hit you, with what, how m
 The live link reads the game's own combat log file as you play, like Warcraft Logs' uploader does; type `/wow live on`
 once and the addon turns combat logging on at every login. Answers reach the game's Coach after your next /reload.
 
+**Celebrations.** Hit level 20, 30, 40 or 50, loot an epic, max a profession, learn to ride or rank up in PvP, and
+Guild Camp says it in guild chat, guildmates get a toast and the guild's Discord cheers. Level 60 gets the full Horde
+treatment: a LOK'TAR OGAR banner across every guildie's screen. New members get the welcome wagon (officers send a
+welcome kit and a guild buddy), and guild anniversaries and character birthdays are celebrated on the day.
+
 **Guild seasons.** Every month the guild starts a new leaderboard from what people actually do: gold and items given
 to the guild bank (valued at that day's Auctionator price), kills in the open world, crafting requests filled and raids.
 Leaders get titles (Quartermaster, Warlord, Master Crafter, Stalwart, MVP), weeks in a row build a streak bonus,
@@ -126,6 +131,14 @@ The addon works on its own, and does much more with the app:
   can search the auction house for you.
 - **Item tooltips**: who in the guild can craft it, how many your alts hold and what's in the guild bank.
 - **Guild news**: notices, raid reminders, crafting requests and calls to arms, right in game.
+- **Guildies nearby**: arrive in a zone and the addon says which guildies are there; `/wow near` lists them,
+  closest in level first, with a "Group up?" whisper.
+- **Instance helper**: zone into a dungeon and see which guildies online are the right level for it (with Invite),
+  plus "Ask the Coach for tips".
+- **Smart reminders**: a raid you signed up for starting within the hour (bring consumables), gear under 20%, bags
+  nearly full, talent points to spend. Each at most every 30 minutes.
+- **Who can craft this?**: Alt-click any item link to see the guild's crafters and send a crafting request (and a
+  whisper) in one click.
 - A minimap button (or a Titan Panel / ElvUI broker), the Retail addon drawer and key bindings.
 
 | Command | What it does |
@@ -137,6 +150,8 @@ The addon works on its own, and does much more with the app:
 | `/wow live on` | Turn on combat logging at every login, for the app's live link and Coach overlay (`/wow live off` stops it) |
 | `/wow guide` | Open the skill-up guide |
 | `/wow list` | Open the shopping list |
+| `/wow near` | Guildies online in your zone, to group up with |
+| `/wow remind` | Check repairs, bags, talents and raids now |
 | `/wow board` | The guild bulletin board; `/wow board wts Mooncloth x4 12g` puts a post up |
 | `/wow deals` | Open the Deal hunter (it also opens with the auction house) |
 | `/wow cta <where> <need> <what>` | Sound a call to arms, e.g. `/wow cta Crossroads 5 need help`: guildmates with the addon get it with a sound, guild chat sees it, and (with the app and `/wow live on`) Discord at once |

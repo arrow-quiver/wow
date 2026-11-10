@@ -893,7 +893,21 @@ const MIGRATIONS = [
    );
    ALTER TABLE ctas ADD COLUMN discord_posted INTEGER NOT NULL DEFAULT 0;`,
 
-  // 27: Guild life (services/guildlife.js). bulletin_posts: the guild bulletin board, from "bb" records.
+  // 27: Celebrations (services/celebrate.js). characters.first_seen: when Guild Camp first saw the character (its
+  // "birthday"; characters already known count from today). celebrated: anniversaries this app already posted.
+  `ALTER TABLE characters ADD COLUMN first_seen TEXT;
+   UPDATE characters SET first_seen = datetime('now');
+   CREATE TRIGGER characters_first_seen AFTER INSERT ON characters WHEN NEW.first_seen IS NULL
+   BEGIN UPDATE characters SET first_seen = datetime('now') WHERE rowid = NEW.rowid; END;
+   CREATE TABLE celebrated (
+     guild_id INTEGER NOT NULL REFERENCES guilds(id),
+     user_id INTEGER NOT NULL REFERENCES users(id),
+     key TEXT NOT NULL,
+     at TEXT NOT NULL DEFAULT (datetime('now')),
+     PRIMARY KEY (guild_id, user_id, key)
+   );`,
+
+  // 28: Guild life (services/guildlife.js). bulletin_posts: the guild bulletin board, from "bb" records.
   // seen_hours: how often each guildmate was online at each hour of the week (slot = weekday * 24 + hour, local
   // time), from roster scans, for leveling matches. digest_posts: weekly digests this app posted to Discord.
   `CREATE TABLE bulletin_posts (
