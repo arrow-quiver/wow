@@ -1010,6 +1010,25 @@ const MIGRATIONS = [
      guild_id INTEGER PRIMARY KEY REFERENCES guilds(id),
      ad TEXT, msg TEXT, classes TEXT, min_level INTEGER, max_level INTEGER
    );`,
+
+  // 32: Surnames. Some realms show a surname after the name ("Gorm Tshabalala"); roster scans stored those as
+  // characters of their own beside the real one ("Gorm", from the addon). The real one takes over what the copy
+  // knew, the copy goes, and lone ones are renamed to their first word. Bank log and donation names likewise.
+  `UPDATE characters SET
+     level = MAX(COALESCE(level, 0), COALESCE((SELECT MAX(s.level) FROM characters s WHERE s.guild_id = characters.guild_id AND instr(s.name, ' ') > 0 AND substr(s.name, 1, instr(s.name, ' ') - 1) = characters.name), 0)),
+     online = MAX(online, COALESCE((SELECT MAX(s.online) FROM characters s WHERE s.guild_id = characters.guild_id AND instr(s.name, ' ') > 0 AND substr(s.name, 1, instr(s.name, ' ') - 1) = characters.name), 0)),
+     rank = COALESCE(rank, (SELECT s.rank FROM characters s WHERE s.guild_id = characters.guild_id AND instr(s.name, ' ') > 0 AND substr(s.name, 1, instr(s.name, ' ') - 1) = characters.name)),
+     rank_index = COALESCE(rank_index, (SELECT s.rank_index FROM characters s WHERE s.guild_id = characters.guild_id AND instr(s.name, ' ') > 0 AND substr(s.name, 1, instr(s.name, ' ') - 1) = characters.name)),
+     zone = COALESCE(zone, (SELECT s.zone FROM characters s WHERE s.guild_id = characters.guild_id AND instr(s.name, ' ') > 0 AND substr(s.name, 1, instr(s.name, ' ') - 1) = characters.name)),
+     class = COALESCE(class, (SELECT s.class FROM characters s WHERE s.guild_id = characters.guild_id AND instr(s.name, ' ') > 0 AND substr(s.name, 1, instr(s.name, ' ') - 1) = characters.name)),
+     in_official_roster = COALESCE(in_official_roster, (SELECT s.in_official_roster FROM characters s WHERE s.guild_id = characters.guild_id AND instr(s.name, ' ') > 0 AND substr(s.name, 1, instr(s.name, ' ') - 1) = characters.name)),
+     first_seen = COALESCE(MIN(first_seen, (SELECT MIN(s.first_seen) FROM characters s WHERE s.guild_id = characters.guild_id AND instr(s.name, ' ') > 0 AND substr(s.name, 1, instr(s.name, ' ') - 1) = characters.name)), first_seen)
+   WHERE instr(name, ' ') = 0 AND EXISTS (SELECT 1 FROM characters s WHERE s.guild_id = characters.guild_id AND instr(s.name, ' ') > 0 AND substr(s.name, 1, instr(s.name, ' ') - 1) = characters.name);
+   DELETE FROM characters WHERE instr(name, ' ') > 0
+     AND EXISTS (SELECT 1 FROM characters b WHERE b.guild_id = characters.guild_id AND b.name = substr(characters.name, 1, instr(characters.name, ' ') - 1));
+   UPDATE OR IGNORE characters SET name = substr(name, 1, instr(name, ' ') - 1) WHERE instr(name, ' ') > 0;
+   UPDATE bank_log SET who = substr(who, 1, instr(who, ' ') - 1) WHERE instr(who, ' ') > 0;
+   UPDATE donations SET who = substr(who, 1, instr(who, ' ') - 1) WHERE instr(who, ' ') > 0;`,
 ];
 
 // Runs every migration the database hasn't had yet, each in its own transaction.

@@ -75,6 +75,9 @@ test('chat log: my calls to arms are read as they are written', () => {
   assert.deepStrictEqual(parseCta('11/10 12:30:01.123  [Guild] Grom: [Guild Camp] Call to arms: Tarren Mill — from Grom\r'), { character: 'Grom', zone: 'Tarren Mill', needed: null, message: '' });
   // No sender, or a name hidden inside someone else's message: refused.
   assert.strictEqual(parseCta('[Guild Camp] Call to arms: Tarren Mill — from Grom'), null);
+  // A realm that shows surnames: "Gorm Tshabalala" is Gorm.
+  assert.deepStrictEqual(parseCta('11/10 12:30:01.123  [Guild] Gorm Tshabalala: [Guild Camp] Call to arms: Tarren Mill — from Gorm'), { character: 'Gorm', zone: 'Tarren Mill', needed: null, message: '' });
+  assert.strictEqual(parseCta('11/10 12:30:01.123  [Guild] Mallory Smith: [Guild Camp] Call to arms: Tarren Mill — from Gorm'), null);
   assert.strictEqual(parseCta('[Guild] Mallory: [x] Grom: [Guild Camp] Call to arms: X — from Grom'), null);
   assert.strictEqual(parseCta('11/10 12:30:01.123  [Guild] Mallory: Grom: [Guild Camp] Call to arms: X — from Grom'), null);
   assert.strictEqual(parseCta('[Guild] Grom: anyone up for MC?'), null);

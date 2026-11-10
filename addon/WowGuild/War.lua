@@ -133,7 +133,7 @@ function W.killerName()
       local g = e.sourceGUID or e.srcGUID
       local okP, isP = pcall(function() return type(g) == "string" and string.find(g, "^Player%-") ~= nil end)
       local name = e.sourceName or e.srcName
-      if okP and isP and type(name) == "string" and name ~= "" then return string.match(name, "^([^%-]+)") or name end
+      if okP and isP and type(name) == "string" and name ~= "" then return string.match(name, "^([^%-%s]+)") or name end
     end
   end
   return nil

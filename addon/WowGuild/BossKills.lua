@@ -9,7 +9,7 @@ ns.bossKills = BK
 BK.DELAY = 3
 
 local function now() return (GetServerTime and ns.try(GetServerTime)) or time() end
-local function short(n) return type(n) == "string" and (string.match(n, "^([^%-]+)") or n) or nil end
+local function short(n) return type(n) == "string" and (string.match(n, "^([^%-%s]+)") or n) or nil end
 
 -- Names of the guild's members (online now; raiders are online).
 local function guildNames()

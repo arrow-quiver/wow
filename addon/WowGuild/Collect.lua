@@ -620,6 +620,9 @@ function ns.collectRoster()
     local name, rank, rankIndex, level, _, zone, _, _, online, _, classToken = ns.try(GetGuildRosterInfo, i)
     if name then
       if Ambiguate then name = Ambiguate(name, "guild") end
+      -- Some realms show a surname after the name ("Gorm Tshabalala"); the character is the first word, which is
+      -- what UnitName, whispers and records use.
+      name = string.match(name, "^([^%-%s]+)") or name
       members[#members + 1] = {
         name = name, rank = rank, rankIndex = rankIndex, level = level, zone = zone,
         online = online and true or false, class = classToken,

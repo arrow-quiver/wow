@@ -12,6 +12,7 @@
 // Starts at the end of the newest log (no replay of old sessions), reads what was added once a second, and looks
 // for a newer file every 30 s (Retail starts a new file per session; Classic keeps appending to one).
 
+const { baseName } = require('../shared/names');
 const fs = require('fs');
 const path = require('path');
 const { EventEmitter } = require('events');
@@ -144,10 +145,11 @@ const CTA = /\[Guild Camp\] Call to arms: (.+?) — from ([^\s—]+)\s*$/;
 // the channel tag must be who the line says it's from, with the Guild Camp text right after it. So a guildmate typing
 // "[Guild Camp] … — from <my character>" (or "Grom: [Guild Camp] …" inside their own message) can't post to my
 // Discord. A line without a sender is refused.
-const SENDER = /^\d+\/\d+ [\d:.]+\s+\[[^\]]+\] ([^\s:]+): \[Guild Camp\] /;
+// The sender may show a surname ("[Guild] Gorm Tshabalala: …"): the character is its first word.
+const SENDER = /^\d+\/\d+ [\d:.]+\s+\[[^\]]+\] ([^:\]]+?): \[Guild Camp\] /;
 function senderOk(line, from) {
   const s = SENDER.exec(String(line || ''));
-  return Boolean(s) && s[1].split('-')[0].toLowerCase() === String(from).split('-')[0].toLowerCase();
+  return Boolean(s) && baseName(s[1]).toLowerCase() === baseName(from).toLowerCase();
 }
 
 function parseCta(line) {

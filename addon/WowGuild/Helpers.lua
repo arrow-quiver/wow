@@ -17,7 +17,7 @@ H.RAID_SOON = 60 * 60         -- a raid within the hour
 local ROWS = 8
 
 local function me() return UnitName and UnitName("player") or "?" end
-local function short(n) return n and (string.match(n, "^([^%-]+)") or n) or nil end
+local function short(n) return n and (string.match(n, "^([^%-%s]+)") or n) or nil end
 local function now() return (GetServerTime and ns.try(GetServerTime)) or time() end
 local function whisper(text, to)
   local send = (C_ChatInfo and C_ChatInfo.SendChatMessage) or SendChatMessage

@@ -28,7 +28,7 @@ local GOLD, GREY = "|cffe8a33d", "|cff9e9ea8"
 
 local function now() return (GetServerTime and ns.try(GetServerTime)) or time() end
 local function me() return UnitName and UnitName("player") or "?" end
-local function short(n) return type(n) == "string" and (string.match(n, "^([^%-]+)") or n) or nil end
+local function short(n) return type(n) == "string" and (string.match(n, "^([^%-%s]+)") or n) or nil end
 local function sh() local s = ns.Share; if type(s) == "table" and type(s.list) == "function" then return s end end
 local function store()
   ns.db.recruit = ns.db.recruit or {}
@@ -131,7 +131,8 @@ end
 function R.prune()
   local d, known, list = store(), R.known(), {}
   for name, p in pairs(d.queue) do
-    if now() - (p.seen or 0) > R.KEEP or known[string.lower(name)] then d.queue[name] = nil else list[#list + 1] = p end
+    -- Names saved with a surname (0.18.0) aren't whisperable: the first word is the character.
+    if now() - (p.seen or 0) > R.KEEP or known[string.lower(name)] or string.find(name, "%s") then d.queue[name] = nil else list[#list + 1] = p end
   end
   if #list > R.MAX_QUEUE then
     table.sort(list, function(a, b) return (a.seen or 0) > (b.seen or 0) end)

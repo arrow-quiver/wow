@@ -57,3 +57,11 @@ and the game's Terms of Use. Every change keeps to these:
 - **No taint.** Our own frames only: never Blizzard's StaticPopup, UIErrorsFrame or raid-warning frames (use
   `ns.confirm` and `ns.notice` from `Skin.lua`), never replace Blizzard functions (use `hooksecurefunc`), never
   register `COMBAT_LOG_EVENT_UNFILTERED` (the game blocks the addon at load). `addon-war.test.js` checks the sources.
+
+## Character names
+
+Some realms (WoW Forever) show a surname after the name: the roster, `/who`, the raid roster, chat lines and system
+messages say "Gorm Tshabalala", while `UnitName("player")`, whispers and every shared record use "Gorm". The
+character is always the first word. In the addon, take names from the game with `string.match(n, "^([^%-%s]+)")`
+(no realm, no surname); in the app, `baseName` from `shared/names.js`. Migration 32 merged the roster's surname copies
+into the real characters.

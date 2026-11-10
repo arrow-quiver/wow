@@ -18,7 +18,7 @@ local RED, GOLD = "|cffff4040", "|cffe8a33d"
 local function now() return (GetServerTime and ns.try(GetServerTime)) or time() end
 local function S() local s = ns.Share; if type(s) == "table" and type(s.list) == "function" then return s end end
 local function plain(s) return (string.gsub(tostring(s or ""), "|", "||")) end
-local function short(n) return n and (string.match(n, "^([^%-]+)") or n) or nil end
+local function short(n) return n and (string.match(n, "^([^%-%s]+)") or n) or nil end
 -- "gankalot" → "Gankalot" (record keys are names as the game writes them).
 local function proper(n)
   n = short(n)

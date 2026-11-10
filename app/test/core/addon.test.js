@@ -58,7 +58,7 @@ test('addon collects data out of combat and parses /wow cta', () => {
   assert.deepStrictEqual(me.recipes.Blacksmithing.map((r) => r.name), ['Rough Sharpening Stone', 'Copper Chain Vest']);
   assert.match(wow.printed(), /Saved 2 Blacksmithing recipes for the guild crafter list/);
   assert.strictEqual(db.roster.members.length, 3);
-  assert.strictEqual(db.roster.members[1].name, 'Grommash Hellscream', 'realm suffix removed');
+  assert.strictEqual(db.roster.members[1].name, 'Grommash', 'realm suffix and surname removed');
   assert.deepStrictEqual(db.roster.members.map((m) => m.online), [true, true, false]);
   assert.strictEqual(db.roster.members[2].class, 'HUNTER');
   assert.deepStrictEqual(db.roster.members.map((m) => m.rankIndex), [0, 1, 2], 'in-game rank index (0 = Guild Master) is saved');

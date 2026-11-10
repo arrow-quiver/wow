@@ -27,6 +27,7 @@
 //   toLua(value) → Lua table source (shared/lua.js).
 //   freshOnly(db, guildId, payload) → payload without data from before a fresh start or from another realm/guild.
 // Injected dependencies: none. Coach and economy parts come from services/coach.js and services/economy.js.
+const { baseName } = require('../../shared/names');
 const { applyCoach, inboxPart } = require('./coach');
 const { applyEconomy, latestPrices } = require('./economy');
 const deals = require('./deals');
@@ -257,7 +258,7 @@ function applyPayload(db, guildId, userId, payload, { trustedRanks = true, ctx =
         db.prepare('UPDATE guilds SET roster_scanned_at = ? WHERE id = ?').run(scanned, guildId);
         db.prepare('UPDATE characters SET online = 0 WHERE guild_id = ?').run(guildId);
         for (const m of roster.members.slice(0, 1000)) {
-          const name = str(m && m.name, 40);
+          const name = baseName(str(m && m.name, 40));
           if (!name) continue;
           upsertRoster.run({
             guild_id: guildId, name, class: str(m.class, 20), level: int(m.level), rank: str(m.rank, 40),

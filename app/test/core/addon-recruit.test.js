@@ -114,3 +114,21 @@ test('a "no thanks"; Skip; the ad once every 15 minutes; members can\'t invite',
   assert.strictEqual(wow.eval('tostring(__ns.recruit.invite("Healer"))'), 'false');
   assert.strictEqual(wow.eval('__ns.debugError'), null);
 });
+
+test('surnames (WoW Forever): "Be Fachada" is Be, queued and whispered as Be', () => {
+  const wow = client();
+  wow.exec(`__who = { { fullName = "Be Fachada", fullGuildName = "", level = 12, classStr = "Paladin", area = "Durotar", filename = "PALADIN" } }
+__ns.db.recruit = { queue = { ["Korty Ul"] = { name = "Korty Ul", level = 11, seen = GetServerTime() } }, skip = {}, sent = {}, bracket = 0 }`);
+  wow.exec('__ns.recruit.scan()');
+  wow.fire('WHO_LIST_UPDATE');
+  assert.strictEqual(wow.eval('#__ns.recruit.queue()'), '1', 'the old "Korty Ul" entry is dropped');
+  assert.strictEqual(wow.eval('__ns.recruit.queue()[1].name'), 'Be');
+  assert.strictEqual(wow.eval('tostring(__ns.recruit.message("Be"))'), 'true');
+  assert.strictEqual(wow.eval('__chat[1]'), '/w Be Hey Be, want in?');
+  assert.strictEqual(wow.eval('__ns.Share.get("rk:Be").fields.state'), 'c');
+  wow.fire('CHAT_MSG_WHISPER', 'yes please', 'Be Fachada');
+  assert.strictEqual(wow.eval('__ns.Share.get("rk:Be").fields.state'), 'i');
+  wow.fire('CHAT_MSG_SYSTEM', 'Be Fachada has joined the guild.');
+  assert.strictEqual(wow.eval('__ns.Share.get("rk:Be").fields.state'), 'j');
+  assert.strictEqual(wow.eval('__ns.debugError'), null);
+});

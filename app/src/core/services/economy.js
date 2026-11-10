@@ -12,6 +12,7 @@
 //   recordBankLog(db, guildId, lines) → rows added   guild bank log lines, matched against known rows
 // Injected dependencies: none (pure database code).
 
+const { baseName } = require('../../shared/names');
 const int = (v) => (Number.isFinite(Number(v)) ? Math.trunc(Number(v)) : null);
 const str = (v, max = 100) => (typeof v === 'string' ? v.slice(0, max) : null);
 const list = (v) => (Array.isArray(v) ? v : v && typeof v === 'object' ? Object.values(v) : []);
@@ -109,7 +110,7 @@ function recordBankLog(db, guildId, lines) {
   for (const l of lines) {
     const at = nz(l && l.at);
     if (!at) continue;
-    const row = { at, kind: String(l.kind || 'unknown').slice(0, 20), who: l.who ? String(l.who).slice(0, 40) : null, item: nz(l.item), count: nz(l.count), amount: nz(l.amount) };
+    const row = { at, kind: String(l.kind || 'unknown').slice(0, 20), who: l.who ? baseName(String(l.who).slice(0, 40)) : null, item: nz(l.item), count: nz(l.count), amount: nz(l.amount) };
     const key = [row.kind, row.who, row.item || '', row.count || '', row.amount || ''].join('|');
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(row);

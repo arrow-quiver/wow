@@ -15,7 +15,7 @@ local GOLD = "|cffe8a33d"
 local function S() local s = ns.Share; if type(s) == "table" and type(s.list) == "function" then return s end end
 local function me() return UnitName and UnitName("player") or "?" end
 local function now() return (GetServerTime and ns.try(GetServerTime)) or time() end
-local function short(n) return n and (string.match(n, "^([^%-]+)") or n) or nil end
+local function short(n) return n and (string.match(n, "^([^%-%s]+)") or n) or nil end
 local function itemName(id) return (C_Item and C_Item.GetItemNameByID and ns.try(C_Item.GetItemNameByID, id)) or (GetItemInfo and ns.try(GetItemInfo, id)) or ("item " .. id) end
 
 -- ---------- my side: what my shopping list is short of ----------

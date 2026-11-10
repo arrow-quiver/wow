@@ -237,7 +237,7 @@ function C.levelOf(name)
   if not GetNumGuildMembers or not GetGuildRosterInfo then return nil end
   for i = 1, (ns.try(GetNumGuildMembers) or 0) do
     local n, _, _, lvl = ns.try(GetGuildRosterInfo, i)
-    if n and (string.match(n, "^([^%-]+)") or n) == name and type(lvl) == "number" then return lvl end
+    if n and (string.match(n, "^([^%-%s]+)") or n) == name and type(lvl) == "number" then return lvl end
   end
 end
 
@@ -246,7 +246,7 @@ function C.buddy(newcomer, level)
   local best, bestGap
   for i = 1, (ns.try(GetNumGuildMembers) or 0) do
     local name, _, _, lvl, _, _, _, _, online = ns.try(GetGuildRosterInfo, i)
-    name = name and string.match(name, "^([^%-]+)") or name
+    name = name and string.match(name, "^([^%-%s]+)") or name
     if name and online and name ~= newcomer and name ~= me() and type(lvl) == "number" then
       local gap = math.abs(lvl - (level or lvl))
       if not bestGap or gap < bestGap then best, bestGap = name, gap end
