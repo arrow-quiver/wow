@@ -178,7 +178,7 @@ end
 
 function Q.heard(prefix, msg, chan, sender)
   if prefix ~= Q.PREFIX or type(msg) ~= "string" then return nil end
-  local who = sender and (string.match(sender, "^([^%-]+)") or sender)
+  local who = sender and (string.match(sender, "^([^%-%s]+)") or sender)
   if who == (UnitName and UnitName("player")) then return nil end
   local ask = string.sub(msg, 1, 1) == "?"
   local key, have = Q.decode(ask and string.sub(msg, 2) or msg)

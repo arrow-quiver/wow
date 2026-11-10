@@ -104,7 +104,7 @@ F.seen = {}   -- name → { name, text, kind, role, dungeon, at, source = "chat"
 local function now() return (GetTime and GetTime()) or (time and time()) or 0 end
 
 local function guildmate(name)
-  local short = string.match(name or "", "^([^%-]+)") or name
+  local short = string.match(name or "", "^([^%-%s]+)") or name
   local members = ns.db and ns.db.roster and ns.db.roster.members
   if type(members) ~= "table" then return false end
   for _, m in ipairs(members) do
@@ -115,7 +115,7 @@ end
 
 local function remember(e)
   local myName = UnitName and UnitName("player")
-  local short = string.match(e.name or "", "^([^%-]+)")
+  local short = string.match(e.name or "", "^([^%-%s]+)")
   if not e.name or e.name == myName or short == myName or guildmate(e.name) then return end
   local old = F.seen[e.name]
   if old then for k, v in pairs(old) do if e[k] == nil then e[k] = v end end end

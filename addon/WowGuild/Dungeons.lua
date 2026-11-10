@@ -337,7 +337,7 @@ end
 
 local function inParty(name)
   if not UnitInParty then return false end
-  local short = string.match(name, "^([^%-]+)") or name
+  local short = string.match(name, "^([^%-%s]+)") or name
   return (ns.try(UnitInParty, name) or ns.try(UnitInParty, short)) and true or false
 end
 

@@ -13,7 +13,7 @@ function SE.data()
   return type(s) == "table" and type(s.players) == "table" and s or nil
 end
 
-local function short(name) return type(name) == "string" and (string.match(name, "^([^%-]+)") or name) or nil end
+local function short(name) return type(name) == "string" and (string.match(name, "^([^%-%s]+)") or name) or nil end
 
 -- → the season entry for a character name ("Grom" or "Grom-Realm"), or nil.
 function SE.of(name)
