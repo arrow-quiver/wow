@@ -151,6 +151,12 @@ const TYPES = {
     key: ['pid', 'name'], max: 400, expiry: { days: 3 },
     fields: [text('character', 48), int('level'), text('zone', 60), text('when', 60), text('note', 140)],
   },
+  // A raid boss kill: the boss, where, when, and who was in the raid. The key comes from the boss, the day and the
+  // raid leader, so every raider's addon writes the same record (the first one to see none yet writes it).
+  ek: {
+    key: ['b36x6'], max: 1280, expiry: { days: 120 },
+    fields: [int('enc'), text('boss', 60), text('instance', 60), int('at'), int('size'), list('names', 40, { of: { k: 'text', max: 24 } })],
+  },
   // Kill on sight: an Alliance player the guild hunts. Keyed by their name; any member adds one or takes it off
   // (state 'x'), and the last change wins.
   ko: {

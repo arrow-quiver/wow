@@ -237,6 +237,7 @@ RT:k3f9a2^wzltl343^Grommash^^d^tob9c0^r^4kq1zm^tobn80^Thrallia.p4m7,d72,eim;Zulj
 | `cr` craft request | random | a character of pid | pid, item, notes, state `o`/`x`/`d` | `x`, `d` | 30 d open; 7 d after final | 400 |
 | `cl` craft claim | request`:`pid | a character of pid | state `c`/`d`/`w` (claimed, done, withdrawn), claimedAt | | with the request | 60 |
 | `lp` leveling post | pid`:`character | a character of pid | character, level, zone, when, note | | 3 d | 400 |
+| `ek` raid boss kill | from boss, day and raid leader (the same for every raider) | any member | enc (encounter id), boss, instance, at, size, names (guild raiders, up to 40) | | 120 d | 1280 |
 | `ko` kill on sight | the enemy's name | any member | pid, reason, state `o`/`x` (taken off) | | 90 d | 300 |
 | `kk` a kill that counts | random | a character of pid | pid, target, zone, at, kos (1: on the list), bounty (a `BT` key) | | 45 d | 260 |
 | `bb` bulletin board post | random | a character of pid | pid, character, kind `l`/`s`/`w`/`h` (looking for group, selling, buying, help), text, price (copper), state `o`/`x` | `x` | 7 d; 1 d after taken down | 400 |
@@ -657,6 +658,7 @@ confirmed with "It was me"), `share_repair` (the repair after the update ran, §
 | `cr` + `cl` | craft_requests (status and crafter_id derived) |
 | `lp`, `ca`, `AN` | buddy_posts, ctas (client_ref = key), announcements |
 | `bb` | bulletin_posts (taken down or expired: deleted) |
+| `ek` | boss_kills |
 | `ko`, `kk`, `BT` | kos (taken off: deleted), hunt_kills, bounties |
 | `dg` + `dj` | no rows: routes/dungeons.js reads the effective records and the line-up comes from `dungeonGroupState` (the leader fills a slot of their role; then the leader's guests in the order listed; then joins in joinedAt order, a tie to the smaller pid; past a role's free slots they wait). A `dj` on the leader's own group is ignored (`own group`). |
 | `DR` + `dc` | drives (status derived), drive_contribs |
@@ -992,6 +994,7 @@ pid (`<name>.<4 base36>`), tab (`0`–`8`), `1`.
 | `cr` | random | pid text(64), item text(100), notes text(200), state enum `oxd` |
 | `cl` | random:pid | state enum `cdw`, claimedAt int |
 | `lp` | pid:name | character text(48), level int, zone text(60), when text(60), note text(140) |
+| `ek` | random (derived) | enc int, boss text(60), instance text(60), at int, size int, names list(40) of text(24) |
 | `ko` | name | pid text(64), reason text(100), state enum `ox` |
 | `kk` | random | pid text(64), target text(24), zone text(60), at int, kos int, bounty text(6) |
 | `bb` | random | pid text(64), character text(48), kind enum `lswh`, text text(200), price int, state enum `ox` |

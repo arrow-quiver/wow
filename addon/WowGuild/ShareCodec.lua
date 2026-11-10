@@ -164,6 +164,11 @@ local TYPES = {
     key = { "pid", "name" }, max = 400, expiry = { days = 3 },
     fields = { text("character", 48), int("level"), text("zone", 60), text("when", 60), text("note", 140) },
   },
+  -- A raid boss kill (the same key from every raider: boss, day, raid leader).
+  ek = {
+    key = { "b36x6" }, max = 1280, expiry = { days = 120 },
+    fields = { int("enc"), text("boss", 60), text("instance", 60), int("at"), int("size"), listOf("names", 40, 24) },
+  },
   -- Kill on sight (keyed by the enemy's name; any member adds or takes off) and kills that count (by the killer).
   ko = {
     key = { "name" }, max = 300, expiry = { days = 90 },

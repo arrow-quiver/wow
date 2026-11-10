@@ -91,6 +91,15 @@ after a death in a PvP area calls the guild to arms in one click; the overlay an
 **Call for help** button for Discord. Every death and honorable kill in the open world goes on the guild's war map:
 pins on the in-game world map, and the **War** page with hotspots and your nemeses (the players who keep killing you).
 
+**Raid boss kills and attendance.** When a raid boss dies, your addon records who of the guild was in the raid (one
+record per kill, however many raiders have the addon). That counts as raid attendance for season points at once,
+shows on the raid's page, ticks the right people when an officer closes the raid, and cheers on Discord
+("💀 **Ragnaros** is down!"). The weekly digest lists the bosses down.
+
+**Dungeon quest checklist.** Zone into a dungeon and the addon tells you how many of its quests you have and how many
+you haven't picked up; `/wow quests` shows them all (with where to get the missing ones) and which of your group has
+each (their addons tell each other over the party channel).
+
 **The hunt: kill on sight and bounties.** Put Alliance gankers on the guild's kill-on-sight list (in the app, with
 `/wow kos add Name reason`, or one click on the death popup for whoever just killed you). Officers put **bounties**
 on a player (first kill claims it) or on a zone (points for every kill there, up to a number of kills). When one is
@@ -153,6 +162,7 @@ The addon works on its own, and does much more with the app:
 | `/wow` or `/guildcamp` | Open the Guild Camp window |
 | `/wow coach` | Open the Coach |
 | `/wow season` | This month's guild season: the top five and your place |
+| `/wow quests [dungeon]` | The dungeon quest checklist: yours, ones to pick up, and who in your group has each |
 | `/wow kos` | The kill-on-sight list; `/wow kos add Name reason`, `/wow kos remove Name` |
 | `/wow bounties` | Open bounties |
 | `/wow war` | Your war map marks; `/wow war off` hides the guild's deaths and kills on the world map |

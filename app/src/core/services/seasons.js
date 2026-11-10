@@ -12,6 +12,7 @@
 // PvP kill in the open world (the war map's kill marks) 2, each crafting request filled 5, each raid attended 10.
 // Streak: weeks in a row (Monday to Sunday, UTC) with any points, up to this week or last week. Each week of streak
 // after the first adds 5% to the season's points, up to +25%.
+// Raid boss kills the guild's addons recorded count as raids attended too (services/bosskills.js), once a raid.
 // The hunt (services/hunt.js): each kill of a kill-on-sight target 8 more, and a bounty's points (bounty: n = points).
 const POINTS = { gold: 1, kill: 2, craft: 5, raid: 10, kos: 8, bounty: 1 };
 const STREAK_STEP = 0.05;
@@ -72,6 +73,7 @@ function events(db, guildId, from, to) {
   for (const a of db.prepare(`SELECT a.user_id, r.starts_at FROM attendance a JOIN raids r ON r.id = a.raid_id
       WHERE r.guild_id = ? AND r.status != 'cancelled' AND r.starts_at >= ? AND r.starts_at < ?`).all(guildId, iso(from), iso(to)))
     out.push({ userId: a.user_id, kind: 'raid', n: 1, at: parseTime(a.starts_at) });
+  out.push(...require('./bosskills').events(db, guildId, from, to));
   out.push(...require('./hunt').events(db, guildId, from, to));
   return out;
 }

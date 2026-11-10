@@ -145,6 +145,7 @@ function digest(db, gid, { week, now = Date.now() } = {}) {
     top,
     points: { gold: Math.round(totals.gold * 100) / 100, kills: totals.kill, crafts: totals.craft, raidNights: totals.raid },
     raids,
+    bosses: require('./bosskills').kills(db, gid, { from: Math.floor(from / 1000), to: Math.floor(to / 1000) }).reverse().map((k) => ({ boss: k.boss, instance: k.instance, at: k.at })),
     donations: { count: don.length, value: don.reduce((s, d) => s + d.value, 0), top: topGiver ? { name: topGiver[0], value: topGiver[1] } : null },
     crafts: count("SELECT COUNT(*) AS n FROM craft_requests WHERE guild_id = ? AND status = 'done' AND updated_at >= ? AND updated_at < ?", gid, ...range),
     war: { kills: (pvp.find((p) => p.kind === 'k') || {}).n || 0, deaths: (pvp.find((p) => p.kind === 'd') || {}).n || 0 },
@@ -165,6 +166,7 @@ function discordText(d) {
   const lines = [`📰 **${d.guild} — the week of ${d.week}**`];
   if (d.top.length) lines.push(`🏆 Top of the week: ${d.top.map((p, i) => `${['🥇', '🥈', '🥉'][i]} ${p.name} (${p.points})`).join('  ')}`);
   if (d.raids.length) lines.push(`🗓️ Raids: ${d.raids.map((r) => `${r.title} (${day(r.startsAt)}${r.attended ? `, ${r.attended} came` : ''})`).join(', ')}`);
+  if (d.bosses && d.bosses.length) lines.push(`💀 Bosses down: ${[...new Set(d.bosses.map((b) => b.boss))].join(', ')}`);
   if (d.war.kills || d.war.deaths) lines.push(`⚔️ Out in the world: ${d.war.kills} Alliance slain, ${d.war.deaths} deaths${d.ctas ? `, ${d.ctas} call${d.ctas === 1 ? '' : 's'} to arms` : ''}`);
   else if (d.ctas) lines.push(`⚔️ ${d.ctas} call${d.ctas === 1 ? '' : 's'} to arms`);
   if (d.donations.count) lines.push(`🎁 ${d.donations.count} donation${d.donations.count === 1 ? '' : 's'} to the guild bank, worth ${gold(d.donations.value)}${d.donations.top ? `. Most generous: ${d.donations.top.name}` : ''}`);

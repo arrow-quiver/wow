@@ -973,6 +973,21 @@ const MIGRATIONS = [
      PRIMARY KEY (guild_id, share_id)
    );
    CREATE INDEX hunt_kills_at ON hunt_kills(guild_id, at);`,
+
+  // 30: Raid boss kills ("ek" records, from raiders' addons): who was there, for attendance and season points
+  // (services/bosskills.js).
+  `CREATE TABLE boss_kills (
+     guild_id INTEGER NOT NULL REFERENCES guilds(id),
+     share_id TEXT NOT NULL,
+     encounter INTEGER,
+     boss TEXT NOT NULL,
+     instance TEXT,
+     at INTEGER NOT NULL,
+     size INTEGER,
+     names TEXT NOT NULL DEFAULT '[]',
+     PRIMARY KEY (guild_id, share_id)
+   );
+   CREATE INDEX boss_kills_at ON boss_kills(guild_id, at);`,
 ];
 
 // Runs every migration the database hasn't had yet, each in its own transaction.

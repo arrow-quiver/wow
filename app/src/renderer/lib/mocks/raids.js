@@ -229,6 +229,9 @@ addMockRoutes({
       board: boardOf(r),
       loot: r.loot.slice().sort((a, b) => a.id - b.id).map(withWh),
       attended: r.attended,
+      bossKills: r.status === 'done' || Date.parse(r.starts_at) < Date.now()
+        ? { kills: [{ boss: 'Lucifron', at: Math.floor(Date.parse(r.starts_at) / 1000) + 1500, size: 38 }, { boss: 'Magmadar', at: Math.floor(Date.parse(r.starts_at) / 1000) + 2700, size: 38 }], seen: (r.attended || []).slice(0, 8) }
+        : { kills: [], seen: [] },
       canSignUp: r.status === 'open' || r.status === 'locked',
       canReserve: reservable && Boolean(mySignup),
       needsSignup: reservable && !mySignup,

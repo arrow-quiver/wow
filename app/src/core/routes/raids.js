@@ -324,6 +324,7 @@ function register(app, ctx) {
       board: R.reserveBoard(db, raid).map((b) => ({ ...b, reservers: b.reservers.map(reserverJson) })),
       loot: q.lootAsc.all(raid.id),
       attended: q.attended.all(raid.id).map((r) => r.user_id),
+      bossKills: require('../services/bosskills').forRaid(db, raid.guild_id, raid.id),
       canSignUp: open,
       canReserve: reservable && Boolean(mine),
       needsSignup: reservable && !mine,
