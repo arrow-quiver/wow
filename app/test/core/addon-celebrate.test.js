@@ -91,6 +91,8 @@ test('welcome wagon: everyone can say welcome; officers send the kit with a budd
   wow.exec('__ns.celebrate.welcomeKit("Newbie")');
   assert.strictEqual(wow.eval('#__whispers'), '3');
   assert.match(wow.eval('__whispers[3]'), /^Newbie\|Your guild buddy this week is Mokra/);
+  // No links or ads in whispers to other players (Blizzard's add-on policy).
+  for (let i = 1; i <= 3; i += 1) assert.ok(!/https?:|Guild Camp app/.test(wow.eval(`__whispers[${i}]`)), wow.eval(`__whispers[${i}]`));
   assert.match(wow.eval('__said[2]'), /Welcome to the guild, Newbie! Your buddy is Mokra\. — from /);
 });
 

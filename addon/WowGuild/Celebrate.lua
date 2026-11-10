@@ -226,7 +226,7 @@ function C.welcomeKit(newcomer)
   local buddy = C.buddy(newcomer)
   local lines = {
     string.format("Welcome to the guild, %s! Type /wow for the guild window: calls to arms, raids, crafters and more.", newcomer),
-    "Get the Guild Camp app (it keeps the addon updated and adds Discord, the Coach and seasons): " .. ((ns.ui and ns.ui.APP_URL) or "https://github.com/arrow-quiver/wow/releases/latest"),
+    "Ask an officer if you'd like a hand finding your feet. Good to have you!",
   }
   if buddy then lines[#lines + 1] = string.format("Your guild buddy this week is %s: ask them anything.", buddy) end
   if whisper then for _, l in ipairs(lines) do pcall(whisper, l, "WHISPER", nil, newcomer) end end

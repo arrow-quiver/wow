@@ -54,6 +54,8 @@ test('no addon file registers the combat log event (the game refuses it as the a
     const src = fs.readFileSync(path.join(ADDON_DIR, f), 'utf8').replace(/--[^\n]*/g, '');
     assert.ok(!/COMBAT_LOG_EVENT/.test(src), `${f} must not use COMBAT_LOG_EVENT(_UNFILTERED)`);
     assert.ok(!/CombatLogGetCurrentEventInfo/.test(src), `${f} must not read the combat log`);
+    // Never write into Blizzard's shared frames (taint gets the addon blocked): our own dialog and notice instead.
+    assert.ok(!/StaticPopup_Show|StaticPopupDialogs|UIErrorsFrame|RaidNotice_AddMessage|RaidWarningFrame/.test(src), `${f} must not use Blizzard's popups or error/raid-warning frames`);
   }
   const wow = new WowClient();
   wow.login();

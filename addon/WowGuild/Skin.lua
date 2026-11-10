@@ -126,3 +126,55 @@ end
 
 -- The guild style is on unless someone picks Blizzard's look in the options.
 function S.enabled() return not ns.opt("blizzardStyle") end
+
+-- ---------- our own dialog and notice ----------
+-- Never Blizzard's StaticPopup or UIErrorsFrame: an addon writing into those shared frames can taint them, and the
+-- game then blocks Blizzard's own popups (Release Spirit, among others) and blames this addon.
+
+-- ns.confirm(text, yesLabel, noLabel, onYes, seconds): one dialog at a time; closes itself after `seconds` if given.
+local dialog
+function ns.confirm(text, yesLabel, noLabel, onYes, seconds)
+  if not dialog then
+    local f = CreateFrame("Frame", "WowGuildConfirm", UIParent)
+    f:SetSize(320, 104); f:SetPoint("TOP", 0, -160); f:SetFrameStrata("DIALOG")
+    S.panel(f)
+    f.text = S.text(f, "body", ""); f.text:SetPoint("TOP", 0, -14); f.text:SetWidth(292); f.text:SetJustifyH("CENTER")
+    f.yes = CreateFrame("Button", nil, f, "UIPanelButtonTemplate"); f.yes:SetSize(140, 24); f.yes:SetPoint("BOTTOMLEFT", 14, 12)
+    f.no = CreateFrame("Button", nil, f, "UIPanelButtonTemplate"); f.no:SetSize(140, 24); f.no:SetPoint("BOTTOMRIGHT", -14, 12)
+    f.yes:SetScript("OnClick", function() f:Hide(); if f.onYes then ns.safely(f.onYes) end end)
+    f.no:SetScript("OnClick", function() f:Hide() end)
+    f:SetScript("OnUpdate", function(self, elapsed)
+      if not self.left then return end
+      self.left = self.left - (elapsed or 0)
+      if self.left <= 0 then self:Hide() end
+    end)
+    f:Hide()
+    dialog = f
+  end
+  dialog.text:SetText(text or "")
+  dialog.yes:SetText(yesLabel or "OK"); dialog.no:SetText(noLabel or "Cancel")
+  dialog.onYes = onYes
+  dialog.left = seconds
+  dialog:Show()
+  return dialog
+end
+
+-- ns.notice(text): a line in the middle of the screen for a few seconds (our own frame).
+local note
+function ns.notice(text, seconds)
+  if not note then
+    local f = CreateFrame("Frame", "WowGuildNotice", UIParent)
+    f:SetSize(600, 30); f:SetPoint("TOP", 0, -120); f:SetFrameStrata("HIGH")
+    f.text = S.text(f, "heading", "", S.GOLD); f.text:SetAllPoints(); f.text:SetJustifyH("CENTER")
+    f:SetScript("OnUpdate", function(self, elapsed)
+      self.left = (self.left or 0) - (elapsed or 0)
+      if self.left <= 0 then self:Hide() end
+    end)
+    f:Hide()
+    note = f
+  end
+  note.text:SetText(text or "")
+  note.left = seconds or 6
+  note:Show()
+  return note
+end

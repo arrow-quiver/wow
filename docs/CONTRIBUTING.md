@@ -39,3 +39,21 @@ through a pull request. Nobody pushes straight to `main`.
 ## Releases
 
 Releases are made from `main` after the pull requests are merged: see [RELEASING.md](RELEASING.md).
+
+## Playing by Blizzard's rules
+
+The addon follows Blizzard's [UI Add-On Development Policy](https://us.forums.blizzard.com/en/wow/t/ui-add-on-development-policy/24534)
+and the game's Terms of Use. Every change keeps to these:
+
+- **Free and open.** No paid features, no hidden or obfuscated code.
+- **No ads or donation requests in game.** Nothing the addon says to other players (guild chat, whispers) links to
+  or promotes the app or anything else. The app link lives on the addon's own setup page only. (Guild bank
+  donations are guildmates giving to their guild, not to us.)
+- **No spam, light on the realm.** Lines in guild chat only for real moments (calls to arms, celebrations), each once,
+  never in instances, each behind an option. Whispers only when the player clicks. Roster requests at most once a
+  minute.
+- **No automation.** Anything the game protects (buying, inviting, chat to public channels) happens on the player's
+  own click, one action per click (the auction house buy list asks once, then one purchase per click).
+- **No taint.** Our own frames only: never Blizzard's StaticPopup, UIErrorsFrame or raid-warning frames (use
+  `ns.confirm` and `ns.notice` from `Skin.lua`), never replace Blizzard functions (use `hooksecurefunc`), never
+  register `COMBAT_LOG_EVENT_UNFILTERED` (the game blocks the addon at load). `addon-war.test.js` checks the sources.
