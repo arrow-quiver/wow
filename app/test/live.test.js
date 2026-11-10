@@ -67,3 +67,23 @@ test('newestLog picks the newest combat log and ignores other files', () => {
   assert.strictEqual(newestLog([install, { dir: '/nope' }]).file, b);
   assert.strictEqual(newestLog([]), null);
 });
+
+test('chat log: my calls to arms are read as they are written', () => {
+  const { parseCta, createChatWatch } = require('../src/main/live');
+  assert.deepStrictEqual(parseCta('11/10 12:30:01.123  [Guild] Grom-Zuljin: [Guild Camp] Call to arms: Hillsbrad Foothills (3 needed): help at the mill! — from Grom'),
+    { character: 'Grom', zone: 'Hillsbrad Foothills', needed: 3, message: 'help at the mill!' });
+  assert.deepStrictEqual(parseCta('[Guild Camp] Call to arms: Tarren Mill — from Grom\r'), { character: 'Grom', zone: 'Tarren Mill', needed: null, message: '' });
+  assert.strictEqual(parseCta('[Guild] Grom: anyone up for MC?'), null);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gc-chat-'));
+  fs.mkdirSync(path.join(dir, 'Logs'));
+  const file = path.join(dir, 'Logs', 'WoWChatLog.txt');
+  fs.writeFileSync(file, '11/10 12:00:00.000  [Guild] Grom: [Guild Camp] Call to arms: Old Zone — from Grom\n');
+  const seen = [];
+  const w = createChatWatch({ findInstalls: () => [{ dir }], log: quiet });
+  w.on('cta', (c) => seen.push(c));
+  w.tick();
+  assert.deepStrictEqual(seen, [], 'old lines are not sent again');
+  fs.appendFileSync(file, '11/10 12:30:00.000  [Guild] Grom: [Guild Camp] Call to arms: Southshore: ganked — from Grom\n11/10 12:30:01.000  [Guild] Mokra: lol\n');
+  w.tick();
+  assert.deepStrictEqual(seen, [{ character: 'Grom', zone: 'Southshore', needed: null, message: 'ganked' }]);
+});

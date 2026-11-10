@@ -133,7 +133,7 @@ The addon works on its own, and does much more with the app:
 | `/wow guide` | Open the skill-up guide |
 | `/wow list` | Open the shopping list |
 | `/wow deals` | Open the Deal hunter (it also opens with the auction house) |
-| `/wow cta <where> <need> <what>` | Sound a call to arms, e.g. `/wow cta Crossroads 5 need help` |
+| `/wow cta <where> <need> <what>` | Sound a call to arms, e.g. `/wow cta Crossroads 5 need help`: guildmates with the addon get it with a sound, guild chat sees it, and (with the app and `/wow live on`) Discord at once |
 | `/wow status` | Show what's been saved and when guild news last arrived |
 | `/wow options` | Open the settings |
 

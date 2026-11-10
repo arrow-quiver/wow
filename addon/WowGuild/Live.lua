@@ -11,6 +11,8 @@ local function logging() return LoggingCombat and ns.try(LoggingCombat) end
 function L.enable(quiet)
   if not LoggingCombat then if not quiet then ns.print("This game version can't write a combat log.") end return false end
   if not logging() then ns.try(LoggingCombat, true) end
+  -- The chat log too: the app reads your calls to arms from it and posts them to Discord at once.
+  if LoggingChat and not ns.try(LoggingChat) then ns.try(LoggingChat, true) end
   local on = logging() and true or false
   if not quiet then
     ns.print(on and "Combat logging is on. The Guild Camp app's live link can follow your fights."
@@ -29,6 +31,7 @@ function L.slash(rest)
   elseif rest == "off" then
     ns.db.options.liveLink = false
     if LoggingCombat and logging() then ns.try(LoggingCombat, false) end
+    if LoggingChat and ns.try(LoggingChat) then ns.try(LoggingChat, false) end
     ns.print("Combat logging is off, and won't turn on when you log in.")
   else
     ns.print("Live link: " .. (logging() and "combat logging is on." or "combat logging is off.")

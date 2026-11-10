@@ -142,7 +142,7 @@ test('activity paging', async () => {
   } finally { await t.close(); }
 });
 
-test('call to arms: a ca record, validation, Discord once the game sends it, no notification for the caller', async () => {
+test('call to arms: a ca record, validation, Discord at once and only once, no notification for the caller', async () => {
   const t = await setup({ character: null });
   const { db, g, me } = t;
   try {
@@ -164,12 +164,13 @@ test('call to arms: a ca record, validation, Discord once the game sends it, no 
     assert.deepEqual([ca.need, ca.base, ca.del, ca.author], [null, '', false, 'Mokra']);
     assert.match(ca.key, /^[0-9a-z]{6}$/);
     assert.deepEqual(ca.fields, { character: 'Mokra', zone: 'Tarren Mill', needed: 40, message: 'Alliance at the flight master' });
-    assert.deepEqual(t.posts, [], 'Discord waits until the game sends it');
+    await t.kit.settle();
+    assert.deepEqual(t.discordText(), ['📣 **Call to arms** from **Mokra**: **Tarren Mill**, 40 needed. "Alliance at the flight master"'], 'on Discord at once');
+    assert.equal(t.posts[0].url, WEBHOOK);
     assert.deepEqual(t.c.events, [], 'I sounded it: no notification for me');
     t.kit.ack(ca);
     await t.kit.settle();
-    assert.deepEqual(t.discordText(), ['⚔️ **Call to arms: Tarren Mill** (need 40)\nAlliance at the flight master\n— Mokra']);
-    assert.equal(t.posts[0].url, WEBHOOK);
+    assert.equal(t.posts.length, 1, 'not again when the game sends it');
 
     // needed is optional; 0 rounds up to 1.
     r = await t.api.post('/api/ctas', { zone: 'Crossroads' });
@@ -184,12 +185,15 @@ test('call to arms: a ca record, validation, Discord once the game sends it, no 
     assert.equal(r.body.cta.message.length, 200);
     assert.equal(t.kit.queued('ca').length, 3, 'each call is its own record (the first one has gone out)');
 
+    // The same call again within 15 minutes (Crossroads twice) posts once: Tarren Mill, Crossroads, the long one.
+    await t.kit.settle();
+    assert.equal(t.posts.length, 3);
     // Without a webhook nothing is posted, and it still works.
     t.c.settings.discordWebhook = null;
     assert.equal((await t.api.post('/api/ctas', { zone: 'Ashenvale' })).status, 201);
     t.kit.ack(t.kit.last('ca'));
     await t.kit.settle();
-    assert.equal(t.posts.length, 1);
+    assert.equal(t.posts.length, 3);
 
     const camp = (await t.api.get('/api/camp')).body;
     assert.equal(camp.ctas.length, 5);

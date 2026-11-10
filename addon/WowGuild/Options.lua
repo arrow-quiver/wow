@@ -12,6 +12,7 @@ ns.OPTION_LIST = {
   { key = "ahTab", label = "Show the Guild Camp list (shopping list and guild requests) at the auction house" },
   { key = "dealsPanel", label = "Show the Deal hunter next to the auction house" },
   { key = "coachTalents", label = "Show the Coach's talent guide next to the talent window" },
+  { key = "ctaChat", label = "Also post my calls to arms in guild chat (and, with the app, on Discord)" },
   { key = "seasonTooltips", label = "Show guildies' season titles and badges on their tooltips" },
   { key = "warMap", label = "Show the guild's deaths and kills of the last week on the world map" },
   { key = "warHelp", label = "When I die to players, offer to call the guild for help" },

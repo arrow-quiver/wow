@@ -109,9 +109,20 @@ once.
 - `needed` optional (missing or `""` → `null`), otherwise a whole number clamped to 1–40.
 - `message` up to 200 characters.
 - Signed with my main (else my highest-level character).
-- When the game confirms it: Discord `⚔️ **Call to arms: <zone>** (need <n>)\n<message>\n— <character>`.
-  Guildmates' apps notify (`cta`, `⚔️ Call to arms: <zone>`, body `Need <n>. <message> (<character>)`, route `/`)
+- **Discord at once**: `📣 **Call to arms** from **<character>**: **<zone>**, <n> needed. "<message>"`
+  (services/ctaDiscord.js). The same call (character, zone and message) is posted once within 15 minutes, however
+  it arrives; when the game later confirms the record, nothing is posted again.
+- Guildmates' apps notify (`cta`, `⚔️ Call to arms: <zone>`, body `Need <n>. <message> (<character>)`, route `/`)
   while it is under an hour old; guildmates online in game get a chat line and a sound.
+
+### `POST /api/ctas/discord` (guild)
+From the app itself: a call to arms of mine that the app read from the game's chat log (`main/live.js`
+`createChatWatch`). In game, `/wow cta` (and the war alerts' "Call the guild") also says the call in **guild chat**
+as `[Guild Camp] Call to arms: <zone> (<n> needed): <message> — from <character>` (addon option `ctaChat`); while
+chat logging is on (`/wow live on` turns it on with combat logging) the app sees that line within seconds and posts
+it to Discord. `{ character, zone, needed?, message? }` → `{ posted }` (false: no webhook, or already posted).
+A call made in game while chat logging is off reaches Discord when the next upload brings it (checked every
+minute, for calls under 15 minutes old).
 
 ### `POST /api/announcements` (officer)
 Queues an `AN` record (it waits for an officer character in game).

@@ -135,4 +135,72 @@ function createLive({ findInstalls, myNames = async () => [], log = console, now
   };
 }
 
-module.exports = { createLive, newestLog };
+// ---------- the chat log: my calls to arms, for Discord ----------
+// The addon also says each call to arms in guild chat, as
+// "[Guild Camp] Call to arms: Hillsbrad Foothills (3 needed): help at the mill! — from Grom" (Core.lua ns.ctaText).
+// While chat logging is on (/chatlog, or /wow live on) the game writes it to Logs/WoWChatLog*.txt.
+const CTA = /\[Guild Camp\] Call to arms: (.+?) — from ([^\s—]+)\s*$/;
+function parseCta(line) {
+  const m = CTA.exec(String(line || '').replace(/\r$/, ''));
+  if (!m) return null;
+  const body = /^(.*?)(?: \((\d+) needed\))?(?:: (.*))?$/.exec(m[1]);
+  return { character: m[2].split('-')[0], zone: body[1], needed: body[2] ? Number(body[2]) : null, message: body[3] || '' };
+}
+
+function newestChatLog(installs) {
+  let best = null;
+  for (const inst of installs || []) {
+    const dir = path.join(inst.dir, 'Logs');
+    let names = [];
+    try { names = fs.readdirSync(dir); } catch { continue; }
+    for (const n of names) {
+      if (!/^WoWChatLog.*\.txt$/i.test(n)) continue;
+      const file = path.join(dir, n);
+      let st; try { st = fs.statSync(file); } catch { continue; }
+      if (!best || st.mtimeMs > best.mtimeMs) best = { file, size: st.size, mtimeMs: st.mtimeMs };
+    }
+  }
+  return best;
+}
+
+//   const chat = createChatWatch({ findInstalls, log }); chat.on('cta', ({ character, zone, needed, message }) => …)
+// Starts at the end of the newest chat log (old lines are never sent again) and reads what's added every 2 s.
+function createChatWatch({ findInstalls, log = console, pollMs = 2000, rescanMs = 30000 } = {}) {
+  const em = new EventEmitter();
+  let current = null; let partial = ''; let timer = null; let rescanTimer = null;
+  function rescan() {
+    let found = null;
+    try { found = newestChatLog(findInstalls()); } catch { /* no game folder */ }
+    if (!found) { current = null; return; }
+    if (!current || current.file !== found.file) { current = { file: found.file, offset: found.size }; partial = ''; }
+  }
+  function readMore() {
+    if (!current) return;
+    let st; try { st = fs.statSync(current.file); } catch { current = null; return; }
+    if (st.size < current.offset) { current.offset = 0; partial = ''; }
+    if (st.size === current.offset) return;
+    try {
+      const len = Math.min(st.size - current.offset, MAX_READ);
+      const buf = Buffer.alloc(len);
+      const fd = fs.openSync(current.file, 'r');
+      try { fs.readSync(fd, buf, 0, len, current.offset); } finally { fs.closeSync(fd); }
+      current.offset += len;
+      const lines = (partial + buf.toString('utf8')).split('\n');
+      partial = lines.pop();
+      for (const line of lines) { const c = parseCta(line); if (c) em.emit('cta', c); }
+    } catch (err) { log.warn(`Couldn't read the chat log: ${err.message}`); }
+  }
+  return {
+    start() {
+      if (timer) return;
+      rescan();
+      timer = setInterval(readMore, pollMs); rescanTimer = setInterval(rescan, rescanMs);
+      for (const t of [timer, rescanTimer]) if (t.unref) t.unref();
+    },
+    stop() { clearInterval(timer); clearInterval(rescanTimer); timer = rescanTimer = null; },
+    tick() { rescan(); readMore(); },
+    on: (ev, fn) => { em.on(ev, fn); return () => em.off(ev, fn); },
+  };
+}
+
+module.exports = { createLive, newestLog, createChatWatch, parseCta, newestChatLog };
