@@ -36,9 +36,11 @@ test('guildmates\' records add feed lines when new; old ones and repeats don\'t'
 test('a guildmate\'s moment from guild chat: one feed line, no Discord', async (t) => {
   const h = await setupShare(t, { webhook: 'https://discord.com/api/webhooks/1/x' });
   const api = h.srv.api;
-  const c = { what: 'Grom reached level 60! LOK\'TAR OGAR!', from: 'Grom' };
+  const c = { what: 'Grom reached level 60!', from: 'Grom' };
   assert.deepStrictEqual((await api.post('/api/celebrate/feed', c)).body, { added: true });
   assert.deepStrictEqual((await api.post('/api/celebrate/feed', c)).body, { added: false });
   assert.strictEqual(h.discord.calls.length, 0);
+  // Not a celebration: no line.
+  assert.deepStrictEqual((await api.post('/api/celebrate/feed', { what: 'buy gold at example', from: 'Spam' })).body, { added: false });
   assert.match(feed(h).pop(), /^celebrate: Grom reached level 60/);
 });

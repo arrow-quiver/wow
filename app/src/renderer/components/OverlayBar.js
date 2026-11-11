@@ -113,9 +113,11 @@ export function AlertsFeed({ every = 8000 }) {
       try {
         const r = await api.get('/api/activity?limit=10');
         const rows = (r && r.activity) || [];
-        if (!alive || !rows.length) return;
+        if (!alive) return;
+        // The first look: what's there already isn't news (an empty feed starts at 0, so its first line is).
+        if (last.current == null) { last.current = rows.length ? Math.max(...rows.map((a) => a.id)) : 0; return; }
+        if (!rows.length) return;
         const top = Math.max(...rows.map((a) => a.id));
-        if (last.current == null) { last.current = top; return; } // the first look: what's there already isn't news
         const fresh = rows.filter((a) => a.id > last.current).sort((a, b) => a.id - b.id);
         last.current = Math.max(last.current, top);
         for (const a of fresh.slice(-4)) {

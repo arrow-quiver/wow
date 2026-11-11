@@ -37,6 +37,8 @@ function register(app, ctx) {
     const what = str(req.body && req.body.what, 255);
     const from = str(req.body && req.body.from, 48);
     if (!what) throw new HttpError(400, 'Say what to celebrate.');
+    // Only lines that are celebrations (the same check as the Discord post).
+    if (!Celebrate.discordText({ what, from })) return res.json({ added: false });
     if (!CtaDiscord.claim(db, req.guild.id, { character: from, zone: `feed:${what}`, message: '' })) return res.json({ added: false });
     ctx.activity(req.guild.id, 'celebrate', Celebrate.linkName(what));
     res.json({ added: true });
