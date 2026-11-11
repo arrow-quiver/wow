@@ -34,11 +34,11 @@ function ns.textRaids()
       elseif r.signup == "no" then me = "|cff999999you can't make it|r"
       elseif r.signup == nil or r.signup == "" then me = "|cffe8a33dnot signed up yet: sign up in the Guild Camp app|r"
       else me = "|cff999999signed up: " .. tostring(r.signup) .. "|r" end
-      add("  " .. tostring(r.title or "Raid") .. "  |cff999999" .. date("%a %d %b %H:%M", r.startsAt or 0) .. ", " .. (r.coming or 0) .. " coming|r")
+      add("  " .. plain(r.title or "Raid") .. "  |cff999999" .. date("%a %d %b %H:%M", r.startsAt or 0) .. ", " .. (r.coming or 0) .. " coming|r")
       add("    " .. me)
       if r.reserves and #r.reserves > 0 then
         local parts = {}
-        for _, x in ipairs(r.reserves) do parts[#parts + 1] = tostring(x.name or "?") .. ((x.bonus or 0) > 0 and (" (+" .. x.bonus .. ")") or "") end
+        for _, x in ipairs(r.reserves) do parts[#parts + 1] = plain(x.name or "?") .. ((x.bonus or 0) > 0 and (" (+" .. x.bonus .. ")") or "") end
         add("    |cff999999reserved:|r " .. table.concat(parts, ", "))
       end
     end
@@ -50,7 +50,7 @@ function ns.textNotices()
   local inbox = WowGuildInbox
   local lines = { "|cffffd100Notices|r" }
   if inbox and inbox.announcements and #inbox.announcements > 0 then
-    for _, a in ipairs(inbox.announcements) do lines[#lines + 1] = "  " .. tostring(a.body or "") .. "  |cff999999" .. who(a.by) .. "|r" end
+    for _, a in ipairs(inbox.announcements) do lines[#lines + 1] = "  " .. plain(a.body or "") .. "  |cff999999" .. who(a.by) .. "|r" end
   else lines[#lines + 1] = "  |cff999999None|r" end
   return table.concat(lines, "\n")
 end

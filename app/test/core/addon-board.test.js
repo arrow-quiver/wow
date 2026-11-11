@@ -138,6 +138,11 @@ test("a guildmate's |c, |r and |H in a post, partner row or request are shown as
   assert.match(wow.eval(`tostring(${p}.rows[1].who:GetText())`), /^Z\|\|cffff0000ed, /);
   wow.exec(`WowGuildInbox = { canCraft = { { item = "Vest|r", requester = "Grom|cff#2", notes = "|Hx|h" } }, myRequests = { { item = "Belt|r" } },
     buddies = { { character = "Zul|r", level = 18, zone = "|cffStone", whenText = "to|night", note = "|Hn|h" } } }`);
+  wow.exec(`WowGuildInbox.announcements = { { body = "Raid at |cffff0000eight|r", by = "Mokra#1" } }
+    WowGuildInbox.raids = { { title = "MC|r", startsAt = 0, coming = 1, signup = "yes", reserves = { { name = "Zul|cff" } } } }`);
+  assert.ok(wow.eval('__ns.textNotices()').includes('Raid at ||cffff0000eight||r'));
+  const raids = wow.eval('__ns.textRaids()');
+  assert.ok(raids.includes('MC||r') && raids.includes('Zul||cff'), raids);
   const req = wow.eval('__ns.textGuildRequests()');
   assert.ok(req.includes('Vest||r') && req.includes('Grom||cff') && req.includes('||Hx||h') && req.includes('Belt||r'), req);
   wow.exec('__ns.ui.show("guild")');
