@@ -110,3 +110,102 @@ C_Map.GetPlayerMapPosition = function() return { GetXY = function() return 0.4, 
   assert.match(wow.eval('__ns.hunt.onList("Sneaky").reason'), /^Killed Thrallia in /);
   assert.strictEqual(wow.eval('__ns.debugError'), null);
 });
+
+// ---------------------------------------------------------------- the War section of the guild window
+
+const hunt = 'WowGuildWindow.pages.hunt';
+const noError = (wow) => assert.strictEqual(wow.eval('__ns.debugError'), null, 'no addon errors');
+
+test('The hunt page: the list with who added it, take off, add by name and from my target, bounties', () => {
+  const wow = client();
+  wow.exec('__ns.ui.show("hunt")');
+  assert.ok(wow.texts().includes('Kill on sight  |cff9999991 on the list · 8 season points a kill|r'));
+  assert.strictEqual(wow.eval(`${hunt}.kos[1].name:GetText()`), 'Gankalot');
+  assert.strictEqual(wow.eval(`${hunt}.kos[1].why:GetText()`), 'Camps the Crossroads|cff999999 · added by Mokra|r');
+  assert.strictEqual(wow.eval(`tostring(${hunt}.kos[2]:IsShown())`), 'false');
+  // Bounties: the richest first, with what to do and the time left.
+  assert.strictEqual(wow.eval(`${hunt}.bounties[1].points:GetText()`), '50 points');
+  assert.strictEqual(wow.eval(`${hunt}.bounties[1].what:GetText()`), 'Kill Stabby');
+  assert.strictEqual(wow.eval(`${hunt}.bounties[2].what:GetText()`), 'Each kill in Hillsbrad Foothills, up to 10');
+  assert.match(wow.eval(`${hunt}.bounties[1].left:GetText()`), /^(23|24)h left$/);
+  assert.strictEqual(wow.eval(`tostring(${hunt}.bounties[3]:IsShown())`), 'false', 'the expired one is gone');
+
+  // Add by name: the answer shows on the page, not in chat.
+  wow.clearOutput();
+  wow.exec(`${hunt}.name:SetText("campy"); ${hunt}.why:SetText("Ganks lowbies")`);
+  wow.click(`${hunt}.add`);
+  assert.strictEqual(wow.printed(), '');
+  assert.match(wow.eval(`${hunt}.status:GetText()`), /Campy is now kill on sight for the guild/);
+  assert.strictEqual(wow.eval('#__ns.hunt.kos()'), '2');
+  assert.strictEqual(wow.eval(`${hunt}.name:GetText()`), '', 'the boxes are cleared');
+  // An empty name does nothing.
+  wow.click(`${hunt}.add`);
+  assert.strictEqual(wow.eval(`${hunt}.status:GetText()`), "Type the player's name first.");
+  assert.strictEqual(wow.eval('#__ns.hunt.kos()'), '2');
+
+  // From my target: enemy players only.
+  wow.click(`${hunt}.target`);
+  assert.strictEqual(wow.eval(`${hunt}.status:GetText()`), 'Target an enemy player first.');
+  wow.exec('__units.target = { name = "Friendly", level = 20, class = "Mage" }');
+  wow.click(`${hunt}.target`);
+  assert.strictEqual(wow.eval(`${hunt}.status:GetText()`), 'Target an enemy player first.');
+  wow.exec('__units.target = { name = "Stabby", level = 28, class = "Warrior" }; GetZoneText = function() return "Ashenvale" end');
+  wow.click(`${hunt}.target`);
+  assert.strictEqual(wow.eval('__ns.hunt.onList("Stabby").reason'), 'Seen in Ashenvale');
+  assert.strictEqual(wow.eval('#__ns.hunt.kos()'), '3');
+
+  // Take off: the row's own button.
+  const rowOf = (name) => [1, 2, 3].find((i) => wow.eval(`tostring(${hunt}.kos[${i}].who)`) === name);
+  wow.click(`${hunt}.kos[${rowOf('Gankalot')}].btn`);
+  assert.match(wow.eval(`${hunt}.status:GetText()`), /Gankalot is off the list/);
+  assert.strictEqual(wow.eval('tostring((__ns.hunt.onList("Gankalot")))'), 'nil');
+  assert.strictEqual(wow.eval('#__ns.hunt.kos()'), '2');
+  noError(wow);
+});
+
+test('Call to arms page: a guildmate\'s call has "On my way", one whisper, once', () => {
+  const wow = client();
+  wow.exec(`__whispers = {}
+    C_ChatInfo = C_ChatInfo or {}
+    C_ChatInfo.SendChatMessage = function(text, kind, _, to) table.insert(__whispers, kind .. ">" .. tostring(to) .. ">" .. text) end
+    __ns.ctaRecent = { { zone = "Ashenvale", needed = 5, message = "Zoram Strand", character = "Mokra", at = time() - 60 }, { zone = "Barrens", at = time() - 30, mine = true, character = "Thrallia" } }
+    __ns.ui.show("cta")`);
+  const calls = 'WowGuildWindow.pages.cta.calls';
+  // Newest first: mine (no button), then Mokra's.
+  assert.match(wow.eval(`${calls}[1].text:GetText()`), /^Barrens \|cff999999you, /);
+  assert.strictEqual(wow.eval(`tostring(${calls}[1].btn:IsShown())`), 'false');
+  assert.match(wow.eval(`${calls}[2].text:GetText()`), /^Ashenvale \(need 5\): Zoram Strand \|cff999999Mokra, /);
+  assert.strictEqual(wow.eval(`tostring(${calls}[2].btn:IsShown())`), 'true');
+  assert.strictEqual(wow.eval('#__whispers'), '0', 'nothing is sent by opening the page');
+  wow.click(`${calls}[2].btn`);
+  assert.deepStrictEqual(wow.get('__whispers'), ['WHISPER>Mokra>On my way to Ashenvale!']);
+  assert.strictEqual(wow.eval(`tostring(${calls}[2].btn:IsShown())`), 'false', 'answered: the button goes');
+  assert.strictEqual(wow.eval(`tostring(${calls}[3]:IsShown())`), 'false');
+  noError(wow);
+});
+
+test('War report page: the guild\'s week by zone, and the map marks switch', () => {
+  const wow = client();
+  wow.exec(`local t = GetServerTime()
+    table.insert(__recs, { type = "wm", key = "Mokra.m1", author = "Mokra", t = t, fields = { maps = { { id = 10, name = "The Barrens" }, { id = 63, name = "Ashenvale" } }, marks = {
+      { map = 10, x = 500, y = 500, at = t - 3600, kind = "d" }, { map = 10, x = 510, y = 500, at = t - 7200, kind = "k" }, { map = 10, x = 520, y = 500, at = t - 100, kind = "k" },
+      { map = 63, x = 100, y = 100, at = t - 86400, kind = "d" }, { map = 63, x = 100, y = 100, at = t - 9 * 86400, kind = "d" } } } })
+    table.insert(__recs, { type = "wm", key = "Zed.z1", author = "Zed", t = t, fields = { maps = {}, marks = { { map = 10, x = 1, y = 1, at = t - 50, kind = "d" } } } })`);
+  const s = wow.get('__ns.war.summary()');
+  assert.deepStrictEqual([s.deaths, s.kills], [3, 2], 'the nine-day-old death is out');
+  assert.deepStrictEqual(s.zones.map((z) => [z.name, z.kills, z.deaths]), [['The Barrens', 2, 2], ['Ashenvale', 0, 1]]);
+  wow.clearOutput();
+  wow.exec('__ns.ui.show("report")');
+  const body = wow.texts().find((t) => /The last 7 days/.test(t));
+  assert.match(body, /The guild: \|cff40bf402 kills\|r, \|cffff40403 deaths\|r to players\./);
+  assert.match(body, /The Barrens {2}\|cff40bf402 kills\|r {2}\|cffff40402 deaths\|r/);
+  assert.match(body, /Ashenvale {2}\|cff40bf400 kills\|r {2}\|cffff40401 death\|r/);
+  assert.match(body, /The marks show on your world map\./);
+  wow.click('WowGuildWindow.pages.report.buttons[1]');
+  assert.strictEqual(wow.eval('tostring(__ns.opt("warMap"))'), 'false');
+  assert.ok(wow.texts().some((t) => /The marks are hidden on your world map/.test(t)));
+  assert.strictEqual(wow.printed(), '');
+  wow.click('WowGuildWindow.pages.report.buttons[1]');
+  assert.strictEqual(wow.eval('tostring(__ns.opt("warMap"))'), 'true');
+  noError(wow);
+});

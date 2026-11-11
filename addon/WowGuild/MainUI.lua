@@ -23,6 +23,7 @@ local SECTIONS = {
   { id = "war", label = "War", icon = "Ability_Warrior_BattleShout", pages = {
     { key = "cta", label = "Call to arms" },
     { key = "hunt", label = "The hunt", when = function() return ns.hunt end },
+    { key = "report", label = "War report", when = function() return ns.war and ns.war.summary end },
     { key = "near", label = "Guildies nearby", when = function() return ns.helpers end },
   } },
   { id = "dungeons", label = "Raids & Dungeons", icon = "INV_Misc_Key_03", pages = {
@@ -216,25 +217,42 @@ function pages.cta(page)
   local msg = editbox(page, PW - 60); msg:SetPoint("TOPLEFT", 6, -170)
 
   local send = button(page, "Sound the horn", 150); send:SetPoint("TOPLEFT", 0, -210)
-  local sent = label(page, "", "GameFontHighlightSmall"); sent:SetPoint("TOPLEFT", 0, -244); sent:SetWidth(PW - 40)
   send:SetScript("OnClick", function()
     if ns.addCta(zone:GetText() or "", tonumber(needed:GetText() or ""), msg:GetText() or "") then msg:SetText("") end
     page.refresh()
   end)
+  -- The calls since I logged in, newest first. A guildmate's call has "On my way": one whisper to the caller.
+  local recent = label(page, "", "GameFontNormal"); recent:SetPoint("TOPLEFT", 0, -250)
+  page.calls = {}
+  for i = 1, 5 do
+    local r = CreateFrame("Frame", nil, page)
+    r:SetSize(PW - 40, 24); r:SetPoint("TOPLEFT", 0, -270 - (i - 1) * 26)
+    r.text = label(r, "", "GameFontHighlight"); r.text:SetPoint("LEFT", 0, 0); r.text:SetWidth(PW - 170)
+    r.btn = button(r, "On my way", 110); r.btn:SetPoint("RIGHT", 0, 0)
+    r:Hide()
+    page.calls[i] = r
+  end
   page.zone, page.needed, page.msg, page.send = zone, needed, msg, send
   page.refresh = function()
     if (zone:GetText() or "") == "" and GetZoneText then zone:SetText(GetZoneText() or "") end
     local q = ns.ctaRecent or {}
-    if #q == 0 then sent:SetText("") return end
-    local lines = { "|cffffd100Calls to arms since you logged in|r" }
-    for i = #q, 1, -1 do
-      local c = q[i]
-      local need = c.needed and string.format(" (need %d)", c.needed) or ""
-      local msgText = (c.message and c.message ~= "") and (" " .. c.message) or ""
-      lines[#lines + 1] = string.format("  %s%s%s |cff999999%s, %s|r", c.zone or "", need, msgText,
-        c.mine and "you" or tostring(c.character or "?"), ns.ago(c.at))
+    recent:SetText(#q > 0 and "Calls to arms since you logged in" or "")
+    for i, r in ipairs(page.calls) do
+      local c = q[#q + 1 - i]
+      if c then
+        local need = c.needed and string.format(" (need %d)", c.needed) or ""
+        local msgText = (c.message and c.message ~= "") and (": " .. c.message) or ""
+        r.text:SetText(string.format("%s%s%s |cff999999%s, %s|r", c.zone or "", need, msgText, c.mine and "you" or tostring(c.character or "?"), ns.ago(c.at)))
+        if c.mine or not c.character or c.answered then r.btn:Hide() else
+          r.btn:SetScript("OnClick", function()
+            c.answered = W.whisper(string.format("On my way to %s!", (c.zone and c.zone ~= "") and c.zone or "you"), c.character) and true or false
+            page.refresh()
+          end)
+          r.btn:Show()
+        end
+        r:Show()
+      else r:Hide() end
     end
-    sent:SetText(table.concat(lines, "\n"))
   end
 end
 
@@ -342,6 +360,13 @@ local function capture(fn, ...)
   return table.concat(lines, "\n")
 end
 W.capture = capture
+
+-- One whisper, sent because the player clicked. → true when the game took it.
+function W.whisper(text, to)
+  local send = (C_ChatInfo and C_ChatInfo.SendChatMessage) or SendChatMessage
+  if not send or not to or to == "" then return false end
+  return pcall(send, text, "WHISPER", nil, to) and true or false
+end
 
 -- A page of text with, optionally, one input line and buttons under it.
 --   spec.text()                         the body
@@ -539,13 +564,131 @@ function pages.season(page)
   end
 end
 
--- War › The hunt: kill on sight and bounties.
+-- War › The hunt: the kill-on-sight list (add by name or from my target, take off) and the open bounties.
+local KOS_ROWS, BOUNTY_ROWS = 6, 4
+local function timeLeft(ends)
+  local h = math.max(0, math.floor(((ends or 0) - time()) / 3600))
+  return h >= 48 and (math.floor(h / 24) .. " days left") or (h .. "h left")
+end
 function pages.hunt(page)
+  local HU = ns.hunt
+  local W_ROW = PW - 40
+  local head = label(page, "", "GameFontNormal"); head:SetPoint("TOPLEFT", 0, 0); head:SetWidth(W_ROW)
+  page.kos = {}
+  for i = 1, KOS_ROWS do
+    local r = CreateFrame("Frame", nil, page)
+    r:SetSize(W_ROW, 24); r:SetPoint("TOPLEFT", 0, -20 - (i - 1) * 25)
+    r.name = label(r, "", "GameFontHighlight"); r.name:SetPoint("LEFT", 0, 0); r.name:SetWidth(130)
+    r.name:SetTextColor(1, 0.25, 0.25)
+    r.why = label(r, "", "GameFontHighlightSmall"); r.why:SetPoint("LEFT", 136, 0); r.why:SetWidth(W_ROW - 136 - 100)
+    r.btn = button(r, "Take off", 90); r.btn:SetPoint("RIGHT", 0, 0)
+    r:Hide()
+    page.kos[i] = r
+  end
+  local y = -20 - KOS_ROWS * 25
+  local more = label(page, "", "GameFontDisableSmall"); more:SetPoint("TOPLEFT", 0, y); more:SetWidth(W_ROW)
+
+  local al = label(page, "Add a player: name, then why", "GameFontNormalSmall"); al:SetPoint("TOPLEFT", 0, y - 20)
+  local name = editbox(page, 120); name:SetPoint("TOPLEFT", 6, y - 36)
+  local why = editbox(page, 200); why:SetPoint("LEFT", name, "RIGHT", 12, 0)
+  local add = button(page, "Add", 60); add:SetPoint("LEFT", why, "RIGHT", 8, 0)
+  local target = button(page, "Add my target", 120); target:SetPoint("LEFT", add, "RIGHT", 6, 0)
+  local status = label(page, "", "GameFontHighlightSmall"); status:SetPoint("TOPLEFT", 0, y - 64); status:SetWidth(W_ROW)
+
+  local bh = label(page, "", "GameFontNormal"); bh:SetPoint("TOPLEFT", 0, y - 86); bh:SetWidth(W_ROW)
+  page.bounties = {}
+  for i = 1, BOUNTY_ROWS do
+    local r = CreateFrame("Frame", nil, page)
+    r:SetSize(W_ROW, 20); r:SetPoint("TOPLEFT", 0, y - 106 - (i - 1) * 21)
+    r.points = label(r, "", "GameFontNormal"); r.points:SetPoint("LEFT", 0, 0); r.points:SetWidth(76)
+    r.what = label(r, "", "GameFontHighlight"); r.what:SetPoint("LEFT", 80, 0); r.what:SetWidth(W_ROW - 80 - 100)
+    r.left = label(r, "", "GameFontDisableSmall"); r.left:SetPoint("RIGHT", 0, 0)
+    r:Hide()
+    page.bounties[i] = r
+  end
+  page.name, page.why, page.add, page.target, page.status = name, why, add, target, status
+
+  -- Runs a change and shows what it said under the boxes instead of in chat.
+  local function say(fn, ...)
+    status:SetText(capture(fn, ...))
+    page.refresh(true)
+  end
+  local function addTyped()
+    local n = name:GetText() or ""
+    if n == "" then status:SetText("Type the player's name first."); return end
+    say(HU.add, n, why:GetText() or "")
+    name:SetText(""); why:SetText("")
+  end
+  add:SetScript("OnClick", addTyped)
+  name:SetScript("OnEnterPressed", function(self) addTyped(); self:ClearFocus() end)
+  why:SetScript("OnEnterPressed", function(self) addTyped(); self:ClearFocus() end)
+  target:SetScript("OnClick", function()
+    local isPlayer = UnitIsPlayer and ns.try(UnitIsPlayer, "target")
+    local enemy = isPlayer and (not UnitIsEnemy or ns.try(UnitIsEnemy, "player", "target"))
+    local ok, n = pcall(UnitName, "target")
+    if not enemy or not ok or type(n) ~= "string" or n == "" then status:SetText("Target an enemy player first."); return end
+    local zone = (GetZoneText and ns.try(GetZoneText)) or ""
+    say(HU.add, n, (why:GetText() or "") ~= "" and why:GetText() or (zone ~= "" and ("Seen in " .. zone) or ""))
+  end)
+
+  page.refresh = function(keepStatus)
+    if not keepStatus then status:SetText("") end
+    HU.invalidate()
+    local list = HU.kos()
+    head:SetText(string.format("Kill on sight  |cff999999%d on the list · %d season points a kill|r", #list, HU.KOS_POINTS))
+    for i, r in ipairs(page.kos) do
+      local k = list[i]
+      if k then
+        r.name:SetText(k.name)
+        local by = k.by and k.by ~= "" and ("|cff999999" .. ((k.reason and k.reason ~= "") and " · " or "") .. "added by " .. tostring(k.by) .. "|r") or ""
+        r.why:SetText(((k.reason and k.reason ~= "") and k.reason or "") .. by)
+        r.btn:SetScript("OnClick", function() say(HU.remove, k.name) end)
+        r.who = k.name
+        r:Show()
+      else r.who = nil; r:Hide() end
+    end
+    more:SetText(#list == 0 and "Nobody yet. Add whoever keeps killing guildies and everyone gets a warning when they're near."
+      or (#list > KOS_ROWS and string.format("And %d more: /wow kos lists them all.", #list - KOS_ROWS) or ""))
+    local b = HU.bounties()
+    bh:SetText(#b > 0 and "Bounties" or "Bounties  |cff999999none up. Officers put them up in the Guild Camp app.|r")
+    for i, r in ipairs(page.bounties) do
+      local x = b[i]
+      if x then
+        r.points:SetText(string.format("%d points", x.points))
+        r.what:SetText((x.target and ("Kill " .. x.target) or ("Each kill in " .. tostring(x.zone) .. ((x.cap or 1) > 1 and (", up to " .. x.cap) or "")))
+          .. ((x.note and x.note ~= "") and ("  |cff999999" .. x.note .. "|r") or ""))
+        r.left:SetText(timeLeft(x.ends))
+        r:Show()
+      else r:Hide() end
+    end
+  end
+end
+
+-- War › War report: where the guild fought this week, and the marks on the world map.
+function pages.report(page)
   textPage(page, {
-    text = function() return capture(ns.hunt.slash, "") .. "\n\n" .. capture(ns.hunt.slashBounties) end,
-    input = { label = "Add a player to the kill-on-sight list: name, then the reason.", button = "Add to the list",
-      run = function(t) ns.hunt.slash("add " .. t) end },
-    hint = "Remove a name with /wow kos remove <name>. Officers put bounties up in the Guild Camp app.",
+    text = function()
+      local s = ns.war.summary()
+      local lines = { string.format("|cffffd100The last %d days|r", ns.war.SHOW_DAYS or 7), "" }
+      if #s.zones == 0 then
+        lines[#lines + 1] = "No fights marked yet. Deaths to players and honorable kills in the open world are marked where they happen,"
+        lines[#lines + 1] = "for the whole guild."
+      else
+        lines[#lines + 1] = string.format("The guild: |cff40bf40%d %s|r, |cffff4040%d %s|r to players.", s.kills, s.kills == 1 and "kill" or "kills", s.deaths, s.deaths == 1 and "death" or "deaths")
+        lines[#lines + 1] = ""
+        lines[#lines + 1] = "|cffffd100Where|r"
+        for i, z in ipairs(s.zones) do
+          if i > 12 then lines[#lines + 1] = string.format("  … and %d more zones.", #s.zones - 12); break end
+          lines[#lines + 1] = string.format("  %s  |cff40bf40%d %s|r  |cffff4040%d %s|r  |cff999999last %s|r", z.name, z.kills, z.kills == 1 and "kill" or "kills",
+            z.deaths, z.deaths == 1 and "death" or "deaths", ns.war.ago(z.last))
+        end
+      end
+      lines[#lines + 1] = ""
+      lines[#lines + 1] = ns.opt("warMap") ~= false and "The marks show on your world map." or "|cff999999The marks are hidden on your world map.|r"
+      return table.concat(lines, "\n")
+    end,
+    buttons = { { "Show or hide the map marks", function() capture(ns.war.slash, ns.opt("warMap") ~= false and "off" or "on") end, 210 } },
+    hint = "Nemeses and the full war map are in the Guild Camp app (War).",
   })
 end
 

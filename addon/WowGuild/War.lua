@@ -247,6 +247,41 @@ function W.marksFor(map)
   return out
 end
 
+-- The guild's week, by zone: { deaths, kills, zones = { { name, deaths, kills, last } } }, the busiest zone first.
+-- From every "wm" record in the guild's store (mine included) and the last SHOW_DAYS. Zone names come with the
+-- records (their `maps` list), from my own marks, or from the game.
+function W.summary()
+  local t = now()
+  local out = { deaths = 0, kills = 0, zones = {} }
+  local names, byMap = {}, {}
+  if ns.db and ns.db.war and type(ns.db.war.maps) == "table" then
+    for id, name in pairs(ns.db.war.maps) do names[id] = name end
+  end
+  local recs = (ns.Share and ns.Share.list and ns.try(ns.Share.list, "wm")) or {}
+  for _, rec in ipairs(recs) do
+    local f = type(rec.fields) == "table" and rec.fields or {}
+    for _, m in ipairs(type(f.maps) == "table" and f.maps or {}) do
+      if type(m) == "table" and m.id and type(m.name) == "string" then names[m.id] = m.name end
+    end
+    for _, m in ipairs(type(f.marks) == "table" and f.marks or {}) do
+      if type(m) == "table" and m.map and type(m.at) == "number" and t - m.at <= W.SHOW_DAYS * 86400 then
+        local z = byMap[m.map]
+        if not z then z = { map = m.map, deaths = 0, kills = 0, last = 0 }; byMap[m.map] = z; out.zones[#out.zones + 1] = z end
+        if m.kind == "k" then z.kills = z.kills + 1; out.kills = out.kills + 1 else z.deaths = z.deaths + 1; out.deaths = out.deaths + 1 end
+        if m.at > z.last then z.last = m.at end
+      end
+    end
+  end
+  for _, z in ipairs(out.zones) do z.name = names[z.map] or mapName(z.map) or ("Map " .. tostring(z.map)) end
+  table.sort(out.zones, function(a, b)
+    local x, y = a.deaths + a.kills, b.deaths + b.kills
+    if x ~= y then return x > y end
+    return a.last > b.last
+  end)
+  return out
+end
+W.ago = function(t) return W._ago(t) end
+
 local layer, pins = nil, {}
 local function ago(t)
   local s = math.max(0, now() - t)
@@ -254,6 +289,8 @@ local function ago(t)
   if s < 86400 then return string.format("%d h ago", math.floor(s / 3600)) end
   return string.format("%d days ago", math.floor(s / 86400))
 end
+
+W._ago = ago
 
 local function pin(i)
   if pins[i] then return pins[i] end

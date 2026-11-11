@@ -387,11 +387,12 @@ test('Call to arms form sends a call with the typed details', () => {
   assert.deepStrictEqual([q[0].type, q[0].fields.zone, q[0].fields.needed, q[0].fields.message], ['ca', 'Crossroads', 8, 'Alliance at the flight master']);
   assert.strictEqual(wow.eval('__popups'), '0', 'sent at once: no reload');
   assert.strictEqual(text(wow, 'WowGuildWindow.pages.cta.msg:GetText()'), '', 'message box clears');
-  assert.ok(wow.texts().some((t) => /Calls to arms since you logged in[\s\S]*Crossroads \(need 8\) Alliance at the flight master \|cff999999you, /.test(t)), 'sent calls are listed');
+  assert.ok(wow.texts().includes('Calls to arms since you logged in'));
+  assert.ok(wow.texts().some((t) => /^Crossroads \(need 8\): Alliance at the flight master \|cff999999you, /.test(t)), 'sent calls are listed');
   // A guildmate's call arrives (the sharing engine prints it and plays the sound): it's listed too.
   wow.exec(`__ns.ctaArrived({ id = "ca:k3f9a2", type = "ca", author = "Grommash", t = GetServerTime(),
     fields = { character = "Grommash", zone = "Tarren Mill", needed = 5.0, message = "they are back" } }, "d", "Grommash")`);
-  assert.ok(wow.texts().some((t) => /Tarren Mill \(need 5\) they are back \|cff999999Grommash, /.test(t)));
+  assert.ok(wow.texts().some((t) => /^Tarren Mill \(need 5\): they are back \|cff999999Grommash, /.test(t)));
   // Without the sharing engine the form says so and keeps what was typed.
   wow.exec(`__ns.Share = nil; local p = WowGuildWindow.pages.cta; p.msg:SetText("again"); __click(p.send)`);
   assert.match(wow.printed(), /Calls to arms can't be sent right now/);
@@ -558,7 +559,7 @@ test('the window has a rail of sections; each section\'s pages are its tabs', ()
     ['Camp', 'Coach', 'War', 'Raids & Dungeons', 'Professions', 'Market', 'Guild', 'Settings']);
   // Every section is on the rail and every page opens without an error.
   const keys = wow.get('(function() local t = {} for _, s in ipairs(__ns.ui.SECTIONS) do for _, p in ipairs(s.pages) do t[#t + 1] = s.id .. ":" .. p.key end end return t end)()');
-  assert.deepStrictEqual(keys, ['camp:camp', 'camp:board', 'camp:season', 'coach:coach', 'war:cta', 'war:hunt', 'war:near',
+  assert.deepStrictEqual(keys, ['camp:camp', 'camp:board', 'camp:season', 'coach:coach', 'war:cta', 'war:hunt', 'war:report', 'war:near',
     'dungeons:raids', 'dungeons:groups', 'dungeons:quests', 'prof:prof', 'prof:mats', 'market:deals', 'market:alerts',
     'guild:guild', 'guild:recruit', 'settings:settings']);
   for (const k of keys) {
@@ -612,7 +613,7 @@ test('pages show what the commands print, without printing it', () => {
   const wow = uiClient();
   wow.clearOutput();
   wow.exec('__ns.ui.show("hunt")');
-  assert.ok(wow.texts().some((t) => /kill on sight/i.test(t) && /bounties/i.test(t)), 'the hunt page has both lists');
+  assert.ok(wow.texts().some((t) => /^Kill on sight/.test(t)) && wow.texts().some((t) => /^Bounties/.test(t)), 'the hunt page has both lists');
   wow.exec('__ns.ui.show("board"); __ns.ui.show("season"); __ns.ui.show("groups"); __ns.ui.show("alerts")');
   assert.strictEqual(wow.printed(), '', 'nothing went to chat');
   // ns.print is back to normal afterwards, also when the command fails.
