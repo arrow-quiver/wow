@@ -6,6 +6,8 @@ local W = {}
 ns.ui = W
 
 local WIDTH, HEIGHT, RAIL = 806, 520, 172
+-- Text a guildmate wrote, shown as written: "|" is doubled so |c, |r and |H in it aren't read as colours or links.
+local function plain(s) return (string.gsub(tostring(s or ""), "|", "||")) end
 -- The width the pages lay themselves out in (the window without the rail).
 local PW = WIDTH - RAIL
 
@@ -416,9 +418,9 @@ function pages.guild(page)
     for i, r in ipairs(page.partners) do
       local x = list[i]
       if x then
-        r.text:SetText(string.format("%s (%s)%s%s%s", tostring(x.character or "?"), tostring(x.level or "?"),
-          (x.zone and x.zone ~= "") and (" in " .. x.zone) or "", (x.whenText and x.whenText ~= "") and (", " .. x.whenText) or "",
-          (x.note and x.note ~= "") and ("  |cff999999" .. x.note .. "|r") or ""))
+        r.text:SetText(string.format("%s (%s)%s%s%s", plain(x.character or "?"), plain(x.level or "?"),
+          (x.zone and x.zone ~= "") and (" in " .. plain(x.zone)) or "", (x.whenText and x.whenText ~= "") and (", " .. plain(x.whenText)) or "",
+          (x.note and x.note ~= "") and ("  |cff999999" .. plain(x.note) .. "|r") or ""))
         r.btn:SetScript("OnClick", function() W.startWhisper(x.character) end)
         if x.character and x.character ~= "" then r.btn:Show() else r.btn:Hide() end
         r:Show()
@@ -596,11 +598,11 @@ function pages.board(page)
       if x then
         local mine = pid ~= nil and x.pid == pid
         r.kind:SetText((KIND_COLOUR[x.kind] or "") .. (B.LABEL[x.kind] or "Post") .. "|r")
-        r.text:SetText(tostring(x.text) .. (x.price and ("  |cffffd100" .. money(x.price) .. "|r") or ""))
-        r.who:SetText((mine and "you" or tostring(x.character or "?")) .. ", " .. ns.ago(x.t))
+        r.text:SetText(plain(x.text) .. (x.price and ("  |cffffd100" .. money(x.price) .. "|r") or ""))
+        r.who:SetText((mine and "you" or plain(x.character or "?")) .. ", " .. ns.ago(x.t))
         if mine then
           r.btn:SetText("Take down")
-          r.btn:SetScript("OnClick", function() status:SetText(capture(B.takeDown, i)); page.refresh(true) end)
+          r.btn:SetScript("OnClick", function() status:SetText(capture(B.takeDownKey, x.key)); page.refresh(true) end)
           r.btn:Show()
         elseif x.character and x.character ~= "" then
           r.btn:SetText("Whisper")

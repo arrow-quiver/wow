@@ -97,3 +97,56 @@ test('Bulletin board page: posts as rows; whisper the poster, take my own down, 
   assert.strictEqual(wow.printed(), '', 'nothing goes to chat');
   assert.strictEqual(wow.eval('__ns.debugError'), null, 'no addon errors');
 });
+
+// ---------------------------------------------------------------- review of #60
+
+test('Take down on a row removes that post even after a newer one arrives; a rejected post or take-down is a failure', () => {
+  const wow = new WowClient();
+  wow.login();
+  wow.exec(STUBS);
+  wow.exec(`__recs = {}
+    local t = GetServerTime()
+    table.insert(__recs, { type = "bb", key = "m1", author = "Thrallia", t = t - 600, fields = { pid = "Thrallia.p4m7", character = "Thrallia", kind = "s", text = "Mine A", state = "o" } })
+    table.insert(__recs, { type = "bb", key = "m2", author = "Thrallia", t = t - 900, fields = { pid = "Thrallia.p4m7", character = "Thrallia", kind = "s", text = "Mine B", state = "o" } })`);
+  wow.exec('__ns.ui.show("board")');
+  const p = 'WowGuildWindow.pages.board';
+  assert.strictEqual(wow.eval(`tostring(${p}.rows[1].text:GetText())`), 'Mine A');
+  // A newer post of mine lands after the page was drawn: every index shifts by one.
+  wow.exec(`table.insert(__recs, { type = "bb", key = "m3", author = "Thrallia", t = GetServerTime(), fields = { pid = "Thrallia.p4m7", character = "Thrallia", kind = "l", text = "Mine C", state = "o" } })`);
+  wow.click(`${p}.rows[1].btn`);
+  assert.strictEqual(wow.eval(`tostring(${p}.status:GetText())`), 'Post taken down.');
+  const state = (k) => wow.eval(`(function() for _, r in ipairs(__recs) do if r.key == "${k}" then return r.fields.state end end end)()`);
+  assert.strictEqual(state('m1'), 'x', 'the post on the clicked row is the one taken down');
+  assert.strictEqual(state('m3'), 'o', 'the newer post is untouched');
+  assert.strictEqual(state('m2'), 'o');
+  // putLocal refusing the record (returns nil and a reason) is not a post and not a take-down.
+  wow.exec('__ns.Share.putLocal = function() return nil, "guild" end');
+  assert.strictEqual(wow.eval('tostring(__ns.board.post("wts", "Wool 2g"))'), 'false');
+  assert.strictEqual(wow.eval('tostring(__ns.board.takeDownKey("m2"))'), 'false');
+  assert.strictEqual(wow.eval('__ns.debugError'), null);
+});
+
+test("a guildmate's |c, |r and |H in a post, partner row or request are shown as text", () => {
+  const wow = new WowClient();
+  wow.login();
+  wow.exec(STUBS);
+  wow.exec(`__recs = {}
+    table.insert(__recs, { type = "bb", key = "e1", author = "Zed", t = GetServerTime(), fields = { pid = "Zed.z1", character = "Z|cffff0000ed", kind = "s", text = "|Hitem:1|h[Fake]|h |cffff0000red|r", state = "o" } })`);
+  wow.exec('__ns.ui.show("board")');
+  const p = 'WowGuildWindow.pages.board';
+  assert.strictEqual(wow.eval(`tostring(${p}.rows[1].text:GetText())`), '||Hitem:1||h[Fake]||h ||cffff0000red||r');
+  assert.match(wow.eval(`tostring(${p}.rows[1].who:GetText())`), /^Z\|\|cffff0000ed, /);
+  wow.exec(`WowGuildInbox = { canCraft = { { item = "Vest|r", requester = "Grom|cff#2", notes = "|Hx|h" } }, myRequests = { { item = "Belt|r" } },
+    buddies = { { character = "Zul|r", level = 18, zone = "|cffStone", whenText = "to|night", note = "|Hn|h" } } }`);
+  wow.exec(`WowGuildInbox.announcements = { { body = "Raid at |cffff0000eight|r", by = "Mokra#1" } }
+    WowGuildInbox.raids = { { title = "MC|r", startsAt = 0, coming = 1, signup = "yes", reserves = { { name = "Zul|cff" } } } }`);
+  assert.ok(wow.eval('__ns.textNotices()').includes('Raid at ||cffff0000eight||r'));
+  const raids = wow.eval('__ns.textRaids()');
+  assert.ok(raids.includes('MC||r') && raids.includes('Zul||cff'), raids);
+  const req = wow.eval('__ns.textGuildRequests()');
+  assert.ok(req.includes('Vest||r') && req.includes('Grom||cff') && req.includes('||Hx||h') && req.includes('Belt||r'), req);
+  wow.exec('__ns.ui.show("guild")');
+  const row = wow.eval('tostring(WowGuildWindow.pages.guild.partners[1].text:GetText())');
+  assert.strictEqual(row, 'Zul||r (18) in ||cffStone, to||night  |cff999999||Hn||h|r');
+  assert.strictEqual(wow.eval('__ns.debugError'), null);
+});
