@@ -30,6 +30,7 @@ function createOverlay({ store, log, preload, startUrl, electron = require('elec
   let winMode = null; // 'game' | 'desktop'
   let creating = null; // the window being made, so two quick presses don't make two
   let generation = 0; // bumped by drop(): a window still being made when the game starts or stops is thrown away
+  let disposed = false; // the app is quitting: no new windows
   let hotkey = null;
   let game = null; // Overwolf's overlay API, once its package is ready
   let inGame = false; // the game is running and has let the overlay in
@@ -118,6 +119,8 @@ function createOverlay({ store, log, preload, startUrl, electron = require('elec
         // The game started or stopped while this window was being made: it is the wrong kind now.
         if (w && !w.isDestroyed()) { try { w.destroy(); } catch { /* gone already */ } }
         if (creating === pending) creating = null;
+        // Make the right kind, unless the app is quitting or the overlay was switched off meanwhile.
+        if (disposed || !store.get().overlayEnabled) return null;
         return ensure();
       }
       win = w;
@@ -208,7 +211,7 @@ function createOverlay({ store, log, preload, startUrl, electron = require('elec
     window: () => (win && !win.isDestroyed() ? win : null),
     mode: () => (win && !win.isDestroyed() ? winMode : null),
     hotkey: () => hotkey,
-    dispose() { if (hotkey) { try { globalShortcut.unregister(hotkey); } catch { /* quitting */ } } drop(); },
+    dispose() { disposed = true; if (hotkey) { try { globalShortcut.unregister(hotkey); } catch { /* quitting */ } } drop(); },
   };
 }
 

@@ -217,3 +217,19 @@ test('a game that errors after letting the overlay in drops its in-game window',
   await tick();
   assert.equal(overlay.mode(), 'desktop');
 });
+
+test('a window still being made when the app quits, or the overlay is switched off, is not made again', async () => {
+  for (const stop of ['dispose', 'switch off']) {
+    const { overlay, api, made, state } = setup();
+    overlay.attachGame(api);
+    overlay.show();
+    if (stop === 'dispose') overlay.dispose();
+    else { state.overlayEnabled = false; api.emit('game-injected', WOW); }
+    await tick();
+    await tick();
+    assert.equal(made.length, 1, `${stop}: no second window`);
+    assert.equal(made[0].destroyed, true, `${stop}: the late window is destroyed`);
+    assert.equal(api.gameWindows.length, 0);
+    assert.equal(overlay.window(), null);
+  }
+});
