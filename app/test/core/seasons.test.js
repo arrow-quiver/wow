@@ -94,6 +94,15 @@ test('GET /api/seasons: the board with badges, my place, and officers announce a
   assert.deepStrictEqual(r.players.find((p) => p.name === 'Grommash').badges.map((b) => b.name), ['Bloodied']);
   assert.deepStrictEqual(r.myBadges.map((b) => b.name), ['Benefactor']);
   assert.strictEqual(r.mine.rank, 1);
+  // The addon's inbox field carries the board for its Leaderboard page: one row per player, best first.
+  const Seasons = require('../../src/core/services/seasons');
+  const part = Seasons.inboxPart(h.c.db, h.g.guildId, now);
+  assert.deepStrictEqual(part.board.map((b) => [b.rank, b.name]), [[1, 'Mychar'], [2, 'Grommash']]);
+  assert.deepStrictEqual({ gold: part.board[0].gold, score: part.board[0].score, kills: part.board[1].kills }, { gold: 150, score: 150, kills: 12 });
+  assert.strictEqual(part.count, 2);
+  assert.ok(part.daysLeft >= 1 && part.daysLeft <= 31);
+  assert.deepStrictEqual(part.leaders.map((l) => `${l.title}:${l.name}`), ['Quartermaster:Mychar', 'Warlord:Grommash']);
+  assert.strictEqual(part.players.Mychar.rank, 1, 'the tooltip entries are still there');
   assert.strictEqual(r.canAnnounce, false, 'not while the month runs');
   assert.ok(r.allBadges.length >= 10);
   // A running month can't be announced; last month (empty) has nobody to crown.

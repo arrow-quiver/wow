@@ -1,7 +1,9 @@
 -- Guild Camp: guild seasons in game. Guildies' season titles, ranks and badges on their player tooltips, and
 -- /wow season for this month's board. The Guild Camp app works the season out from the guild's shared data and
--- writes it to the inbox (WowGuildInbox.seasons: { month, players = { [name] = { title, rank, score, streak, badges, best } } }),
--- so it changes after a /reload.
+-- writes it to the inbox (WowGuildInbox.seasons: { month, daysLeft, count, players = { [name] = { title, rank, score,
+-- streak, badges, best } }, board = { { rank, name, class, score, streak, title, gold, kills, crafts, raids } },
+-- leaders = { { title, name, value, unit } } }), so it changes after a /reload. The board is the Leaderboard page of
+-- the guild window (MainUI.lua).
 local ADDON, ns = ...
 local SE = {}
 ns.seasons = SE
@@ -61,6 +63,35 @@ function SE.hook()
   elseif GameTooltip and GameTooltip.HookScript then
     GameTooltip:HookScript("OnTooltipSetUnit", function(tooltip) ns.safely(onUnitTooltip, tooltip) end)
   end
+end
+
+-- The board, best first: { { rank, name, class, score, streak, title, gold, kills, crafts, raids, me } }.
+-- From the app's `board`; with an older app, from the per-character entries (one row per rank, no class or counts).
+function SE.board()
+  local s = SE.data()
+  if not s then return {} end
+  local me = UnitName and ns.try(UnitName, "player")
+  local mine = me and SE.of(me)
+  local myRank = mine and (mine.rank or 0) > 0 and mine.rank or nil
+  local rows = {}
+  if type(s.board) == "table" and #s.board > 0 then
+    for _, r in ipairs(s.board) do
+      rows[#rows + 1] = { rank = r.rank or 0, name = r.name or "?", class = r.class, score = r.score or 0, streak = r.streak or 0, title = r.title or "",
+        gold = r.gold or 0, kills = r.kills or 0, crafts = r.crafts or 0, raids = r.raids or 0, me = myRank ~= nil and r.rank == myRank }
+    end
+  else
+    local seen = {}
+    for name, p in pairs(s.players) do
+      local rank = p.rank or 0
+      -- A player's characters share a rank: my own character stands for me, otherwise the first name in the alphabet.
+      if rank > 0 and (not seen[rank] or (name == me) or (seen[rank].name ~= me and name < seen[rank].name)) then
+        seen[rank] = { rank = rank, name = name, score = p.score or 0, streak = p.streak or 0, title = p.title or "", me = rank == myRank }
+      end
+    end
+    for _, r in pairs(seen) do rows[#rows + 1] = r end
+  end
+  table.sort(rows, function(a, b) if a.rank ~= b.rank then return a.rank < b.rank end return a.name < b.name end)
+  return rows, s
 end
 
 -- /wow season: the top five and me.
