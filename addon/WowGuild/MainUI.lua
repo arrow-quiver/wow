@@ -703,23 +703,163 @@ function pages.near(page)
   })
 end
 
--- Raids & Dungeons › Raids: what's scheduled and whether I'm signed up.
+-- Raids & Dungeons › Raids: what's scheduled, how many are coming, where I stand, what I reserved.
+local RAID_ROWS = 6
+local SIGNUP = {
+  yes = { "You're coming", 0.25, 0.75, 0.35 }, tentative = { "You're a maybe", 0.91, 0.64, 0.24 },
+  bench = { "On the bench", 0.6, 0.6, 0.6 }, no = { "You can't make it", 0.6, 0.6, 0.6 },
+}
+local function untilText(t)
+  local d = (tonumber(t) or 0) - time()
+  if d <= 0 then return "now" end
+  if d < 3600 then return string.format("in %d min", math.floor(d / 60 + 0.5)) end
+  if d < 48 * 3600 then return string.format("in %d h", math.floor(d / 3600 + 0.5)) end
+  return string.format("in %d days", math.floor(d / 86400 + 0.5))
+end
 function pages.raids(page)
-  textPage(page, { text = function() return ns.textRaids() end, hint = "Sign up and reserve loot in the Guild Camp app." })
+  local W_ROW = PW - 40
+  local head = label(page, "", "GameFontNormal"); head:SetPoint("TOPLEFT", 0, 0); head:SetWidth(W_ROW)
+  page.rows = {}
+  for i = 1, RAID_ROWS do
+    local r = CreateFrame("Frame", nil, page)
+    r:SetSize(W_ROW, 52); r:SetPoint("TOPLEFT", 0, -24 - (i - 1) * 56)
+    r.stripe = ns.skin.colorTex(r, "BACKGROUND", 1, 1, 1, i % 2 == 1 and 0.04 or 0); r.stripe:SetAllPoints()
+    r.title = label(r, "", "GameFontNormalLarge"); r.title:SetPoint("TOPLEFT", 6, -4); r.title:SetWidth(W_ROW - 190)
+    r.when = label(r, "", "GameFontHighlightSmall"); r.when:SetPoint("TOPLEFT", 6, -24); r.when:SetWidth(W_ROW - 190)
+    r.reserved = label(r, "", "GameFontDisableSmall"); r.reserved:SetPoint("TOPLEFT", 6, -38); r.reserved:SetWidth(W_ROW - 20)
+    r.me = label(r, "", "GameFontNormal"); r.me:SetPoint("TOPRIGHT", -6, -6); r.me:SetJustifyH("RIGHT")
+    r.coming = label(r, "", "GameFontHighlightSmall"); r.coming:SetPoint("TOPRIGHT", -6, -24)
+    r:Hide()
+    page.rows[i] = r
+  end
+  local foot = label(page, "Sign up and reserve loot in the Guild Camp app. It shows here after a /reload.", "GameFontDisableSmall")
+  foot:SetPoint("BOTTOMLEFT", 0, 0); foot:SetWidth(W_ROW)
+  page.head = head
+  page.refresh = function()
+    local raids = (WowGuildInbox and type(WowGuildInbox.raids) == "table" and WowGuildInbox.raids) or {}
+    local open = 0
+    for _, x in ipairs(raids) do if x.signup == nil or x.signup == "" then open = open + 1 end end
+    head:SetText(#raids == 0 and "Nothing scheduled." or string.format("%d coming up%s", #raids,
+      open > 0 and string.format("  |cffe8a33d%d you haven't answered|r", open) or "  |cff999999you've answered them all|r"))
+    for i, r in ipairs(page.rows) do
+      local x = raids[i]
+      if x then
+        r.title:SetText(tostring(x.title or "Raid"))
+        r.when:SetText(date("%a %d %b %H:%M", x.startsAt or 0) .. "  |cff999999" .. untilText(x.startsAt) .. "|r")
+        r.coming:SetText(string.format("%d coming", x.coming or 0))
+        local st = SIGNUP[x.signup or ""]
+        if st then
+          r.me:SetText(st[1] .. ((x.role and (x.signup == "yes" or x.signup == "bench")) and (" as " .. tostring(x.role)) or ""))
+          r.me:SetTextColor(st[2], st[3], st[4])
+        elseif x.signup == nil or x.signup == "" then r.me:SetText("Not signed up yet"); r.me:SetTextColor(0.91, 0.64, 0.24)
+        else r.me:SetText("Signed up: " .. tostring(x.signup)); r.me:SetTextColor(0.6, 0.6, 0.6) end
+        local parts = {}
+        for _, it in ipairs(type(x.reserves) == "table" and x.reserves or {}) do
+          parts[#parts + 1] = tostring(it.name or "?") .. ((it.bonus or 0) > 0 and (" (+" .. it.bonus .. ")") or "")
+        end
+        r.reserved:SetText(#parts > 0 and ("Reserved: " .. table.concat(parts, ", ")) or "")
+        r:Show()
+      else r:Hide() end
+    end
+  end
 end
 
--- Raids & Dungeons › Dungeon groups: the guild's groups, start one, find players.
+-- Raids & Dungeons › Dungeon groups: the guild's open groups with their line-up. Join as tank, healer or dps,
+-- leave, and for my own group: invite everyone, mark it done, call it off. Start one from the bottom row.
+local GROUP_ROWS = 5
 function pages.groups(page)
-  textPage(page, {
-    text = function() return capture(ns.lfg.list) end,
-    input = { label = "Start a group: your role, then the dungeon (tank Deadmines).", button = "Start a group",
-      run = function(t) ns.lfg.new(t) end },
-    buttons = { { "Find players", function() if ns.finder then ns.finder.show() end end, 130 } },
-    hint = "Join with /wow lfg join <number> <role>, leave with /wow lfg leave <number>.",
-  })
+  local L = ns.lfg
+  local W_ROW = PW - 40
+  local head = label(page, "", "GameFontNormal"); head:SetPoint("TOPLEFT", 0, 0); head:SetWidth(W_ROW)
+  local status
+  -- Runs a group command and shows its answer on the page instead of in chat.
+  local function say(fn, ...)
+    status:SetText(capture(fn, ...))
+    page.refresh(true)
+  end
+  page.rows = {}
+  for i = 1, GROUP_ROWS do
+    local r = CreateFrame("Frame", nil, page)
+    r:SetSize(W_ROW, 44); r:SetPoint("TOPLEFT", 0, -22 - (i - 1) * 48)
+    r.stripe = ns.skin.colorTex(r, "BACKGROUND", 1, 1, 1, i % 2 == 1 and 0.04 or 0); r.stripe:SetAllPoints()
+    r.title = label(r, "", "GameFontNormal"); r.title:SetPoint("TOPLEFT", 6, -5); r.title:SetWidth(W_ROW - 250)
+    r.who = label(r, "", "GameFontHighlightSmall"); r.who:SetPoint("TOPLEFT", 6, -24); r.who:SetWidth(W_ROW - 250)
+    -- Three buttons, right to left; what they do depends on whether the group is mine, joined or neither.
+    r.b = {}
+    for k = 1, 3 do
+      local btn = button(r, "", 74)
+      btn:SetPoint("RIGHT", -6 - (3 - k) * 78, 0)
+      r.b[k] = btn
+    end
+    r:Hide()
+    page.rows[i] = r
+  end
+  local function setButtons(r, specs)
+    for k = 1, 3 do
+      local sp = specs[k]
+      if sp then r.b[k]:SetText(sp[1]); r.b[k]:SetScript("OnClick", sp[2]); r.b[k]:Show() else r.b[k]:Hide() end
+    end
+  end
+
+  local nl = label(page, "Start a group: the dungeon, then your role", "GameFontNormalSmall"); nl:SetPoint("BOTTOMLEFT", 0, 62)
+  local dungeon = editbox(page, 200); dungeon:SetPoint("BOTTOMLEFT", 6, 34)
+  page.start = {}
+  local prev = dungeon
+  for k, role in ipairs({ "tank", "healer", "dps" }) do
+    local btn = button(page, role == "dps" and "As DPS" or ("As " .. role), 84)
+    btn:SetPoint("LEFT", prev, "RIGHT", k == 1 and 12 or 6, 0)
+    btn:SetScript("OnClick", function()
+      local d = dungeon:GetText() or ""
+      if d == "" then status:SetText("Type the dungeon first."); return end
+      local ok = false
+      status:SetText(capture(function() ok = L.new(role .. " " .. d) end))
+      if ok then dungeon:SetText("") end
+      page.refresh(true)
+    end)
+    page.start[role] = btn
+    prev = btn
+  end
+  local find = button(page, "Find players", 110); find:SetPoint("LEFT", prev, "RIGHT", 14, 0)
+  find:SetScript("OnClick", function() if ns.finder then ns.finder.show((dungeon:GetText() or "") ~= "" and dungeon:GetText() or nil) end end)
+  status = label(page, "", "GameFontHighlightSmall"); status:SetPoint("BOTTOMLEFT", 0, 0); status:SetWidth(W_ROW)
+  page.dungeon, page.find, page.status = dungeon, find, status
+
+  page.refresh = function(keepStatus)
+    if not keepStatus then status:SetText("") end
+    local groups = L.groups()
+    L.last = groups -- the row number is the number L.join, L.leave and L.finish take
+    head:SetText(#groups == 0 and "No guild dungeon groups right now. Start one below." or
+      string.format("%d open %s", #groups, #groups == 1 and "group" or "groups") .. (#groups > GROUP_ROWS and string.format("  |cff999999showing the next %d|r", GROUP_ROWS) or ""))
+    for i, r in ipairs(page.rows) do
+      local e = groups[i]
+      if e then
+        local f = e.rec.fields
+        r.title:SetText(string.format("%s  |cff999999%s|r  %s", tostring(f.dungeon or "?"), L.whenText(f.startsAt), L.needText(e.g.open) == "full" and "|cff999999full|r" or ("|cffe8a33d" .. L.needText(e.g.open) .. "|r")))
+        local names = { string.format("%s (%s)", tostring(f.character or "?"), L.ROLE_NAME[f.role] or "dps") }
+        for _, m in ipairs(e.g.members) do names[#names + 1] = string.format("%s (%s)%s", tostring(m.character), L.ROLE_NAME[m.role] or "dps", m.guest and "*" or "") end
+        local wait = #e.g.waiting > 0 and string.format("  |cff999999+%d waiting|r", #e.g.waiting) or ""
+        r.who:SetText(table.concat(names, ", ") .. wait .. ((f.note and f.note ~= "") and ("  |cff999999" .. tostring(f.note) .. "|r") or ""))
+        if e.mine then
+          setButtons(r, { { "Invite all", function() L.last = groups; say(L.inviteGroup, i) end },
+            { "Done", function() L.last = groups; say(L.finish, i, "d") end },
+            { "Call off", function() L.last = groups; say(L.finish, i, "x") end } })
+        elseif e.joined then
+          r.who:SetText(r.who:GetText() .. (e.joined.waiting and "  |cffe8a33dYou're waiting.|r" or "  |cff40bf40You're in.|r"))
+          setButtons(r, { nil, nil, { "Leave", function() L.last = groups; say(L.leave, i) end } })
+        else
+          setButtons(r, { { "Tank", function() L.last = groups; say(L.join, i, "tank") end },
+            { "Healer", function() L.last = groups; say(L.join, i, "healer") end },
+            { "DPS", function() L.last = groups; say(L.join, i, "dps") end } })
+        end
+        r.key = e.rec.key
+        r:Show()
+      else r.key = nil; r:Hide() end
+    end
+  end
 end
 
--- Raids & Dungeons › Dungeon quests: the checklist for a dungeon (the one I'm in when the box is empty).
+-- Raids & Dungeons › Dungeon quests: the checklist for a dungeon (the one I'm in when the box is empty), with who
+-- else in my group has each quest.
 function pages.quests(page)
   local Q = ns.dungeonQuests
   local shown
@@ -740,15 +880,24 @@ function pages.quests(page)
         table.sort(names)
         return (name ~= "" and ("No quests known for " .. name .. ".\n\n") or "") .. "|cffffd100Dungeons with a checklist|r\n  " .. table.concat(names, ", ")
       end
-      local lines = { "|cffffd100Quests: " .. tostring(key) .. "|r", "|cff999999Bring these in. The grey ones you can still pick up.|r", "" }
+      local have, ready, left = 0, 0, 0
       for _, q in ipairs(list) do
-        lines[#lines + 1] = string.format("  %s  %s", q.title, q.done and "|cff40bf40ready to hand in|r" or q.have and "|cffe8a33din your log|r" or ("|cff999999" .. tostring(q.where) .. "|r"))
+        if q.done then ready = ready + 1 elseif q.have then have = have + 1 elseif not q.extra then left = left + 1 end
+      end
+      local lines = { "|cffffd100Quests: " .. tostring(key) .. "|r",
+        string.format("|cff40bf40%d ready to hand in|r  |cffe8a33d%d in your log|r  |cff999999%d still to pick up|r", ready, have, left), "" }
+      for _, q in ipairs(list) do
+        local others = {}
+        for who, has in pairs((Q.party and Q.party[key]) or {}) do if has[string.lower(q.title)] then others[#others + 1] = who end end
+        table.sort(others)
+        lines[#lines + 1] = string.format("  %s  %s%s", q.title, q.done and "|cff40bf40ready to hand in|r" or q.have and "|cffe8a33din your log|r" or ("|cff999999" .. tostring(q.where) .. "|r"),
+          #others > 0 and ("  |cff999999also: " .. table.concat(others, ", ") .. "|r") or "")
       end
       return table.concat(lines, "\n")
     end,
     input = { label = "Which dungeon? Leave it empty inside a dungeon to see that one.", button = "Show quests", allowEmpty = true, keep = true,
       run = function(t) shown = t end },
-    buttons = { { "Ask my group who has them", function() local n = current(); if n ~= "" then Q.slash(n) end end, 200 } },
+    buttons = { { "Ask my group who has them", function() local n = current(); local key = n ~= "" and Q.dungeonNamed(n); if key then Q.tell(key, true) end end, 200 } },
   })
 end
 
