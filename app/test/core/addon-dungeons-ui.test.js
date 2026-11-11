@@ -131,3 +131,69 @@ test('Dungeon quests page: counts, each quest\'s state, and who else in my group
   assert.strictEqual(txt(wow, `${page}.input`), name, 'the dungeon stays in the box');
   noError(wow);
 });
+
+// ---------------------------------------------------------------- PvP premades
+
+const pre = 'WowGuildWindow.pages.premades';
+
+test('PvP premades: a 15-spot group on the same record; dungeon groups and premades each on their own page', () => {
+  const wow = client();
+  wow.exec('__ns.ui.show("premades")');
+  assert.ok(wow.texts().includes('No premades forming right now. Start one below.'));
+  assert.strictEqual(txt(wow, `${pre}.dungeon`), 'Darkspear Islands', 'the battleground is filled in');
+  assert.strictEqual(txt(wow, `${pre}.size`), '15 players');
+  wow.click(`${pre}.start.healer`);
+  assert.match(txt(wow, `${pre}.status`), /Premade for Darkspear Islands posted to your guild: 15 spots/);
+  const rec = wow.get('__recs[#__recs]');
+  assert.deepStrictEqual([rec.type, rec.fields.dungeon, rec.fields.role, rec.fields.tank, rec.fields.heal, rec.fields.dps], ['dg', 'Darkspear Islands', 'h', 1, 4, 10]);
+  assert.ok(wow.texts().includes('1 open premade'));
+  assert.match(txt(wow, `${pre}.rows[1].title`), /^Darkspear Islands .*needs 1 tank, 3 healer, 10 dps/);
+  assert.deepStrictEqual([1, 2, 3].map((k) => txt(wow, `${pre}.rows[1].b[${k}]`)), ['Invite all', 'Won', 'Lost']);
+  // The dungeon groups page still shows only the five-player group, and not the premade.
+  wow.exec('__ns.ui.show("groups")');
+  assert.ok(wow.texts().includes('1 open group'));
+  assert.match(txt(wow, `${groups}.rows[1].title`), /^Deadmines/);
+  assert.strictEqual(shown(wow, `${groups}.rows[2]`), 'false');
+  // Ten players.
+  wow.exec('__ns.ui.show("premades")');
+  wow.click(`${pre}.size`);
+  assert.strictEqual(txt(wow, `${pre}.size`), '10 players');
+  wow.exec(`${pre}.dungeon:SetText("Warsong Gulch")`);
+  wow.click(`${pre}.start.tank`);
+  const ten = wow.get('__recs[#__recs]');
+  assert.deepStrictEqual([ten.fields.tank, ten.fields.heal, ten.fields.dps], [1, 3, 6]);
+  noError(wow);
+});
+
+test('PvP premades: Won and Lost go in the tally; a guildmate\'s result arriving counts too; a raid for the invites', () => {
+  const wow = client();
+  wow.exec(`__converted = 0
+    C_PartyInfo = C_PartyInfo or {}
+    C_PartyInfo.ConvertToRaid = function() __converted = __converted + 1 end
+    C_PartyInfo.InviteUnit = function() end
+    function IsInGroup() return true end
+    function IsInRaid() return false end
+    __ns.ui.show("premades")`);
+  wow.click(`${pre}.start.dps`);
+  wow.click(`${pre}.rows[1].b[1]`);
+  assert.strictEqual(wow.eval('__converted'), '1', 'in a party and not a raid yet: converted before inviting');
+  wow.click(`${pre}.rows[1].b[2]`);
+  assert.match(txt(wow, `${pre}.status`), /Marked as won/);
+  assert.deepStrictEqual(wow.get('{ __ns.lfg.results() }').slice(0, 2), [1, 0]);
+  assert.ok(wow.texts().some((t) => /last 30 days:\|r \|cff40bf401 won\|r, \|cffff40400 lost\|r/.test(t)));
+  // A guildmate's premade is marked lost: it arrives through the sharing engine.
+  wow.clearOutput();
+  wow.exec(`__ns.lfg.arrived({ id = "dg:zz9", type = "dg", key = "zz9", author = "Mokra", t = GetServerTime(), v = 2,
+    fields = { pid = "Mokra.m1", character = "Mokra", dungeon = "Darkspear Islands", startsAt = GetServerTime(), role = "t", tank = 1, heal = 4, dps = 10, note = "Lost", state = "d" } }, "d", "Mokra")`);
+  assert.match(wow.printed(), /The Darkspear Islands premade lost\./);
+  assert.deepStrictEqual(wow.get('{ __ns.lfg.results() }').slice(0, 2), [1, 1]);
+  // A finished five-player dungeon run isn't a premade result; the same premade twice counts once.
+  wow.exec(`__ns.lfg.noteResult("d5", { dungeon = "Deadmines", tank = 1, heal = 1, dps = 3, note = "Won", state = "d" })
+    __ns.lfg.noteResult("zz9", { dungeon = "Darkspear Islands", tank = 1, heal = 4, dps = 10, note = "Lost", state = "d" })`);
+  assert.deepStrictEqual(wow.get('{ __ns.lfg.results() }').slice(0, 2), [1, 1]);
+  assert.strictEqual(wow.db().premades.length, 2, 'kept across a reload');
+  // Old results fall out after thirty days.
+  wow.exec('local t = GetServerTime(); GetServerTime = function() return t + 31 * 86400 end');
+  assert.deepStrictEqual(wow.get('{ __ns.lfg.results() }').slice(0, 2), [0, 0]);
+  noError(wow);
+});

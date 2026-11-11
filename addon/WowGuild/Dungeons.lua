@@ -190,7 +190,8 @@ local function me()
   return name, type(level) == "number" and level or nil, type(class) == "string" and class or ""
 end
 
-function L.new(rest)
+-- `comp` = { t, h, d } spots (a 5-player group when left out; a PvP premade passes more, see L.newPremade).
+function L.new(rest, comp)
   local roleWord, dungeon = string.match(rest or "", "^(%S+)%s+(.+)$")
   local role = roleWord and ROLE_OF[string.lower(roleWord)]
   if not role or not dungeon then
@@ -209,10 +210,13 @@ function L.new(rest)
   end
   local name, level = me()
   dungeon = string.sub(dungeon, 1, 60)
+  comp = type(comp) == "table" and comp or { t = 1, h = 1, d = 3 }
   local fields = { pid = pid, character = name, dungeon = dungeon, startsAt = serverNow(), role = role, level = level,
-    tank = 1, heal = 1, dps = 3, note = "", state = "o" }
+    tank = comp.t, heal = comp.h, dps = comp.d, note = "", state = "o" }
   if not put("dg", ns.randomKey(), fields) then return false end
-  ns.print(string.format("Group for %s posted to your guild. Guildmates join with /wow lfg.", plain(dungeon)))
+  local spots = comp.t + comp.h + comp.d
+  ns.print(spots > 5 and string.format("Premade for %s posted to your guild: %d spots. Guildmates join in the guild window.", plain(dungeon), spots)
+    or string.format("Group for %s posted to your guild. Guildmates join with /wow lfg.", plain(dungeon)))
   L.last = nil
   return true
 end
@@ -261,17 +265,65 @@ function L.leave(n)
   return true
 end
 
-function L.finish(n, state)
+-- `result` ("Won" or "Lost") is for a premade: it goes in the note, and into everyone's tally (L.results).
+function L.finish(n, state, result)
   local e = pick(n)
   if not e then return false end
   if not e.mine then ns.print("Only the leader can do that.") return false end
   local fields = {}
   for k, v in pairs(e.rec.fields) do fields[k] = v end
   fields.state = state
+  if state == "d" and (result == "Won" or result == "Lost") then fields.note = result end
   if not put("dg", e.rec.key, fields) then return false end
-  ns.print(state == "x" and "Group called off." or "Marked as done. Good run!")
+  if state == "d" and fields.note == "Won" then ns.print("Marked as won. Well fought!")
+  elseif state == "d" and fields.note == "Lost" then ns.print("Marked as lost. Next one.")
+  else ns.print(state == "x" and "Group called off." or "Marked as done. Good run!") end
+  L.noteResult(e.rec.key, fields)
   L.last = nil
   return true
+end
+
+-- ---------- PvP premades ----------
+-- A premade is a group with more than five spots (the same "dg" record, so the app and older addons read it).
+L.PREMADE = { [10] = { t = 1, h = 3, d = 6 }, [15] = { t = 1, h = 4, d = 10 } }
+L.RESULTS_KEEP = 30 * 86400
+
+function L.isPremade(f)
+  if type(f) ~= "table" then return false end
+  local sl = slots(f)
+  return sl.t + sl.h + sl.d > 5
+end
+
+-- Start a premade: my role, the battleground's name, 10 or 15 spots.
+function L.newPremade(roleWord, name, size)
+  local comp = L.PREMADE[tonumber(size) or 15] or L.PREMADE[15]
+  name = (type(name) == "string" and name ~= "") and name or "Darkspear Islands"
+  return L.new(tostring(roleWord or "") .. " " .. name, comp)
+end
+
+-- Finished premades this account has seen, the newest first: { { key, name, at, result } } (WowGuildDB.premades).
+-- Group records leave the guild's store a day after they start, so the tally is kept here.
+function L.noteResult(key, f)
+  if type(key) ~= "string" or type(f) ~= "table" or f.state ~= "d" or not L.isPremade(f) then return false end
+  if f.note ~= "Won" and f.note ~= "Lost" then return false end
+  ns.db.premades = ns.db.premades or {}
+  local list, t = ns.db.premades, serverNow()
+  for _, r in ipairs(list) do if r.key == key then r.result = f.note; return true end end
+  table.insert(list, 1, { key = key, name = string.sub(tostring(f.dungeon or "?"), 1, 60), at = t, result = f.note })
+  for i = #list, 1, -1 do if t - (list[i].at or 0) > L.RESULTS_KEEP or i > 60 then table.remove(list, i) end end
+  return true
+end
+
+-- → won, lost, list (the last RESULTS_KEEP seconds).
+function L.results()
+  local won, lost, out, t = 0, 0, {}, serverNow()
+  for _, r in ipairs((ns.db and ns.db.premades) or {}) do
+    if t - (r.at or 0) <= L.RESULTS_KEEP then
+      out[#out + 1] = r
+      if r.result == "Won" then won = won + 1 else lost = lost + 1 end
+    end
+  end
+  return won, lost, out
 end
 
 -- ---------- players from outside the guild ----------
@@ -348,6 +400,11 @@ function L.inviteGroup(n)
   local myName = UnitName and UnitName("player")
   local sent = 0
   local names = {}
+  -- A premade needs a raid: once somebody is in my party, turn it into one before inviting the rest.
+  if L.isPremade(e.rec.fields) and IsInGroup and ns.try(IsInGroup) and not (IsInRaid and ns.try(IsInRaid)) then
+    local convert = C_PartyInfo and C_PartyInfo.ConvertToRaid
+    if type(convert) == "function" then pcall(convert) end
+  end
   for _, m in ipairs(e.g.members) do
     if m.character and m.character ~= myName and not inParty(m.character) then
       if L.invite(m.character) then sent = sent + 1; names[#names + 1] = m.character end
@@ -407,6 +464,12 @@ function L.arrived(rec, how, from)
   seen[mark] = true
   local f = rec.fields
   if rec.type == "dg" then
+    -- A premade's result, for my tally.
+    if f.state == "d" and L.noteResult(rec.key, f) then
+      ns.print(string.format("The %s premade %s.", plain(f.dungeon), f.note == "Won" and "won" or "lost"))
+      L.last = nil
+      return
+    end
     if f.state ~= "o" or f.pid == pid then return end
     if seen["dg:" .. tostring(rec.key)] then return end
     seen["dg:" .. tostring(rec.key)] = true
