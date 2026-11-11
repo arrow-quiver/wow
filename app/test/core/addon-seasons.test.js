@@ -50,3 +50,68 @@ test('/wow season: the top five and me; nothing yet before the app wrote a seaso
   assert.match(out, /You: #2 with 33 points\./);
   assert.strictEqual(wow.eval('__ns.debugError'), null);
 });
+
+// ---------------------------------------------------------------- the Leaderboard page of the guild window
+
+const BOARD = `WowGuildInbox = WowGuildInbox or {}
+WowGuildInbox.seasons = { month = "2026-11", daysLeft = 19, count = 15, players = {
+  Grommash = { title = "MVP", rank = 1, score = 306, streak = 3, badges = 2, best = "Bloodied" },
+  Jainah = { title = "", rank = 2, score = 33, streak = 1, badges = 0, best = "" },
+  Tester = { title = "", rank = 14, score = 4, streak = 0, badges = 0, best = "" },
+}, board = {
+  { rank = 1, name = "Grommash", class = "Warrior", score = 306, streak = 3, title = "MVP", gold = 120, kills = 14, crafts = 2, raids = 3 },
+  { rank = 2, name = "Jainah", class = "Mage", score = 33, streak = 1, title = "", gold = 0, kills = 1, crafts = 0, raids = 0 },
+  { rank = 3, name = "Zed", class = "Death Knight", score = 30, streak = 0, title = "", gold = 30, kills = 0, crafts = 0, raids = 0 },
+  { rank = 4, name = "P4", score = 20 }, { rank = 5, name = "P5", score = 19 }, { rank = 6, name = "P6", score = 18 },
+  { rank = 7, name = "P7", score = 17 }, { rank = 8, name = "P8", score = 16 }, { rank = 9, name = "P9", score = 15 },
+  { rank = 10, name = "P10", score = 14 }, { rank = 11, name = "P11", score = 13 }, { rank = 12, name = "P12", score = 12 },
+  { rank = 13, name = "P13", score = 11 }, { rank = 14, name = "Testermain", score = 4 }, { rank = 15, name = "P15", score = 1 },
+}, leaders = { { title = "Quartermaster", name = "Grommash", value = 120, unit = "gold" }, { title = "Warlord", name = "Grommash", value = 14, unit = "kills" } } }`;
+
+function boardClient(inbox, me = 'Tester') {
+  const wow = new WowClient({ player: me });
+  wow.login();
+  wow.exec(inbox);
+  wow.exec(`function UnitName(u) if u == "player" then return ${JSON.stringify(me)} end return nil end`);
+  wow.clearOutput();
+  wow.exec('__ns.ui.show("season")');
+  return wow;
+}
+const row = (wow, i, field) => wow.eval(`tostring(WowGuildWindow.pages.season.rows[${i}].${field})`);
+
+test('Leaderboard page: the board best first, my row lit and kept in view, leaders and days left', () => {
+  const wow = boardClient(BOARD);
+  assert.strictEqual(wow.eval('__ns.debugError'), null, 'no addon errors');
+  const t = wow.texts();
+  assert.ok(t.includes('Season: November 2026'));
+  assert.ok(t.includes('19 days left'));
+  assert.strictEqual(row(wow, 1, 'name:GetText()'), 'Grommash  |cffe8a33d3-week streak|r');
+  assert.strictEqual(row(wow, 1, 'title:GetText()'), 'MVP');
+  assert.strictEqual(row(wow, 1, 'deeds:GetText()'), '120g given · 14 kills · 2 crafts · 3 raids');
+  assert.strictEqual(row(wow, 1, 'score:GetText()'), '306');
+  assert.strictEqual(row(wow, 2, 'deeds:GetText()'), '1 kill');
+  assert.strictEqual(row(wow, 1, 'me'), 'false');
+  // I'm #14 and twelve rows fit: the last row is mine.
+  assert.strictEqual(row(wow, 11, 'shownRank'), '11');
+  assert.strictEqual(row(wow, 12, 'shownRank'), '14');
+  assert.strictEqual(row(wow, 12, 'me'), 'true');
+  assert.strictEqual(row(wow, 12, 'name:GetText()'), 'Testermain');
+  assert.ok(t.includes('|cffe8a33dQuartermaster|r Grommash   |cffe8a33dWarlord|r Grommash'));
+  assert.ok(t.includes("You're #14 of 15.  The full board of 15 is in the Guild Camp app."));
+  assert.strictEqual(wow.printed(), '', 'nothing goes to chat');
+});
+
+test('Leaderboard page: an older app (no board) still shows ranks from the tooltip entries; empty says so', () => {
+  const wow = boardClient(INBOX, 'Jainah');
+  assert.strictEqual(wow.eval('__ns.debugError'), null, 'no addon errors');
+  assert.strictEqual(row(wow, 1, 'name:GetText()'), 'Grommash  |cffe8a33d3-week streak|r');
+  assert.strictEqual(row(wow, 2, 'name:GetText()'), 'Jainah');
+  assert.strictEqual(row(wow, 2, 'me'), 'true');
+  assert.strictEqual(wow.eval('tostring(WowGuildWindow.pages.season.rows[3]:IsShown())'), 'false');
+  assert.ok(wow.texts().includes("You're #2 of 2."));
+
+  const none = boardClient('WowGuildInbox = WowGuildInbox or {}; WowGuildInbox.seasons = { month = "2026-11", players = {} }');
+  assert.strictEqual(none.eval('__ns.debugError'), null, 'no addon errors');
+  assert.ok(none.texts().some((x) => /No standings yet/.test(x)));
+  assert.strictEqual(none.eval('tostring(WowGuildWindow.pages.season.rows[1]:IsShown())'), 'false');
+});

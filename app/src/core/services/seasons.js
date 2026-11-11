@@ -4,7 +4,8 @@
 //   season(db, guildId, { month, now }) → { month, start, end, players: [...], leaders, ... }   (docs/api/seasons.md)
 //   hall(db, guildId, { months, now }) → [{ month, mvp, leaders }]   the past months' winners
 //   badgesOf(db, guildId) → { [userId]: [badge] }                     lifetime badges
-//   inboxPart(db, guildId) → the addon's `seasons` inbox field (titles and badges on player tooltips)
+//   inboxPart(db, guildId) → the addon's `seasons` inbox field (titles and badges on player tooltips, and the
+//                            board and category leaders for its Leaderboard page)
 //   announceText(s) → the Discord post crowning a month's winners
 //   donationText(d) / badgeText(name, badge) → the shout-outs
 //
@@ -19,6 +20,8 @@ const POINTS = { gold: 1, kill: 2, craft: 5, raid: 10, kos: 8, bounty: 1, recrui
 const STREAK_STEP = 0.05;
 const STREAK_MAX = 0.25;
 const WEEK_MS = 7 * 86400000;
+// How many rows of the board go to the addon (the app shows them all).
+const BOARD_ROWS = 30;
 
 const CATEGORIES = [
   { id: 'donor', title: 'Quartermaster', label: 'Most given to the guild bank', unit: 'gold' },
@@ -204,7 +207,13 @@ function inboxPart(db, guildId, now = Date.now()) {
       badges: b.length, best: b.length ? b[b.length - 1].name : '',
     };
   }
-  return { month: s.month, players: out };
+  // The board itself, for the addon's Leaderboard page: one row per player (their main), best first.
+  const board = s.players.slice(0, BOARD_ROWS).map((p) => ({
+    rank: p.rank, name: p.name, class: p.class || '', score: p.score, streak: p.streak, title: p.titles[0] || '',
+    gold: Math.round(p.gold), kills: p.kills, crafts: p.crafts, raids: p.raids,
+  }));
+  const leaders = s.categories.filter((c) => s.leaders[c.id]).map((c) => ({ title: c.title, name: s.leaders[c.id].name, value: Math.round(s.leaders[c.id].value), unit: c.unit }));
+  return { month: s.month, daysLeft: s.daysLeft, count: s.players.length, players: out, board, leaders };
 }
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];

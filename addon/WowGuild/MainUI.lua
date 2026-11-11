@@ -15,7 +15,7 @@ local SECTIONS = {
   { id = "camp", label = "Camp", icon = "Spell_Fire_Fire", pages = {
     { key = "camp", label = "Today" },
     { key = "board", label = "Bulletin board", when = function() return ns.board end },
-    { key = "season", label = "Season", when = function() return ns.seasons end },
+    { key = "season", label = "Leaderboard", when = function() return ns.seasons end },
   } },
   { id = "coach", label = "Coach", icon = "INV_Misc_Book_09", pages = {
     { key = "coach", label = "Coach" },
@@ -440,10 +440,103 @@ function pages.board(page)
   })
 end
 
--- Camp › Season: the top five and you.
+-- Camp › Leaderboard: this month's season. Rank, name (class colour), title, streak, what they did, points with a
+-- bar against the leader. The top three are gold, silver and bronze; my row is lit. When I'm further down than the
+-- rows that fit, the last row is mine.
+local BOARD_ROWS = 12
+local MEDAL = { { 1, 0.82, 0.2 }, { 0.78, 0.8, 0.85 }, { 0.8, 0.5, 0.25 } }
+local MONTHS = { "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December" }
+local function monthName(m)
+  local y, mo = string.match(tostring(m or ""), "^(%d+)%-(%d+)$")
+  return (mo and MONTHS[tonumber(mo)]) and (MONTHS[tonumber(mo)] .. " " .. y) or tostring(m or "")
+end
+local function classColour(token)
+  local key = token and string.upper((string.gsub(tostring(token), "%s", "")))
+  local c = key and RAID_CLASS_COLORS and RAID_CLASS_COLORS[key]
+  if c then return c.r, c.g, c.b end
+  return 1, 1, 1
+end
+-- "120g given · 14 kills · 2 crafts · 3 raids", leaving out the zeros.
+local function deeds(r)
+  local parts = {}
+  if (r.gold or 0) > 0 then parts[#parts + 1] = r.gold .. "g given" end
+  if (r.kills or 0) > 0 then parts[#parts + 1] = r.kills .. (r.kills == 1 and " kill" or " kills") end
+  if (r.crafts or 0) > 0 then parts[#parts + 1] = r.crafts .. (r.crafts == 1 and " craft" or " crafts") end
+  if (r.raids or 0) > 0 then parts[#parts + 1] = r.raids .. (r.raids == 1 and " raid" or " raids") end
+  return table.concat(parts, " · ")
+end
+
 function pages.season(page)
-  textPage(page, { text = function() return capture(ns.seasons.slash) end,
-    hint = "Standings come from the Guild Camp app. Points: guild bank gifts, crafting requests, raids and world PvP." })
+  local S = ns.skin
+  local head = label(page, "", "GameFontNormalLarge"); head:SetPoint("TOPLEFT", 0, 0)
+  local left = label(page, "", "GameFontHighlightSmall"); left:SetPoint("TOPRIGHT", -4, -4)
+  local W_ROW = PW - 40
+  local cols = label(page, "", "GameFontDisableSmall"); cols:SetPoint("TOPLEFT", 6, -28)
+  cols:SetText("#")
+  local cn = label(page, "Player", "GameFontDisableSmall"); cn:SetPoint("TOPLEFT", 44, -28)
+  local cd = label(page, "This month", "GameFontDisableSmall"); cd:SetPoint("TOPLEFT", 250, -28)
+  local cp = label(page, "Points", "GameFontDisableSmall"); cp:SetPoint("TOPRIGHT", -8, -28)
+  local empty = label(page, "", "GameFontDisable"); empty:SetPoint("TOPLEFT", 0, -56); empty:SetWidth(W_ROW)
+
+  page.rows = {}
+  for i = 1, BOARD_ROWS do
+    local r = CreateFrame("Frame", nil, page)
+    r:SetSize(W_ROW, 24); r:SetPoint("TOPLEFT", 0, -44 - (i - 1) * 26)
+    r.stripe = S.colorTex(r, "BACKGROUND", 1, 1, 1, i % 2 == 0 and 0.04 or 0); r.stripe:SetAllPoints()
+    r.mine = S.colorTex(r, "BACKGROUND", S.EMBER[1], S.EMBER[2], S.EMBER[3], 0.22); r.mine:SetAllPoints(); r.mine:Hide()
+    -- The bar sits behind the points, as long as this player's share of the leader's score.
+    r.bar = S.colorTex(r, "BORDER", S.GOLD[1], S.GOLD[2], S.GOLD[3], 0.18); r.bar:SetHeight(18); r.bar:SetPoint("RIGHT", -4, 0)
+    r.rank = label(r, "", "GameFontNormalLarge"); r.rank:SetPoint("LEFT", 6, 0); r.rank:SetWidth(34)
+    r.name = label(r, "", "GameFontHighlight"); r.name:SetPoint("LEFT", 44, 3); r.name:SetWidth(200)
+    r.title = label(r, "", "GameFontDisableSmall"); r.title:SetPoint("LEFT", 44, -8); r.title:SetWidth(200)
+    r.deeds = label(r, "", "GameFontHighlightSmall"); r.deeds:SetPoint("LEFT", 250, 0); r.deeds:SetWidth(W_ROW - 250 - 90)
+    r.score = label(r, "", "GameFontNormal"); r.score:SetPoint("RIGHT", -8, 0); r.score:SetJustifyH("RIGHT")
+    r:Hide()
+    page.rows[i] = r
+  end
+  local leaders = label(page, "", "GameFontHighlightSmall"); leaders:SetPoint("BOTTOMLEFT", 0, 16); leaders:SetWidth(W_ROW)
+  local foot = label(page, "", "GameFontDisableSmall"); foot:SetPoint("BOTTOMLEFT", 0, 0); foot:SetWidth(W_ROW)
+  page.head, page.empty, page.leaders, page.foot = head, empty, leaders, foot
+
+  page.refresh = function()
+    local rows, s = ns.seasons.board()
+    head:SetText(s and ("Season: " .. monthName(s.month)) or "Season")
+    local days = s and tonumber(s.daysLeft)
+    left:SetText(days and days > 0 and (days == 1 and "Last day" or (days .. " days left")) or "")
+    -- Which rows show: the top ones, and mine in the last row when I'm below them.
+    local show, mineAt = {}, nil
+    for i, r in ipairs(rows) do if r.me then mineAt = i end end
+    for i = 1, math.min(#rows, BOARD_ROWS) do show[i] = rows[i] end
+    if mineAt and mineAt > BOARD_ROWS then show[BOARD_ROWS] = rows[mineAt] end
+    local top = rows[1] and rows[1].score or 0
+    for i, r in ipairs(page.rows) do
+      local x = show[i]
+      if x then
+        local medal = MEDAL[x.rank]
+        r.rank:SetText(tostring(x.rank))
+        if medal then r.rank:SetTextColor(medal[1], medal[2], medal[3]) else r.rank:SetTextColor(0.6, 0.6, 0.6) end
+        r.name:SetText(x.name .. ((x.streak or 0) >= 2 and string.format("  |cffe8a33d%d-week streak|r", x.streak) or ""))
+        r.name:SetTextColor(classColour(x.class))
+        r.title:SetText(x.title or "")
+        r.deeds:SetText(deeds(x))
+        r.score:SetText(tostring(x.score))
+        r.bar:SetWidth(math.max(2, math.floor((top > 0 and x.score / top or 0) * 160)))
+        if x.me then r.mine:Show() else r.mine:Hide() end
+        r.me, r.shownRank = x.me and true or false, x.rank
+        r:Show()
+      else r:Hide() end
+    end
+    empty:SetText(#rows == 0 and "No standings yet. They come from the Guild Camp app: keep it running and /reload." or "")
+    local parts = {}
+    for _, l in ipairs((s and type(s.leaders) == "table" and s.leaders) or {}) do
+      parts[#parts + 1] = string.format("|cffe8a33d%s|r %s", tostring(l.title), tostring(l.name))
+    end
+    leaders:SetText(table.concat(parts, "   "))
+    local total = s and tonumber(s.count) or #rows
+    local where = mineAt and string.format("You're #%d of %d.", rows[mineAt].rank, total)
+      or (#rows > 0 and "You're not on the board yet: give to the guild bank, fill a crafting request, raid or fight in the open world." or "")
+    foot:SetText(where .. (total > #show and #show > 0 and string.format("  The full board of %d is in the Guild Camp app.", total) or ""))
+  end
 end
 
 -- War › The hunt: kill on sight and bounties.
