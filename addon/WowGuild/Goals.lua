@@ -26,7 +26,8 @@ function G.drives()
     local f = c.fields
     if type(f) == "table" and type(f.drive) == "string" and (tonumber(f.amount) or 0) > 0 then
       gifts[f.drive] = gifts[f.drive] or {}
-      table.insert(gifts[f.drive], { who = (type(f.character) == "string" and f.character ~= "" and f.character) or c.author or "?", amount = math.floor(tonumber(f.amount)), mine = pid ~= nil and f.pid == pid })
+      -- Capped on read as well as in give(): gifts are on trust, and one oversized record mustn't finish a drive.
+      table.insert(gifts[f.drive], { who = (type(f.character) == "string" and f.character ~= "" and f.character) or c.author or "?", amount = math.floor(math.min(G.MAX_GIFT, tonumber(f.amount))), mine = pid ~= nil and f.pid == pid })
     end
   end
   for _, r in ipairs(sh.list("DR")) do
@@ -42,7 +43,7 @@ function G.drives()
       for name, amount in pairs(by) do givers[#givers + 1] = { name = name, amount = amount } end
       table.sort(givers, function(a, b) if a.amount ~= b.amount then return a.amount > b.amount end return a.name < b.name end)
       local goal = math.max(0, math.floor(tonumber(f.goal) or 0))
-      out[#out + 1] = { key = r.key, title = plain(f.title ~= "" and f.title or "Drive"), unit = plain(f.unit or ""), goal = goal, notes = plain(f.notes or ""),
+      out[#out + 1] = { key = r.key, title = plain((type(f.title) == "string" and f.title ~= "") and f.title or "Drive"), unit = plain(f.unit or ""), goal = goal, notes = plain(f.notes or ""),
         total = total, mine = mine, givers = givers, done = goal > 0 and total >= goal, t = r.t or 0 }
     end
   end
@@ -78,9 +79,11 @@ function G.hunts()
   end
   for _, r in ipairs(sh.list("BT")) do
     local f = r.fields
-    if type(f) == "table" and f.state == "o" and (f.points or 0) > 0 and (f.ends or 0) > t and type(f.zone) == "string" and f.zone ~= "" and (f.target or "") == "" then
+    -- Shared records: numbers are coerced, so one malformed record can't break the Today line and the Goals page.
+    local pts, ends = type(f) == "table" and tonumber(f.points) or 0, type(f) == "table" and tonumber(f.ends) or 0
+    if type(f) == "table" and f.state == "o" and pts > 0 and ends > t and type(f.zone) == "string" and f.zone ~= "" and (f.target or "") == "" then
       local cap = math.max(1, math.floor(tonumber(f.cap) or 1))
-      out[#out + 1] = { key = r.key, zone = plain(f.zone), points = f.points, cap = cap, done = math.min(cap, claims[r.key] or 0), ends = f.ends, note = plain(f.note or "") }
+      out[#out + 1] = { key = r.key, zone = plain(f.zone), points = math.floor(pts), cap = cap, done = math.min(cap, claims[r.key] or 0), ends = ends, note = plain(f.note or "") }
     end
   end
   table.sort(out, function(a, b) if a.ends ~= b.ends then return a.ends < b.ends end return a.key < b.key end)
