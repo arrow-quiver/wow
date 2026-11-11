@@ -65,7 +65,8 @@ function SE.hook()
   end
 end
 
--- The board, best first: { { rank, name, class, score, streak, title, gold, kills, crafts, raids, me } }.
+-- The board, best first: { { rank, name, class, score, streak, title, gold, kills, crafts, raids, me } }, the season,
+-- and my rank (nil when I'm not ranked). The app sends only the top rows, so my rank can be below the last of them.
 -- From the app's `board`; with an older app, from the per-character entries (one row per rank, no class or counts).
 function SE.board()
   local s = SE.data()
@@ -91,7 +92,7 @@ function SE.board()
     for _, r in pairs(seen) do rows[#rows + 1] = r end
   end
   table.sort(rows, function(a, b) if a.rank ~= b.rank then return a.rank < b.rank end return a.name < b.name end)
-  return rows, s
+  return rows, s, myRank
 end
 
 -- Last month's season in short (the app's `last`), or nil: { month, mvp = { name, score }, leaders, players, gold,
