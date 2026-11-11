@@ -196,7 +196,8 @@ function recap(s) {
   const sum = (f) => s.players.reduce((n, p) => n + (f(p) || 0), 0);
   const streak = [...s.players].sort((a, b) => b.streak - a.streak || a.rank - b.rank)[0];
   return {
-    players: s.players.length,
+    // Who earned points this month: the season also keeps players who only carry a streak over from earlier weeks.
+    players: s.players.filter((p) => p.base > 0).length,
     gold: Math.round(sum((p) => p.gold)), kills: sum((p) => p.kills), crafts: sum((p) => p.crafts), raids: sum((p) => p.raids),
     streak: streak && streak.streak >= 2 ? { name: streak.name, weeks: streak.streak } : null,
   };
