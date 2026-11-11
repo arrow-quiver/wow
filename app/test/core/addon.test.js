@@ -459,7 +459,7 @@ test('Settings tab: options apply immediately, app link and update notice shown'
   assert.strictEqual(text(wow, 'WowGuildMinimapButton:IsShown()'), 'true');
   // Every option has a box, in the same order as the Blizzard options panel.
   assert.strictEqual(wow.eval(`#${page}.boxes`), wow.eval('#__ns.OPTION_LIST'));
-  assert.strictEqual(wow.eval('#__ns.OPTION_LIST'), '26');
+  assert.strictEqual(wow.eval('#__ns.OPTION_LIST'), '27');
   wow.exec('__ns.optionsPanel.scripts.OnShow()');
   assert.strictEqual(text(wow, '__ns.optionsPanel.boxes[2]:GetChecked()'), 'true');
   wow.exec('__ns.optionsPanel.boxes[2]:SetChecked(false); __click(__ns.optionsPanel.boxes[2])');
@@ -559,7 +559,7 @@ test('the window has a rail of sections; each section\'s pages are its tabs', ()
     ['Camp', 'Coach', 'War', 'Raids & Dungeons', 'Professions', 'Market', 'Guild', 'Settings']);
   // Every section is on the rail and every page opens without an error.
   const keys = wow.get('(function() local t = {} for _, s in ipairs(__ns.ui.SECTIONS) do for _, p in ipairs(s.pages) do t[#t + 1] = s.id .. ":" .. p.key end end return t end)()');
-  assert.deepStrictEqual(keys, ['camp:camp', 'camp:board', 'camp:season', 'coach:coach', 'war:cta', 'war:hunt', 'war:report', 'war:near',
+  assert.deepStrictEqual(keys, ['camp:camp', 'camp:board', 'camp:season', 'coach:coach', 'war:cta', 'war:hunt', 'war:nemesis', 'war:where', 'war:report',
     'dungeons:raids', 'dungeons:groups', 'dungeons:quests', 'prof:prof', 'prof:mats', 'market:deals', 'market:alerts',
     'guild:guild', 'guild:recruit', 'settings:settings']);
   for (const k of keys) {
@@ -575,7 +575,7 @@ test('the window has a rail of sections; each section\'s pages are its tabs', ()
   // Only the open section's tabs show, and a section with one page shows none.
   wow.exec('__ns.ui.show("hunt")');
   assert.strictEqual(text(wow, 'WowGuildWindow.tabs.cta:IsShown()'), 'true');
-  assert.strictEqual(text(wow, 'WowGuildWindow.tabs.near:IsShown()'), 'true');
+  assert.strictEqual(text(wow, 'WowGuildWindow.tabs.where:IsShown()'), 'true');
   assert.strictEqual(text(wow, 'WowGuildWindow.tabs.raids:IsShown()'), 'false');
   wow.exec('__ns.ui.show("coach")');
   assert.strictEqual(text(wow, 'WowGuildWindow.tabs.coach:IsShown()'), 'false');
@@ -659,7 +659,7 @@ test('Settings: options in groups with a description, a search box and the windo
   const page = 'WowGuildWindow.pages.settings';
   // Every option has a group and a description.
   assert.strictEqual(wow.eval('(function() for _, o in ipairs(__ns.OPTION_LIST) do if not o.group or not o.desc or o.desc == "" then return o.key end end return "ok" end)()'), 'ok');
-  assert.strictEqual(wow.eval(`${page}.matches`), '26');
+  assert.strictEqual(wow.eval(`${page}.matches`), '27');
   const shown = () => wow.get(`(function() local t = {} for _, cb in ipairs(${page}.boxes) do if cb:IsShown() then t[#t + 1] = cb.key end end return t end)()`) || [];
   wow.exec(`${page}.search:SetText("auction"); ${page}.search.scripts.OnTextChanged(${page}.search)`);
   assert.ok(shown().includes('dealsPanel') && shown().includes('ahTab') && shown().includes('priceAlerts'));
@@ -669,7 +669,7 @@ test('Settings: options in groups with a description, a search box and the windo
   assert.strictEqual(wow.eval(`${page}.matches`), '0');
   assert.ok(wow.texts().includes('Nothing matches.'));
   wow.exec(`${page}.search:SetText(""); ${page}.search.scripts.OnTextChanged(${page}.search)`);
-  assert.strictEqual(shown().length, 26);
+  assert.strictEqual(shown().length, 27);
   // Window size: 80% to 130%, remembered.
   wow.click(`${page}.larger`);
   assert.strictEqual(wow.eval('string.format("%.1f", WowGuildDB.ui.scale)'), '1.1');

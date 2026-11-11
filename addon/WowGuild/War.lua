@@ -280,6 +280,33 @@ function W.summary()
   end)
   return out
 end
+-- The guild's kills and deaths in a zone since a time (a call to arms there): → kills, deaths.
+function W.since(zone, at)
+  local kills, deaths = 0, 0
+  if type(zone) ~= "string" or zone == "" then return kills, deaths end
+  local names = {}
+  if ns.db and ns.db.war and type(ns.db.war.maps) == "table" then
+    for id, name in pairs(ns.db.war.maps) do names[id] = name end
+  end
+  local recs = (ns.Share and ns.Share.list and ns.try(ns.Share.list, "wm")) or {}
+  for _, rec in ipairs(recs) do
+    local f = type(rec.fields) == "table" and rec.fields or {}
+    for _, m in ipairs(type(f.maps) == "table" and f.maps or {}) do
+      if type(m) == "table" and m.id and type(m.name) == "string" then names[m.id] = m.name end
+    end
+  end
+  local want = string.lower(zone)
+  for _, rec in ipairs(recs) do
+    local f = type(rec.fields) == "table" and rec.fields or {}
+    for _, m in ipairs(type(f.marks) == "table" and f.marks or {}) do
+      if type(m) == "table" and type(m.at) == "number" and m.at >= (at or 0) and string.lower(names[m.map] or mapName(m.map) or "") == want then
+        if m.kind == "k" then kills = kills + 1 else deaths = deaths + 1 end
+      end
+    end
+  end
+  return kills, deaths
+end
+
 W.ago = function(t) return W._ago(t) end
 
 local layer, pins = nil, {}
