@@ -87,3 +87,22 @@ test('Guild goals page: bars, "I gave", and the kill goals', () => {
   assert.ok(wow.texts().some((t) => /^No guild goals right now/.test(t)));
   noError(wow);
 });
+
+// ---------------------------------------------------------------- review of #64
+
+test('shared records with odd numbers: strings are coerced, junk is skipped, an oversized gift is capped', () => {
+  const wow = client();
+  wow.exec(`local t = GetServerTime()
+    table.insert(__recs, { type = "BT", key = "z2", author = "Mokra", t = t, fields = { target = "", zone = "Arathi", points = "7", cap = 3, ends = tostring(t + 86400), note = "", state = "o" } })
+    table.insert(__recs, { type = "BT", key = "z3", author = "Mokra", t = t, fields = { target = "", zone = "Duskwood", points = "lots", cap = 3, ends = "soon", note = "", state = "o" } })
+    table.insert(__recs, { type = "DR", key = "d3", author = "Mokra", t = t, fields = { unit = "Iron", goal = 50, state = "o" } })
+    table.insert(__recs, { type = "dc", key = "c9", author = "Zed", t = t, fields = { pid = "Zed.z1", drive = "d3", character = "Zed", amount = 1e15 } })`);
+  const h = wow.get('__ns.goals.hunts()');
+  assert.deepStrictEqual(h.map((x) => [x.zone, x.points]), [['Arathi', 7], ['Hillsbrad Foothills', 5]], 'the string record is read, the junk one is skipped');
+  const d3 = wow.get('__ns.goals.drives()').find((x) => x.key === 'd3');
+  assert.strictEqual(d3.title, 'Drive', 'a drive with no title is called Drive');
+  assert.strictEqual(d3.total, wow.get('__ns.goals.MAX_GIFT'), 'one gift counts at most MAX_GIFT');
+  assert.match(wow.eval('__ns.goals.line()'), /Arathi 0\/3 kills/);
+  wow.exec('__ns.ui.show("goals")');
+  noError(wow);
+});
