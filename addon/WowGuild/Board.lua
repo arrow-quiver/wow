@@ -34,7 +34,8 @@ function B.posts()
       out[#out + 1] = { key = r.key, kind = f.kind, text = f.text, price = f.price, character = f.character or r.author, pid = f.pid, t = r.t or 0, fields = f }
     end
   end
-  table.sort(out, function(a, b) return a.t > b.t end)
+  -- Newest first; the key breaks ties so posts made in the same second keep their order.
+  table.sort(out, function(a, b) if a.t ~= b.t then return a.t > b.t end return tostring(a.key) < tostring(b.key) end)
   return out
 end
 
@@ -73,24 +74,35 @@ function B.post(kindWord, args)
   local sh = S()
   local pid = sh and sh.myPid and ns.try(sh.myPid)
   if not sh or not pid then ns.print("The board isn't ready yet: guild sharing starts a little after login. Try again in a minute."); return false end
-  local ok = pcall(sh.putLocal, "bb", ns.randomKey(), { pid = pid, character = UnitName and UnitName("player") or "?",
+  -- putLocal returns the stored record, or nil and a reason (sharing not open, …): only a stored record is a post.
+  local called, res = pcall(sh.putLocal, "bb", ns.randomKey(), { pid = pid, character = UnitName and UnitName("player") or "?",
     kind = kind, text = string.sub(text, 1, 200), price = price, state = "o" })
+  local ok = (called and res) and true or false
   if ok then ns.print(string.format("Posted to the guild board: %s %s%s. It stays up for a week.", B.LABEL[kind], plain(text), price and (" (" .. money(price) .. ")") or ""))
   else ns.print("Couldn't post that. Try a shorter message.") end
   return ok
 end
 
-function B.takeDown(n)
-  local p = B.posts()[tonumber(n or "") or 0]
+-- One of mine, by its number in the list (/wow board down 3), or by its record key with B.takeDownKey (the
+-- window's rows: a number would hit a different post once a newer one has arrived since the page was drawn).
+local function takeDownPost(p)
   local sh = S()
   local pid = sh and sh.myPid and ns.try(sh.myPid)
   if not p or not pid or p.pid ~= pid then ns.print("That isn't one of your posts. /wow board lists them with their numbers."); return false end
   local f = {}
   for k, v in pairs(p.fields) do f[k] = v end
   f.state = "x"
-  local ok = pcall(sh.putLocal, "bb", p.key, f)
+  local called, res = pcall(sh.putLocal, "bb", p.key, f)
+  local ok = (called and res) and true or false
   ns.print(ok and "Post taken down." or "Couldn't take that post down.")
   return ok
+end
+
+function B.takeDown(n) return takeDownPost(B.posts()[tonumber(n or "") or 0]) end
+
+function B.takeDownKey(key)
+  for _, x in ipairs(B.posts()) do if x.key == key then return takeDownPost(x) end end
+  return takeDownPost(nil)
 end
 
 function B.slash(rest)

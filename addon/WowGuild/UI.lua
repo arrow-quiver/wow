@@ -16,7 +16,9 @@ end
 function ns.ago(t) return ago(t) end
 
 -- Battle tags arrive as "Name#1234"; players only need the name.
-local function who(s) return (tostring(s or ""):gsub("#%d+", "")) end
+-- Text a guildmate wrote, shown as written: "|" is doubled so |c, |r and |H in it aren't read as colours or links.
+local function plain(s) return (string.gsub(tostring(s or ""), "|", "||")) end
+local function who(s) return plain((tostring(s or ""):gsub("#%d+", ""))) end
 
 function ns.textRaids()
   local inbox = WowGuildInbox
@@ -62,7 +64,7 @@ function ns.textGuildRequests()
   add("|cffffd100Requests you can craft|r")
   if inbox.canCraft and #inbox.canCraft > 0 then
     for _, r in ipairs(inbox.canCraft) do
-      add("  " .. tostring(r.item or "?") .. "  |cff999999for " .. who(r.requester) .. "|r" .. (r.notes and r.notes ~= "" and ("  " .. r.notes) or ""))
+      add("  " .. plain(r.item or "?") .. "  |cff999999for " .. who(r.requester) .. "|r" .. (r.notes and r.notes ~= "" and ("  " .. plain(r.notes)) or ""))
     end
     add("  |cff999999Claim them in the Guild Camp app so nobody doubles up.|r")
   else add("  |cff999999None right now|r") end
@@ -70,7 +72,7 @@ function ns.textGuildRequests()
   add("|cffffd100Your requests|r")
   if inbox.myRequests and #inbox.myRequests > 0 then
     for _, r in ipairs(inbox.myRequests) do
-      add("  " .. tostring(r.item or "?") .. "  |cff999999" .. (r.status == "claimed" and ("being made by " .. who(r.crafter)) or "waiting for a crafter") .. "|r")
+      add("  " .. plain(r.item or "?") .. "  |cff999999" .. (r.status == "claimed" and ("being made by " .. who(r.crafter)) or "waiting for a crafter") .. "|r")
     end
   else add("  |cff999999None|r") end
   return table.concat(lines, "\n")
@@ -84,7 +86,7 @@ function ns.textGuild()
   add("|cffffd100Requests you can craft|r")
   if inbox.canCraft and #inbox.canCraft > 0 then
     for _, r in ipairs(inbox.canCraft) do
-      add("  " .. tostring(r.item or "?") .. "  |cff999999for " .. who(r.requester) .. "|r" .. (r.notes and r.notes ~= "" and ("  " .. r.notes) or ""))
+      add("  " .. plain(r.item or "?") .. "  |cff999999for " .. who(r.requester) .. "|r" .. (r.notes and r.notes ~= "" and ("  " .. plain(r.notes)) or ""))
     end
     add("  |cff999999Claim them in the Guild Camp app so nobody doubles up.|r")
   else add("  |cff999999None right now|r") end
@@ -92,16 +94,16 @@ function ns.textGuild()
   add("|cffffd100Your requests|r")
   if inbox.myRequests and #inbox.myRequests > 0 then
     for _, r in ipairs(inbox.myRequests) do
-      add("  " .. tostring(r.item or "?") .. "  |cff999999" .. (r.status == "claimed" and ("being made by " .. who(r.crafter)) or "waiting for a crafter") .. "|r")
+      add("  " .. plain(r.item or "?") .. "  |cff999999" .. (r.status == "claimed" and ("being made by " .. who(r.crafter)) or "waiting for a crafter") .. "|r")
     end
   else add("  |cff999999None|r") end
   add("")
   add("|cffffd100Looking for leveling partners|r")
   if inbox.buddies and #inbox.buddies > 0 then
     for _, b in ipairs(inbox.buddies) do
-      add(string.format("  %s (%s)%s%s", tostring(b.character or "?"), tostring(b.level or "?"),
-        (b.zone and b.zone ~= "") and (" in " .. b.zone) or "", (b.whenText and b.whenText ~= "") and (", " .. b.whenText) or ""))
-      if b.note and b.note ~= "" then add("    |cff999999" .. b.note .. "|r") end
+      add(string.format("  %s (%s)%s%s", plain(b.character or "?"), plain(b.level or "?"),
+        (b.zone and b.zone ~= "") and (" in " .. plain(b.zone)) or "", (b.whenText and b.whenText ~= "") and (", " .. plain(b.whenText)) or ""))
+      if b.note and b.note ~= "" then add("    |cff999999" .. plain(b.note) .. "|r") end
     end
   else add("  |cff999999Nobody posted|r") end
   return table.concat(lines, "\n")
