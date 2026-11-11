@@ -856,9 +856,9 @@ function OverlayCard({ settings, change }) {
         : live.status === 'waiting' ? 'On: combat logging is on, waiting for your next fight.'
           : 'On, but the game isn\'t writing a combat log. In game, type /combatlog, or /wow live on so the addon turns it on at every login.';
   return html`<${Card} id=${sectionDomId('overlay')} title="Overlay & live link" class="settings-card">
-    <${ToggleRow} title="Coach overlay" checked=${s.overlayEnabled !== false} disabled=${!ready}
-      hint=${`A small window that stays on top of the game: your session, last death, next steps and a quick Ask box. Play WoW in "Windowed (Fullscreen)" mode to see it.`}
-      onValue=${(on) => change({ overlayEnabled: on }, on ? 'The Coach overlay is on.' : 'The Coach overlay is off.')} />
+    <${ToggleRow} title="War table (overlay)" checked=${s.overlayEnabled !== false} disabled=${!ready}
+      hint=${`All of Guild Camp in a window that stays on top of the game: your session and the Coach, every page, quick actions and live (and spoken) alerts. Play WoW in "Windowed (Fullscreen)" mode to see it.`}
+      onValue=${(on) => change({ overlayEnabled: on }, on ? 'The war table is on.' : 'The war table is off.')} />
     <${Row} title="Hotkey" hint="Shows or hides the overlay, even while the game has focus.">
       <div class="row nowrap">
         <select class="select" disabled=${!ready || s.overlayEnabled === false} value=${s.overlayHotkey}

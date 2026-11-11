@@ -34,7 +34,6 @@ function register(app, ctx) {
     const name = enemyName(req.body && req.body.name);
     const reason = str(req.body && req.body.reason, 100) || '';
     sharing.queue(db, ctx, { type: 'ko', key: name, fields: { pid: myPid(), reason, state: 'o' } });
-    ctx.activity(req.guild.id, 'kos', `${name} is kill on sight${reason ? `: ${reason}` : ''}`);
     res.status(201).json({ ok: true, message: `${name} is now kill on sight for the guild.` });
   });
 

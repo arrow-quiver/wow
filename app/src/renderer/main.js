@@ -11,6 +11,8 @@ import { applyTheme } from './lib/theme.js';
 import { watchTooltips } from './lib/wowhead.js';
 import { syncStatus, updaterStatus, addonStatus, settingsStatus, useSettings } from './lib/status.js';
 import { Sidebar, TopBar } from './components/Shell.js';
+import { OverlayBar, AlertsFeed } from './components/OverlayBar.js';
+import { OVERLAY } from './lib/overlay.js';
 import { Splash, shouldShowSplash, whenVisible } from './components/Splash.js';
 import { Page, Toasts, ErrorBox, Empty, Loading, Button } from './components/index.js';
 import { NoGuild } from './components/NoGuild.js';
@@ -151,7 +153,7 @@ function App({ initialSplash, smoke = false }) {
   const loc = useLocation();
   const session = useSession();
   const settings = useSettings();
-  const [splash, setSplash] = useState(initialSplash);
+  const [splash, setSplash] = useState(OVERLAY ? false : initialSplash);
   const contentRef = useRef(null);
   const firstPath = useRef(true);
 
@@ -176,7 +178,7 @@ function App({ initialSplash, smoke = false }) {
 
   // Started while the window was still hidden: decide about the splash once it is shown.
   useEffect(() => {
-    if (initialSplash || !document.hidden) return undefined;
+    if (OVERLAY || initialSplash || !document.hidden) return undefined;
     return whenVisible(() => { const show = shouldShowSplash(); if (show) setSplash(show); });
   }, []);
 
@@ -211,6 +213,19 @@ function App({ initialSplash, smoke = false }) {
     body = html`<${PageBoundary} key=${loc.path} title=${route.title}>
       <${PageHost} route=${route} params=${params} query=${loc.query} />
     <//>`;
+  }
+
+  // The overlay window (Ctrl+Shift+G): the whole app as the war table, with its own bar and live alerts.
+  if (OVERLAY) {
+    return html`
+      <div class="app app--overlay">
+        <${OverlayBar} />
+        <${Sidebar} routes=${routes} sections=${NAV_SECTIONS} overlay />
+        <${TopBar} route=${route} path=${loc.path} />
+        <main class="content" id="content" tabIndex="-1" ref=${contentRef} aria-label=${route.title}>${body}</main>
+      </div>
+      <${AlertsFeed} />
+      <${Toasts} />`;
   }
 
   return html`

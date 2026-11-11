@@ -94,6 +94,7 @@ test('one deposit seen by scans whose time estimates straddle a 6-hour window, a
 test('identical deposits in one scan are separate gifts; a rescan adds only the new ones', async (t) => {
   const { db, g, price } = await setup(t);
   price.run(g.guildId, 14047, dayOf(0), 1000);
+  price.run(g.guildId, 14047, dayOf(1), 1000);  // just after midnight, "an hour ago" is yesterday
   const now = Math.floor(Date.now() / 1000);
   const rune = (at) => ({ kind: 'deposit', who: 'Grommash', id: 14047, name: 'Runecloth', count: 20, at });
   applyPayload(db, g.guildId, g.me, bankScan(now - 1200, [rune(now - 4000), rune(now - 4000), rune(now - 4000)]));

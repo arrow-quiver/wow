@@ -14,12 +14,12 @@ import { pageStore } from './Page.js';
 
 // Which routes the sidebar shows. officer / owner follow the role from in-game ranks; publisher routes (Releases)
 // only show on a PC that can publish (publisher.status().canPublish: a source checkout and the GitHub CLI).
-export function visibleNav(routes, session, { canPublish = false } = {}) {
+export function visibleNav(routes, session, { canPublish = false, overlay = false } = {}) {
   return routes.filter((r) => r.nav && (!r.officer || session.isOfficer) && (!r.owner || session.isOwner)
-    && (!r.publisher || canPublish));
+    && (!r.publisher || canPublish) && (!r.overlayOnly || overlay));
 }
 
-export function Sidebar({ routes, sections }) {
+export function Sidebar({ routes, sections, overlay = false }) {
   const session = useSession();
   const sync = useSyncStatus();
   const updater = useUpdaterStatus();
@@ -27,7 +27,7 @@ export function Sidebar({ routes, sections }) {
   const publisher = usePublisherStatus();
   const { guild, user, role } = session;
 
-  const items = visibleNav(routes, session, { canPublish: Boolean(publisher && publisher.canPublish) });
+  const items = visibleNav(routes, session, { canPublish: Boolean(publisher && publisher.canPublish), overlay });
   const groups = sections.map((s) => [s, items.filter((r) => r.nav === s)]).filter(([, list]) => list.length);
   const syncInfo = describeSync(sync);
   const updates = describeUpdates(updater, addon);
@@ -53,7 +53,7 @@ export function Sidebar({ routes, sections }) {
         <h2 class="nav-heading">${section}</h2>
         <ul class="nav-list">
           ${list.map((r) => html`<li key=${r.path}>
-            <${Link} href=${r.path} class="nav-link" exact=${r.path === '/'}>
+            <${Link} href=${r.path} class="nav-link" exact=${r.path === '/'} title=${overlay ? r.title : undefined}>
               <${Icon} name=${r.icon} />
               <span class="nav-label">${r.title}</span>
               ${badges[r.path] ? html`<span class="nav-badge" aria-label=${r.path === '/addon' && badges[r.path] === '!' ? 'needs attention' : `${badges[r.path]} waiting`}>${badges[r.path]}</span>` : null}

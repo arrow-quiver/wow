@@ -1331,3 +1331,113 @@ a.wh.q0 { color: var(--q-0) !important; } a.wh.q1 { color: var(--q-1) !important
 
 /* Recruiting */
 .recruit-classes { flex-wrap: wrap; gap: 4px 14px; }
+
+
+/* ---------- the war table (the overlay window, Ctrl+Shift+G: lib/overlay.js) ----------
+   The whole app over the game: dark leather and iron, gold and blood-red, an icon rail that grows labels when the
+   window is wide, the war bar on top. Always dark, whatever the app's theme. */
+:root.is-overlay {
+  --pine: #160f0a; --pine-2: #7a1f17;
+  --ember: #e9b04a; --ember-deep: #b07a22; --ember-soft: #f5cd78;
+  --mist: #1b130d; --paper: #241910; --ink: #f3e6cc; --ink-2: #c4ae8a; --line: #4a3423;
+  --bg: #1b130d; --surface: #241910; --surface-2: #2d2015; --surface-3: #37271a; --text-3: #9c8566; --line-strong: #5e4430;
+  --link: var(--ember); --accent: var(--ember); --on-accent: #241405; --focus: #f5cd78;
+  --frame: #130d08; --frame-2: #2a1c12; --frame-active: #5a1812; --frame-line: #3b2a1c;
+  --frame-text: #f3e6cc; --frame-text-2: #c9b18c; --frame-text-3: #8f7759;
+  --ok: #7cc47f; --warn: #eaa93a; --alarm: #e5534b; --info: #e9b04a; --muted: #9c8566;
+  --q-1: var(--ink); --backdrop: rgb(8 5 3 / .7);
+  --shadow-1: 0 1px 2px rgb(0 0 0 / .45); --shadow-2: 0 8px 22px rgb(0 0 0 / .55), 0 2px 6px rgb(0 0 0 / .4);
+  --sidebar-w: 52px; --topbar-h: 34px;
+  color-scheme: dark;
+}
+:root.is-overlay body { background: #130d08; }
+.app--overlay {
+  grid-template-rows: 44px var(--topbar-h) minmax(0, 1fr);
+  grid-template-areas: "bar bar" "side top" "side main";
+  background:
+    radial-gradient(ellipse at 20% -10%, rgb(122 31 23 / .35), transparent 55%),
+    repeating-linear-gradient(115deg, rgb(255 255 255 / .012) 0 2px, transparent 2px 7px),
+    linear-gradient(180deg, #1d140d, #120c08);
+}
+.app--overlay .content { background: transparent; }
+.app--overlay .page { padding: var(--s-4) var(--s-4) var(--s-6); gap: var(--s-4); }
+.app--overlay .card, .app--overlay .ovl-card {
+  background: linear-gradient(180deg, rgb(255 236 200 / .035), rgb(0 0 0 / .12)), var(--surface);
+  border: 1px solid #4a3423; box-shadow: inset 0 1px 0 rgb(255 220 160 / .06), 0 2px 10px rgb(0 0 0 / .35);
+  border-radius: 6px; position: relative;
+}
+.app--overlay .card::before, .app--overlay .ovl-card::before {
+  content: ""; position: absolute; inset: 3px; border: 1px solid rgb(233 176 74 / .12); border-radius: 4px; pointer-events: none;
+}
+.app--overlay h1, .app--overlay h2, .app--overlay .card-title { color: var(--ember-soft); letter-spacing: .01em; }
+.app--overlay .topbar { background: transparent; border-bottom: 1px solid var(--frame-line); }
+.app--overlay .topbar h1 { font-size: var(--fs-l); }
+
+/* The icon rail: icons only, a gold edge on the current page; labels come back when the window is wide. */
+.app--overlay .sidebar { background: linear-gradient(180deg, #170f09, #0f0a06); border-right: 1px solid #3b2a1c; }
+.app--overlay .sidebar-brand, .app--overlay .nav-heading, .app--overlay .sidebar-foot .ellipsis,
+.app--overlay .who-role, .app--overlay .nav-label, .app--overlay .nav-badge { display: none; }
+.app--overlay .nav { padding: 6px 6px; }
+.app--overlay .nav-section + .nav-section { margin-top: 6px; padding-top: 6px; border-top: 1px solid #2a1c12; }
+.app--overlay .nav-link { justify-content: center; padding: 7px 0; border-radius: 6px; }
+.app--overlay .nav-link .icon { width: 19px; height: 19px; }
+.app--overlay .nav-link.is-active { background: linear-gradient(180deg, #6b1c15, #4a120d); box-shadow: inset 0 0 0 1px rgb(233 176 74 / .45), 0 0 12px rgb(229 83 75 / .25); }
+.app--overlay .nav-link.is-active .icon { color: #f5cd78; }
+.app--overlay .sidebar-foot { padding: 6px; align-items: center; }
+.app--overlay .foot-link { justify-content: center; padding: 6px 0; }
+@media (min-width: 820px) {
+  :root.is-overlay { --sidebar-w: 190px; }
+  .app--overlay .nav-heading, .app--overlay .nav-label, .app--overlay .sidebar-foot .ellipsis, .app--overlay .nav-badge { display: revert; }
+  .app--overlay .nav-heading { color: #8f7759; }
+  .app--overlay .nav-link { justify-content: flex-start; padding: 5px 8px; }
+  .app--overlay .foot-link { justify-content: flex-start; padding: 4px 8px; }
+  .app--overlay .sidebar-foot { align-items: stretch; }
+}
+
+/* The war bar: drag strip, quick actions, tools. */
+.ovl-bar2 {
+  grid-area: bar; display: flex; align-items: center; gap: 8px; padding: 0 8px 0 10px; min-width: 0;
+  -webkit-app-region: drag; user-select: none;
+  background: linear-gradient(180deg, #3a120d 0%, #24100b 60%, #170d08 100%);
+  border-bottom: 2px solid #8a5a1f; box-shadow: 0 2px 0 #2a1a0e, 0 4px 14px rgb(0 0 0 / .5);
+}
+.ovl-brand { display: flex; align-items: center; gap: 6px; font: 800 .95rem/1 var(--font-head); color: #f5cd78; text-shadow: 0 1px 0 #000; white-space: nowrap; }
+.ovl-quick { display: flex; gap: 4px; min-width: 0; overflow: hidden; flex: 1; justify-content: center; }
+.ovl-act, .ovl-tool {
+  -webkit-app-region: no-drag; display: inline-flex; align-items: center; gap: 5px; cursor: pointer;
+  font: 700 .78rem/1 var(--font-body); color: #f3e6cc; padding: 6px 8px; border-radius: 5px;
+  background: linear-gradient(180deg, #4a2a17, #2b170c); border: 1px solid #7a5222;
+  box-shadow: inset 0 1px 0 rgb(255 210 140 / .18), 0 1px 0 #000; white-space: nowrap;
+  transition: transform var(--t-fast), box-shadow var(--t-fast), border-color var(--t-fast);
+}
+.ovl-act .icon, .ovl-tool .icon { width: 15px; height: 15px; color: #f5cd78; }
+.ovl-act:hover, .ovl-tool:hover { border-color: #e9b04a; box-shadow: inset 0 1px 0 rgb(255 210 140 / .25), 0 0 10px rgb(233 176 74 / .3); }
+.ovl-act:active, .ovl-tool:active { transform: translateY(1px); }
+.ovl-act:focus-visible, .ovl-tool:focus-visible { outline: 2px solid #f5cd78; outline-offset: 1px; }
+.ovl-act:first-child { background: linear-gradient(180deg, #8c2219, #5a130d); border-color: #c0452f; }
+.ovl-tools { display: flex; align-items: center; gap: 6px; }
+.ovl-tool { padding: 5px 7px; font-size: 1rem; }
+.ovl-tool.is-on { background: linear-gradient(180deg, #8a5a1f, #5c3a12); }
+.ovl-opacity { -webkit-app-region: no-drag; width: 64px; accent-color: #e9b04a; }
+@media (max-width: 560px) { .ovl-act span { display: none; } .ovl-act { padding: 6px 7px; } }
+
+/* Now: two columns when there's room. */
+.ovl-now { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-3); }
+.ovl-col { display: flex; flex-direction: column; gap: var(--s-3); min-width: 0; }
+@media (min-width: 900px) { .ovl-now { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+.app--overlay .ovl-card { padding: 12px; color: var(--ink); }
+.ovl-feed { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.ovl-feed li { display: flex; justify-content: space-between; gap: 8px; padding: 4px 0; border-bottom: 1px solid rgb(233 176 74 / .1); }
+.ovl-feed li:last-child { border-bottom: 0; }
+:root.is-overlay .toast { border-left: 3px solid #e9b04a; background: #2a1c12; color: #f3e6cc; box-shadow: 0 6px 20px rgb(0 0 0 / .55); }
+@media (prefers-reduced-motion: no-preference) {
+  :root.is-overlay .toast { animation: ovl-drop .28s var(--ease) both; }
+  @keyframes ovl-drop { from { transform: translateY(8px) scale(.98); opacity: 0; } to { transform: none; opacity: 1; } }
+}
+/* A narrow war table: every page's columns stack, stat rows go two by two. */
+@media (max-width: 760px) {
+  :root.is-overlay .cols, :root.is-overlay .war-cols, :root.is-overlay .camp-cols, :root.is-overlay .grid-3,
+  :root.is-overlay .form-grid, :root.is-overlay .partners-grid, :root.is-overlay .store-grid { grid-template-columns: minmax(0, 1fr); }
+  :root.is-overlay .war-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  :root.is-overlay .page-lede { font-size: var(--fs-m); }
+}

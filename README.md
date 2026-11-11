@@ -63,9 +63,13 @@ In game, the Coach sits **beside your talent window**: the next talent your plan
 plan's order with what you've taken ticked off. **Item tooltips** say whether an item is an upgrade for your build,
 weighed by your plan's stat priorities against what you're wearing.
 
-**Coach overlay and live link.** Press **Ctrl+Shift+G** while you play and a small Coach window shows on top of the
-game (use Windowed (Fullscreen) mode): this session's kills and deaths, what to do next and a quick Ask box. After a
-death, **Why did I die?** sends the death's recap (who hit you, with what, how much healing you got) to the Coach.
+**The war table (overlay) and live link.** Press **Ctrl+Shift+G** while you play and the whole of Guild Camp shows on
+top of the game (use Windowed (Fullscreen) mode), dressed as a Horde war table. Every page sits in an icon rail, which
+grows labels when you make the window wide. It opens on **Now**: this session's kills and deaths, your last death,
+what to do next, the Coach and the guild feed. The war bar on top has quick actions (call to arms, kill on sight, a
+board post, ask the Coach, the next raid), a see-through slider and **live alerts**: guildmates' calls to arms, boss
+kills, bounties, kill-on-sight news, recruits saying yes and level-ups pop up as they happen. Turn on **spoken
+alerts** (the bell) and the big ones are read out. After a death, **Why did I die?** sends the death's recap (who hit you, with what, how much healing you got) to the Coach.
 The live link reads the game's own combat log file as you play, like Warcraft Logs' uploader does; type `/wow live on`
 once and the addon turns combat logging on at every login. Answers reach the game's Coach after your next /reload.
 

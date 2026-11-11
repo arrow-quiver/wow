@@ -87,8 +87,15 @@ test('router matching', () => {
   assert.deepEqual(found.params, { id: '12' });
 });
 
+test('the war table (overlay window) adds Now to the rail, the main window doesn\'t', () => {
+  const now = pages.routes.find((r) => r.path === '/overlay');
+  assert.strictEqual(now.overlayOnly, true);
+  assert.strictEqual(now.nav, 'Play');
+  assert.ok(!now.bare, 'the overlay is the whole app now, not a bare page');
+});
+
 test('route table covers the architecture navigation', () => {
-  const nav = pages.routes.filter((r) => r.nav).map((r) => `${r.nav}:${r.path}`);
+  const nav = pages.routes.filter((r) => r.nav && !r.overlayOnly).map((r) => `${r.nav}:${r.path}`);
   assert.deepEqual(nav, [
     'Play:/', 'Play:/coach', 'Play:/seasons', 'Play:/war', 'Play:/hunt', 'Play:/raids', 'Play:/dungeons', 'Play:/crafters', 'Play:/requests', 'Play:/partners', 'Play:/board',
     'Guild:/roster', 'Guild:/recruiting', 'Guild:/digest', 'Guild:/bank', 'Guild:/store', 'Guild:/donate', 'Guild:/prices', 'Guild:/deals', 'Guild:/drives', 'Guild:/loot', 'Guild:/guild-settings',

@@ -578,6 +578,7 @@ function projectEk(db, gid, k) {
   const f = r ? r.fields : {};
   if (!r || !f.boss) { db.prepare('DELETE FROM boss_kills WHERE guild_id = ? AND share_id = ?').run(gid, k); return; }
   const names = (Array.isArray(f.names) ? f.names : []).filter((n) => typeof n === 'string' && n).slice(0, 40);
+  if (!db.prepare('SELECT 1 FROM boss_kills WHERE guild_id = ? AND share_id = ?').get(gid, k)) feed(db, gid, r, 'boss', `${f.boss} is down!${f.instance ? ` ${f.instance}` : ''}`);
   db.prepare('INSERT OR REPLACE INTO boss_kills (guild_id, share_id, encounter, boss, instance, at, size, names) VALUES (?,?,?,?,?,?,?,?)')
     .run(gid, k, Number.isInteger(f.enc) ? f.enc : null, f.boss, f.instance || null, Number.isInteger(f.at) ? f.at : r.t, Number.isInteger(f.size) ? f.size : null, JSON.stringify(names));
 }
@@ -604,6 +605,8 @@ function projectRk(db, gid, k) {
   }
   const at = Number.isInteger(f.at) ? f.at : r.t;
   const joinedAt = f.state === 'j' ? (row && row.joined_at) || seen : (row ? row.joined_at : null);
+  if (f.state === 'i' && (!row || row.state !== 'i')) feed(db, gid, r, 'recruit', `${k} wants to join the guild`);
+  if (f.state === 'j' && (!row || row.state !== 'j')) feed(db, gid, r, 'recruit', `${k} joined the guild`);
   db.prepare(`INSERT INTO recruits (guild_id, name, recruiter, level, class, zone, state, at, contacted_at, joined_at) VALUES (?,?,?,?,?,?,?,?,?,?)
     ON CONFLICT (guild_id, name) DO UPDATE SET recruiter = COALESCE(recruits.recruiter, excluded.recruiter), level = excluded.level,
       class = excluded.class, zone = excluded.zone, state = excluded.state, at = excluded.at, joined_at = excluded.joined_at`)
@@ -625,6 +628,7 @@ function projectKo(db, gid, k) {
   const r = liveRec(st.effective(db, gid, `ko:${k}`));
   if (!r || r.fields.state === 'x') { db.prepare('DELETE FROM kos WHERE guild_id = ? AND name = ?').run(gid, k); return; }
   const by = r.fields.pid ? st.userForPid(db, gid, r.fields.pid) : null;
+  if (!db.prepare('SELECT 1 FROM kos WHERE guild_id = ? AND name = ?').get(gid, k)) feed(db, gid, r, 'kos', `${k} is now kill on sight${r.fields.reason ? ` — ${r.fields.reason}` : ''}`);
   db.prepare(`INSERT INTO kos (guild_id, name, reason, added_by, added_at) VALUES (?,?,?,?,?)
     ON CONFLICT (guild_id, name) DO UPDATE SET reason = excluded.reason, added_by = excluded.added_by, added_at = excluded.added_at`)
     .run(gid, k, r.fields.reason || null, by, st.iso(r.t));
@@ -638,6 +642,9 @@ function projectKk(db, gid, k) {
   const f = r ? r.fields : {};
   if (!r || !f.target) { db.prepare('DELETE FROM hunt_kills WHERE guild_id = ? AND share_id = ?').run(gid, k); return; }
   const uid = st.userForPid(db, gid, f.pid);
+  if (!db.prepare('SELECT 1 FROM hunt_kills WHERE guild_id = ? AND share_id = ?').get(gid, k)) {
+    feed(db, gid, r, f.bounty ? 'bounty' : 'kos', `${r.author} slew ${f.target}${f.bounty ? ' and claims the bounty' : ' (kill on sight)'}`);
+  }
   db.prepare('INSERT OR REPLACE INTO hunt_kills (guild_id, share_id, user_id, target, zone, at, kos, bounty) VALUES (?,?,?,?,?,?,?,?)')
     .run(gid, k, uid || null, f.target, f.zone || null, Number.isInteger(f.at) ? f.at : r.t, f.kos ? 1 : 0, f.bounty || null);
 }
@@ -650,7 +657,18 @@ function projectBt(db, gid, k) {
   const vals = [f.target || null, f.zone || null, f.points, Math.max(1, f.cap || 1), f.ends || 0, f.note || null, f.state === 'x' ? 'x' : 'o'];
   const row = db.prepare('SELECT id FROM bounties WHERE guild_id = ? AND share_id = ?').get(gid, k);
   if (row) db.prepare('UPDATE bounties SET target = ?, zone = ?, points = ?, cap = ?, until = ?, note = ?, state = ? WHERE id = ?').run(...vals, row.id);
-  else db.prepare('INSERT INTO bounties (target, zone, points, cap, until, note, state, guild_id, share_id, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)').run(...vals, gid, k, st.iso(r.t));
+  else {
+    db.prepare('INSERT INTO bounties (target, zone, points, cap, until, note, state, guild_id, share_id, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)').run(...vals, gid, k, st.iso(r.t));
+    feed(db, gid, r, 'bounty', `Bounty: ${f.points} points ${f.target ? `for ${f.target}` : `a kill in ${f.zone}`}`);
+  }
+}
+
+// A line for the guild feed (activity) when a guildmate's record is new: the overlay's live alerts read it. Only
+// records written in the last FEED_HOURS, so a rebuild or a far-behind store doesn't replay old news.
+const FEED_HOURS = 6;
+function feed(db, gid, rec, kind, text) {
+  if (!rec || !Number.isFinite(rec.t) || st.serverNow(db) - rec.t > FEED_HOURS * 3600) return;
+  db.prepare('INSERT INTO activity (guild_id, kind, text) VALUES (?,?,?)').run(gid, kind, String(text).slice(0, 200));
 }
 
 function projectCa(db, gid, k) {
@@ -673,6 +691,7 @@ function projectCa(db, gid, k) {
       const fromApp = db.prepare('SELECT 1 FROM share_outbox WHERE guild_id = ? AND rec_id = ? LIMIT 1').get(gid, `ca:${k}`);
       db.prepare('INSERT INTO ctas (user_id, character, zone, message, needed, guild_id, share_id, client_ref, source, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)')
         .run(...vals, gid, k, k, fromApp ? 'app' : 'addon', st.iso(ca.t).replace('T', ' ').slice(0, 19));
+      if (!fromApp) feed(db, gid, ca, 'cta', `Call to arms in ${f.zone || '?'}${f.needed ? `: ${f.needed} needed` : ''} — ${f.character || ca.author}`);
     }
   }
 }
