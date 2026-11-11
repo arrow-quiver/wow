@@ -90,18 +90,26 @@ test('router matching', () => {
 test('the war table (overlay window) adds Now to the rail, the main window doesn\'t', () => {
   const now = pages.routes.find((r) => r.path === '/overlay');
   assert.strictEqual(now.overlayOnly, true);
-  assert.strictEqual(now.nav, 'Play');
+  assert.strictEqual(now.nav, 'Camp');
   assert.ok(!now.bare, 'the overlay is the whole app now, not a bare page');
 });
 
 test('route table covers the architecture navigation', () => {
   const nav = pages.routes.filter((r) => r.nav && !r.overlayOnly).map((r) => `${r.nav}:${r.path}`);
   assert.deepEqual(nav, [
-    'Play:/', 'Play:/coach', 'Play:/seasons', 'Play:/war', 'Play:/hunt', 'Play:/raids', 'Play:/dungeons', 'Play:/crafters', 'Play:/requests', 'Play:/partners', 'Play:/board',
-    'Guild:/roster', 'Guild:/recruiting', 'Guild:/digest', 'Guild:/bank', 'Guild:/store', 'Guild:/donate', 'Guild:/prices', 'Guild:/deals', 'Guild:/drives', 'Guild:/loot', 'Guild:/guild-settings',
-    'Officers:/admin',
-    'App:/addon', 'App:/settings', 'App:/updates', 'App:/releases',
+    'Camp:/', 'Camp:/board', 'Camp:/digest', 'Camp:/seasons',
+    'Coach:/coach',
+    'War:/war', 'War:/hunt',
+    'Raids:/raids', 'Raids:/dungeons', 'Raids:/loot',
+    'Professions:/crafters', 'Professions:/requests',
+    'Bank:/bank', 'Bank:/store', 'Bank:/donate', 'Bank:/drives', 'Bank:/prices', 'Bank:/deals',
+    'Guild:/roster', 'Guild:/partners', 'Guild:/recruiting', 'Guild:/guild-settings', 'Guild:/admin',
+    'App:/settings', 'App:/addon', 'App:/updates', 'App:/releases',
   ]);
+  // Every page sits in a section the sidebar knows, and detail pages hang under one too.
+  const ids = pages.HUBS.map((h) => h.id);
+  for (const r of pages.routes) if (r.nav || r.hub) assert.ok(ids.includes(r.nav || r.hub), r.path);
+  for (const r of pages.routes) if (r.path.includes(':')) assert.ok(r.hub && !r.nav, r.path);
   // Releases shows on a PC that can publish (publisher.status().canPublish), not by guild role.
   const releases = pages.routes.find((r) => r.path === '/releases');
   assert.ok(releases.publisher);
@@ -607,6 +615,33 @@ test('sidebar: Releases only on a PC that can publish', async () => {
   assert.ok(paths(member).includes('/guild-settings'));
   assert.ok(!paths(member).includes('/admin'));
   assert.ok(paths(owner).includes('/admin'));
+});
+
+test('sidebar: one link per section, each opening its first visible page', async () => {
+  const shell = await load('components/Shell.js');
+  const member = { isOfficer: false, isOwner: false };
+  const officer = { isOfficer: true, isOwner: false };
+  const hubs = shell.navHubs(pages.routes, pages.HUBS, member);
+  assert.deepEqual(hubs.map((h) => h.title), ['Camp', 'Coach', 'War', 'Raids & Dungeons', 'Professions', 'Bank & Market', 'Guild', 'Settings']);
+  assert.deepEqual(hubs.map((h) => h.href), ['/', '/coach', '/war', '/raids', '/crafters', '/bank', '/roster', '/settings']);
+  assert.deepEqual(hubs.filter((h) => h.foot).map((h) => h.id), ['App']);
+  const tabs = (list, id) => list.find((h) => h.id === id).tabs.map((r) => r.tab || r.title);
+  assert.deepEqual(tabs(hubs, 'Camp'), ['Today', 'Bulletin board', 'Weekly digest', 'Seasons']);
+  assert.deepEqual(tabs(hubs, 'Bank'), ['Bank', 'Store', 'Donate', 'Drives', 'Prices', 'Deal hunter']);
+  assert.deepEqual(tabs(hubs, 'Guild'), ['Roster', 'Leveling partners', 'Recruiting', 'Guild settings']);
+  assert.deepEqual(tabs(shell.navHubs(pages.routes, pages.HUBS, officer), 'Guild').at(-1), 'Officer tools');
+  // The war table opens Camp on "Now".
+  const overlay = shell.navHubs(pages.routes, pages.HUBS, member, { overlay: true });
+  assert.equal(overlay[0].href, '/overlay');
+  // Detail pages keep their section lit.
+  assert.equal(shell.hubOf(pages.routes.find((r) => r.path === '/raids/:id')), 'Raids');
+  assert.equal(shell.hubOf(pages.routes.find((r) => r.path === '/characters/:name')), 'Guild');
+  assert.equal(shell.hubOf(pages.routes.find((r) => r.path === '/welcome')), null);
+  // A section shows its pages' most urgent badge.
+  const app = hubs.find((h) => h.id === 'App');
+  assert.equal(shell.hubBadge(app, {}), null);
+  assert.equal(shell.hubBadge(app, { '/updates': '1', '/addon': '2' }), '3');
+  assert.equal(shell.hubBadge(app, { '/updates': '1', '/addon': '!' }), '!');
 });
 
 test('dev mock: the local core and main process shapes', async () => {
