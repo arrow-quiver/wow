@@ -16,6 +16,7 @@ local SECTIONS = {
     { key = "camp", label = "Today" },
     { key = "board", label = "Bulletin board", when = function() return ns.board end },
     { key = "goals", label = "Guild goals", when = function() return ns.goals end },
+    { key = "trail", label = "Getting started", when = function() return ns.trail end },
     { key = "season", label = "Leaderboard", when = function() return ns.seasons end },
   } },
   { id = "coach", label = "Coach", icon = "INV_Misc_Book_09", pages = {
@@ -201,6 +202,8 @@ function pages.camp(page)
     if latest then
       status[#status + 1] = "|cffe8a33dAddon version " .. latest .. " is out.|r " .. ns.UPDATE_HINT
     end
+    local trail = ns.trail and ns.try(ns.trail.line)
+    if trail then status[#status + 1] = "|cffe8a33d" .. trail .. "|r |cff999999Camp, Getting started has the list.|r" end
     local goal = ns.goals and ns.goals.line and ns.try(ns.goals.line)
     if goal then status[#status + 1] = "|cffe8a33d" .. goal .. ".|r" end
     local sharing = ns.Share and ns.try(ns.Share.statusLine)
@@ -608,6 +611,54 @@ function pages.board(page)
         r:Show()
       else r:Hide() end
     end
+  end
+end
+
+-- Camp › Getting started: the first things to do in the guild, ticked as they happen, each with a button to the
+-- page that does it. When all are done: one click tells the guild.
+function pages.trail(page)
+  local T = ns.trail
+  local W_ROW = PW - 40
+  local head = label(page, "", "GameFontNormalLarge"); head:SetPoint("TOPLEFT", 0, 0); head:SetWidth(W_ROW)
+  local track = ns.skin.colorTex(page, "BORDER", 1, 1, 1, 0.08); track:SetSize(W_ROW, 8); track:SetPoint("TOPLEFT", 0, -26)
+  local bar = ns.skin.colorTex(page, "ARTWORK", ns.skin.GOLD[1], ns.skin.GOLD[2], ns.skin.GOLD[3], 0.9); bar:SetHeight(8); bar:SetPoint("TOPLEFT", 0, -26)
+  page.rows = {}
+  for i = 1, #T.STEPS do
+    local r = CreateFrame("Frame", nil, page)
+    r:SetSize(W_ROW, 46); r:SetPoint("TOPLEFT", 0, -46 - (i - 1) * 50)
+    r.stripe = ns.skin.colorTex(r, "BACKGROUND", 1, 1, 1, i % 2 == 1 and 0.04 or 0); r.stripe:SetAllPoints()
+    r.tick = label(r, "", "GameFontNormalLarge"); r.tick:SetPoint("LEFT", 8, 0); r.tick:SetWidth(40)
+    r.title = label(r, "", "GameFontNormal"); r.title:SetPoint("TOPLEFT", 52, -6); r.title:SetWidth(W_ROW - 52 - 110)
+    r.why = label(r, "", "GameFontHighlightSmall"); r.why:SetPoint("TOPLEFT", 52, -26); r.why:SetWidth(W_ROW - 52 - 110)
+    r.btn = button(r, "Go there", 90); r.btn:SetPoint("RIGHT", -6, 0)
+    page.rows[i] = r
+  end
+  local tell = button(page, "Tell the guild I'm done", 200); tell:SetPoint("BOTTOMLEFT", 0, 18)
+  local hide = button(page, "Hide the reminder on Today", 210); hide:SetPoint("LEFT", tell, "RIGHT", 8, 0)
+  local status = label(page, "", "GameFontHighlightSmall"); status:SetPoint("BOTTOMLEFT", 0, 0); status:SetWidth(W_ROW)
+  tell:SetScript("OnClick", function()
+    status:SetText(T.announce() and "Told the guild. An officer can promote you from here." or "Couldn't post that in guild chat right now.")
+    page.refresh(true)
+  end)
+  hide:SetScript("OnClick", function() T.hide(true); status:SetText("Hidden. This page stays here."); page.refresh(true) end)
+  page.tell, page.hide, page.status = tell, hide, status
+  page.refresh = function(keepStatus)
+    if not keepStatus then status:SetText("") end
+    local steps, n, all = T.state()
+    head:SetText(all and "You're all set. Welcome to the pack!" or string.format("Getting started: %d of %d done", n, #steps))
+    bar:SetWidth(math.max(1, math.floor(W_ROW * n / #steps)))
+    for i, r in ipairs(page.rows) do
+      local s = steps[i]
+      r.tick:SetText(s.done and "|cff40bf40Done|r" or "|cff999999" .. i .. "|r")
+      r.title:SetText(s.title)
+      r.title:SetTextColor(s.done and 0.6 or 1, s.done and 0.6 or 0.82, s.done and 0.6 or 0)
+      r.why:SetText(s.why)
+      r.btn:SetScript("OnClick", function() W.show(s.page) end)
+      if s.done then r.btn:Hide() else r.btn:Show() end
+      r.done = s.done
+    end
+    if all and not (ns.db.trail and ns.db.trail.told) then tell:Show() else tell:Hide() end
+    if not all and not (ns.db.trail and ns.db.trail.hidden) then hide:Show() else hide:Hide() end
   end
 end
 
