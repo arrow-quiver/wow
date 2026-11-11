@@ -94,6 +94,55 @@ function SE.board()
   return rows, s
 end
 
+-- Last month's season in short (the app's `last`), or nil: { month, mvp = { name, score }, leaders, players, gold,
+-- kills, crafts, raids }.
+function SE.last()
+  local s = SE.data()
+  local l = s and s.last
+  if type(l) ~= "table" or type(l.mvp) ~= "table" or type(l.mvp.name) ~= "string" then return nil end
+  return l
+end
+
+local MONTHS = { "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December" }
+local function monthOnly(m)
+  local mo = tonumber(string.match(tostring(m or ""), "^%d+%-(%d+)$"))
+  return (mo and MONTHS[mo]) or tostring(m or "last month")
+end
+
+-- "October's season: MVP Jainah (1000 points) · Quartermaster Jainah · Warlord Grom", or nil.
+function SE.recapLine()
+  local l = SE.last()
+  if not l then return nil end
+  local parts = { string.format("MVP %s (%d points)", l.mvp.name, l.mvp.score or 0) }
+  for _, x in ipairs(type(l.leaders) == "table" and l.leaders or {}) do parts[#parts + 1] = string.format("%s %s", tostring(x.title), tostring(x.name)) end
+  return string.format("%s's season: %s", monthOnly(l.month), table.concat(parts, " · "))
+end
+
+-- "The guild together: 1240g given · 86 kills · 31 crafts · 12 raids, by 9 guildies", or nil.
+function SE.togetherLine()
+  local l = SE.last()
+  if not l then return nil end
+  local did = {}
+  if (l.gold or 0) > 0 then did[#did + 1] = l.gold .. "g given" end
+  if (l.kills or 0) > 0 then did[#did + 1] = l.kills .. " kills" end
+  if (l.crafts or 0) > 0 then did[#did + 1] = l.crafts .. " crafts" end
+  if (l.raids or 0) > 0 then did[#did + 1] = l.raids .. " raid sign-ins" end
+  if #did == 0 then return nil end
+  return string.format("The guild together: %s, by %d %s", table.concat(did, " · "), l.players or 0, (l.players or 0) == 1 and "guildie" or "guildies")
+end
+
+-- In chat, once for each finished season (the first login after the app has it). → true when it printed.
+function SE.announceLast()
+  if ns.opt("loginNews") == false then return false end
+  local l = SE.last()
+  if not l or ns.db.recapSeen == l.month then return false end
+  ns.db.recapSeen = l.month
+  ns.print(GOLD .. SE.recapLine() .. "|r")
+  local together = SE.togetherLine()
+  if together then ns.print(together .. ". A new season is on: /wow season.") end
+  return true
+end
+
 -- /wow season: the top five and me.
 function SE.slash()
   local s = SE.data()
@@ -120,4 +169,7 @@ function SE.slash()
   end
 end
 
-ns.on("PLAYER_LOGIN", function() ns.safely(SE.hook) end)
+ns.on("PLAYER_LOGIN", function()
+  ns.safely(SE.hook)
+  if ns.after then ns.after(12, SE.announceLast) end
+end)

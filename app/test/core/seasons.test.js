@@ -71,6 +71,17 @@ test('points, titles and the MVP for a month; streak bonus; the hall of fame', a
   // The announcement text.
   const text = S.announceText(S.season(h.db, h.g.guildId, { month: '2026-10', now }));
   assert.match(text, /^🏆 \*\*October 2026 season: the winners\*\*\n👑 MVP: \*\*Jainah\*\* with 1000 points\n💰 Quartermaster: \*\*Jainah\*\* \(1,000g given\)/);
+  // The recap: what the guild did together.
+  assert.match(text, /\n📊 The guild together: .*given.*, by \d+ guildies?\n/);
+  assert.match(text, /Thank you all\. A new season starts now!$/);
+  const rc = S.recap(S.season(h.db, h.g.guildId, { month: '2026-10', now }));
+  assert.ok(rc.players >= 1 && rc.gold >= 1000);
+  // Last month in short goes to the addon while this month runs (the test's "now" is in November 2026).
+  const last = S.lastSeason(h.db, h.g.guildId, now);
+  assert.strictEqual(last.month, '2026-10');
+  assert.strictEqual(last.mvp.name, 'Jainah');
+  assert.strictEqual(last.leaders[0].title, 'Quartermaster');
+  assert.strictEqual(S.inboxPart(h.db, h.g.guildId, now).last.mvp.name, 'Jainah');
 });
 
 test('streaks and badges', () => {

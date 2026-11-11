@@ -794,6 +794,8 @@ function pages.season(page)
     r:Hide()
     page.rows[i] = r
   end
+  local last = label(page, "", "GameFontDisableSmall"); last:SetPoint("BOTTOMLEFT", 0, 32); last:SetWidth(W_ROW)
+  page.last = last
   local leaders = label(page, "", "GameFontHighlightSmall"); leaders:SetPoint("BOTTOMLEFT", 0, 16); leaders:SetWidth(W_ROW)
   local foot = label(page, "", "GameFontDisableSmall"); foot:SetPoint("BOTTOMLEFT", 0, 0); foot:SetWidth(W_ROW)
   page.head, page.empty, page.leaders, page.foot = head, empty, leaders, foot
@@ -832,6 +834,7 @@ function pages.season(page)
       parts[#parts + 1] = string.format("|cffe8a33d%s|r %s", tostring(l.title), tostring(l.name))
     end
     leaders:SetText(table.concat(parts, "   "))
+    last:SetText(ns.seasons.recapLine and ns.seasons.recapLine() or "")
     local total = s and tonumber(s.count) or #rows
     local where = mineAt and string.format("You're #%d of %d.", rows[mineAt].rank, total)
       or (#rows > 0 and "You're not on the board yet: give to the guild bank, fill a crafting request, raid or fight in the open world." or "")
