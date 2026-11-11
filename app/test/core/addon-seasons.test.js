@@ -115,3 +115,38 @@ test('Leaderboard page: an older app (no board) still shows ranks from the toolt
   assert.ok(none.texts().some((x) => /No standings yet/.test(x)));
   assert.strictEqual(none.eval('tostring(WowGuildWindow.pages.season.rows[1]:IsShown())'), 'false');
 });
+
+// ---------------------------------------------------------------- last season's recap
+
+const LAST = `WowGuildInbox = WowGuildInbox or {}
+WowGuildInbox.seasons = { month = "2026-11", daysLeft = 19, count = 1, players = { Thrallia = { title = "", rank = 1, score = 5, streak = 0, badges = 0, best = "" } },
+  board = { { rank = 1, name = "Thrallia", score = 5 } }, leaders = {},
+  last = { month = "2026-10", mvp = { name = "Jainah", score = 1000 }, players = 9, gold = 1240, kills = 86, crafts = 31, raids = 12,
+    leaders = { { title = "Quartermaster", name = "Jainah", value = 1000, unit = "gold" }, { title = "Warlord", name = "Grommash", value = 40, unit = "kills" } } } }`;
+
+test('last season: the recap lines, once in chat for each finished season, and on the Leaderboard page', () => {
+  const wow = new WowClient();
+  wow.login();
+  wow.exec(LAST);
+  wow.clearOutput();
+  assert.strictEqual(wow.eval('__ns.seasons.recapLine()'), "October's season: MVP Jainah (1000 points) · Quartermaster Jainah · Warlord Grommash");
+  assert.strictEqual(wow.eval('__ns.seasons.togetherLine()'), 'The guild together: 1240g given · 86 kills · 31 crafts · 12 raid sign-ins, by 9 guildies');
+  assert.strictEqual(wow.eval('tostring(__ns.seasons.announceLast())'), 'true');
+  assert.match(wow.printed(), /October's season: MVP Jainah \(1000 points\)/);
+  assert.match(wow.printed(), /The guild together: 1240g given .* A new season is on: \/wow season\./);
+  wow.clearOutput();
+  assert.strictEqual(wow.eval('tostring(__ns.seasons.announceLast())'), 'false', 'once per season');
+  assert.strictEqual(wow.printed(), '');
+  assert.strictEqual(wow.db().recapSeen, '2026-10');
+  // On the page.
+  wow.exec('__ns.ui.show("season")');
+  assert.strictEqual(wow.eval('WowGuildWindow.pages.season.last:GetText()'), "October's season: MVP Jainah (1000 points) · Quartermaster Jainah · Warlord Grommash");
+  // With login news switched off nothing is printed; with no last season there is nothing to say.
+  wow.exec('WowGuildDB.recapSeen = nil; WowGuildDB.options.loginNews = false');
+  assert.strictEqual(wow.eval('tostring(__ns.seasons.announceLast())'), 'false');
+  wow.exec('WowGuildDB.options.loginNews = true; WowGuildInbox.seasons.last = nil; __ns.ui.show("season")');
+  assert.strictEqual(wow.eval('tostring(__ns.seasons.recapLine())'), 'nil');
+  assert.strictEqual(wow.eval('tostring(__ns.seasons.announceLast())'), 'false');
+  assert.strictEqual(wow.eval('WowGuildWindow.pages.season.last:GetText()'), '');
+  assert.strictEqual(wow.eval('__ns.debugError'), null, 'no addon errors');
+});

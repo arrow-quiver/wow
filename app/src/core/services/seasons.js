@@ -191,6 +191,31 @@ function hall(db, guildId, { months = 6, now = Date.now() } = {}) {
   return out;
 }
 
+// What the whole guild did in a season, for the month-end recap: totals, how many took part, the longest streak.
+function recap(s) {
+  const sum = (f) => s.players.reduce((n, p) => n + (f(p) || 0), 0);
+  const streak = [...s.players].sort((a, b) => b.streak - a.streak || a.rank - b.rank)[0];
+  return {
+    players: s.players.length,
+    gold: Math.round(sum((p) => p.gold)), kills: sum((p) => p.kills), crafts: sum((p) => p.crafts), raids: sum((p) => p.raids),
+    streak: streak && streak.streak >= 2 ? { name: streak.name, weeks: streak.streak } : null,
+  };
+}
+
+// Last month's season in short, for the addon's Leaderboard page and its first-week-of-the-month login line.
+function lastSeason(db, guildId, now = Date.now()) {
+  const d = new Date(now);
+  const prev = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - 1, 1));
+  const s = season(db, guildId, { month: `${prev.getUTCFullYear()}-${pad(prev.getUTCMonth() + 1)}`, now });
+  if (!s.mvp) return null;
+  const r = recap(s);
+  return {
+    month: s.month, mvp: { name: s.mvp.name, score: s.mvp.score },
+    leaders: s.categories.filter((c) => s.leaders[c.id]).map((c) => ({ title: c.title, name: s.leaders[c.id].name, value: Math.round(s.leaders[c.id].value), unit: c.unit })),
+    players: r.players, gold: r.gold, kills: r.kills, crafts: r.crafts, raids: r.raids,
+  };
+}
+
 // For the addon: titles and badges by character name (every character of each player).
 function inboxPart(db, guildId, now = Date.now()) {
   const s = season(db, guildId, { now });
@@ -213,7 +238,8 @@ function inboxPart(db, guildId, now = Date.now()) {
     gold: Math.round(p.gold), kills: p.kills, crafts: p.crafts, raids: p.raids,
   }));
   const leaders = s.categories.filter((c) => s.leaders[c.id]).map((c) => ({ title: c.title, name: s.leaders[c.id].name, value: Math.round(s.leaders[c.id].value), unit: c.unit }));
-  return { month: s.month, daysLeft: s.daysLeft, count: s.players.length, players: out, board, leaders };
+  const last = lastSeason(db, guildId, now);
+  return { month: s.month, daysLeft: s.daysLeft, count: s.players.length, players: out, board, leaders, ...(last ? { last } : {}) };
 }
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -232,6 +258,11 @@ function announceText(s) {
   }
   const top = s.players.slice(1, 5).map((p) => `${clean(p.name)} ${p.score}`);
   if (top.length) lines.push(`Also on the board: ${top.join(' · ')}`);
+  // The guild together, and the longest streak.
+  const r = recap(s);
+  const did = [r.gold > 0 && `${fmtGold(r.gold)} given`, r.kills > 0 && `${r.kills} kills`, r.crafts > 0 && `${r.crafts} crafts`, r.raids > 0 && `${r.raids} raid sign-ins`].filter(Boolean);
+  if (did.length) lines.push(`📊 The guild together: ${did.join(' · ')}, by ${r.players} ${r.players === 1 ? 'guildie' : 'guildies'}`);
+  if (r.streak) lines.push(`🔥 Longest streak: **${clean(r.streak.name)}**, ${r.streak.weeks} weeks in a row`);
   lines.push('Thank you all. A new season starts now!');
   return lines.join('\n');
 }
@@ -247,6 +278,6 @@ function fmtGoldCopper(c) {
 const badgeText = (name, badge) => `🏅 **${clean(name)}** earned the **${badge.name}** badge!`;
 
 module.exports = {
-  season, hall, badgesOf, lifetimePoints, inboxPart, events, members, announceText, donationText, badgeText, monthOf, bounds,
+  season, hall, recap, lastSeason, badgesOf, lifetimePoints, inboxPart, events, members, announceText, donationText, badgeText, monthOf, bounds,
   POINTS, CATEGORIES, BADGES, STREAK_STEP, STREAK_MAX, _bestStreak: bestStreak, _streakOf: streakOf, _weekOf: weekOf,
 };
