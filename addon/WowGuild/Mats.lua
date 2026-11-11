@@ -107,7 +107,8 @@ local function whisper(text, to)
   return send and pcall(send, text, "WHISPER", nil, to) or false
 end
 
-function MM.show()
+-- Rows for a list: { text, button = { "Whisper", fn } }. One whisper per click.
+function MM.rows()
   local m = MM.matches()
   local rows = {}
   for _, h in ipairs(m.have) do
@@ -120,6 +121,11 @@ function MM.show()
       whisper(string.format("Hi %s! I can make %s for you. Send me the mats or tell me what you've got.", c.who, c.item), c.who)
     end } }
   end
+  return rows
+end
+
+function MM.show()
+  local rows = MM.rows()
   if #rows == 0 then ns.print("No mats or crafts wanted that you can help with right now."); return 0 end
   if ns.helpers and ns.helpers.show then ns.helpers.show("Mats and crafts wanted", "Guildies you can help, from what you hold and can make", rows) end
   return #rows

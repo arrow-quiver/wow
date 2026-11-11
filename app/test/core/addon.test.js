@@ -458,7 +458,7 @@ test('Settings tab: options apply immediately, app link and update notice shown'
   assert.strictEqual(text(wow, 'WowGuildMinimapButton:IsShown()'), 'true');
   // Every option has a box, in the same order as the Blizzard options panel.
   assert.strictEqual(wow.eval(`#${page}.boxes`), wow.eval('#__ns.OPTION_LIST'));
-  assert.strictEqual(wow.eval('#__ns.OPTION_LIST'), '25');
+  assert.strictEqual(wow.eval('#__ns.OPTION_LIST'), '26');
   wow.exec('__ns.optionsPanel.scripts.OnShow()');
   assert.strictEqual(text(wow, '__ns.optionsPanel.boxes[2]:GetChecked()'), 'true');
   wow.exec('__ns.optionsPanel.boxes[2]:SetChecked(false); __click(__ns.optionsPanel.boxes[2])');
@@ -536,15 +536,146 @@ test('guild style by default: dark-and-gold window with text tabs, first-run wel
   noError(wow);
 });
 
-test('window uses the Blizzard frame and bottom tabs when that style is picked', () => {
+test('window uses the Blizzard frame, with the same rail and tabs, when that style is picked', () => {
   const wow = uiClient();
   wow.exec('__ns.db.options.blizzardStyle = true; __ns.ui.show("guild")');
   assert.strictEqual(wow.eval('tostring(WowGuildWindow.native)'), 'true');
-  assert.strictEqual(wow.eval('tostring(WowGuildWindow.bottomTabs)'), 'true');
-  assert.strictEqual(wow.eval('WowGuildWindow.selectedTab'), '5');
+  assert.strictEqual(wow.eval('tostring(WowGuildWindow.bottomTabs)'), 'false');
+  assert.strictEqual(wow.eval('tostring(WowGuildWindow.rail.guild.on)'), 'true');
+  assert.strictEqual(wow.eval('tostring(WowGuildWindow.tabs.guild.on)'), 'true');
   assert.match(wow.eval('WowGuildWindow.TitleText:GetText()'), /Guild Camp {2}\|cff999999wow\|r/);
   wow.exec('__ns.ui.show("nonsense")');
   assert.strictEqual(text(wow, '__ns.ui.current'), 'camp', 'an unknown tab falls back to Camp');
+  noError(wow);
+});
+
+// ---------------------------------------------------------------- one window: sections and their pages
+
+test('the window has a rail of sections; each section\'s pages are its tabs', () => {
+  const wow = uiClient();
+  wow.exec('__ns.ui.show()');
+  assert.deepStrictEqual(wow.get('(function() local t = {} for _, s in ipairs(__ns.ui.SECTIONS) do t[#t + 1] = s.label end return t end)()'),
+    ['Camp', 'Coach', 'War', 'Raids & Dungeons', 'Professions', 'Market', 'Guild', 'Settings']);
+  // Every section is on the rail and every page opens without an error.
+  const keys = wow.get('(function() local t = {} for _, s in ipairs(__ns.ui.SECTIONS) do for _, p in ipairs(s.pages) do t[#t + 1] = s.id .. ":" .. p.key end end return t end)()');
+  assert.deepStrictEqual(keys, ['camp:camp', 'camp:board', 'camp:season', 'coach:coach', 'war:cta', 'war:hunt', 'war:near',
+    'dungeons:raids', 'dungeons:groups', 'dungeons:quests', 'prof:prof', 'prof:mats', 'market:deals', 'market:alerts',
+    'guild:guild', 'guild:recruit', 'settings:settings']);
+  for (const k of keys) {
+    const [section, page] = k.split(':');
+    wow.exec(`__ns.ui.show(${toLua(page)})`);
+    assert.strictEqual(text(wow, '__ns.ui.current'), page, `${page} opens`);
+    assert.strictEqual(text(wow, '__ns.ui.section'), section);
+    assert.strictEqual(text(wow, `WowGuildWindow.pages[${toLua(page)}]:IsShown()`), 'true');
+    assert.strictEqual(text(wow, `WowGuildWindow.rail[${toLua(section)}].on`), 'true', `${section} is lit for ${page}`);
+    assert.strictEqual(text(wow, `WowGuildWindow.tabs[${toLua(page)}].on`), 'true');
+  }
+  noError(wow);
+  // Only the open section's tabs show, and a section with one page shows none.
+  wow.exec('__ns.ui.show("hunt")');
+  assert.strictEqual(text(wow, 'WowGuildWindow.tabs.cta:IsShown()'), 'true');
+  assert.strictEqual(text(wow, 'WowGuildWindow.tabs.near:IsShown()'), 'true');
+  assert.strictEqual(text(wow, 'WowGuildWindow.tabs.raids:IsShown()'), 'false');
+  wow.exec('__ns.ui.show("coach")');
+  assert.strictEqual(text(wow, 'WowGuildWindow.tabs.coach:IsShown()'), 'false');
+  assert.strictEqual(text(wow, 'WowGuildWindow.tabs.hunt:IsShown()'), 'false');
+  // The rail opens a section on its first page, then on the page it showed last.
+  wow.click('WowGuildWindow.rail.war');
+  assert.strictEqual(text(wow, '__ns.ui.current'), 'hunt', 'back where I left it');
+  wow.click('WowGuildWindow.rail.market');
+  assert.strictEqual(text(wow, '__ns.ui.current'), 'alerts');
+  wow.click('WowGuildWindow.tabs.deals');
+  assert.strictEqual(text(wow, '__ns.ui.current'), 'deals');
+  wow.click('WowGuildWindow.rail.dungeons');
+  assert.strictEqual(text(wow, '__ns.ui.current'), 'quests');
+  noError(wow);
+});
+
+test('/wow <section> opens the window there; the old commands still do what they did', () => {
+  const wow = uiClient();
+  for (const [cmd, page] of [['dungeons', 'raids'], ['market', 'deals'], ['prof', 'prof'], ['guild', 'guild'], ['hunt', 'hunt'], ['raids', 'raids'], ['camp', 'camp'], ['settings', 'settings']]) {
+    wow.slash(cmd);
+    assert.strictEqual(text(wow, '__ns.ui.current'), page, `/wow ${cmd}`);
+  }
+  wow.exec('WowGuildWindow:Hide()');
+  wow.clearOutput();
+  wow.slash('kos');
+  assert.match(wow.printed(), /kill on sight/i, '/wow kos still answers in chat');
+  assert.strictEqual(text(wow, 'WowGuildWindow:IsShown()'), 'false');
+  wow.clearOutput();
+  wow.slash('help');
+  assert.match(wow.printed(), /\/wow camp \| dungeons \| raids \| hunt \| prof \| market \| guild \| settings/);
+  noError(wow);
+});
+
+test('pages show what the commands print, without printing it', () => {
+  const wow = uiClient();
+  wow.clearOutput();
+  wow.exec('__ns.ui.show("hunt")');
+  assert.ok(wow.texts().some((t) => /kill on sight/i.test(t) && /bounties/i.test(t)), 'the hunt page has both lists');
+  wow.exec('__ns.ui.show("board"); __ns.ui.show("season"); __ns.ui.show("groups"); __ns.ui.show("alerts")');
+  assert.strictEqual(wow.printed(), '', 'nothing went to chat');
+  // ns.print is back to normal afterwards, also when the command fails.
+  wow.exec('pcall(__ns.ui.capture, function() error("boom") end); __ns.print("still here")');
+  assert.match(wow.printed(), /still here/);
+  assert.strictEqual(wow.eval('__ns.ui.capture(function() __ns.print("a"); __ns.print("b") end)'), 'a\nb');
+  // The dungeon quests page lists the dungeons it knows, then the one asked for.
+  wow.exec('__ns.ui.show("quests")');
+  assert.ok(wow.texts().some((t) => /Dungeons with a checklist/.test(t)));
+  noError(wow);
+});
+
+test('opening the window lands on what you\'re doing, once per situation', () => {
+  const wow = uiClient();
+  wow.exec('__ns.ui.show("guild"); WowGuildWindow:Hide()');
+  wow.exec('WowGuild_Toggle()');
+  assert.strictEqual(text(wow, '__ns.ui.current'), 'guild', 'nothing going on: where I left it');
+  // At the auction house: the Deal hunter.
+  wow.exec('WowGuildWindow:Hide(); AuctionHouseFrame = { IsShown = function() return true end }; WowGuild_Toggle()');
+  assert.strictEqual(text(wow, '__ns.ui.current'), 'deals');
+  // I pick another page: it stays there while I'm still at the auction house.
+  wow.exec('__ns.ui.show("prof"); WowGuildWindow:Hide(); WowGuild_Toggle()');
+  assert.strictEqual(text(wow, '__ns.ui.current'), 'prof');
+  // In a dungeon: its quests. In a raid: the raids page.
+  wow.exec('AuctionHouseFrame = nil; function IsInInstance() return true, "party" end; WowGuildWindow:Hide(); WowGuild_Toggle()');
+  assert.strictEqual(text(wow, '__ns.ui.current'), 'quests');
+  wow.exec('function IsInInstance() return true, "raid" end; WowGuildWindow:Hide(); WowGuild_Toggle()');
+  assert.strictEqual(text(wow, '__ns.ui.current'), 'raids');
+  // A guildmate's call to arms in the last ten minutes; my own doesn't count.
+  wow.exec('function IsInInstance() return false end; __ns.ctaRecent = { { zone = "Ashenvale", at = time() - 60, character = "Mokra" } }; WowGuildWindow:Hide(); WowGuild_Toggle()');
+  assert.strictEqual(text(wow, '__ns.ui.current'), 'cta');
+  wow.exec('__ns.ui.show("camp"); __ns.ui.lastContext = nil; __ns.ctaRecent = { { zone = "Ashenvale", at = time() - 60, mine = true } }; WowGuildWindow:Hide(); WowGuild_Toggle()');
+  assert.strictEqual(text(wow, '__ns.ui.current'), 'camp');
+  // Switched off in the settings: always where I left it.
+  wow.exec('__ns.db.options.smartOpen = false; AuctionHouseFrame = { IsShown = function() return true end }; WowGuildWindow:Hide(); WowGuild_Toggle()');
+  assert.strictEqual(text(wow, '__ns.ui.current'), 'camp');
+  noError(wow);
+});
+
+test('Settings: options in groups with a description, a search box and the window size', () => {
+  const wow = uiClient();
+  wow.exec('__ns.ui.show("settings")');
+  const page = 'WowGuildWindow.pages.settings';
+  // Every option has a group and a description.
+  assert.strictEqual(wow.eval('(function() for _, o in ipairs(__ns.OPTION_LIST) do if not o.group or not o.desc or o.desc == "" then return o.key end end return "ok" end)()'), 'ok');
+  assert.strictEqual(wow.eval(`${page}.matches`), '26');
+  const shown = () => wow.get(`(function() local t = {} for _, cb in ipairs(${page}.boxes) do if cb:IsShown() then t[#t + 1] = cb.key end end return t end)()`) || [];
+  wow.exec(`${page}.search:SetText("auction"); ${page}.search.scripts.OnTextChanged(${page}.search)`);
+  assert.ok(shown().includes('dealsPanel') && shown().includes('ahTab') && shown().includes('priceAlerts'));
+  assert.ok(!shown().includes('warMap'));
+  assert.strictEqual(text(wow, `${page}.groups.War:IsShown()`), 'false', 'a group with no match hides its heading');
+  wow.exec(`${page}.search:SetText("zzz"); ${page}.search.scripts.OnTextChanged(${page}.search)`);
+  assert.strictEqual(wow.eval(`${page}.matches`), '0');
+  assert.ok(wow.texts().includes('Nothing matches.'));
+  wow.exec(`${page}.search:SetText(""); ${page}.search.scripts.OnTextChanged(${page}.search)`);
+  assert.strictEqual(shown().length, 26);
+  // Window size: 80% to 130%, remembered.
+  wow.click(`${page}.larger`);
+  assert.strictEqual(wow.eval('string.format("%.1f", WowGuildDB.ui.scale)'), '1.1');
+  for (let i = 0; i < 6; i += 1) wow.click(`${page}.larger`);
+  assert.strictEqual(wow.eval('string.format("%.1f", WowGuildDB.ui.scale)'), '1.3');
+  for (let i = 0; i < 9; i += 1) wow.click(`${page}.smaller`);
+  assert.strictEqual(wow.eval('string.format("%.1f", WowGuildDB.ui.scale)'), '0.8');
   noError(wow);
 });
 
