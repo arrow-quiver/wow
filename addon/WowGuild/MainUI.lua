@@ -31,6 +31,7 @@ local SECTIONS = {
   { id = "dungeons", label = "Raids & Dungeons", icon = "INV_Misc_Key_03", pages = {
     { key = "raids", label = "Raids" },
     { key = "groups", label = "Dungeon groups", when = function() return ns.lfg end },
+    { key = "premades", label = "PvP premades", when = function() return ns.lfg and ns.lfg.newPremade end },
     { key = "quests", label = "Dungeon quests", when = function() return ns.dungeonQuests end },
   } },
   { id = "prof", label = "Professions", icon = "Trade_BlackSmithing", pages = {
@@ -1087,7 +1088,8 @@ end
 -- Raids & Dungeons › Dungeon groups: the guild's open groups with their line-up. Join as tank, healer or dps,
 -- leave, and for my own group: invite everyone, mark it done, call it off. Start one from the bottom row.
 local GROUP_ROWS = 5
-function pages.groups(page)
+-- `premade` makes it the PvP premades page: groups with more than five spots, a 10 or 15 start row, Won and Lost.
+local function groupsPage(page, premade)
   local L = ns.lfg
   local W_ROW = PW - 40
   local head = label(page, "", "GameFontNormal"); head:SetPoint("TOPLEFT", 0, 0); head:SetWidth(W_ROW)
@@ -1121,19 +1123,27 @@ function pages.groups(page)
     end
   end
 
-  local nl = label(page, "Start a group: the dungeon, then your role", "GameFontNormalSmall"); nl:SetPoint("BOTTOMLEFT", 0, 62)
-  local dungeon = editbox(page, 200); dungeon:SetPoint("BOTTOMLEFT", 6, 34)
+  local nl = label(page, premade and "Start a premade: the battleground, how many, then your role" or "Start a group: the dungeon, then your role", "GameFontNormalSmall"); nl:SetPoint("BOTTOMLEFT", 0, 62)
+  local dungeon = editbox(page, premade and 150 or 200); dungeon:SetPoint("BOTTOMLEFT", 6, 34)
+  local size = 15
+  local sizeBtn
+  if premade then
+    dungeon:SetText("Darkspear Islands")
+    sizeBtn = button(page, "15 players", 90); sizeBtn:SetPoint("LEFT", dungeon, "RIGHT", 10, 0)
+    sizeBtn:SetScript("OnClick", function() size = size == 15 and 10 or 15; sizeBtn:SetText(size .. " players") end)
+    page.size = sizeBtn
+  end
   page.start = {}
-  local prev = dungeon
+  local prev = sizeBtn or dungeon
   for k, role in ipairs({ "tank", "healer", "dps" }) do
-    local btn = button(page, role == "dps" and "As DPS" or ("As " .. role), 84)
+    local btn = button(page, role == "dps" and "As DPS" or ("As " .. role), premade and 78 or 84)
     btn:SetPoint("LEFT", prev, "RIGHT", k == 1 and 12 or 6, 0)
     btn:SetScript("OnClick", function()
       local d = dungeon:GetText() or ""
-      if d == "" then status:SetText("Type the dungeon first."); return end
+      if d == "" then status:SetText(premade and "Type the battleground first." or "Type the dungeon first."); return end
       local ok = false
-      status:SetText(capture(function() ok = L.new(role .. " " .. d) end))
-      if ok then dungeon:SetText("") end
+      status:SetText(capture(function() if premade then ok = L.newPremade(role, d, size) else ok = L.new(role .. " " .. d) end end))
+      if ok and not premade then dungeon:SetText("") end
       page.refresh(true)
     end)
     page.start[role] = btn
@@ -1141,15 +1151,24 @@ function pages.groups(page)
   end
   local find = button(page, "Find players", 110); find:SetPoint("LEFT", prev, "RIGHT", 14, 0)
   find:SetScript("OnClick", function() if ns.finder then ns.finder.show((dungeon:GetText() or "") ~= "" and dungeon:GetText() or nil) end end)
+  if premade then find:Hide() end
   status = label(page, "", "GameFontHighlightSmall"); status:SetPoint("BOTTOMLEFT", 0, 0); status:SetWidth(W_ROW)
   page.dungeon, page.find, page.status = dungeon, find, status
 
   page.refresh = function(keepStatus)
     if not keepStatus then status:SetText("") end
-    local groups = L.groups()
+    local groups = {}
+    for _, e in ipairs(L.groups()) do
+      if (L.isPremade(e.rec.fields) and true or false) == (premade and true or false) then groups[#groups + 1] = e end
+    end
     L.last = groups -- the row number is the number L.join, L.leave and L.finish take
-    head:SetText(#groups == 0 and "No guild dungeon groups right now. Start one below." or
-      string.format("%d open %s", #groups, #groups == 1 and "group" or "groups") .. (#groups > GROUP_ROWS and string.format("  |cff999999showing the next %d|r", GROUP_ROWS) or ""))
+    local tally = ""
+    if premade then
+      local won, lost = L.results()
+      if won + lost > 0 then tally = string.format("  |cff999999last 30 days:|r |cff40bf40%d won|r, |cffff4040%d lost|r", won, lost) end
+    end
+    head:SetText((#groups == 0 and (premade and "No premades forming right now. Start one below." or "No guild dungeon groups right now. Start one below.") or
+      string.format("%d open %s", #groups, premade and (#groups == 1 and "premade" or "premades") or (#groups == 1 and "group" or "groups")) .. (#groups > GROUP_ROWS and string.format("  |cff999999showing the next %d|r", GROUP_ROWS) or "")) .. tally)
     for i, r in ipairs(page.rows) do
       local e = groups[i]
       if e then
@@ -1157,12 +1176,20 @@ function pages.groups(page)
         r.title:SetText(string.format("%s  |cff999999%s|r  %s", tostring(f.dungeon or "?"), L.whenText(f.startsAt), L.needText(e.g.open) == "full" and "|cff999999full|r" or ("|cffe8a33d" .. L.needText(e.g.open) .. "|r")))
         local names = { string.format("%s (%s)", tostring(f.character or "?"), L.ROLE_NAME[f.role] or "dps") }
         for _, m in ipairs(e.g.members) do names[#names + 1] = string.format("%s (%s)%s", tostring(m.character), L.ROLE_NAME[m.role] or "dps", m.guest and "*" or "") end
+        -- A premade's line-up is too long for a row: show how many are in and the first few.
+        if premade and #names > 4 then names = { string.format("%d in: %s, %s, %s and %d more", #names, names[1], names[2], names[3], #names - 3) } end
         local wait = #e.g.waiting > 0 and string.format("  |cff999999+%d waiting|r", #e.g.waiting) or ""
         r.who:SetText(table.concat(names, ", ") .. wait .. ((f.note and f.note ~= "") and ("  |cff999999" .. tostring(f.note) .. "|r") or ""))
         if e.mine then
-          setButtons(r, { { "Invite all", function() L.last = groups; say(L.inviteGroup, i) end },
-            { "Done", function() L.last = groups; say(L.finish, i, "d") end },
-            { "Call off", function() L.last = groups; say(L.finish, i, "x") end } })
+          if premade then
+            setButtons(r, { { "Invite all", function() L.last = groups; say(L.inviteGroup, i) end },
+              { "Won", function() L.last = groups; say(L.finish, i, "d", "Won") end },
+              { "Lost", function() L.last = groups; say(L.finish, i, "d", "Lost") end } })
+          else
+            setButtons(r, { { "Invite all", function() L.last = groups; say(L.inviteGroup, i) end },
+              { "Done", function() L.last = groups; say(L.finish, i, "d") end },
+              { "Call off", function() L.last = groups; say(L.finish, i, "x") end } })
+          end
         elseif e.joined then
           r.who:SetText(r.who:GetText() .. (e.joined.waiting and "  |cffe8a33dYou're waiting.|r" or "  |cff40bf40You're in.|r"))
           setButtons(r, { nil, nil, { "Leave", function() L.last = groups; say(L.leave, i) end } })
@@ -1177,6 +1204,9 @@ function pages.groups(page)
     end
   end
 end
+
+function pages.groups(page) groupsPage(page, false) end
+function pages.premades(page) groupsPage(page, true) end
 
 -- Raids & Dungeons › Dungeon quests: the checklist for a dungeon (the one I'm in when the box is empty), with who
 -- else in my group has each quest.
