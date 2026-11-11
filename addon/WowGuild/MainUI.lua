@@ -15,6 +15,7 @@ local SECTIONS = {
   { id = "camp", label = "Camp", icon = "Spell_Fire_Fire", pages = {
     { key = "camp", label = "Today" },
     { key = "board", label = "Bulletin board", when = function() return ns.board end },
+    { key = "goals", label = "Guild goals", when = function() return ns.goals end },
     { key = "season", label = "Leaderboard", when = function() return ns.seasons end },
   } },
   { id = "coach", label = "Coach", icon = "INV_Misc_Book_09", pages = {
@@ -199,6 +200,8 @@ function pages.camp(page)
     if latest then
       status[#status + 1] = "|cffe8a33dAddon version " .. latest .. " is out.|r " .. ns.UPDATE_HINT
     end
+    local goal = ns.goals and ns.goals.line and ns.try(ns.goals.line)
+    if goal then status[#status + 1] = "|cffe8a33d" .. goal .. ".|r" end
     local sharing = ns.Share and ns.try(ns.Share.statusLine)
     if type(sharing) == "string" and sharing ~= "" then status[#status + 1] = "|cff999999" .. sharing .. "|r" end
     local recipes, profs = 0, 0
@@ -520,6 +523,12 @@ local function rowsPage(page, spec)
   end
 end
 
+-- "3 days left" / "5h left" for a time in the future.
+local function timeLeft(ends)
+  local h = math.max(0, math.floor(((ends or 0) - time()) / 3600))
+  return h >= 48 and (math.floor(h / 24) .. " days left") or (h .. "h left")
+end
+
 local function coins(c)
   c = math.floor(tonumber(c) or 0)
   local g, s = math.floor(c / 10000), math.floor((c % 10000) / 100)
@@ -598,6 +607,84 @@ function pages.board(page)
         r:Show()
       else r:Hide() end
     end
+  end
+end
+
+-- Camp › Guild goals: what the officers asked for this week. Supply drives with a bar and "I gave", and zone
+-- bounties with how many kills are in.
+local DRIVE_ROWS, HUNT_ROWS, BAR_W = 4, 3, 260
+function pages.goals(page)
+  local G = ns.goals
+  local W_ROW = PW - 40
+  local head = label(page, "", "GameFontNormal"); head:SetPoint("TOPLEFT", 0, 0); head:SetWidth(W_ROW)
+  local status
+  page.drives = {}
+  for i = 1, DRIVE_ROWS do
+    local r = CreateFrame("Frame", nil, page)
+    r:SetSize(W_ROW, 56); r:SetPoint("TOPLEFT", 0, -22 - (i - 1) * 60)
+    r.stripe = ns.skin.colorTex(r, "BACKGROUND", 1, 1, 1, i % 2 == 1 and 0.04 or 0); r.stripe:SetAllPoints()
+    r.title = label(r, "", "GameFontNormal"); r.title:SetPoint("TOPLEFT", 6, -4); r.title:SetWidth(W_ROW - 190)
+    r.track = ns.skin.colorTex(r, "BORDER", 1, 1, 1, 0.08); r.track:SetSize(BAR_W, 10); r.track:SetPoint("TOPLEFT", 6, -24)
+    r.bar = ns.skin.colorTex(r, "ARTWORK", ns.skin.GOLD[1], ns.skin.GOLD[2], ns.skin.GOLD[3], 0.9); r.bar:SetHeight(10); r.bar:SetPoint("TOPLEFT", 6, -24)
+    r.count = label(r, "", "GameFontHighlightSmall"); r.count:SetPoint("TOPLEFT", BAR_W + 14, -22)
+    r.who = label(r, "", "GameFontDisableSmall"); r.who:SetPoint("TOPLEFT", 6, -39); r.who:SetWidth(W_ROW - 190)
+    r.box = editbox(r, 54, true); r.box:SetPoint("RIGHT", -84, 6)
+    r.btn = button(r, "I gave", 74); r.btn:SetPoint("RIGHT", -4, 6)
+    r:Hide()
+    page.drives[i] = r
+  end
+  local hy = -22 - DRIVE_ROWS * 60 - 6
+  local hh = label(page, "", "GameFontNormal"); hh:SetPoint("TOPLEFT", 0, hy); hh:SetWidth(W_ROW)
+  page.hunts = {}
+  for i = 1, HUNT_ROWS do
+    local r = CreateFrame("Frame", nil, page)
+    r:SetSize(W_ROW, 20); r:SetPoint("TOPLEFT", 0, hy - 20 - (i - 1) * 22)
+    r.what = label(r, "", "GameFontHighlight"); r.what:SetPoint("LEFT", 6, 0); r.what:SetWidth(W_ROW - 120)
+    r.left = label(r, "", "GameFontDisableSmall"); r.left:SetPoint("RIGHT", -4, 0)
+    r:Hide()
+    page.hunts[i] = r
+  end
+  status = label(page, "", "GameFontHighlightSmall"); status:SetPoint("BOTTOMLEFT", 0, 0); status:SetWidth(W_ROW)
+  page.status = status
+
+  page.refresh = function(keepStatus)
+    if not keepStatus then status:SetText("") end
+    local drives, hunts = G.drives(), G.hunts()
+    head:SetText((#drives + #hunts == 0) and "No guild goals right now. Officers set them in the Guild Camp app (Bank & Market › Drives, War › The hunt)."
+      or string.format("%d supply %s", #drives, #drives == 1 and "drive" or "drives"))
+    for i, r in ipairs(page.drives) do
+      local d = drives[i]
+      if d then
+        r.title:SetText(d.title .. (d.done and "  |cff40bf40done!|r" or ""))
+        r.bar:SetWidth(math.max(1, math.floor(BAR_W * math.min(1, d.goal > 0 and d.total / d.goal or 0))))
+        r.count:SetText(string.format("%d of %d %s", d.total, d.goal, d.unit))
+        local top = {}
+        for k = 1, math.min(3, #d.givers) do top[k] = string.format("%s %d", d.givers[k].name, d.givers[k].amount) end
+        r.who:SetText((d.mine > 0 and string.format("|cffe8a33dYou gave %d.|r  ", d.mine) or "") .. (#top > 0 and ("Most: " .. table.concat(top, ", ")) or "Nobody has given yet.")
+          .. (d.notes ~= "" and ("  " .. d.notes) or ""))
+        r.btn:SetScript("OnClick", function()
+          local n = r.box:GetText() or ""
+          if n == "" then status:SetText("Write how many you gave in the box, then click I gave."); return end
+          local ok = false
+          status:SetText(capture(function() ok = G.give(d.key, n) end))
+          if ok then r.box:SetText("") end
+          page.refresh(true)
+        end)
+        r.key = d.key
+        r:Show()
+      else r.key = nil; r:Hide() end
+    end
+    hh:SetText(#hunts > 0 and "Kill goals" or "")
+    for i, r in ipairs(page.hunts) do
+      local h = hunts[i]
+      if h then
+        r.what:SetText(string.format("%s  |cff%s%d of %d kills|r  |cff999999%d season points each|r%s", h.zone, h.done >= h.cap and "40bf40" or "e8a33d", h.done, h.cap, h.points,
+          h.note ~= "" and ("  |cff999999" .. h.note .. "|r") or ""))
+        r.left:SetText(timeLeft(h.ends))
+        r:Show()
+      else r:Hide() end
+    end
+    if #drives > DRIVE_ROWS and status:GetText() == "" then status:SetText(string.format("And %d more drives in the Guild Camp app.", #drives - DRIVE_ROWS)) end
   end
 end
 
@@ -702,10 +789,6 @@ end
 
 -- War › The hunt: the kill-on-sight list (add by name or from my target, take off) and the open bounties.
 local KOS_ROWS, BOUNTY_ROWS = 6, 4
-local function timeLeft(ends)
-  local h = math.max(0, math.floor(((ends or 0) - time()) / 3600))
-  return h >= 48 and (math.floor(h / 24) .. " days left") or (h .. "h left")
-end
 function pages.hunt(page)
   local HU = ns.hunt
   local W_ROW = PW - 40
