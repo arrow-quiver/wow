@@ -41,6 +41,7 @@ Recruit.lua
 Seasons.lua
 Celebrate.lua
 Welcome.lua
+Trail.lua
 MainUI.lua
 Tooltip.lua
 Helpers.lua
