@@ -339,7 +339,7 @@ function killTree(child) {
   }
 }
 
-// Runs `npm run dist` in the app folder (electron-builder --win --publish never), streaming each
+// Runs `npm run dist` in the app folder (ow-electron-builder --win --publish never), streaming each
 // output line to onLog. Resolves { distDir } on success; rejects when the build fails.
 // bnet: the Battle.net credentials to build in (see prepareBnetFile); the file is removed again
 // when the build ends, whatever happens.

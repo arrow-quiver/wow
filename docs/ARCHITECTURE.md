@@ -11,7 +11,7 @@ The decisions behind this design are in [PIVOT.md](PIVOT.md). The in-game sharin
 
 | Part | Where | What it does |
 |---|---|---|
-| **The app** ("Guild Camp") | `app/` | An Electron desktop app for Windows. It shows everything a player sees and does, syncs with the game in the background, and installs and updates the addon. Inside it runs the **local core**: the old server's domain logic, an Express app on `127.0.0.1` over a SQLite database in the player's user data folder. |
+| **The app** ("Guild Camp") | `app/` | An Electron desktop app for Windows, built on Overwolf Electron (`@overwolf/ow-electron`), so the Coach overlay can draw inside the game. It shows everything a player sees and does, syncs with the game in the background, and installs and updates the addon. Inside it runs the **local core**: the old server's domain logic, an Express app on `127.0.0.1` over a SQLite database in the player's user data folder. |
 | **The addon** (WowGuild, listed as "Guild Camp") | `addon/WowGuild/` | Runs in the game (interfaces 16001 for Forever and 120105 for Retail). It collects what the game shows outside combat, saves it for the app, shows the guild news the app writes back, and trades guild data with guildmates over WoW's hidden addon channel. |
 | **GitHub Releases** | `arrow-quiver/wow` releases | App installers (tag `v<version>`, marked Latest) and addon zips (tag `addon-v<version>`, never Latest). Apps update themselves and the addon from here. Releases are published with the GitHub CLI (`gh`). |
 
@@ -463,7 +463,7 @@ All publishing goes through `app/src/shared/release.js`, which runs the GitHub C
 | App | `app/package.json` | `v<version>` | `Guild-Camp-Setup-<v>.exe`, its `.blockmap`, `latest.yml` | yes |
 | Addon | `## Version:` in `addon/WowGuild/WowGuild.toc` | `addon-v<version>` | `WowGuild-<v>.zip`, `WowGuild-<v>.zip.sha256` | never (`--latest=false`) |
 
-App builds run `npm run dist` in `app/` (`electron-builder --win --publish never`); electron-builder never
+App builds run `npm run dist` in `app/` (`ow-electron-builder --win --publish never`); the builder never
 publishes by itself. A version bump that does not end in a published release is undone. The full walkthrough,
 first-time setup and rollback: [RELEASING.md](RELEASING.md).
 
@@ -607,17 +607,17 @@ From `app/`:
 
 ```bash
 # The dev app, kept away from your real game folders and settings
-GUILDCAMP_NO_SCAN=1 npx electron . --user-data ./dist/dev-profile
+GUILDCAMP_NO_SCAN=1 npx ow-electron . --user-data ./dist/dev-profile
 
 # One test file, or the whole suite with the heavy simulations
 GUILDCAMP_NO_SCAN=1 node --test test/core/raids.test.js
 GUILDCAMP_SIM_HEAVY=1 GUILDCAMP_NO_SCAN=1 node --test "test/**/*.test.{js,mjs}"
 
 # Screenshots of every page with a demo guild, into dist/smoke (report in dist/smoke/smoke-report.json)
-npx electron . --smoke --smoke-seed
+npx ow-electron . --smoke --smoke-seed
 
 # The same in a scratch profile of your own (fake game folders set up there under Addon & sync)
-npx electron . --smoke --smoke-user-data ./dist/smoke-profile
+npx ow-electron . --smoke --smoke-user-data ./dist/smoke-profile
 ```
 
 From Git Bash, set `MSYS_NO_PATHCONV=1` before `--smoke-routes=/,/raids`, or it rewrites `/` into a Windows path.

@@ -24,7 +24,7 @@ The `server/` folder goes away as a deployable. Decisions, verbatim choices:
 ```
 app/src/core/      the old server's domain logic, running INSIDE the Electron main process
                    (Express on 127.0.0.1:<random port>, per-launch random bearer secret; only the app's
-                   own main process calls it). Database: node:sqlite (built into Electron 45 / Node 24)
+                   own main process calls it). Database: node:sqlite (built into Overwolf Electron 44)
                    in userData/guildcamp.db, through a small better-sqlite3-compatible adapter so the
                    ported code keeps working (prepare/run/get/all, transaction, pragma, exec).
 app/src/main/      Electron main process (as before). api.js now talks to the local core.

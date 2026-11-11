@@ -112,9 +112,34 @@ If your organization limits workflow permissions to read-only, allow write acces
 
 ### 5. Building the app
 
-The Windows installer is built with electron-builder, on Windows. To build on your own computer, install
+The Windows installer is built with ow-electron-builder (Overwolf's electron-builder; it reads the same
+`electron-builder.yml`), on Windows. To build on your own computer, install
 Node.js 24, then run `npm install` in `app/` once. If you aren't on Windows, use GitHub Actions for app
 releases (it builds on a Windows machine).
+
+#### Overwolf signing
+
+Guild Camp is an Overwolf Electron app. A build for players must be signed by Overwolf, or Overwolf's
+packages (the in-game Coach overlay) refuse to load in the installed app. The builder stops with
+`[OW] signing required but OW_CLI_EMAIL/OW_CLI_API_KEY/OW_BUILD_KEY are not set` until these are set, in your
+shell or as GitHub Actions secrets (never commit them):
+
+| Variable | What it is |
+|---|---|
+| `OW_CLI_EMAIL` | The email of your Overwolf developer console account. |
+| `OW_CLI_API_KEY` | That account's API key. |
+| `OW_BUILD_KEY` | The build key of the app registered in the console. |
+
+The app's Overwolf id comes from `productName` and `author.name` in `app/package.json`
+("Guild Camp" by "Calvin" → `gnbjoigjdakoplbncgpbcpmafapidekcgkknimak`). Changing either changes the id, and
+the app must be registered again. The app logs its id at start ("Running on Overwolf Electron (app id …)").
+
+To check that packaging works without the keys (the result is not for players: the overlay falls back to the
+desktop window), run in `app/`:
+
+```
+npx ow-electron-builder --win --dir --publish never -c.overwolf.requireSigning=false
+```
 
 Check everything:
 ```

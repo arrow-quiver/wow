@@ -334,6 +334,26 @@ function bootstrap() {
   const userDataOverride = pickUserDataDir(args, process.env, smokeOut);
   if (userDataOverride) app.setPath('userData', userDataOverride);
 
+  // Overwolf: Guild Camp runs on ow-electron (Overwolf's Electron), which adds app.overwolf. Its overlay
+  // package (package.json "overwolf.packages") loads in the background and reports 'ready'; the Coach
+  // overlay then draws inside the game (overlay.js). Plain Electron has no app.overwolf, and a smoke run
+  // leaves the game alone.
+  const overwolf = app.overwolf || null;
+  let gameOverlayApi = null;
+  let onGameOverlay = null; // set once the Coach overlay exists
+  if (overwolf) {
+    // Dev and smoke runs stay out of Overwolf's usage reports. Must be called before the app is ready.
+    if (!isPackaged) { try { overwolf.disableAnonymousAnalytics(); } catch { /* not fatal */ } }
+    if (!args.smoke && overwolf.packages) {
+      overwolf.packages.on('ready', (_event, name, packageVersion) => {
+        if (name !== 'overlay') return;
+        gameOverlayApi = overwolf.packages.overlay;
+        if (services) services.log.info(`Overwolf's game overlay is ready (version ${packageVersion}).`);
+        if (onGameOverlay) onGameOverlay(gameOverlayApi);
+      });
+    }
+  }
+
   app.setAppUserModelId(APP_ID);
   registerScheme();
 
@@ -519,6 +539,8 @@ function bootstrap() {
     process.on('unhandledRejection', (reason) => log.warn('Unhandled promise rejection:', reason instanceof Error ? reason : String(reason)));
     log.info(`Guild Camp ${version} starting (${isPackaged ? 'installed' : 'dev'}; Electron ${process.versions.electron}; ${process.platform} ${process.arch}).`);
     if (userDataOverride) log.info(`User data folder: ${userData}`);
+    if (overwolf) log.info(`Running on Overwolf Electron (app id ${overwolf.uid || process.env.OVERWOLF_APP_UID || 'unknown'}).`);
+    else log.info('Running on plain Electron: no Overwolf, so the Coach overlay shows on the desktop only.');
 
     // Smoke runs are for screenshots only: they must never read or change a real game install.
     // Default folder scanning is off (add fake folders with extraWowFolders in a scratch folder given with
@@ -660,6 +682,7 @@ function bootstrap() {
         platform: process.platform,
         arch: process.arch,
         electron: process.versions.electron,
+        overwolf: Boolean(overwolf),
         logFile: log.file,
         userData,
         dataFile: path.join(userData, 'guildcamp.db'),
@@ -734,6 +757,9 @@ function bootstrap() {
     overlay = createOverlay({ store, log: log.scope('overlay'), preload: path.join(__dirname, '..', 'preload', 'preload.js'), startUrl: START_URL });
     services.overlay = overlay;
     overlay.registerHotkey();
+    // Inside the game once Overwolf's overlay package is ready (it may be already).
+    onGameOverlay = (api) => overlay.attachGame(api);
+    if (gameOverlayApi) onGameOverlay(gameOverlayApi);
     if (store.get().liveLink) { background(() => live.start(), 'Live link failed to start'); chat.start(); }
     store.on('change', (s, keys) => {
       if (!keys.includes('liveLink')) return;

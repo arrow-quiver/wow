@@ -265,7 +265,7 @@ Run the app from `app/`, always with a scratch profile and without scanning your
 
 ```bash
 cd app
-GUILDCAMP_NO_SCAN=1 npx electron . --user-data ./dist/dev-profile
+GUILDCAMP_NO_SCAN=1 npx ow-electron . --user-data ./dist/dev-profile
 ```
 
 Without those two settings a dev app finds your real World of Warcraft folders and installs, updates or syncs
@@ -276,7 +276,7 @@ Screenshots of every page with a demo guild (safe by default; nothing touches yo
 
 ```bash
 cd app
-npx electron . --smoke --smoke-seed      # pictures and a report in app/dist/smoke
+npx ow-electron . --smoke --smoke-seed      # pictures and a report in app/dist/smoke
 ```
 
 Heavy simulations of many players run only with `GUILDCAMP_SIM_HEAVY=1`. Tests never touch the network, a real
