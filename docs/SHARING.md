@@ -422,6 +422,26 @@ complete in 8–12 minutes with two or three guildmates serving. A day away (abo
 pages and 50 `R` messages, shared among responders: 1–3 minutes. Steady state: one beacon hello per 10 minutes
 per guild, one push per change.
 
+### Live messages on a second prefix (`Presence.lua`)
+
+What the guild is doing right now travels outside this engine, on its own prefix `GuildCampNow` (GUILD channel),
+so it never takes from the bucket above and nothing of it is stored in the shared records:
+
+| Message | Meaning | Sent when |
+|---|---|---|
+| `P|<map>|<x>|<y>|<zone>` | where I am (x, y in thousandths) | option `shareLocation` on (off by default): at most every 20 s while moving, every 120 s standing |
+| `P|0` | I stopped sharing | I turn the option off |
+| `R|<caller>` | I'm on my way to that caller's call to arms | I click "On my way" |
+| `D|<killer>` | a player killed me | my death, when the game's death recap names the player |
+| `K|<victim>` | I killed a player | the game's honor line |
+
+Every message follows something the player did; none is sent in answer to a message, so clients can't set each
+other off. Nothing goes out inside an instance or outside a guild. A receiver takes them from the GUILD channel
+only, checks every field (names are one word of letters, coordinates 0–1000, zone text stripped of `|` and
+control characters), ignores a sender above 40 messages a minute, and forgets a position after 5 minutes.
+Positions and answers live in memory; the nemesis tally (`WowGuildDB.nemesis`) is this account's own count of what
+it heard while online, kept 60 days.
+
 ## 8. Sync algorithm
 
 The engine is **ready** when the character is in a guild, the roster is scanned, it is outside instances and

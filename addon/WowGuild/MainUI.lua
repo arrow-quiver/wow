@@ -23,8 +23,9 @@ local SECTIONS = {
   { id = "war", label = "War", icon = "Ability_Warrior_BattleShout", pages = {
     { key = "cta", label = "Call to arms" },
     { key = "hunt", label = "The hunt", when = function() return ns.hunt end },
+    { key = "nemesis", label = "Nemeses", when = function() return ns.presence end },
+    { key = "where", label = "Guild map", when = function() return ns.presence and ns.helpers end },
     { key = "report", label = "War report", when = function() return ns.war and ns.war.summary end },
-    { key = "near", label = "Guildies nearby", when = function() return ns.helpers end },
   } },
   { id = "dungeons", label = "Raids & Dungeons", icon = "INV_Misc_Key_03", pages = {
     { key = "raids", label = "Raids" },
@@ -231,13 +232,13 @@ function pages.cta(page)
     if ns.addCta(zone:GetText() or "", tonumber(needed:GetText() or ""), msg:GetText() or "") then msg:SetText("") end
     page.refresh()
   end)
-  -- The calls since I logged in, newest first. A guildmate's call has "On my way": one whisper to the caller.
+  -- The calls since I logged in, newest first. A guildmate's call has "On my way"; my own shows who's coming.
   local recent = label(page, "", "GameFontNormal"); recent:SetPoint("TOPLEFT", 0, -250)
   page.calls = {}
   for i = 1, 5 do
     local r = CreateFrame("Frame", nil, page)
     r:SetSize(PW - 40, 24); r:SetPoint("TOPLEFT", 0, -270 - (i - 1) * 26)
-    r.text = label(r, "", "GameFontHighlight"); r.text:SetPoint("LEFT", 0, 0); r.text:SetWidth(PW - 170)
+    r.text = label(r, "", "GameFontHighlightSmall"); r.text:SetPoint("LEFT", 0, 0); r.text:SetWidth(PW - 170)
     r.btn = button(r, "On my way", 110); r.btn:SetPoint("RIGHT", 0, 0)
     r:Hide()
     page.calls[i] = r
@@ -252,10 +253,35 @@ function pages.cta(page)
       if c then
         local need = c.needed and string.format(" (need %d)", c.needed) or ""
         local msgText = (c.message and c.message ~= "") and (": " .. c.message) or ""
-        r.text:SetText(string.format("%s%s%s |cff999999%s, %s|r", c.zone or "", need, msgText, c.mine and "you" or tostring(c.character or "?"), ns.ago(c.at)))
-        if c.mine or not c.character or c.answered then r.btn:Hide() else
+        -- Who's coming (their "On my way", heard live), and how the fight has gone there since the call.
+        local P = ns.presence
+        local caller = c.mine and UnitName and UnitName("player") or c.character
+        local coming = (P and caller) and P.coming(caller, c.at) or {}
+        local kills, deaths = 0, 0
+        if ns.war and ns.war.since then kills, deaths = ns.war.since(c.zone, c.at) end
+        local extra = (#coming > 0 and ("  |cff40bf40Coming: " .. table.concat(coming, ", ") .. "|r") or "")
+          .. ((kills + deaths > 0) and string.format("  |cff999999since: %d %s, %d %s|r", kills, kills == 1 and "kill" or "kills", deaths, deaths == 1 and "death" or "deaths") or "")
+        r.text:SetText(string.format("%s%s%s |cff999999%s, %s|r%s", c.zone or "", need, msgText, c.mine and "you" or tostring(c.character or "?"), ns.ago(c.at), extra))
+        r.coming = coming
+        if c.mine then
+          -- My call: invite whoever answered and isn't in my group yet (one invite each, on this click).
+          if #coming > 0 and ns.lfg and ns.lfg.invite then
+            r.btn:SetText("Invite them")
+            r.btn:SetScript("OnClick", function()
+              for _, name in ipairs(coming) do
+                local grouped = UnitInParty and (ns.try(UnitInParty, name) and true or false)
+                if not grouped then ns.lfg.invite(name) end
+              end
+            end)
+            r.btn:Show()
+          else r.btn:Hide() end
+        elseif not c.character or c.answered then r.btn:Hide() else
+          r.btn:SetText("On my way")
           r.btn:SetScript("OnClick", function()
-            c.answered = W.whisper(string.format("On my way to %s!", (c.zone and c.zone ~= "") and c.zone or "you"), c.character) and true or false
+            -- Tell the whole guild (so the caller sees who's coming); a whisper when that can't go out.
+            local sent = P and P.answer(c.character)
+            if not sent then sent = W.whisper(string.format("On my way to %s!", (c.zone and c.zone ~= "") and c.zone or "you"), c.character) end
+            c.answered = sent and true or false
             page.refresh()
           end)
           r.btn:Show()
@@ -802,15 +828,116 @@ function pages.report(page)
   })
 end
 
--- War › Guildies nearby: online in my zone, one whisper per click.
-function pages.near(page)
-  rowsPage(page, {
-    rows = function()
-      local rows, zone = ns.helpers.nearbyRows()
-      return rows, string.format("Guildies online in %s, closest in level first.", (zone and zone ~= "") and zone or "this zone")
-    end,
-    empty = "Nobody from the guild is in this zone right now.",
-  })
+-- War › Nemeses: the players who keep killing guildies, counted from what guildies online tell each other.
+local NEMESIS_ROWS = 10
+function pages.nemesis(page)
+  local P = ns.presence
+  local W_ROW = PW - 40
+  local head = label(page, "", "GameFontNormal"); head:SetPoint("TOPLEFT", 0, 0); head:SetWidth(W_ROW)
+  page.rows = {}
+  for i = 1, NEMESIS_ROWS do
+    local r = CreateFrame("Frame", nil, page)
+    r:SetSize(W_ROW, 26); r:SetPoint("TOPLEFT", 0, -24 - (i - 1) * 28)
+    r.stripe = ns.skin.colorTex(r, "BACKGROUND", 1, 1, 1, i % 2 == 1 and 0.04 or 0); r.stripe:SetAllPoints()
+    r.name = label(r, "", "GameFontNormal"); r.name:SetPoint("LEFT", 6, 0); r.name:SetWidth(120)
+    r.name:SetTextColor(1, 0.25, 0.25)
+    r.what = label(r, "", "GameFontHighlightSmall"); r.what:SetPoint("LEFT", 130, 0); r.what:SetWidth(W_ROW - 130 - 120)
+    r.btn = button(r, "Kill on sight", 110); r.btn:SetPoint("RIGHT", -4, 0)
+    r:Hide()
+    page.rows[i] = r
+  end
+  local status = label(page, "", "GameFontHighlightSmall"); status:SetPoint("BOTTOMLEFT", 0, 16); status:SetWidth(W_ROW)
+  local foot = label(page, "Counted while you're online, from guildies with Guild Camp: deaths the game names a killer for, and honorable kills.", "GameFontDisableSmall")
+  foot:SetPoint("BOTTOMLEFT", 0, 0); foot:SetWidth(W_ROW)
+  page.status = status
+  page.refresh = function(keepStatus)
+    if not keepStatus then status:SetText("") end
+    local list = P.nemeses()
+    head:SetText(#list == 0 and "No nemeses yet. When a player kills a guildie, they show up here." or
+      string.format("%d %s who killed guildies in the last %d days", #list, #list == 1 and "player" or "players", math.floor(P.NEMESIS_KEEP / 86400)))
+    for i, r in ipairs(page.rows) do
+      local x = list[i]
+      if x then
+        r.name:SetText(x.name)
+        r.what:SetText(string.format("killed guildies %d %s%s  |cff40bf40we got them %d %s|r  |cff999999last %s|r%s",
+          x.deaths, x.deaths == 1 and "time" or "times", (x.worst and x.deaths > 1) and (" (" .. x.worst .. " most)") or "",
+          x.kills, x.kills == 1 and "time" or "times", ns.ago(x.last), x.mine > 0 and string.format("  |cffe8a33dowes you %d|r", x.mine) or ""))
+        local listed = ns.hunt and ns.hunt.onList and ns.hunt.onList(x.name)
+        if ns.hunt and not listed then
+          r.btn:SetScript("OnClick", function()
+            status:SetText(capture(ns.hunt.add, x.name, string.format("Killed guildies %d %s", x.deaths, x.deaths == 1 and "time" or "times")))
+            page.refresh(true)
+          end)
+          r.btn:Show()
+        else r.btn:Hide() end
+        r.who, r.listed = x.name, listed and true or false
+        r:Show()
+      else r.who = nil; r:Hide() end
+    end
+  end
+end
+
+-- War › Guild map: who's online and where (from the guild roster), my own zone first with "Group up?". Guildies
+-- who share their position are on the world map too; the button turns my own sharing on or off.
+local WHERE_ROWS = 10
+function pages.where(page)
+  local P, H = ns.presence, ns.helpers
+  local W_ROW = PW - 40
+  local head = label(page, "", "GameFontNormal"); head:SetPoint("TOPLEFT", 0, 0); head:SetWidth(W_ROW - 230)
+  local share = button(page, "", 220); share:SetPoint("TOPRIGHT", 0, 4)
+  share:SetScript("OnClick", function() P.share(not P.sharing()); page.refresh() end)
+  page.share = share
+  page.rows = {}
+  for i = 1, WHERE_ROWS do
+    local r = CreateFrame("Frame", nil, page)
+    r:SetSize(W_ROW, 24); r:SetPoint("TOPLEFT", 0, -30 - (i - 1) * 26)
+    r.stripe = ns.skin.colorTex(r, "BACKGROUND", 1, 1, 1, i % 2 == 1 and 0.04 or 0); r.stripe:SetAllPoints()
+    r.name = label(r, "", "GameFontHighlight"); r.name:SetPoint("LEFT", 6, 0); r.name:SetWidth(150)
+    r.zone = label(r, "", "GameFontHighlightSmall"); r.zone:SetPoint("LEFT", 160, 0); r.zone:SetWidth(W_ROW - 160 - 110)
+    r.btn = button(r, "Group up?", 100); r.btn:SetPoint("RIGHT", -4, 0)
+    r:Hide()
+    page.rows[i] = r
+  end
+  local foot = label(page, "", "GameFontDisableSmall"); foot:SetPoint("BOTTOMLEFT", 0, 0); foot:SetWidth(W_ROW)
+  page.refresh = function()
+    local myZone = (GetRealZoneText and ns.try(GetRealZoneText)) or (GetZoneText and ns.try(GetZoneText)) or ""
+    local online = H.online and H.online() or {}
+    local onMap = {}
+    for _, w in ipairs(P.list()) do onMap[w.name] = w end
+    -- My zone first, then the zones with the most guildies, then by name.
+    local count = {}
+    for _, g in ipairs(online) do local z = g.zone or ""; count[z] = (count[z] or 0) + 1 end
+    table.sort(online, function(a, b)
+      local az, bz = a.zone or "", b.zone or ""
+      if (az == myZone) ~= (bz == myZone) then return az == myZone end
+      if az ~= bz then
+        if count[az] ~= count[bz] then return count[az] > count[bz] end
+        return az < bz
+      end
+      return tostring(a.name) < tostring(b.name)
+    end)
+    local shared = 0
+    for _ in pairs(onMap) do shared = shared + 1 end
+    head:SetText(#online == 0 and "No other guildies online right now." or
+      string.format("%d online  |cff999999%d on the world map|r", #online, shared))
+    share:SetText(P.sharing() and "Sharing my position: on" or "Share my position: off")
+    for i, r in ipairs(page.rows) do
+      local g = online[i]
+      if g then
+        r.name:SetText(string.format("%s |cff999999%s|r", tostring(g.name), tostring(g.level or "")))
+        local w = onMap[g.name]
+        r.zone:SetText(((g.zone and g.zone ~= "") and g.zone or "Somewhere") .. (w and string.format("  |cff4dbfff%d, %d on the map|r", math.floor(w.x / 10 + 0.5), math.floor(w.y / 10 + 0.5)) or ""))
+        if g.zone and g.zone ~= "" and g.zone == myZone and H.groupUp then
+          r.btn:SetScript("OnClick", function() H.groupUp(g, myZone) end)
+          r.btn:Show()
+        else r.btn:Hide() end
+        r.who = g.name
+        r:Show()
+      else r.who = nil; r:Hide() end
+    end
+    foot:SetText((#online > WHERE_ROWS and string.format("And %d more. ", #online - WHERE_ROWS) or "")
+      .. (P.sharing() and "Guildies see you on their world map while you're in the open world." or "Turn sharing on and guildies see you on their world map. It's off in instances, and off until you choose."))
+  end
 end
 
 -- Raids & Dungeons › Raids: what's scheduled, how many are coming, where I stand, what I reserved.

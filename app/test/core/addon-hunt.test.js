@@ -163,24 +163,32 @@ test('The hunt page: the list with who added it, take off, add by name and from 
   noError(wow);
 });
 
-test('Call to arms page: a guildmate\'s call has "On my way", one whisper, once', () => {
+test('Call to arms page: "On my way" tells the guild, once; the whisper is the fallback', () => {
   const wow = client();
   wow.exec(`__whispers = {}
-    C_ChatInfo = C_ChatInfo or {}
+    local send = C_ChatInfo.SendChatMessage
     C_ChatInfo.SendChatMessage = function(text, kind, _, to) table.insert(__whispers, kind .. ">" .. tostring(to) .. ">" .. text) end
     __ns.ctaRecent = { { zone = "Ashenvale", needed = 5, message = "Zoram Strand", character = "Mokra", at = time() - 60 }, { zone = "Barrens", at = time() - 30, mine = true, character = "Thrallia" } }
     __ns.ui.show("cta")`);
   const calls = 'WowGuildWindow.pages.cta.calls';
-  // Newest first: mine (no button), then Mokra's.
+  // Newest first: mine (no button until someone answers), then Mokra's.
   assert.match(wow.eval(`${calls}[1].text:GetText()`), /^Barrens \|cff999999you, /);
   assert.strictEqual(wow.eval(`tostring(${calls}[1].btn:IsShown())`), 'false');
   assert.match(wow.eval(`${calls}[2].text:GetText()`), /^Ashenvale \(need 5\): Zoram Strand \|cff999999Mokra, /);
-  assert.strictEqual(wow.eval(`tostring(${calls}[2].btn:IsShown())`), 'true');
-  assert.strictEqual(wow.eval('#__whispers'), '0', 'nothing is sent by opening the page');
+  assert.strictEqual(wow.eval(`${calls}[2].btn:GetText()`), 'On my way');
+  const before = wow.sentMessages.length;
   wow.click(`${calls}[2].btn`);
-  assert.deepStrictEqual(wow.get('__whispers'), ['WHISPER>Mokra>On my way to Ashenvale!']);
+  const sent = wow.sentMessages.slice(before).filter((m) => m.prefix === 'GuildCampNow');
+  assert.deepStrictEqual(sent.map((m) => [m.channel, m.text]), [['GUILD', 'R|Mokra']], 'one message to the guild');
+  assert.strictEqual(wow.eval('#__whispers'), '0', 'no whisper when the guild message went out');
   assert.strictEqual(wow.eval(`tostring(${calls}[2].btn:IsShown())`), 'false', 'answered: the button goes');
-  assert.strictEqual(wow.eval(`tostring(${calls}[3]:IsShown())`), 'false');
+  assert.match(wow.eval(`${calls}[2].text:GetText()`), /Coming: Thrallia/, 'I am listed as coming');
+  // When the guild message can't go out (inside an instance), a whisper does.
+  wow.exec(`table.insert(__ns.ctaRecent, { zone = "Hillsbrad", character = "Zed", at = time() })
+    function IsInInstance() return true, "party" end
+    __ns.ui.show("cta")`);
+  wow.click(`${calls}[1].btn`);
+  assert.deepStrictEqual(wow.get('__whispers'), ['WHISPER>Zed>On my way to Hillsbrad!']);
   noError(wow);
 });
 
