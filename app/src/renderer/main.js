@@ -4,13 +4,13 @@
 // has shown Guild Camp a guild.
 import { html, render, Component, useEffect, useReducer, useRef, useState } from './lib/html.js';
 import { gc } from './lib/gc.js';
-import routes, { NAV_SECTIONS, staticPaths } from './pages/index.js';
+import routes, { HUBS, staticPaths } from './pages/index.js';
 import { setRoutes, useLocation, findRoute, navigate, currentLocation } from './lib/router.js';
 import { useSession, refreshSession, setSession, sessionStore, pageGate, isOnboarded } from './lib/session.js';
 import { applyTheme } from './lib/theme.js';
 import { watchTooltips } from './lib/wowhead.js';
 import { syncStatus, updaterStatus, addonStatus, settingsStatus, useSettings } from './lib/status.js';
-import { Sidebar, TopBar } from './components/Shell.js';
+import { Sidebar, TopBar, HubTabs } from './components/Shell.js';
 import { OverlayBar, AlertsFeed } from './components/OverlayBar.js';
 import { OVERLAY } from './lib/overlay.js';
 import { Splash, shouldShowSplash, whenVisible } from './components/Splash.js';
@@ -220,9 +220,12 @@ function App({ initialSplash, smoke = false }) {
     return html`
       <div class="app app--overlay">
         <${OverlayBar} />
-        <${Sidebar} routes=${routes} sections=${NAV_SECTIONS} overlay />
+        <${Sidebar} routes=${routes} hubs=${HUBS} route=${route} overlay />
         <${TopBar} route=${route} path=${loc.path} />
-        <main class="content" id="content" tabIndex="-1" ref=${contentRef} aria-label=${route.title}>${body}</main>
+        <main class="content" id="content" tabIndex="-1" ref=${contentRef} aria-label=${route.title}>
+          <${HubTabs} routes=${routes} hubs=${HUBS} route=${route} path=${loc.path} overlay=${OVERLAY} />
+          ${body}
+        </main>
       </div>
       <${AlertsFeed} />
       <${Toasts} />`;
@@ -230,9 +233,12 @@ function App({ initialSplash, smoke = false }) {
 
   return html`
     <div class="app">
-      <${Sidebar} routes=${routes} sections=${NAV_SECTIONS} />
+      <${Sidebar} routes=${routes} hubs=${HUBS} route=${route} />
       <${TopBar} route=${route} path=${loc.path} />
-      <main class="content" id="content" tabIndex="-1" ref=${contentRef} aria-label=${route.title}>${body}</main>
+      <main class="content" id="content" tabIndex="-1" ref=${contentRef} aria-label=${route.title}>
+          <${HubTabs} routes=${routes} hubs=${HUBS} route=${route} path=${loc.path} overlay=${OVERLAY} />
+          ${body}
+        </main>
     </div>
     ${splashEl}
     <${Toasts} />`;

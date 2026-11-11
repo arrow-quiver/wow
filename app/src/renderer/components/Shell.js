@@ -1,7 +1,8 @@
-// The app frame: left sidebar (brand, navigation, sync + update status, who you are) and the top bar
+// The app frame: left sidebar (brand, one link per section, sync + update status, who you are), the sub-tabs of
+// the current section, and the top bar
 // (window drag strip with the page title and actions). main.js composes them with the content area.
 import { html, cx } from '../lib/html.js';
-import { Link, back as goBack } from '../lib/router.js';
+import { Link, back as goBack, isActivePath } from '../lib/router.js';
 import { useStore } from '../lib/store.js';
 import { useSession } from '../lib/session.js';
 import {
@@ -19,22 +20,59 @@ export function visibleNav(routes, session, { canPublish = false, overlay = fals
     && (!r.publisher || canPublish) && (!r.overlayOnly || overlay));
 }
 
-export function Sidebar({ routes, sections, overlay = false }) {
+// The section a route belongs to: its own (`nav`), or the one a detail page hangs under (`hub`).
+export const hubOf = (route) => (route && (route.nav || route.hub)) || null;
+
+// The sidebar's sections: [{ ...hub, tabs: visible routes, href: the first of them }], without empty ones.
+export function navHubs(routes, hubs, session, opts) {
+  const items = visibleNav(routes, session, opts);
+  return hubs.map((h) => {
+    const tabs = items.filter((r) => r.nav === h.id);
+    return { ...h, tabs, href: tabs.length ? tabs[0].path : null };
+  }).filter((h) => h.tabs.length);
+}
+
+function useNav(routes, hubs, overlay) {
   const session = useSession();
   const sync = useSyncStatus();
   const updater = useUpdaterStatus();
   const addon = useAddonStatus();
   const publisher = usePublisherStatus();
-  const { guild, user, role } = session;
-
-  const items = visibleNav(routes, session, { canPublish: Boolean(publisher && publisher.canPublish), overlay });
-  const groups = sections.map((s) => [s, items.filter((r) => r.nav === s)]).filter(([, list]) => list.length);
-  const syncInfo = describeSync(sync);
-  const updates = describeUpdates(updater, addon);
+  const list = navHubs(routes, hubs, session, { canPublish: Boolean(publisher && publisher.canPublish), overlay });
   const outdated = addon && Array.isArray(addon.installs) ? addon.installs.filter((i) => i.state === 'outdated' && i.inUse !== false).length : 0;
   const badges = {
     '/updates': updater && ['available', 'downloaded'].includes(updater.state) ? '1' : null,
     '/addon': sync && sync.state === 'error' ? '!' : outdated ? String(outdated) : null,
+  };
+  return { session, sync, updater, addon, list, badges };
+}
+
+const badgeLabel = (b) => (b === '!' ? 'needs attention' : `${b} waiting`);
+// A section shows the most urgent badge of its pages: "!" first, then the count.
+export function hubBadge(hub, badges) {
+  const found = hub.tabs.map((r) => badges[r.path]).filter(Boolean);
+  if (!found.length) return null;
+  if (found.includes('!')) return '!';
+  return String(found.reduce((n, b) => n + (Number(b) || 0), 0));
+}
+
+export function Sidebar({ routes, hubs, route, overlay = false }) {
+  const { session, sync, updater, addon, list, badges } = useNav(routes, hubs, overlay);
+  const { guild, user, role } = session;
+  const syncInfo = describeSync(sync);
+  const updates = describeUpdates(updater, addon);
+  const current = hubOf(route);
+
+  const link = (h) => {
+    const active = h.id === current;
+    const badge = hubBadge(h, badges);
+    return html`<li key=${h.id}>
+      <${Link} href=${h.href} class=${cx('nav-link', active && 'is-active')} activeClass="" aria-current=${active ? 'page' : undefined} title=${overlay ? h.title : undefined}>
+        <${Icon} name=${h.icon} />
+        <span class="nav-label">${h.title}</span>
+        ${badge ? html`<span class="nav-badge" aria-label=${badgeLabel(badge)}>${badge}</span>` : null}
+      <//>
+    </li>`;
   };
 
   return html`<aside class="sidebar">
@@ -49,18 +87,8 @@ export function Sidebar({ routes, sections, overlay = false }) {
     </div>
 
     <nav class="nav" aria-label="Main">
-      ${groups.map(([section, list]) => html`<div class="nav-section" key=${section}>
-        <h2 class="nav-heading">${section}</h2>
-        <ul class="nav-list">
-          ${list.map((r) => html`<li key=${r.path}>
-            <${Link} href=${r.path} class="nav-link" exact=${r.path === '/'} title=${overlay ? r.title : undefined}>
-              <${Icon} name=${r.icon} />
-              <span class="nav-label">${r.title}</span>
-              ${badges[r.path] ? html`<span class="nav-badge" aria-label=${r.path === '/addon' && badges[r.path] === '!' ? 'needs attention' : `${badges[r.path]} waiting`}>${badges[r.path]}</span>` : null}
-            <//>
-          </li>`)}
-        </ul>
-      </div>`)}
+      <ul class="nav-list">${list.filter((h) => !h.foot).map(link)}</ul>
+      <ul class="nav-list nav-list--foot">${list.filter((h) => h.foot).map(link)}</ul>
     </nav>
 
     <div class="sidebar-foot">
@@ -78,6 +106,28 @@ export function Sidebar({ routes, sections, overlay = false }) {
       <//>` : null}
     </div>
   </aside>`;
+}
+
+// The sub-tabs of the current section, along the top of the content. Hidden when the section has one page.
+// A detail page (a raid, a character) keeps its parent's tab lit: '/raids/12' lights "Raids".
+export function HubTabs({ routes, hubs, route, path, overlay = false }) {
+  const { list, badges } = useNav(routes, hubs, overlay);
+  const hub = list.find((h) => h.id === hubOf(route));
+  if (!hub || hub.tabs.length < 2) return null;
+  return html`<nav class="hub-tabs" aria-label=${`${hub.title} pages`}>
+    <span class="hub-tabs-name"><${Icon} name=${hub.icon} />${hub.title}</span>
+    <ul>
+      ${hub.tabs.map((r) => {
+        const active = isActivePath(path, r.path, r.path === '/');
+        return html`<li key=${r.path}>
+          <${Link} href=${r.path} class=${cx('hub-tab', active && 'is-active')} activeClass="" aria-current=${active ? 'page' : undefined}>
+            ${r.tab || r.title}
+            ${badges[r.path] ? html`<span class="nav-badge" aria-label=${badgeLabel(badges[r.path])}>${badges[r.path]}</span>` : null}
+          <//>
+        </li>`;
+      })}
+    </ul>
+  </nav>`;
 }
 
 // The route a "Back" button falls back to when there is no history: '/raids/12/loot' → '/raids/12', '/raids/12' → '/raids'.

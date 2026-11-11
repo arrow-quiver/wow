@@ -101,18 +101,18 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 .nav { flex: 1 1 auto; overflow-y: auto; overflow-x: hidden; padding: 2px var(--s-3) var(--s-3); }
 .nav::-webkit-scrollbar-thumb { background-color: color-mix(in srgb, var(--frame-text) 18%, transparent); }
-.nav-section + .nav-section { margin-top: 10px; }
-.nav-heading { font-size: var(--fs-xs); font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--frame-text-3); padding: 0 var(--s-2) 3px; line-height: 1.4; margin: 0; font-family: var(--font-body); }
-.nav-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 1px; }
+.nav { display: flex; flex-direction: column; }
+.nav-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 3px; }
+.nav-list--foot { margin-top: auto; padding-top: var(--s-3); }
 .nav-link {
   display: flex; align-items: center; gap: var(--s-3);
-  padding: 4px var(--s-2); line-height: 1.3; border-radius: var(--radius-s);
-  color: var(--frame-text-2); text-decoration: none; font-weight: 500;
+  padding: 9px var(--s-3); line-height: 1.3; border-radius: var(--radius-s);
+  color: var(--frame-text-2); text-decoration: none; font-weight: 600;
   transition: background var(--t-fast), color var(--t-fast);
 }
 .nav-link:hover { background: var(--frame-2); color: var(--frame-text); }
 .nav-link.is-active { background: var(--frame-active); color: var(--frame-text); box-shadow: inset 3px 0 0 var(--accent); }
-.nav-link .icon { width: 18px; height: 18px; flex: none; opacity: .9; }
+.nav-link .icon { width: 20px; height: 20px; flex: none; opacity: .9; }
 .nav-link.is-active .icon { color: var(--accent); opacity: 1; }
 .nav-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nav-badge { font-size: var(--fs-xs); font-weight: 700; line-height: 1; padding: 3px 6px; border-radius: 999px; background: var(--accent); color: var(--on-accent); }
@@ -130,8 +130,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 /* Short windows (the minimum is 680px tall): tighten the sidebar so every section still fits. */
 @media (max-height: 760px) {
   .sidebar-brand { min-height: 50px; padding-top: var(--s-2); padding-bottom: var(--s-2); }
-  .nav-link { padding-top: 2px; padding-bottom: 2px; }
-  .nav-section + .nav-section { margin-top: 6px; }
+  .nav-link { padding-top: 6px; padding-bottom: 6px; }
   .foot-link { padding-top: 3px; padding-bottom: 3px; }
 }
 
@@ -169,6 +168,23 @@ button, input, select, textarea { font: inherit; color: inherit; }
   scroll-padding-top: var(--s-4);
 }
 .content:focus { outline: none; }
+
+/* The sub-tabs of the current sidebar section (components/Shell.js HubTabs). Stays in view while the page scrolls. */
+.hub-tabs {
+  position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: var(--s-4);
+  padding: 0 var(--s-7); min-height: 44px;
+  background: color-mix(in srgb, var(--bg) 92%, transparent); backdrop-filter: blur(6px);
+  box-shadow: inset 0 -1px 0 var(--line-strong);
+}
+.hub-tabs-name { display: inline-flex; align-items: center; gap: var(--s-2); flex: none; font: 800 var(--fs-m) var(--font-head); color: var(--text-2); letter-spacing: .02em; padding-right: var(--s-4); border-right: 1px solid var(--line-strong); }
+.hub-tabs-name .icon { width: 17px; height: 17px; color: var(--accent); }
+.hub-tabs ul { list-style: none; margin: 0; padding: 0; display: flex; gap: var(--s-1); min-width: 0; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+.hub-tabs ul::-webkit-scrollbar { display: none; }
+.hub-tab { display: inline-flex; align-items: center; gap: 6px; padding: 12px 12px 10px; border-bottom: 2px solid transparent; font-weight: 700; color: var(--text-2); text-decoration: none; white-space: nowrap; border-radius: var(--radius-s) var(--radius-s) 0 0; transition: background var(--t-fast), color var(--t-fast); }
+.hub-tab:hover { color: var(--text); background: var(--surface-2); }
+.hub-tab.is-active { color: var(--text); border-bottom-color: var(--accent); }
+.hub-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+@media (max-width: 1000px) { .hub-tabs-name { display: none; } .hub-tabs { padding: 0 var(--s-4); } }
 .page { max-width: var(--content-max); margin: 0 auto; padding: var(--s-6) var(--s-7) var(--s-9); display: flex; flex-direction: column; gap: var(--s-5); }
 .page--wide { max-width: none; }
 .page--narrow { max-width: 760px; }
@@ -1375,10 +1391,13 @@ a.wh.q0 { color: var(--q-0) !important; } a.wh.q1 { color: var(--q-1) !important
 
 /* The icon rail: icons only, a gold edge on the current page; labels come back when the window is wide. */
 .app--overlay .sidebar { background: linear-gradient(180deg, #170f09, #0f0a06); border-right: 1px solid #3b2a1c; }
-.app--overlay .sidebar-brand, .app--overlay .nav-heading, .app--overlay .sidebar-foot .ellipsis,
+.app--overlay .sidebar-brand, .app--overlay .sidebar-foot .ellipsis,
 .app--overlay .who-role, .app--overlay .nav-label, .app--overlay .nav-badge { display: none; }
 .app--overlay .nav { padding: 6px 6px; }
-.app--overlay .nav-section + .nav-section { margin-top: 6px; padding-top: 6px; border-top: 1px solid #2a1c12; }
+.app--overlay .nav-list--foot { border-top: 1px solid #2a1c12; padding-top: 6px; }
+.app--overlay .hub-tabs { padding: 0 var(--s-4); min-height: 36px; }
+.app--overlay .hub-tabs-name { display: none; }
+.app--overlay .hub-tab { padding: 8px 9px 6px; }
 .app--overlay .nav-link { justify-content: center; padding: 7px 0; border-radius: 6px; }
 .app--overlay .nav-link .icon { width: 19px; height: 19px; }
 .app--overlay .nav-link.is-active { background: linear-gradient(180deg, #6b1c15, #4a120d); box-shadow: inset 0 0 0 1px rgb(233 176 74 / .45), 0 0 12px rgb(229 83 75 / .25); }
@@ -1387,8 +1406,7 @@ a.wh.q0 { color: var(--q-0) !important; } a.wh.q1 { color: var(--q-1) !important
 .app--overlay .foot-link { justify-content: center; padding: 6px 0; }
 @media (min-width: 820px) {
   :root.is-overlay { --sidebar-w: 190px; }
-  .app--overlay .nav-heading, .app--overlay .nav-label, .app--overlay .sidebar-foot .ellipsis, .app--overlay .nav-badge { display: revert; }
-  .app--overlay .nav-heading { color: #8f7759; }
+  .app--overlay .nav-label, .app--overlay .sidebar-foot .ellipsis, .app--overlay .nav-badge { display: revert; }
   .app--overlay .nav-link { justify-content: flex-start; padding: 5px 8px; }
   .app--overlay .foot-link { justify-content: flex-start; padding: 4px 8px; }
   .app--overlay .sidebar-foot { align-items: stretch; }
