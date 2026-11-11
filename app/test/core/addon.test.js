@@ -559,7 +559,7 @@ test('the window has a rail of sections; each section\'s pages are its tabs', ()
     ['Camp', 'Coach', 'War', 'Raids & Dungeons', 'Professions', 'Market', 'Guild', 'Settings']);
   // Every section is on the rail and every page opens without an error.
   const keys = wow.get('(function() local t = {} for _, s in ipairs(__ns.ui.SECTIONS) do for _, p in ipairs(s.pages) do t[#t + 1] = s.id .. ":" .. p.key end end return t end)()');
-  assert.deepStrictEqual(keys, ['camp:camp', 'camp:board', 'camp:season', 'coach:coach', 'war:cta', 'war:hunt', 'war:nemesis', 'war:where', 'war:report',
+  assert.deepStrictEqual(keys, ['camp:camp', 'camp:board', 'camp:goals', 'camp:season', 'coach:coach', 'war:cta', 'war:hunt', 'war:nemesis', 'war:where', 'war:report',
     'dungeons:raids', 'dungeons:groups', 'dungeons:quests', 'prof:prof', 'prof:mats', 'market:deals', 'market:alerts',
     'guild:guild', 'guild:recruit', 'settings:settings']);
   for (const k of keys) {
