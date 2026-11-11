@@ -910,33 +910,131 @@ function pages.mats(page)
   })
 end
 
--- Market › Deal hunter: what to buy and sell again.
+-- Market › Deal hunter: what's worth buying to sell again, each checked against this session's live price.
+local DEAL_ROWS = 11
+local SURE = { certain = "|cff40bf40certain|r", high = "|cff40bf40likely|r", medium = "|cffe8a33dfair|r", low = "|cff999999risky|r" }
 function pages.deals(page)
-  textPage(page, {
-    text = function()
-      local list = ns.deals.list()
-      if not list or #list == 0 then return "No deals yet. They come from the Guild Camp app's price history: keep it running and /reload." end
-      local lines = { "|cffffd100Worth buying to sell again|r", "" }
-      for i, d in ipairs(list) do
-        if i > 20 then lines[#lines + 1] = string.format("  … and %d more in the Deal hunter.", #list - 20); break end
-        local state = d.state == "gone" and "  |cff999999gone|r" or d.state == "changed" and "  |cffe8a33dprice changed|r" or ""
-        lines[#lines + 1] = string.format("  %s  |cff999999buy under %s, worth %s|r  |cff40bf40+%s|r%s%s", d.name, coins(d.buy), coins(d.worth), coins(math.max(0, d.profit or 0)),
-          d.vendor and "  |cff999999sells to a vendor|r" or "", state)
-      end
-      return table.concat(lines, "\n")
-    end,
-    buttons = { { "Open the Deal hunter", function() ns.deals.show() end, 180 } },
-    hint = "At the auction house the Deal hunter checks today's prices and buys one item per click.",
-  })
+  local DH = ns.deals
+  local W_ROW = PW - 40
+  local head = label(page, "", "GameFontNormal"); head:SetPoint("TOPLEFT", 0, 0); head:SetWidth(W_ROW)
+  local c1 = label(page, "Item", "GameFontDisableSmall"); c1:SetPoint("TOPLEFT", 6, -22)
+  local c2 = label(page, "Buy under", "GameFontDisableSmall"); c2:SetPoint("TOPLEFT", 240, -22)
+  local c3 = label(page, "Worth", "GameFontDisableSmall"); c3:SetPoint("TOPLEFT", 330, -22)
+  local c4 = label(page, "Profit", "GameFontDisableSmall"); c4:SetPoint("TOPLEFT", 420, -22)
+  page.rows = {}
+  for i = 1, DEAL_ROWS do
+    local r = CreateFrame("Frame", nil, page)
+    r:SetSize(W_ROW, 24); r:SetPoint("TOPLEFT", 0, -38 - (i - 1) * 26)
+    r.stripe = ns.skin.colorTex(r, "BACKGROUND", 1, 1, 1, i % 2 == 1 and 0.04 or 0); r.stripe:SetAllPoints()
+    r.name = label(r, "", "GameFontHighlight"); r.name:SetPoint("LEFT", 6, 0); r.name:SetWidth(228)
+    r.buy = label(r, "", "GameFontHighlightSmall"); r.buy:SetPoint("LEFT", 240, 0); r.buy:SetWidth(86)
+    r.worth = label(r, "", "GameFontHighlightSmall"); r.worth:SetPoint("LEFT", 330, 0); r.worth:SetWidth(86)
+    r.profit = label(r, "", "GameFontNormal"); r.profit:SetPoint("LEFT", 420, 0); r.profit:SetWidth(80)
+    r.state = label(r, "", "GameFontHighlightSmall"); r.state:SetPoint("RIGHT", -6, 0); r.state:SetJustifyH("RIGHT")
+    r:Hide()
+    page.rows[i] = r
+  end
+  local open = button(page, "Open the Deal hunter", 180); open:SetPoint("BOTTOMLEFT", 0, 18)
+  open:SetScript("OnClick", function() DH.show() end)
+  local hint = label(page, "At the auction house the Deal hunter searches for these and buys one item per click.", "GameFontDisableSmall")
+  hint:SetPoint("BOTTOMLEFT", 0, 0); hint:SetWidth(W_ROW)
+  page.open = open
+  page.refresh = function()
+    local list = DH.list() or {}
+    local live, total = 0, 0
+    for _, d in ipairs(list) do
+      if d.state ~= "gone" then live = live + 1; total = total + math.max(0, d.profit or 0) end
+    end
+    head:SetText(#list == 0 and "No deals yet. They come from the Guild Camp app's price history: keep it running and /reload."
+      or string.format("%d worth buying  |cff999999about %s if you flip them all|r", live, DH.money(total)))
+    for i, r in ipairs(page.rows) do
+      local d = list[i]
+      if d then
+        local gone = d.state == "gone"
+        r.name:SetText(d.name)
+        r.name:SetTextColor(gone and 0.5 or 1, gone and 0.5 or 1, gone and 0.5 or 1)
+        r.buy:SetText(DH.money(d.buy)); r.worth:SetText(DH.money(d.worth))
+        r.profit:SetText(gone and "" or ("+" .. DH.money(math.max(0, d.profit or 0))))
+        r.profit:SetTextColor(0.25, 0.75, 0.35)
+        r.state:SetText(gone and "|cff999999gone|r" or d.state == "changed" and "|cffe8a33dprice changed|r"
+          or (d.vendor and "|cff40bf40sells to a vendor|r" or (SURE[d.sure] or "") .. (d.state == "still" and "  |cff40bf40still there|r" or "")))
+        r.id = d.id
+        r:Show()
+      else r.id = nil; r:Hide() end
+    end
+    c1:SetText(#list > 0 and "Item" or ""); c2:SetText(#list > 0 and "Buy under" or ""); c3:SetText(#list > 0 and "Worth" or ""); c4:SetText(#list > 0 and "Profit" or "")
+    hint:SetText(#list > DEAL_ROWS and string.format("And %d more in the Deal hunter.", #list - DEAL_ROWS) or "At the auction house the Deal hunter searches for these and buys one item per click.")
+  end
 end
 
--- Market › Price alerts: what I'm watching, and my own targets.
+-- Market › Price alerts: what I'm told about at the auction house and at what price. My own targets can be
+-- removed; the rest follow my shopping list and the guild bank's requests.
+local ALERT_ROWS = 9
 function pages.alerts(page)
-  textPage(page, {
-    text = function() return "|cffffd100Watching at the auction house|r\n" .. capture(ns.priceAlerts.slash, "") end,
-    input = { label = "Set your own target: the price, then the item (1g50s Wool Cloth).", button = "Set the alert",
-      run = function(t) ns.priceAlerts.slash(t) end },
-  })
+  local PA = ns.priceAlerts
+  local money = function(c) return ns.deals and ns.deals.money and ns.deals.money(c) or coins(c) end
+  local W_ROW = PW - 40
+  local head = label(page, "", "GameFontNormal"); head:SetPoint("TOPLEFT", 0, 0); head:SetWidth(W_ROW)
+  page.rows = {}
+  for i = 1, ALERT_ROWS do
+    local r = CreateFrame("Frame", nil, page)
+    r:SetSize(W_ROW, 24); r:SetPoint("TOPLEFT", 0, -24 - (i - 1) * 26)
+    r.stripe = ns.skin.colorTex(r, "BACKGROUND", 1, 1, 1, i % 2 == 1 and 0.04 or 0); r.stripe:SetAllPoints()
+    r.name = label(r, "", "GameFontHighlight"); r.name:SetPoint("LEFT", 6, 0); r.name:SetWidth(190)
+    r.target = label(r, "", "GameFontNormal"); r.target:SetPoint("LEFT", 200, 0); r.target:SetWidth(96)
+    r.why = label(r, "", "GameFontHighlightSmall"); r.why:SetPoint("LEFT", 300, 0); r.why:SetWidth(W_ROW - 300 - 96)
+    r.btn = button(r, "Remove", 84); r.btn:SetPoint("RIGHT", -4, 0)
+    r:Hide()
+    page.rows[i] = r
+  end
+  local al = label(page, "Set your own target: the price, then the item (1g50s Wool Cloth, or shift-click an item into the box)", "GameFontNormalSmall")
+  al:SetPoint("BOTTOMLEFT", 0, 50); al:SetWidth(W_ROW)
+  local box = editbox(page, PW - 220); box:SetPoint("BOTTOMLEFT", 6, 22)
+  local set = button(page, "Set the alert", 150); set:SetPoint("LEFT", box, "RIGHT", 10, 0)
+  local status = label(page, "", "GameFontHighlightSmall"); status:SetPoint("BOTTOMLEFT", 0, 0); status:SetWidth(W_ROW)
+  page.input, page.go, page.status = box, set, status
+  local function run()
+    local t = box:GetText() or ""
+    if t == "" then status:SetText("Type a price and an item first."); return end
+    local res
+    local said = capture(function() res = PA.slash(t) end)
+    -- Without a price and an item it understands, the command lists everything: say what was wrong instead.
+    if type(res) == "number" and string.find(said, "^Price alert:") then status:SetText(said); box:SetText("")
+    else status:SetText("Couldn't read that. Write the price first, then the item's exact name: 1g50s Wool Cloth.") end
+    page.refresh(true)
+  end
+  set:SetScript("OnClick", run)
+  box:SetScript("OnEnterPressed", function(self) run(); self:ClearFocus() end)
+
+  page.refresh = function(keepStatus)
+    if not keepStatus then status:SetText("") end
+    local list = {}
+    for _, w in pairs(PA.watch()) do list[#list + 1] = w end
+    -- My own targets first, then by name.
+    table.sort(list, function(a, b)
+      if (a.own and true or false) ~= (b.own and true or false) then return a.own and true or false end
+      return tostring(a.name or a.id) < tostring(b.name or b.id)
+    end)
+    head:SetText(#list == 0 and "Nothing to watch yet. Add mats to your shopping list, or set a target below."
+      or string.format("Watching %d %s at the auction house%s", #list, #list == 1 and "item" or "items", ns.opt("priceAlerts") == false and "  |cffe8a33d(alerts are switched off in Settings)|r" or ""))
+    for i, r in ipairs(page.rows) do
+      local w = list[i]
+      if w then
+        r.name:SetText(tostring(w.name or ("item " .. w.id)))
+        r.target:SetText("under " .. money(w.target))
+        local why = w.kind == "guild" and ("guild bank request" .. (w.who and (" from " .. tostring(w.who)) or "")) or w.kind == "list" and "your shopping list" or "your alert"
+        r.why:SetText(w.own and ("|cffe8a33dyour target|r" .. (w.usual and ("  |cff999999usual " .. money(w.usual) .. "|r") or "") .. (w.kind ~= "alert" and ("  |cff999999" .. why .. "|r") or ""))
+          or ("|cff99999985% of the usual " .. money(w.usual) .. " · " .. why .. "|r"))
+        if w.own then
+          r.btn:SetScript("OnClick", function() status:SetText(capture(PA.slash, "off item:" .. w.id)); page.refresh(true) end)
+          r.btn:Show()
+        else r.btn:Hide() end
+        r.id = w.id
+        r:Show()
+      else r.id = nil; r:Hide() end
+    end
+    if #list > ALERT_ROWS and status:GetText() == "" then status:SetText(string.format("And %d more: /wow alert lists them all.", #list - ALERT_ROWS)) end
+  end
 end
 
 -- Guild › Recruiting: the desk has its own window (the /who scan and one message per click).
