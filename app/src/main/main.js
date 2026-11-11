@@ -334,7 +334,7 @@ function bootstrap() {
   const userDataOverride = pickUserDataDir(args, process.env, smokeOut);
   if (userDataOverride) app.setPath('userData', userDataOverride);
 
-  // Overwolf: Guild Camp runs on ow-electron (Overwolf's Electron), which adds app.overwolf. Its overlay
+  // Overwolf: the Overwolf build runs on ow-electron (Overwolf's Electron), which adds app.overwolf. Its overlay
   // package (package.json "overwolf.packages") loads in the background and reports 'ready'; the Coach
   // overlay then draws inside the game (overlay.js). Plain Electron has no app.overwolf, and a smoke run
   // leaves the game alone.

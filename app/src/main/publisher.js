@@ -547,10 +547,10 @@ function createPublisher({
       const pub = await published({ fresh: true });
       const plan = await planVersion('app', current, bump, pub);
       checkCancelled(signal);
-      const builder = ['ow-electron-builder', 'ow-electron-builder.cmd'];
+      const builder = ['electron-builder', 'electron-builder.cmd'];
       const hasBuilder = [path.join(appSrc, 'node_modules', '.bin'), path.join(repo.dir, 'node_modules', '.bin')]
         .some((bin) => builder.some((b) => exists(path.join(bin, b))));
-      if (!buildApp && !hasBuilder) line("ow-electron-builder isn't installed in this checkout. If the build fails, run npm install in the app folder first.", 'warn');
+      if (!buildApp && !hasBuilder) line("electron-builder isn't installed in this checkout. If the build fails, run npm install in the app folder first.", 'warn');
 
       const saved = snapshot([path.join(appSrc, 'package.json'), path.join(appSrc, 'package-lock.json')]);
       let bumped = false;

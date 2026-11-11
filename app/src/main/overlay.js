@@ -4,7 +4,7 @@
 // alerts, starting on /overlay (Now: the live link, next steps, the Coach and the guild feed).
 //
 // Two ways to draw it:
-//   - In the game (Overwolf). Guild Camp runs on ow-electron; once its overlay package is ready
+//   - In the game (the Overwolf build, on ow-electron). Once Overwolf's overlay package is ready
 //     (attachGame) and the game has let the overlay in, the window is made with the package's
 //     createWindow and is drawn inside the game, in real fullscreen too.
 //   - On the desktop. An always-on-top window, above a game that runs in a window or "windowed

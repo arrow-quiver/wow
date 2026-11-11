@@ -14,10 +14,14 @@
     ]
   },
   "scripts": {
-    "start": "ow-electron .",
-    "dev": "ow-electron . --dev",
-    "smoke": "ow-electron . --smoke",
-    "dist": "ow-electron-builder --win --publish never",
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "smoke": "electron . --smoke",
+    "dist": "electron-builder --win --publish never",
+    "start:overwolf": "ow-electron .",
+    "dev:overwolf": "ow-electron . --dev",
+    "smoke:overwolf": "ow-electron . --smoke",
+    "dist:overwolf": "ow-electron-builder --win --publish never -c.directories.output=dist-overwolf",
     "vendor": "node ../scripts/vendor.js",
     "test": "node --max-old-space-size=4096 --test \"test/**/*.test.{js,mjs}\""
   },
@@ -31,9 +35,14 @@
     "@overwolf/ow-electron": "44.9.0",
     "@overwolf/ow-electron-builder": "^26.18.1",
     "@overwolf/ow-electron-packages-types": "1.1.14",
+    "electron": "45.2.1",
+    "electron-builder": "^26.18.0",
     "fengari": "^0.1.5",
     "htm": "3.1.1",
     "luaparse": "^0.3.1",
     "preact": "10.29.8"
+  },
+  "allowScripts": {
+    "electron@45.2.1": true
   }
 }
