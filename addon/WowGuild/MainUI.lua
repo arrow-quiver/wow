@@ -164,7 +164,17 @@ local win
 
 -- Camp: raids, notices, sync status.
 function pages.camp(page)
-  local body = scrollText(page, 0, 36)
+  -- Shortcuts along the top to the pages people open most; the news is under them.
+  page.go = {}
+  local prev
+  for _, sc in ipairs({ { "raids", "Raids", 80 }, { "groups", "Dungeon groups", 130 }, { "board", "Bulletin board", 120 }, { "season", "Leaderboard", 110 }, { "cta", "Call to arms", 110 } }) do
+    local b = button(page, sc[2], sc[3])
+    if prev then b:SetPoint("LEFT", prev, "RIGHT", 6, 0) else b:SetPoint("TOPLEFT", 0, 0) end
+    b:SetScript("OnClick", function() W.show(sc[1]) end)
+    page.go[sc[1]] = b
+    prev = b
+  end
+  local body = scrollText(page, -34, 36)
   local sync = button(page, "Sync now", 110)
   sync:SetPoint("BOTTOMLEFT", 0, 0)
   sync:SetScript("OnClick", function()
@@ -343,9 +353,46 @@ function pages.coach(page)
   page.refresh = function() ns.coach.refresh(); body.set(ns.coach.summary()) end
 end
 
+-- Opens the chat box on a whisper to someone, for the player to write and send themselves.
+function W.startWhisper(name)
+  if not name or name == "" then return false end
+  if ChatFrame_OpenChat then ChatFrame_OpenChat("/w " .. name .. " "); return true end
+  return false
+end
+
+local PARTNER_ROWS = 5
 function pages.guild(page)
-  local body = scrollText(page, 0, 0)
-  page.refresh = function() body.set(ns.textGuild()) end
+  local W_ROW = PW - 40
+  -- Requests on top (they're claimed in the app); leveling partners under them, each with a whisper button.
+  local body = scrollText(page, 0, 40 + PARTNER_ROWS * 26)
+  local ph = label(page, "", "GameFontNormal"); ph:SetPoint("BOTTOMLEFT", 0, 16 + PARTNER_ROWS * 26); ph:SetWidth(W_ROW)
+  page.partners = {}
+  for i = 1, PARTNER_ROWS do
+    local r = CreateFrame("Frame", nil, page)
+    r:SetSize(W_ROW, 24); r:SetPoint("BOTTOMLEFT", 0, 14 + (PARTNER_ROWS - i) * 26)
+    r.text = label(r, "", "GameFontHighlight"); r.text:SetPoint("LEFT", 0, 0); r.text:SetWidth(W_ROW - 110)
+    r.btn = button(r, "Whisper", 90); r.btn:SetPoint("RIGHT", 0, 0)
+    r:Hide()
+    page.partners[i] = r
+  end
+  local foot = label(page, "", "GameFontDisableSmall"); foot:SetPoint("BOTTOMLEFT", 0, 0); foot:SetWidth(W_ROW)
+  page.refresh = function()
+    body.set(ns.textGuildRequests())
+    local list = (WowGuildInbox and type(WowGuildInbox.buddies) == "table" and WowGuildInbox.buddies) or {}
+    ph:SetText(#list > 0 and "Looking for leveling partners" or "Looking for leveling partners  |cff999999nobody has posted. Post yours in the Guild Camp app.|r")
+    for i, r in ipairs(page.partners) do
+      local x = list[i]
+      if x then
+        r.text:SetText(string.format("%s (%s)%s%s%s", tostring(x.character or "?"), tostring(x.level or "?"),
+          (x.zone and x.zone ~= "") and (" in " .. x.zone) or "", (x.whenText and x.whenText ~= "") and (", " .. x.whenText) or "",
+          (x.note and x.note ~= "") and ("  |cff999999" .. x.note .. "|r") or ""))
+        r.btn:SetScript("OnClick", function() W.startWhisper(x.character) end)
+        if x.character and x.character ~= "" then r.btn:Show() else r.btn:Hide() end
+        r:Show()
+      else r:Hide() end
+    end
+    foot:SetText(#list > PARTNER_ROWS and string.format("And %d more in the Guild Camp app.", #list - PARTNER_ROWS) or "")
+  end
 end
 
 -- ---------- pages built from the slash commands ----------
@@ -455,14 +502,77 @@ local function coins(c)
   return string.format("%dc", c)
 end
 
--- Camp › Bulletin board: read it, and put a post up.
+-- Camp › Bulletin board: the guild's posts, newest first. Whisper the poster, take my own down, put one up.
+local BOARD_POSTS = 9
+local KIND_COLOUR = { l = "|cff66b3ff", s = "|cff40bf40", w = "|cffe8a33d", h = "|cffff8080" }
 function pages.board(page)
-  textPage(page, {
-    text = function() return capture(ns.board.list) end,
-    input = { label = "Put up a post: lfg, wts, wtb or help, then your text. A price at the end is optional (wts Mooncloth x4 12g).",
-      button = "Post it", run = function(t) ns.board.slash(t) end },
-    hint = "Take one of yours down with /wow board down <number>.",
-  })
+  local B = ns.board
+  local W_ROW = PW - 40
+  local money = B.money -- the board's own way of writing a price ("12g", "12g 50s")
+  local head = label(page, "", "GameFontNormal"); head:SetPoint("TOPLEFT", 0, 0); head:SetWidth(W_ROW)
+  local status
+  page.rows = {}
+  for i = 1, BOARD_POSTS do
+    local r = CreateFrame("Frame", nil, page)
+    r:SetSize(W_ROW, 24); r:SetPoint("TOPLEFT", 0, -22 - (i - 1) * 26)
+    r.stripe = ns.skin.colorTex(r, "BACKGROUND", 1, 1, 1, i % 2 == 1 and 0.04 or 0); r.stripe:SetAllPoints()
+    r.kind = label(r, "", "GameFontNormalSmall"); r.kind:SetPoint("LEFT", 6, 0); r.kind:SetWidth(56)
+    r.text = label(r, "", "GameFontHighlight"); r.text:SetPoint("LEFT", 64, 0); r.text:SetWidth(W_ROW - 64 - 230)
+    r.who = label(r, "", "GameFontDisableSmall"); r.who:SetPoint("RIGHT", -100, 0); r.who:SetJustifyH("RIGHT")
+    r.btn = button(r, "", 90); r.btn:SetPoint("RIGHT", -4, 0)
+    r:Hide()
+    page.rows[i] = r
+  end
+  local pl = label(page, "Put up a post: write it, then pick what it is. A price at the end is optional (Mooncloth x4 12g).", "GameFontNormalSmall")
+  pl:SetPoint("BOTTOMLEFT", 0, 50); pl:SetWidth(W_ROW)
+  local box = editbox(page, PW - 370); box:SetPoint("BOTTOMLEFT", 6, 22)
+  page.post = {}
+  local prev = box
+  for k, kind in ipairs({ "lfg", "wts", "wtb", "help" }) do
+    local btn = button(page, B.LABEL[B.KINDS[kind]] or kind, 76)
+    btn:SetPoint("LEFT", prev, "RIGHT", k == 1 and 10 or 4, 0)
+    btn:SetScript("OnClick", function()
+      local t = box:GetText() or ""
+      if t == "" then status:SetText("Write the post first."); return end
+      local ok = false
+      status:SetText(capture(function() ok = B.post(kind, t) end))
+      if ok then box:SetText("") end
+      page.refresh(true)
+    end)
+    page.post[kind] = btn
+    prev = btn
+  end
+  status = label(page, "", "GameFontHighlightSmall"); status:SetPoint("BOTTOMLEFT", 0, 0); status:SetWidth(W_ROW)
+  page.input, page.status = box, status
+
+  page.refresh = function(keepStatus)
+    if not keepStatus then status:SetText("") end
+    local posts = B.posts()
+    local sh = ns.Share
+    local pid = sh and sh.myPid and ns.try(sh.myPid)
+    head:SetText(#posts == 0 and "The board is empty. Put something up below." or
+      string.format("%d %s on the board%s", #posts, #posts == 1 and "post" or "posts", #posts > BOARD_POSTS and string.format("  |cff999999the newest %d|r", BOARD_POSTS) or ""))
+    for i, r in ipairs(page.rows) do
+      local x = posts[i]
+      if x then
+        local mine = pid ~= nil and x.pid == pid
+        r.kind:SetText((KIND_COLOUR[x.kind] or "") .. (B.LABEL[x.kind] or "Post") .. "|r")
+        r.text:SetText(tostring(x.text) .. (x.price and ("  |cffffd100" .. money(x.price) .. "|r") or ""))
+        r.who:SetText((mine and "you" or tostring(x.character or "?")) .. ", " .. ns.ago(x.t))
+        if mine then
+          r.btn:SetText("Take down")
+          r.btn:SetScript("OnClick", function() status:SetText(capture(B.takeDown, i)); page.refresh(true) end)
+          r.btn:Show()
+        elseif x.character and x.character ~= "" then
+          r.btn:SetText("Whisper")
+          r.btn:SetScript("OnClick", function() W.startWhisper(x.character) end)
+          r.btn:Show()
+        else r.btn:Hide() end
+        r.mine = mine
+        r:Show()
+      else r:Hide() end
+    end
+  end
 end
 
 -- Camp › Leaderboard: this month's season. Rank, name (class colour), title, streak, what they did, points with a

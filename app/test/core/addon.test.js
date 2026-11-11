@@ -680,6 +680,30 @@ test('Settings: options in groups with a description, a search box and the windo
   noError(wow);
 });
 
+test('Today has shortcuts; the Guild page lists requests and partners with a whisper button', () => {
+  const wow = uiClient();
+  wow.exec('__chat = {}; function ChatFrame_OpenChat(text) table.insert(__chat, text) end');
+  wow.exec('__ns.ui.show("camp")');
+  for (const key of ['raids', 'groups', 'board', 'season', 'cta']) {
+    wow.exec('__ns.ui.show("camp")');
+    wow.click(`WowGuildWindow.pages.camp.go.${key}`);
+    assert.strictEqual(text(wow, '__ns.ui.current'), key, `the ${key} shortcut`);
+  }
+  wow.exec('__ns.ui.show("guild")');
+  const body = wow.texts().find((t) => /Requests you can craft/.test(t));
+  assert.match(body, /Copper Chain Vest {2}\|cff999999for Grom\|r {2}mats in mail/);
+  assert.ok(!/leveling partners/.test(body), 'partners are rows now');
+  assert.ok(wow.texts().includes('Looking for leveling partners'));
+  const row = 'WowGuildWindow.pages.guild.partners[1]';
+  assert.strictEqual(text(wow, `${row}.text:GetText()`), 'Zuljinne (18) in Stonetalon, tonight  |cff999999Venture Co.|r');
+  wow.click(`${row}.btn`);
+  assert.deepStrictEqual(wow.get('__chat'), ['/w Zuljinne ']);
+  assert.strictEqual(text(wow, 'WowGuildWindow.pages.guild.partners[2]:IsShown()'), 'false');
+  // The full text (login news, /wow) still has all three parts.
+  assert.match(wow.eval('__ns.textGuild()'), /Looking for leveling partners/);
+  noError(wow);
+});
+
 test('uses LibDBIcon when another addon provides it, instead of its own button', () => {
   const LIBS = `
 __dbicon = { registered = nil, shown = nil }
