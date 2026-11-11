@@ -51,3 +51,12 @@ test('the list is rebuilt at most every ten seconds', () => {
   wow.exec('__clock = 111');
   assert.strictEqual(line(wow.get('__ns.tooltip.linesFor(14047, "Runecloth")'), 'Guild request'), 'Mokra wants 20, Zed wants 3');
 });
+
+test("a request's name with |c or |r in it shows as text on the tooltip (review of #67)", () => {
+  const wow = new WowClient();
+  wow.login();
+  wow.exec(SHARE);
+  wow.exec('table.insert(__recs, { type = "bq", key = "q9", author = "Ev|cffff0000il|r", t = GetServerTime(), fields = { pid = "Evil.e1", item = "Silk Cloth", count = 3, note = "", state = "o" } })');
+  assert.strictEqual(line(wow.get('__ns.tooltip.linesFor(4306, "Silk Cloth")'), 'Guild request'), 'Ev||cffff0000il||r wants 3');
+  assert.strictEqual(wow.eval('__ns.debugError'), null, 'no addon errors');
+});

@@ -45,7 +45,8 @@ function T.wants()
       if not e.drive then e.drive = { title = d.title, left = d.goal - d.total } end
     end
   end
-  -- Requests to the guild bank that nobody has handled yet.
+  -- Requests to the guild bank that nobody has handled yet. The name is a guildmate's text: "|" is doubled so it
+  -- can't recolour or garble the tooltip.
   local list = ns.Share and ns.Share.list
   if type(list) == "function" then
     local handled = {}
@@ -54,7 +55,7 @@ function T.wants()
       local f = rec.fields
       if type(f) == "table" and f.state ~= "x" and not handled[rec.key or ""] and type(f.item) == "string" and f.item ~= "" then
         local e = entry(f.item)
-        if #e.asks < 3 then e.asks[#e.asks + 1] = { who = tostring(rec.author or "?"), count = math.max(1, math.floor(tonumber(f.count) or 1)) } end
+        if #e.asks < 3 then e.asks[#e.asks + 1] = { who = (string.gsub(tostring(rec.author or "?"), "|", "||")), count = math.max(1, math.floor(tonumber(f.count) or 1)) } end
       end
     end
   end
