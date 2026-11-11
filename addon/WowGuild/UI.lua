@@ -53,6 +53,29 @@ function ns.textNotices()
   return table.concat(lines, "\n")
 end
 
+-- The requests half of the Guild page (the partners are rows with buttons there).
+function ns.textGuildRequests()
+  local inbox = WowGuildInbox
+  if not inbox then return "No guild news yet.\n\nMake sure the Guild Camp app is running and signed in, then click Sync now on the Camp tab." end
+  local lines = {}
+  local function add(s) lines[#lines + 1] = s end
+  add("|cffffd100Requests you can craft|r")
+  if inbox.canCraft and #inbox.canCraft > 0 then
+    for _, r in ipairs(inbox.canCraft) do
+      add("  " .. tostring(r.item or "?") .. "  |cff999999for " .. who(r.requester) .. "|r" .. (r.notes and r.notes ~= "" and ("  " .. r.notes) or ""))
+    end
+    add("  |cff999999Claim them in the Guild Camp app so nobody doubles up.|r")
+  else add("  |cff999999None right now|r") end
+  add("")
+  add("|cffffd100Your requests|r")
+  if inbox.myRequests and #inbox.myRequests > 0 then
+    for _, r in ipairs(inbox.myRequests) do
+      add("  " .. tostring(r.item or "?") .. "  |cff999999" .. (r.status == "claimed" and ("being made by " .. who(r.crafter)) or "waiting for a crafter") .. "|r")
+    end
+  else add("  |cff999999None|r") end
+  return table.concat(lines, "\n")
+end
+
 function ns.textGuild()
   local inbox = WowGuildInbox
   if not inbox then return "No guild news yet.\n\nMake sure the Guild Camp app is running and signed in, then click Sync now on the Camp tab." end
