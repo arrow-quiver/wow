@@ -93,12 +93,18 @@ function H.groupUp(g, zone)
   return whisper(string.format("Hey %s! I'm in %s too (level %d). Want to group up?", g.name, zone ~= "" and zone or "the same zone", myLevel()), g.name)
 end
 
-function H.showNearby()
+-- Rows for a list: { text, button = { "Group up?", fn } }, and the zone. One whisper per click.
+function H.nearbyRows()
   local list, zone = H.nearby()
   local rows = {}
   for _, g in ipairs(list) do
     rows[#rows + 1] = { text = string.format("%s |cff9e9ea8%d|r", g.name, g.level), button = { "Group up?", function() H.groupUp(g, zone) end } }
   end
+  return rows, zone
+end
+
+function H.showNearby()
+  local rows, zone = H.nearbyRows()
   if #rows == 0 then
     ns.print(string.format("No guildies online in %s right now.", zone ~= "" and zone or "this zone"))
     return 0
