@@ -29,6 +29,7 @@ function createOverlay({ store, log, preload, startUrl, electron = require('elec
   let win = null;
   let winMode = null; // 'game' | 'desktop'
   let creating = null; // the window being made, so two quick presses don't make two
+  let generation = 0; // bumped by drop(): a window still being made when the game starts or stops is thrown away
   let hotkey = null;
   let game = null; // Overwolf's overlay API, once its package is ready
   let inGame = false; // the game is running and has let the overlay in
@@ -63,9 +64,9 @@ function createOverlay({ store, log, preload, startUrl, electron = require('elec
   }
 
   // What both kinds of window share: no new windows, no navigation, Escape hides, then load the page.
+  // The window becomes the overlay's only in ensure(), once it is known to be made for where the game is now.
   function wire(w, mode) {
-    win = w;
-    winMode = mode;
+    w.overlayMode = mode;
     w.on('closed', () => { if (win === w) { win = null; winMode = null; } });
     const wc = w.webContents;
     wc.setWindowOpenHandler(() => ({ action: 'deny' }));
@@ -105,19 +106,33 @@ function createOverlay({ store, log, preload, startUrl, electron = require('elec
   function ensure() {
     if (win && !win.isDestroyed()) return Promise.resolve(win);
     if (creating) return creating;
+    const made = generation;
     const make = inGame && game
       ? createInGame().catch((err) => {
         log.warn(`Couldn't open the Coach inside the game (${err.message}). Showing it on the desktop instead.`);
         return createDesktop();
       })
       : Promise.resolve().then(createDesktop);
-    creating = make.finally(() => { creating = null; });
-    return creating;
+    const pending = make.then((w) => {
+      if (made !== generation) {
+        // The game started or stopped while this window was being made: it is the wrong kind now.
+        if (w && !w.isDestroyed()) { try { w.destroy(); } catch { /* gone already */ } }
+        if (creating === pending) creating = null;
+        return ensure();
+      }
+      win = w;
+      winMode = w.overlayMode;
+      return w;
+    }).finally(() => { if (creating === pending) creating = null; });
+    creating = pending;
+    return pending;
   }
 
   /** Closes the window, so the next show makes one for where the game is now. */
   function drop() {
     const w = win;
+    generation += 1;
+    creating = null; // a window still being made is thrown away when it lands (see ensure)
     win = null;
     winMode = null;
     if (w && !w.isDestroyed()) { try { w.destroy(); } catch { /* the game closed it already */ } }
@@ -165,6 +180,7 @@ function createOverlay({ store, log, preload, startUrl, electron = require('elec
     });
     api.on('game-injection-error', (info, error) => {
       inGame = false;
+      drop(); // a window made inside the game before it errored
       log.warn(`${name(info)} didn't let the Coach overlay in (${error}). It shows on the desktop instead, so run the game in a window or windowed fullscreen.`);
     });
     api.on('game-exit', () => {

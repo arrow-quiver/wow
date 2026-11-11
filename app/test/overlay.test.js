@@ -169,3 +169,51 @@ test('the hotkey toggles the overlay and dispose cleans up', async () => {
   assert.equal(shortcuts.size, 0);
   assert.equal(made[0].destroyed, true);
 });
+
+test('a window still being made when the game starts is thrown away, and the next one is made inside the game', async () => {
+  const { overlay, api, made } = setup();
+  overlay.attachGame(api);
+  overlay.show(); // the desktop window is made on the next microtask
+  api.emit('game-injected', WOW);
+  await tick();
+  await tick();
+  assert.equal(made[0].destroyed, true, 'the desktop window made under the old state is destroyed');
+  assert.equal(overlay.mode(), 'game');
+  assert.equal(api.gameWindows.length, 1);
+  assert.equal(api.gameWindows[0].visible, true);
+});
+
+test('an in-game window still being made when the game exits never becomes the overlay', async () => {
+  const { overlay, api } = setup();
+  overlay.attachGame(api);
+  api.emit('game-injected', WOW);
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  const createWindow = api.createWindow;
+  api.createWindow = async (options) => { await gate; return createWindow(options); };
+  overlay.show();
+  await tick();
+  api.emit('game-exit', WOW, true);
+  release();
+  await tick();
+  await tick();
+  assert.equal(api.gameWindows.length, 1);
+  assert.equal(api.gameWindows[0].destroyed, true, 'the late in-game window is destroyed');
+  assert.equal(overlay.mode(), 'desktop');
+  assert.equal(overlay.window().visible, true);
+});
+
+test('a game that errors after letting the overlay in drops its in-game window', async () => {
+  const { overlay, api } = setup();
+  overlay.attachGame(api);
+  api.emit('game-injected', WOW);
+  overlay.show();
+  await tick();
+  assert.equal(overlay.mode(), 'game');
+  api.emit('game-injection-error', WOW, 'lost');
+  assert.equal(api.gameWindows[0].destroyed, true);
+  assert.equal(overlay.window(), null);
+  overlay.show();
+  await tick();
+  assert.equal(overlay.mode(), 'desktop');
+});
