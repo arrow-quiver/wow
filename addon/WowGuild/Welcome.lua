@@ -18,6 +18,11 @@ WEL.NEWS = {
     "Raids & Dungeons: join dungeon groups by role, and PvP premades for 10 or 15 with a win tally.",
     "Item tooltips now say when the guild is short of something you're holding.",
   },
+  ["0.22.0"] = {
+    "Recruiting: bind a key to \"Recruit: next step\" (Keybindings, Guild Camp). Each press searches, messages or shows who wants in.",
+    "Guild invites: the game doesn't let addons send them here. You get the player's name in chat: right-click it, Invite to guild.",
+    "Someone who whispers you asking to join the guild now goes on the officers' list.",
+  },
 }
 
 local function ago(t)
