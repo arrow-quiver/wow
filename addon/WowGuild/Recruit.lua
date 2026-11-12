@@ -283,15 +283,21 @@ end
 
 -- A whisper from someone we never messaged, asking to join (they saw the ad or heard of us): "guild" plus a word
 -- like join or invite. They go on the guild's list as interested. → "i" or nil.
+R.ASKS_AN_HOUR = 5   -- how many strangers' asks one client records in an hour (the records are shared with the guild)
 function R.asked(text, name)
   if type(name) ~= "string" or string.find(name, "[%s|]") or name == me() then return nil end
+  local d = store()
+  d.asks = d.asks or {}
+  for i = #d.asks, 1, -1 do if now() - d.asks[i] >= 3600 then table.remove(d.asks, i) end end
+  if #d.asks >= R.ASKS_AN_HOUR then return nil end
   local t = " " .. string.lower(string.gsub(text or "", "[%p]", " ")) .. " "
   if not string.find(t, " guild ", 1, true) or not said(text, ASK) or said(text, NO) then return nil end
   if inGuild(name) then return nil end
   local s = sh()
   local pid = s and s.myPid and ns.try(s.myPid)
   if not pid or not put(name, { pid = pid, level = 0, class = "", zone = "", state = "i", at = now() }) then return nil end
-  store().queue[name] = nil
+  d.queue[name] = nil
+  d.asks[#d.asks + 1] = now()
   R.wantsIn(name)
   if R.panel and R.panel:IsShown() then R.refresh() end
   return "i"
@@ -324,6 +330,9 @@ end
 -- → "asked" (the game took the request), "link" (the line to invite from is in chat), or false.
 function R.invite(name)
   if not R.isOfficer() then ns.print("Only officers (or anyone with invite rights) can invite."); return false end
+  -- Noted on every path, so the one-key flow moves on to the next player while this one makes up their mind.
+  store().shown = store().shown or {}
+  store().shown[name] = now()
   local inv = (C_GuildInfo and C_GuildInfo.Invite) or GuildInvite
   if not inv or not R.canInviteByAddon() then R.inviteLine(name); return "link" end
   R.inviting = name

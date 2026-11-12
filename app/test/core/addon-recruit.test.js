@@ -164,6 +164,13 @@ test('elsewhere: the game refusing an addon invite is remembered, and the link i
   assert.match(wow.printed(), /\|Hplayer:Healer\|h\[Healer\]\|h/);
   assert.strictEqual(wow.eval('__ns.recruit.invite("Lonewolf")'), 'link');
   assert.strictEqual(wow.eval('#__invites'), '1', 'not tried again');
+  // Where the game takes the invite, the one-key flow doesn't stick on that player: the next press moves on.
+  wow.exec(`__ns.db.recruit.inviteBlocked = nil; __ns.db.recruit.shown = {}
+    table.insert(__recs, { type = "rk", key = "Keen", author = "Thrallia", fields = { pid = "Thrallia.p4m7", state = "i", at = GetServerTime() } })`);
+  assert.strictEqual(wow.eval('(__ns.recruit.next())'), 'invite');
+  assert.strictEqual(wow.eval('__invites[#__invites]'), 'Keen');
+  assert.strictEqual(wow.eval('(__ns.recruit.next())'), 'scan', 'Keen is still deciding: on to the next thing');
+  assert.strictEqual(wow.eval('#__invites'), '2', 'not invited again');
   // An invite function that throws counts as blocked too.
   wow.exec('__ns.db.recruit.inviteBlocked = nil; C_GuildInfo.Invite = function() error("blocked") end');
   assert.strictEqual(wow.eval('__ns.recruit.invite("Lonewolf")'), 'link');
@@ -259,5 +266,16 @@ test('someone we never messaged asks to join the guild: they go on the list as i
   wow.fire('CHAT_MSG_WHISPER', 'is your guild recruiting?', 'Other');
   assert.strictEqual(wow.eval('__ns.Share.get("rk:Other").fields.state'), 'i');
   assert.match(wow.printed(), /Other wants in!\|r Your officers can invite them now/);
+  assert.strictEqual(wow.eval('__ns.debugError'), null);
+});
+
+test('asks from strangers are capped: five an hour on one client', () => {
+  const wow = client();
+  wow.exec('__clock = GetServerTime(); GetServerTime = function() return __clock end');
+  for (let i = 1; i <= 8; i += 1) wow.fire('CHAT_MSG_WHISPER', 'can i join your guild', `Asker${String.fromCharCode(96 + i)}`);
+  assert.strictEqual(wow.eval('(function() local n = 0 for _, r in ipairs(__recs) do if r.type == "rk" and r.fields.state == "i" then n = n + 1 end end return n end)()'), '5');
+  wow.exec('__clock = __clock + 3700');
+  wow.fire('CHAT_MSG_WHISPER', 'can i join your guild', 'Later');
+  assert.strictEqual(wow.eval('__ns.Share.get("rk:Later").fields.state'), 'i', 'an hour on, asks count again');
   assert.strictEqual(wow.eval('__ns.debugError'), null);
 });
