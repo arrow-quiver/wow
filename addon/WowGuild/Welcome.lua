@@ -11,6 +11,13 @@ WEL.NEWS = {
     "The Coach: your play style, a build plan from Claude, next steps, and questions (/wow coach).",
     "The Guild Camp app can install and update this addon for you.",
   },
+  ["0.21.0"] = {
+    "One window for everything: sections down the left, their pages along the top. /wow opens it.",
+    "War: a live guild map (turn on Share my position), who's coming to a call to arms, and a nemesis list.",
+    "Camp: the season leaderboard, guild goals with \"I gave\", and a getting-started list for new members.",
+    "Raids & Dungeons: join dungeon groups by role, and PvP premades for 10 or 15 with a win tally.",
+    "Item tooltips now say when the guild is short of something you're holding.",
+  },
 }
 
 local function ago(t)
