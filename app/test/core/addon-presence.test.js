@@ -227,3 +227,40 @@ test('Nemeses page: the list, and one click to put a repeat killer on kill on si
   assert.strictEqual(wow.printed(), '');
   noError(wow);
 });
+
+test('guildmates\' text shows as written on the War, Raids and Goals pages: colour codes and links are not read', () => {
+  const wow = client();
+  const evil = '|cffff0000RED|r|Hitem:1|h[x]|h';
+  const shown = '||cffff0000RED||r||Hitem:1||h[x]||h';
+  wow.exec(`__recs = {}
+    __ns.Share = __ns.Share or {}
+    __ns.Share.myPid = function() return "Thrallia.p4m7" end
+    __ns.Share.list = function(ty) local out = {} for _, r in ipairs(__recs) do if r.type == ty then out[#out + 1] = r end end return out end
+    local t, e = GetServerTime(), ${JSON.stringify(evil)}
+    table.insert(__recs, { type = "ko", key = "Gankalot", author = e, t = t, fields = { pid = "x", reason = e, state = "o" } })
+    table.insert(__recs, { type = "BT", key = "b1", author = "Mokra", t = t, fields = { target = "", zone = e, points = 5, cap = 3, ends = t + 86400, note = e, state = "o" } })
+    table.insert(__recs, { type = "dg", key = "g1", author = "Mokra", t = t, fields = { pid = "Mokra.m1", character = e, dungeon = e, startsAt = t, role = "t", tank = 1, heal = 1, dps = 3, note = e, state = "o" } })
+    table.insert(__recs, { type = "DR", key = "d1", author = "Mokra", t = t, fields = { title = "Cloth", unit = "Runecloth", goal = 10, notes = "", state = "o" } })
+    table.insert(__recs, { type = "dc", key = "c1", author = "Zed", t = t, fields = { pid = "Zed.z1", drive = "d1", character = e, amount = 2, note = "" } })
+    __ns.ctaRecent = { { zone = e, message = e, character = e, at = time() } }
+    WowGuildInbox = WowGuildInbox or {}
+    WowGuildInbox.raids = { { title = e, startsAt = time() + 3600, coming = 1, signup = "yes", role = e, reserves = { { name = e, bonus = 10 } } } }`);
+  const t = (expr) => wow.eval(`tostring(${expr}:GetText())`);
+  const pg = 'WowGuildWindow.pages';
+  wow.exec('__ns.ui.show("hunt")');
+  assert.ok(t(`${pg}.hunt.kos[1].why`).startsWith(shown), 'the reason');
+  assert.ok(t(`${pg}.hunt.kos[1].why`).includes(`added by ${shown}`), 'who added it');
+  assert.ok(t(`${pg}.hunt.bounties[1].what`).includes(`Each kill in ${shown}`) && t(`${pg}.hunt.bounties[1].what`).includes(`|cff999999${shown}|r`), 'a bounty zone and note');
+  wow.exec('__ns.ui.show("cta")');
+  assert.ok(t(`${pg}.cta.calls[1].text`).startsWith(`${shown}: ${shown} |cff999999${shown}, `), 'a call to arms');
+  wow.exec('__ns.ui.show("groups")');
+  assert.ok(t(`${pg}.groups.rows[1].title`).startsWith(`${shown}  `), 'a group name');
+  assert.ok(t(`${pg}.groups.rows[1].who`).startsWith(`${shown} (tank)`) && t(`${pg}.groups.rows[1].who`).includes(`|cff999999${shown}|r`), 'a group leader and note');
+  wow.exec('__ns.ui.show("raids")');
+  assert.strictEqual(t(`${pg}.raids.rows[1].title`), shown);
+  assert.strictEqual(t(`${pg}.raids.rows[1].me`), `You're coming as ${shown}`);
+  assert.strictEqual(t(`${pg}.raids.rows[1].reserved`), `Reserved: ${shown} (+10)`);
+  wow.exec('__ns.ui.show("goals")');
+  assert.strictEqual(t(`${pg}.goals.drives[1].who`), `Most: ${shown} 2`);
+  noError(wow);
+});
