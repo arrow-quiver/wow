@@ -261,7 +261,7 @@ function pages.cta(page)
       local c = q[#q + 1 - i]
       if c then
         local need = c.needed and string.format(" (need %d)", c.needed) or ""
-        local msgText = (c.message and c.message ~= "") and (": " .. c.message) or ""
+        local msgText = (c.message and c.message ~= "") and (": " .. plain(c.message)) or ""
         -- Who's coming (their "On my way", heard live), and how the fight has gone there since the call.
         local P = ns.presence
         local caller = c.mine and UnitName and UnitName("player") or c.character
@@ -270,7 +270,7 @@ function pages.cta(page)
         if ns.war and ns.war.since then kills, deaths = ns.war.since(c.zone, c.at) end
         local extra = (#coming > 0 and ("  |cff40bf40Coming: " .. table.concat(coming, ", ") .. "|r") or "")
           .. ((kills + deaths > 0) and string.format("  |cff999999since: %d %s, %d %s|r", kills, kills == 1 and "kill" or "kills", deaths, deaths == 1 and "death" or "deaths") or "")
-        r.text:SetText(string.format("%s%s%s |cff999999%s, %s|r%s", c.zone or "", need, msgText, c.mine and "you" or tostring(c.character or "?"), ns.ago(c.at), extra))
+        r.text:SetText(string.format("%s%s%s |cff999999%s, %s|r%s", plain(c.zone or ""), need, msgText, c.mine and "you" or plain(c.character or "?"), ns.ago(c.at), extra))
         r.coming = coming
         if c.mine then
           -- My call: invite whoever answered and isn't in my group yet (one invite each, on this click).
@@ -713,7 +713,7 @@ function pages.goals(page)
         r.bar:SetWidth(math.max(1, math.floor(BAR_W * math.min(1, d.goal > 0 and d.total / d.goal or 0))))
         r.count:SetText(string.format("%d of %d %s", d.total, d.goal, d.unit))
         local top = {}
-        for k = 1, math.min(3, #d.givers) do top[k] = string.format("%s %d", d.givers[k].name, d.givers[k].amount) end
+        for k = 1, math.min(3, #d.givers) do top[k] = string.format("%s %d", plain(d.givers[k].name), d.givers[k].amount) end
         r.who:SetText((d.mine > 0 and string.format("|cffe8a33dYou gave %d.|r  ", d.mine) or "") .. (#top > 0 and ("Most: " .. table.concat(top, ", ")) or "Nobody has given yet.")
           .. (d.notes ~= "" and ("  " .. d.notes) or ""))
         r.btn:SetScript("OnClick", function()
@@ -819,9 +819,9 @@ function pages.season(page)
         local medal = MEDAL[x.rank]
         r.rank:SetText(tostring(x.rank))
         if medal then r.rank:SetTextColor(medal[1], medal[2], medal[3]) else r.rank:SetTextColor(0.6, 0.6, 0.6) end
-        r.name:SetText(x.name .. ((x.streak or 0) >= 2 and string.format("  |cffe8a33d%d-week streak|r", x.streak) or ""))
+        r.name:SetText(plain(x.name) .. ((x.streak or 0) >= 2 and string.format("  |cffe8a33d%d-week streak|r", x.streak) or ""))
         r.name:SetTextColor(classColour(x.class))
-        r.title:SetText(x.title or "")
+        r.title:SetText(plain(x.title or ""))
         r.deeds:SetText(deeds(x))
         r.score:SetText(tostring(x.score))
         r.bar:SetWidth(math.max(2, math.floor((top > 0 and x.score / top or 0) * 160)))
@@ -833,10 +833,10 @@ function pages.season(page)
     empty:SetText(#rows == 0 and "No standings yet. They come from the Guild Camp app: keep it running and /reload." or "")
     local parts = {}
     for _, l in ipairs((s and type(s.leaders) == "table" and s.leaders) or {}) do
-      parts[#parts + 1] = string.format("|cffe8a33d%s|r %s", tostring(l.title), tostring(l.name))
+      parts[#parts + 1] = string.format("|cffe8a33d%s|r %s", plain(l.title), plain(l.name))
     end
     leaders:SetText(table.concat(parts, "   "))
-    last:SetText(ns.seasons.recapLine and ns.seasons.recapLine() or "")
+    last:SetText(plain(ns.seasons.recapLine and ns.seasons.recapLine() or ""))
     local total = s and tonumber(s.count) or #rows
     -- Ranked below the rows the app sends: no row to show, but still my place.
     local where = mineAt and string.format("You're #%d of %d.", rows[mineAt].rank, total)
@@ -917,9 +917,9 @@ function pages.hunt(page)
     for i, r in ipairs(page.kos) do
       local k = list[i]
       if k then
-        r.name:SetText(k.name)
-        local by = k.by and k.by ~= "" and ("|cff999999" .. ((k.reason and k.reason ~= "") and " · " or "") .. "added by " .. tostring(k.by) .. "|r") or ""
-        r.why:SetText(((k.reason and k.reason ~= "") and k.reason or "") .. by)
+        r.name:SetText(plain(k.name))
+        local by = k.by and k.by ~= "" and ("|cff999999" .. ((k.reason and k.reason ~= "") and " · " or "") .. "added by " .. plain(k.by) .. "|r") or ""
+        r.why:SetText(((k.reason and k.reason ~= "") and plain(k.reason) or "") .. by)
         r.btn:SetScript("OnClick", function() say(HU.remove, k.name) end)
         r.who = k.name
         r:Show()
@@ -933,8 +933,8 @@ function pages.hunt(page)
       local x = b[i]
       if x then
         r.points:SetText(string.format("%d points", x.points))
-        r.what:SetText((x.target and ("Kill " .. x.target) or ("Each kill in " .. tostring(x.zone) .. ((x.cap or 1) > 1 and (", up to " .. x.cap) or "")))
-          .. ((x.note and x.note ~= "") and ("  |cff999999" .. x.note .. "|r") or ""))
+        r.what:SetText((x.target and ("Kill " .. plain(x.target)) or ("Each kill in " .. plain(x.zone) .. ((x.cap or 1) > 1 and (", up to " .. x.cap) or "")))
+          .. ((x.note and x.note ~= "") and ("  |cff999999" .. plain(x.note) .. "|r") or ""))
         r.left:SetText(timeLeft(x.ends))
         r:Show()
       else r:Hide() end
@@ -1123,18 +1123,18 @@ function pages.raids(page)
     for i, r in ipairs(page.rows) do
       local x = raids[i]
       if x then
-        r.title:SetText(tostring(x.title or "Raid"))
+        r.title:SetText(plain(x.title or "Raid"))
         r.when:SetText(date("%a %d %b %H:%M", x.startsAt or 0) .. "  |cff999999" .. untilText(x.startsAt) .. "|r")
         r.coming:SetText(string.format("%d coming", x.coming or 0))
         local st = SIGNUP[x.signup or ""]
         if st then
-          r.me:SetText(st[1] .. ((x.role and (x.signup == "yes" or x.signup == "bench")) and (" as " .. tostring(x.role)) or ""))
+          r.me:SetText(st[1] .. ((x.role and (x.signup == "yes" or x.signup == "bench")) and (" as " .. plain(x.role)) or ""))
           r.me:SetTextColor(st[2], st[3], st[4])
         elseif x.signup == nil or x.signup == "" then r.me:SetText("Not signed up yet"); r.me:SetTextColor(0.91, 0.64, 0.24)
-        else r.me:SetText("Signed up: " .. tostring(x.signup)); r.me:SetTextColor(0.6, 0.6, 0.6) end
+        else r.me:SetText("Signed up: " .. plain(x.signup)); r.me:SetTextColor(0.6, 0.6, 0.6) end
         local parts = {}
         for _, it in ipairs(type(x.reserves) == "table" and x.reserves or {}) do
-          parts[#parts + 1] = tostring(it.name or "?") .. ((it.bonus or 0) > 0 and (" (+" .. it.bonus .. ")") or "")
+          parts[#parts + 1] = plain(it.name or "?") .. ((tonumber(it.bonus) or 0) > 0 and (" (+" .. tonumber(it.bonus) .. ")") or "")
         end
         r.reserved:SetText(#parts > 0 and ("Reserved: " .. table.concat(parts, ", ")) or "")
         r:Show()
@@ -1231,13 +1231,13 @@ local function groupsPage(page, premade)
       local e = groups[i]
       if e then
         local f = e.rec.fields
-        r.title:SetText(string.format("%s  |cff999999%s|r  %s", tostring(f.dungeon or "?"), L.whenText(f.startsAt), L.needText(e.g.open) == "full" and "|cff999999full|r" or ("|cffe8a33d" .. L.needText(e.g.open) .. "|r")))
-        local names = { string.format("%s (%s)", tostring(f.character or "?"), L.ROLE_NAME[f.role] or "dps") }
-        for _, m in ipairs(e.g.members) do names[#names + 1] = string.format("%s (%s)%s", tostring(m.character), L.ROLE_NAME[m.role] or "dps", m.guest and "*" or "") end
+        r.title:SetText(string.format("%s  |cff999999%s|r  %s", plain(f.dungeon or "?"), L.whenText(f.startsAt), L.needText(e.g.open) == "full" and "|cff999999full|r" or ("|cffe8a33d" .. L.needText(e.g.open) .. "|r")))
+        local names = { string.format("%s (%s)", plain(f.character or "?"), L.ROLE_NAME[f.role] or "dps") }
+        for _, m in ipairs(e.g.members) do names[#names + 1] = string.format("%s (%s)%s", plain(m.character), L.ROLE_NAME[m.role] or "dps", m.guest and "*" or "") end
         -- A premade's line-up is too long for a row: show how many are in and the first few.
         if premade and #names > 4 then names = { string.format("%d in: %s, %s, %s and %d more", #names, names[1], names[2], names[3], #names - 3) } end
         local wait = #e.g.waiting > 0 and string.format("  |cff999999+%d waiting|r", #e.g.waiting) or ""
-        r.who:SetText(table.concat(names, ", ") .. wait .. ((f.note and f.note ~= "") and ("  |cff999999" .. tostring(f.note) .. "|r") or ""))
+        r.who:SetText(table.concat(names, ", ") .. wait .. ((f.note and f.note ~= "") and ("  |cff999999" .. plain(f.note) .. "|r") or ""))
         if e.mine then
           if premade then
             setButtons(r, { { "Invite all", function() L.last = groups; say(L.inviteGroup, i) end },
@@ -1359,7 +1359,7 @@ function pages.deals(page)
       local d = list[i]
       if d then
         local gone = d.state == "gone"
-        r.name:SetText(d.name)
+        r.name:SetText(plain(d.name))
         r.name:SetTextColor(gone and 0.5 or 1, gone and 0.5 or 1, gone and 0.5 or 1)
         r.buy:SetText(DH.money(d.buy)); r.worth:SetText(DH.money(d.worth))
         r.profit:SetText(gone and "" or ("+" .. DH.money(math.max(0, d.profit or 0))))
@@ -1428,9 +1428,9 @@ function pages.alerts(page)
     for i, r in ipairs(page.rows) do
       local w = list[i]
       if w then
-        r.name:SetText(tostring(w.name or ("item " .. w.id)))
+        r.name:SetText(plain(w.name or ("item " .. w.id)))
         r.target:SetText("under " .. money(w.target))
-        local why = w.kind == "guild" and ("guild bank request" .. (w.who and (" from " .. tostring(w.who)) or "")) or w.kind == "list" and "your shopping list" or "your alert"
+        local why = w.kind == "guild" and ("guild bank request" .. (w.who and (" from " .. plain(w.who)) or "")) or w.kind == "list" and "your shopping list" or "your alert"
         r.why:SetText(w.own and ("|cffe8a33dyour target|r" .. (w.usual and ("  |cff999999usual " .. money(w.usual) .. "|r") or "") .. (w.kind ~= "alert" and ("  |cff999999" .. why .. "|r") or ""))
           or ("|cff99999985% of the usual " .. money(w.usual) .. " · " .. why .. "|r"))
         if w.own then
