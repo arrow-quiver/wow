@@ -147,3 +147,10 @@ test('shout-outs: my own new donations and badges go to Discord once; old ones n
   assert.strictEqual(await shout(), 0, 'once');
   assert.ok(!posts.some((p) => /Grommash|50g/.test(p)));
 });
+
+test('recap: "by N guildies" counts only who earned points that month, not streak carry-overs (review of #68)', () => {
+  const p = (name, base, streak, rank) => ({ name, base, streak, rank, gold: base, kills: 0, crafts: 0, raids: 0 });
+  const rc = S.recap({ players: [p('Grom', 50, 3, 1), p('Jaina', 20, 1, 2), p('Thrall', 0, 4, 3)] });
+  assert.strictEqual(rc.players, 2);
+  assert.strictEqual(rc.gold, 70);
+});
