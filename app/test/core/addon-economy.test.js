@@ -103,3 +103,16 @@ __ns.Share.list = function(ty) local out = {} for _, r in ipairs(__recs) do if r
   assert.strictEqual(short(2320), '3');
   assert.strictEqual(wow.eval('__ns.debugError'), null);
 });
+
+test('mats rows: the requester\'s name and the item show as written, not as UI codes (review of #73)', () => {
+  const wow = new WowClient({ inbox: INBOX });
+  wow.login();
+  wow.exec(`${RECIPES}
+__recs = { { type = "cr", key = "c00001", author = "Zul|cffff0000sha", fields = { item = "Heavy Linen Gloves", state = "o" } } }
+__ns.Share = __ns.Share or {}
+__ns.Share.list = function(ty) local out = {} for _, r in ipairs(__recs) do if r.type == ty then out[#out + 1] = r end end return out end`);
+  wow.exec('__rows = __ns.mats.rows()');
+  assert.strictEqual(wow.eval('#__rows'), '1');
+  assert.strictEqual(wow.eval('__rows[1].text'), 'Zul||cffff0000sha wants Heavy Linen Gloves |cff9e9ea8(Thrallia)|r');
+  assert.strictEqual(wow.eval('__ns.debugError'), null);
+});

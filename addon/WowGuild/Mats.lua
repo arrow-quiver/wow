@@ -102,6 +102,8 @@ function MM.nudge()
   return n
 end
 
+local function plain(s) return (string.gsub(tostring(s or ""), "|", "||")) end
+
 local function whisper(text, to)
   local send = (C_ChatInfo and C_ChatInfo.SendChatMessage) or SendChatMessage
   return send and pcall(send, text, "WHISPER", nil, to) or false
@@ -117,8 +119,8 @@ function MM.rows()
     end } }
   end
   for _, c in ipairs(m.craft) do
-    -- The item is what the guildmate typed: "|" is doubled so it shows as written.
-    rows[#rows + 1] = { text = string.format("%s wants %s%s |cff9e9ea8(%s)|r", c.who, c.count > 1 and (c.count .. " × ") or "", (string.gsub(tostring(c.item), "|", "||")), c.as), button = { "Whisper", function()
+    -- The item and names come from guildmates' records: "|" is doubled so they show as written.
+    rows[#rows + 1] = { text = string.format("%s wants %s%s |cff9e9ea8(%s)|r", plain(c.who), c.count > 1 and (c.count .. " × ") or "", plain(c.item), plain(c.as)), button = { "Whisper", function()
       whisper(string.format("Hi %s! I can make %s for you. Send me the mats or tell me what you've got.", c.who, c.item), c.who)
     end } }
   end

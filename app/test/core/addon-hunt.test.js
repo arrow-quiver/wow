@@ -217,3 +217,11 @@ test('War report page: the guild\'s week by zone, and the map marks switch', () 
   assert.strictEqual(wow.eval('tostring(__ns.opt("warMap"))'), 'true');
   noError(wow);
 });
+
+test('the kill-on-sight chat list shows a name as written, not as UI codes (review of #73)', () => {
+  const wow = client();
+  wow.exec('table.insert(__recs, { type = "ko", key = "Bad|cffff0000Guy", author = "Mokra", t = GetServerTime() - 50, fields = { pid = "Mokra.m1", reason = "", state = "o" } })');
+  assert.strictEqual(wow.eval('__ns.hunt.slash("")'), '2');
+  assert.match(wow.printed(), /  Bad\|\|cffff0000Guy/);
+  assert.strictEqual(wow.eval('__ns.debugError'), null);
+});
