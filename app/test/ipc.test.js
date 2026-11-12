@@ -720,10 +720,17 @@ describe('main.js helpers', () => {
 // ---------------------------------------------------------------------------------------------
 describe('main window', () => {
   // window.js requires Electron lazily; stand in a fake BrowserWindow for these tests only.
-  const electronId = require.resolve('electron');
+  // Outside Electron there is no 'electron' module to resolve (the app is built on @overwolf/ow-electron),
+  // so the name is pointed at a made-up file whose cache entry is the fake.
+  const Module = require('node:module');
+  const electronId = path.join(__dirname, 'fake-electron.js');
+  const resolveFilename = Module._resolveFilename;
   let saved;
   let windows;
   beforeEach(() => {
+    Module._resolveFilename = function resolve(request, ...rest) {
+      return request === 'electron' ? electronId : resolveFilename.call(this, request, ...rest);
+    };
     saved = require.cache[electronId];
     windows = [];
     class FakeWindow extends EventEmitter {
@@ -751,6 +758,7 @@ describe('main window', () => {
     require.cache[electronId] = { id: electronId, filename: electronId, loaded: true, exports: { BrowserWindow: FakeWindow, shell: { openExternal: async () => {} }, screen: { getAllDisplays: () => [{ workArea: { x: 0, y: 0, width: 1920, height: 1080 } }] } } };
   });
   afterEach(() => {
+    Module._resolveFilename = resolveFilename;
     if (saved) require.cache[electronId] = saved;
     else delete require.cache[electronId];
   });

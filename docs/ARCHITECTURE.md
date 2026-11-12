@@ -11,7 +11,7 @@ The decisions behind this design are in [PIVOT.md](PIVOT.md). The in-game sharin
 
 | Part | Where | What it does |
 |---|---|---|
-| **The app** ("Guild Camp") | `app/` | An Electron desktop app for Windows. It shows everything a player sees and does, syncs with the game in the background, and installs and updates the addon. Inside it runs the **local core**: the old server's domain logic, an Express app on `127.0.0.1` over a SQLite database in the player's user data folder. |
+| **The app** ("Guild Camp") | `app/` | An Electron desktop app for Windows. Releases run on plain Electron; the same code also runs on Overwolf Electron (`npm run start:overwolf`, see RELEASING.md), where the war table is drawn inside the game. It shows everything a player sees and does, syncs with the game in the background, and installs and updates the addon. Inside it runs the **local core**: the old server's domain logic, an Express app on `127.0.0.1` over a SQLite database in the player's user data folder. |
 | **The addon** (WowGuild, listed as "Guild Camp") | `addon/WowGuild/` | Runs in the game (interfaces 16001 for Forever and 120105 for Retail). It collects what the game shows outside combat, saves it for the app, shows the guild news the app writes back, and trades guild data with guildmates over WoW's hidden addon channel. |
 | **GitHub Releases** | `arrow-quiver/wow` releases | App installers (tag `v<version>`, marked Latest) and addon zips (tag `addon-v<version>`, never Latest). Apps update themselves and the addon from here. Releases are published with the GitHub CLI (`gh`). |
 

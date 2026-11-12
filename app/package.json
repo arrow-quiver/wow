@@ -4,13 +4,24 @@
   "version": "0.21.0",
   "private": true,
   "description": "Guild Camp: your guild, your addon and your characters in one desktop app",
-  "author": "Calvin",
+  "author": {
+    "name": "Calvin"
+  },
   "main": "src/main/main.js",
+  "overwolf": {
+    "packages": [
+      "overlay"
+    ]
+  },
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
     "smoke": "electron . --smoke",
     "dist": "electron-builder --win --publish never",
+    "start:overwolf": "ow-electron .",
+    "dev:overwolf": "ow-electron . --dev",
+    "smoke:overwolf": "ow-electron . --smoke",
+    "dist:overwolf": "ow-electron-builder --win --publish never -c.directories.output=dist-overwolf",
     "vendor": "node ../scripts/vendor.js",
     "test": "node --max-old-space-size=4096 --test \"test/**/*.test.{js,mjs}\""
   },
@@ -21,6 +32,9 @@
   "devDependencies": {
     "@fontsource/alegreya": "^5.2.5",
     "@fontsource/alegreya-sans": "^5.2.5",
+    "@overwolf/ow-electron": "44.9.0",
+    "@overwolf/ow-electron-builder": "^26.18.1",
+    "@overwolf/ow-electron-packages-types": "1.1.14",
     "electron": "45.2.1",
     "electron-builder": "^26.18.0",
     "fengari": "^0.1.5",
