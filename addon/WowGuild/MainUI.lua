@@ -1451,14 +1451,18 @@ function pages.recruit(page)
     text = function()
       local R = ns.recruit
       local lines = { "|cffffd100The recruiting desk|r",
-        "Scan /who for players without a guild, message them one at a time, and post the guild's ad.",
-        "Every message and invite is your own click, and nobody is messaged twice.", "" }
+        "One press does the next thing: show who wants in, message the next player without a guild, or search /who.",
+        "Bind a key to \"Recruit: next step\" (Esc, Options, Keybindings, Guild Camp) and keep pressing it.",
+        "Every search and message is your own press, nobody is messaged twice, and it stops at the daily limit.", "" }
+      local okp, peek = pcall(R.peek)
+      if okp and peek then lines[#lines + 1] = "|cffe8a33dNext step: " .. plain(peek.text) .. "|r" end
+      if R.onForever and R.onForever() then lines[#lines + 1] = "|cff999999The game doesn't let addons send guild invites here: you get the name in chat to right-click and invite.|r" end
       local ok, sent = pcall(R.sentToday)
       local okq, queue = pcall(R.queue)
       if ok and okq then lines[#lines + 1] = string.format("|cff999999%d of %d messages today, %d players in the queue.|r", sent or 0, R.DAILY or 0, #(queue or {})) end
       return table.concat(lines, "\n")
     end,
-    buttons = { { "Open the recruiting desk", function() ns.recruit.show() end, 200 } },
+    buttons = { { "Next step", function() ns.recruit.next() end, 120 }, { "Open the recruiting desk", function() ns.recruit.show() end, 200 } },
   })
 end
 
@@ -1879,3 +1883,4 @@ function WowGuild_Toggle() W.toggle() end
 BINDING_HEADER_WOWGUILD = "Guild Camp"
 BINDING_NAME_WOWGUILD_TOGGLE = "Open or close the guild window"
 BINDING_NAME_WOWGUILD_COACH = "Open or close the Coach"
+BINDING_NAME_WOWGUILD_RECRUIT_NEXT = "Recruit: next step"
