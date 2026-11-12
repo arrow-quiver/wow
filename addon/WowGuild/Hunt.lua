@@ -235,7 +235,7 @@ function HU.slash(rest)
   ns.print(RED .. "Kill on sight|r (" .. HU.KOS_POINTS .. " season points a kill):")
   for i, k in ipairs(list) do
     if i > 15 then ns.print(string.format("  … and %d more in the Guild Camp app.", #list - 15)); break end
-    ns.print(string.format("  %s%s", k.name, k.reason and k.reason ~= "" and (" — " .. plain(k.reason)) or ""))
+    ns.print(string.format("  %s%s", plain(k.name), k.reason and k.reason ~= "" and (" — " .. plain(k.reason)) or ""))
   end
   return #list
 end
