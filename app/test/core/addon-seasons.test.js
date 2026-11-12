@@ -150,3 +150,25 @@ test('last season: the recap lines, once in chat for each finished season, and o
   assert.strictEqual(wow.eval('WowGuildWindow.pages.season.last:GetText()'), '');
   assert.strictEqual(wow.eval('__ns.debugError'), null, 'no addon errors');
 });
+
+test('Leaderboard page: ranked below the rows the app sends, the footer still gives my place', () => {
+  const inbox = `WowGuildInbox = WowGuildInbox or {}
+WowGuildInbox.seasons = { month = "2026-11", daysLeft = 19, count = 60, players = {
+  Grommash = { title = "MVP", rank = 1, score = 306, streak = 3, badges = 2, best = "Bloodied" },
+  Tester = { title = "", rank = 42, score = 2, streak = 0, badges = 0, best = "" },
+}, board = {
+  { rank = 1, name = "Grommash", class = "Warrior", score = 306, streak = 3, title = "MVP", gold = 120, kills = 14, crafts = 2, raids = 3 },
+  { rank = 2, name = "Jainah", class = "Mage", score = 33 },
+} }`;
+  const wow = boardClient(inbox);
+  assert.strictEqual(wow.eval('__ns.debugError'), null, 'no addon errors');
+  const t = wow.texts();
+  assert.ok(t.includes("You're #42 of 60.  The full board of 60 is in the Guild Camp app."), t.filter((x) => /You/.test(x)).join(' | '));
+  assert.ok(!t.some((x) => /not on the board yet/.test(x)));
+  assert.strictEqual(row(wow, 1, 'me'), 'false');
+  assert.strictEqual(row(wow, 2, 'me'), 'false');
+
+  // Not ranked at all: the nudge to get on the board stays.
+  const unranked = boardClient(inbox.replace('rank = 42, score = 2', 'rank = 0, score = 0'));
+  assert.ok(unranked.texts().some((x) => /You're not on the board yet/.test(x)));
+});

@@ -803,7 +803,7 @@ function pages.season(page)
   page.head, page.empty, page.leaders, page.foot = head, empty, leaders, foot
 
   page.refresh = function()
-    local rows, s = ns.seasons.board()
+    local rows, s, myRank = ns.seasons.board()
     head:SetText(s and ("Season: " .. monthName(s.month)) or "Season")
     local days = s and tonumber(s.daysLeft)
     left:SetText(days and days > 0 and (days == 1 and "Last day" or (days .. " days left")) or "")
@@ -838,7 +838,9 @@ function pages.season(page)
     leaders:SetText(table.concat(parts, "   "))
     last:SetText(ns.seasons.recapLine and ns.seasons.recapLine() or "")
     local total = s and tonumber(s.count) or #rows
+    -- Ranked below the rows the app sends: no row to show, but still my place.
     local where = mineAt and string.format("You're #%d of %d.", rows[mineAt].rank, total)
+      or (myRank and string.format("You're #%d of %d.", myRank, total))
       or (#rows > 0 and "You're not on the board yet: give to the guild bank, fill a crafting request, raid or fight in the open world." or "")
     foot:SetText(where .. (total > #show and #show > 0 and string.format("  The full board of %d is in the Guild Camp app.", total) or ""))
   end
