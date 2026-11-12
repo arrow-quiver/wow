@@ -116,6 +116,41 @@ The Windows installer is built with electron-builder, on Windows. To build on yo
 Node.js 24, then run `npm install` in `app/` once. If you aren't on Windows, use GitHub Actions for app
 releases (it builds on a Windows machine).
 
+#### The Overwolf build (not released yet)
+
+The same code also runs on Overwolf Electron (`@overwolf/ow-electron`), where Overwolf's overlay package draws
+the war table inside the game, in real fullscreen too. Until the app is registered and approved with Overwolf,
+**releases stay on plain Electron**: `npm run dist`, `scripts/release.js` and the release workflow are
+unchanged, and need nothing from Overwolf. The Overwolf build has its own scripts in `app/`:
+
+| Script | What it does |
+|---|---|
+| `npm run start:overwolf` / `dev:overwolf` / `smoke:overwolf` | Run from source on Overwolf Electron. |
+| `npm run dist:overwolf` | Build the Overwolf installer into `app/dist-overwolf/` (gitignored), never into `dist/`, so it can't end up in a release by accident. |
+
+On plain Electron there is no `app.overwolf`, and the war table is the always-on-top window, as before.
+
+`dist:overwolf` must be signed by Overwolf, or Overwolf's packages refuse to load in the installed app. The
+builder stops with `[OW] signing required but OW_CLI_EMAIL/OW_CLI_API_KEY/OW_BUILD_KEY are not set` until
+these are set in your shell (never commit them):
+
+| Variable | What it is |
+|---|---|
+| `OW_CLI_EMAIL` | The email of your Overwolf developer console account. |
+| `OW_CLI_API_KEY` | That account's API key. |
+| `OW_BUILD_KEY` | The build key of the app registered in the console. |
+
+The app's Overwolf id comes from `productName` and `author.name` in `app/package.json`
+("Guild Camp" by "Calvin" → `gnbjoigjdakoplbncgpbcpmafapidekcgkknimak`). Changing either changes the id, and
+the app must be registered again. The app logs its id at start ("Running on Overwolf Electron (app id …)").
+
+To check that Overwolf packaging works without the keys (the result is not for players: the war table falls
+back to the desktop window), run in `app/`:
+
+```
+npm run dist:overwolf -- --dir -c.overwolf.requireSigning=false
+```
+
 Check everything:
 ```
 node scripts/release.js status

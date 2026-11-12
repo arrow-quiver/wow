@@ -10,3 +10,4 @@ app/dist/
 .DS_Store
 # Battle.net client id and secret, written by scripts/release.js just before a build (never commit)
 app/src/main/bnet-credentials.json
+app/dist-overwolf/
