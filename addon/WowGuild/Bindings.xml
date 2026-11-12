@@ -5,4 +5,7 @@
   <Binding name="WOWGUILD_COACH" header="WOWGUILD" category="ADDONS">
     WowGuild_ToggleCoach()
   </Binding>
+  <Binding name="WOWGUILD_RECRUIT_NEXT" header="WOWGUILD" category="ADDONS">
+    WowGuild_RecruitNext()
+  </Binding>
 </Bindings>
