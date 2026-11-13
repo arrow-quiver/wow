@@ -1,0 +1,29 @@
+## Interface: 16001
+## Title: Warband Codex
+## Notes: One window for WoW Forever: gear planner, dungeons and raids, professions, talent calculator, hunter pets, reputations, a PvP hub and quality-of-life helpers. Links to Guild Camp for guild events, groups and the kill-on-sight list.
+## Author: BaseLayer Labs
+## Version: 0.1.0
+## SavedVariables: WarbandCodexDB
+## OptionalDeps: WowGuild
+## IconTexture: Interface\Icons\INV_Misc_Book_09
+## AddonCompartmentFunc: WarbandCodex_OnAddonCompartmentClick
+
+Core.lua
+Theme.lua
+Shell.lua
+Data\Dungeons.lua
+Data\DungeonQuests.lua
+Data\Classes.lua
+Data\Pets.lua
+Data\Factions.lua
+Modules\Home.lua
+Modules\Armory.lua
+Modules\Dungeons.lua
+Modules\Professions.lua
+Modules\Talents.lua
+Modules\Pets.lua
+Modules\Reputation.lua
+Modules\PvP.lua
+Modules\Guild.lua
+Modules\QoL.lua
+Modules\Settings.lua
