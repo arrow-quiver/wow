@@ -301,7 +301,9 @@ WowGuildDB = {
   assert.strictEqual(db.ui.minimapAngle, 45);
   assert.doesNotMatch(wow.printed(), /crafting request|campfire/, 'login news stays off');
   wow.slash('');
-  assert.strictEqual(text(wow, 'WowGuildWindow:IsShown()'), 'true');
+  assert.strictEqual(text(wow, 'WowGuildQuick:IsShown()'), 'true', '/wow opens the quick panel');
+  wow.slash('full');
+  assert.strictEqual(text(wow, 'WowGuildWindow:IsShown()'), 'true', '/wow full opens the full window');
   noError(wow);
 });
 
@@ -333,7 +335,10 @@ function uiClient() {
   fs.writeFileSync(inboxFile, `WowGuildInbox = ${toLua(UI_INBOX())}\n`);
   const wow = new WowClient({ inboxFile });
   wow.exec(TRADESKILL);
-  return wow.login();
+  wow.login();
+  // These tests are about the full in-game window, which is now behind an option (the quick panel is the default).
+  wow.exec('__ns.db.options.fullWindow = true');
+  return wow;
 }
 
 test('minimap button opens the window on the Camp tab with raids, notices and status', () => {
@@ -459,7 +464,7 @@ test('Settings tab: options apply immediately, app link and update notice shown'
   assert.strictEqual(text(wow, 'WowGuildMinimapButton:IsShown()'), 'true');
   // Every option has a box, in the same order as the Blizzard options panel.
   assert.strictEqual(wow.eval(`#${page}.boxes`), wow.eval('#__ns.OPTION_LIST'));
-  assert.strictEqual(wow.eval('#__ns.OPTION_LIST'), '27');
+  assert.strictEqual(wow.eval('#__ns.OPTION_LIST'), '28');
   wow.exec('__ns.optionsPanel.scripts.OnShow()');
   assert.strictEqual(text(wow, '__ns.optionsPanel.boxes[2]:GetChecked()'), 'true');
   wow.exec('__ns.optionsPanel.boxes[2]:SetChecked(false); __click(__ns.optionsPanel.boxes[2])');
@@ -659,7 +664,7 @@ test('Settings: options in groups with a description, a search box and the windo
   const page = 'WowGuildWindow.pages.settings';
   // Every option has a group and a description.
   assert.strictEqual(wow.eval('(function() for _, o in ipairs(__ns.OPTION_LIST) do if not o.group or not o.desc or o.desc == "" then return o.key end end return "ok" end)()'), 'ok');
-  assert.strictEqual(wow.eval(`${page}.matches`), '27');
+  assert.strictEqual(wow.eval(`${page}.matches`), '28');
   const shown = () => wow.get(`(function() local t = {} for _, cb in ipairs(${page}.boxes) do if cb:IsShown() then t[#t + 1] = cb.key end end return t end)()`) || [];
   wow.exec(`${page}.search:SetText("auction"); ${page}.search.scripts.OnTextChanged(${page}.search)`);
   assert.ok(shown().includes('dealsPanel') && shown().includes('ahTab') && shown().includes('priceAlerts'));
@@ -669,7 +674,7 @@ test('Settings: options in groups with a description, a search box and the windo
   assert.strictEqual(wow.eval(`${page}.matches`), '0');
   assert.ok(wow.texts().includes('Nothing matches.'));
   wow.exec(`${page}.search:SetText(""); ${page}.search.scripts.OnTextChanged(${page}.search)`);
-  assert.strictEqual(shown().length, 27);
+  assert.strictEqual(shown().length, 28);
   // Window size: 80% to 130%, remembered.
   wow.click(`${page}.larger`);
   assert.strictEqual(wow.eval('string.format("%.1f", WowGuildDB.ui.scale)'), '1.1');
@@ -718,11 +723,11 @@ function LibStub(name) if name == "LibDataBroker-1.1" then return ldb elseif nam
   assert.strictEqual(wow.eval('tostring(__dbicon.shown)'), 'true');
   assert.strictEqual(wow.eval('tostring(WowGuildMinimapButton)'), 'nil', 'no duplicate button');
   wow.exec('__ldbobj.OnClick(nil, "LeftButton")');
-  assert.strictEqual(wow.eval('tostring(WowGuildWindow:IsShown())'), 'true');
+  assert.strictEqual(wow.eval('tostring(WowGuildQuick:IsShown())'), 'true', 'a click opens the quick panel');
   wow.exec('__ldbobj.OnClick(nil, "RightButton")');
   assert.strictEqual(text(wow, '__ns.ui.current'), 'settings');
   wow.exec('__lines = {}; __ldbobj.OnTooltipShow({ AddLine = function(_, l) table.insert(__lines, l) end })');
-  assert.deepStrictEqual(wow.get('__lines'), ['Guild Camp', 'Click: open the guild window', 'Right-click: settings']);
+  assert.deepStrictEqual(wow.get('__lines'), ['Guild Camp', 'Click: quick actions (all pages: Ctrl+Shift+G)', 'Right-click: settings']);
   wow.exec('WowGuildDB.options.minimapButton = false; __ns.applyOptions()');
   assert.strictEqual(wow.eval('tostring(__dbicon.shown)'), 'false');
   assert.strictEqual(wow.eval('tostring(WowGuildDB.ui.dbicon.hide)'), 'true', 'LibDBIcon remembers it');

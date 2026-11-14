@@ -72,11 +72,14 @@ function NewGroupCard({ chars, onPosted }) {
     if (r.ok) { setNote(''); setWhen(''); onPosted(); }
   };
   const count = (k) => html`<${Select} label=${ROLE_LABEL[k]} value=${String(slots[k])} fieldClass="dungeons-slot"
-    onValue=${(v) => setSlots({ ...slots, [k]: Number(v) })} options=${[0, 1, 2, 3, 4, 5, 6, 7, 8].map((n) => ({ value: String(n), label: String(n) }))} />`;
+    onValue=${(v) => setSlots({ ...slots, [k]: Number(v) })} options=${[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => ({ value: String(n), label: String(n) }))} />`;
+  // A dungeon run, or a PvP premade for 10 or 15 (Darkspear Islands is 15).
+  const PRESETS = [['Dungeon (5)', { tank: 1, healer: 1, dps: 3 }], ['Premade (10)', { tank: 1, healer: 3, dps: 6 }], ['Premade (15)', { tank: 1, healer: 4, dps: 10 }]];
+  const same = (a, b) => a.tank === b.tank && a.healer === b.healer && a.dps === b.dps;
   if (!chars.length) {
     return html`<${Card} title="Start a group"><p class="muted mb-0">Log in to World of Warcraft on a character in your guild first, then log out or type /reload.</p><//>`;
   }
-  return html`<${Card} title="Start a group" class="dungeons-post">
+  return html`<${Card} title="Start a group or a premade" class="dungeons-post">
     <form class="stack" onSubmit=${submit} novalidate>
       <div class="form-grid dungeons-form">
         <${Select} label="Character" value=${character} onValue=${setCharacter}
@@ -86,6 +89,10 @@ function NewGroupCard({ chars, onPosted }) {
         <datalist id="dungeon-names">${suggestions.map((d) => html`<option key=${d.name} value=${d.name}>${d.min}–${d.max}</option>`)}</datalist>
         <${Select} label="Your role" value=${role} onValue=${setRole} options=${ROLES} />
         <${Input} label="When" type="datetime-local" value=${when} onValue=${setWhen} hint="Leave empty for right now." />
+      </div>
+      <div class="row dungeons-presets" role="group" aria-label="Group size">
+        ${PRESETS.map(([label, p]) => html`<${Button} key=${label} size="sm" variant=${same(slots, p) ? 'primary' : 'ghost'} aria-pressed=${same(slots, p)}
+          onClick=${() => { setSlots(p); if (p.dps > 3 && !dungeon.trim()) setDungeon('Darkspear Islands'); }}>${label}<//>`)}
       </div>
       <div class="row dungeons-slots">
         ${count('tank')}${count('healer')}${count('dps')}

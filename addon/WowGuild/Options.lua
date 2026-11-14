@@ -30,6 +30,7 @@ ns.OPTION_LIST = {
   { key = "liveLink", group = "Coach", label = "Turn on combat logging when I log in (the Guild Camp app's live link reads it)", desc = "For the Coach overlay and \"Why did I die?\"." },
   { key = "blizzardStyle", group = "Window", label = "Use Blizzard's window style instead of the guild's dark-and-gold look (reload to apply)", desc = "The same window in the game's own frame." },
   { key = "shareLocation", group = "War", label = "Share my position with the guild (open world only)", desc = "Guildies see you on their world map. Off until you turn it on; never in instances." },
+  { key = "fullWindow", group = "Window", label = "Use the full in-game window instead of the quick panel", desc = "The war table (Ctrl+Shift+G) has every page. Turn this on to browse them in game too." },
   { key = "smartOpen", group = "Window", label = "Open the window on what I'm doing", desc = "Dungeon quests in a dungeon, deals at the auction house, a fresh call to arms." },
 }
 local OPTIONS = ns.OPTION_LIST

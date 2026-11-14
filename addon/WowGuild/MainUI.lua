@@ -1804,7 +1804,7 @@ local function createMini()
   border:SetPoint("TOPLEFT")
   b:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
   b:SetScript("OnClick", function(_, which)
-    if which == "RightButton" then W.show("settings") else W.toggle() end
+    if which == "RightButton" then W.show("settings") else ns.quick.open() end
   end)
   b:SetScript("OnDragStart", function(self)
     self:SetScript("OnUpdate", function()
@@ -1822,7 +1822,7 @@ local function createMini()
     if not GameTooltip then return end
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
     GameTooltip:AddLine("Guild Camp")
-    GameTooltip:AddLine("Click: open the guild window", 1, 1, 1)
+    GameTooltip:AddLine("Click: quick actions (all pages: Ctrl+Shift+G)", 1, 1, 1)
     GameTooltip:AddLine("Right-click: settings", 1, 1, 1)
     GameTooltip:AddLine("Drag: move this button", 0.6, 0.6, 0.6)
     GameTooltip:Show()
@@ -1840,10 +1840,10 @@ local function setupBroker()
   if not ldb then return end
   ldbObject = ldb:NewDataObject("Guild Camp", {
     type = "launcher", label = "Guild Camp", icon = "Interface\\Icons\\Spell_Fire_Fire",
-    OnClick = function(_, which) if which == "RightButton" then W.show("settings") else W.toggle() end end,
+    OnClick = function(_, which) if which == "RightButton" then W.show("settings") else ns.quick.open() end end,
     OnTooltipShow = function(tt)
       tt:AddLine("Guild Camp")
-      tt:AddLine("Click: open the guild window", 1, 1, 1)
+      tt:AddLine("Click: quick actions (all pages: Ctrl+Shift+G)", 1, 1, 1)
       tt:AddLine("Right-click: settings", 1, 1, 1)
     end,
   })
@@ -1878,8 +1878,10 @@ ns.minimapButton = function() return mini end
 ns.on("PLAYER_LOGIN", function() ns.applyOptions() end)
 
 -- Retail's addon drawer (AddonCompartmentFunc in the .toc) and the key binding (Bindings.xml).
-function WowGuild_OnAddonCompartmentClick() W.toggle() end
-function WowGuild_Toggle() W.toggle() end
+-- The campfire, the addon list and the key binding open the quick panel (Quick.lua), or this window for players who
+-- turned on "Use the full in-game window".
+function WowGuild_OnAddonCompartmentClick() ns.quick.open() end
+function WowGuild_Toggle() ns.quick.open() end
 BINDING_HEADER_WOWGUILD = "Guild Camp"
 BINDING_NAME_WOWGUILD_TOGGLE = "Open or close the guild window"
 BINDING_NAME_WOWGUILD_COACH = "Open or close the Coach"
