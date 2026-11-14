@@ -64,3 +64,27 @@ test('GuildCampAPI.publish keeps another addon\'s snapshot in the saved data, by
   assert.match(wow.saveVariablesBuffer().toString(), /\["character_Thrallia"\]/);
   noError(wow);
 });
+
+test('GuildCampAPI.publish keeps a plain, size-capped copy, never the caller\'s table (review of #78)', () => {
+  const wow = client();
+  // A copy: changing the caller's table afterwards changes nothing saved. Functions and cycles are left out.
+  wow.exec(`__snap = { level = 23, gear = { "Helm" }, fn = function() end, [true] = 1 }
+    __snap.self = __snap; __snap.gear.back = __snap
+    __ok = GuildCampAPI.publish("WarbandCodex", "character_Thrallia", __snap)
+    __snap.level = 99; __snap.gear[1] = "Changed"`);
+  assert.strictEqual(wow.get('__ok'), true);
+  assert.deepStrictEqual(wow.get('WowGuildDB.ext.WarbandCodex.character_Thrallia.data'), { level: 23, gear: ['Helm'] });
+  assert.strictEqual(wow.eval('tostring(WowGuildDB.ext.WarbandCodex.character_Thrallia.data == __snap)'), 'false');
+  // Too deep: the deep part is dropped. Too big: nothing is kept and the old snapshot stays.
+  wow.exec(`local t = {} local c = t for i = 1, 20 do c.x = {} c = c.x end c.leaf = "deep"
+    __deepOk = GuildCampAPI.publish("WarbandCodex", "deep", t)`);
+  assert.strictEqual(wow.get('__deepOk'), true);
+  assert.strictEqual(wow.eval('tostring(string.find(tostring(WowGuildDB.ext.WarbandCodex.deep.data.x.x.x.x.x.x.x.x), "table"))'), 'nil');
+  wow.exec(`local big = {} for i = 1, 2000 do big[i] = string.rep("x", 40) end
+    __bigOk = GuildCampAPI.publish("WarbandCodex", "character_Thrallia", { big = big })`);
+  assert.strictEqual(wow.get('__bigOk'), false);
+  assert.deepStrictEqual(wow.get('WowGuildDB.ext.WarbandCodex.character_Thrallia.data'), { level: 23, gear: ['Helm'] });
+  wow.logout();
+  assert.ok(wow.saveVariablesBuffer().length < 64 * 1024);
+  noError(wow);
+});

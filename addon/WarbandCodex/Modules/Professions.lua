@@ -73,7 +73,10 @@ function P.all()
   table.sort(out, function(a, b) return a.name < b.name end)
   return out
 end
-P.answers = {}   -- recipe (lower case) → { sender = true }, this session
+P.answers = {}   -- recipe (lower case) → { sender = true }, this session; only for recipes I asked about
+P.asked = {}     -- recipe (lower case) → when I asked the guild, this session
+P.ASK_WINDOW = 120   -- seconds an answer to my question is accepted
+P.MAX_ANSWERS = 40   -- guildmates kept per recipe
 -- → { mine = { chars }, guild = { names from Guild Camp }, codex = { guildmates who answered } }
 function P.who(recipe)
   local low = string.lower(recipe or "")
@@ -91,19 +94,39 @@ end
 function P.ask(recipe)
   recipe = string.sub(tostring(recipe or ""), 1, 80)
   if #recipe < 3 then return false end
-  return ns.send("RQ", recipe, "GUILD")
+  local ok = ns.send("RQ", recipe, "GUILD")
+  if ok then P.asked[string.lower(recipe)] = ns.now() end
+  return ok
 end
-ns.onMessage("RQ", function(body, sender)
-  if not ns.opt("recipeShare") or sender == ns.me() then return end
+-- Is this player in my guild's roster? (Answers come by whisper, so the channel alone doesn't say.)
+function P.isGuildmate(name)
+  if not (name and GetNumGuildMembers and GetGuildRosterInfo) then return false end
+  for i = 1, ns.n(ns.try(GetNumGuildMembers)) or 0 do
+    if ns.short(ns.try(GetGuildRosterInfo, i)) == name then return true end
+  end
+  return false
+end
+-- Only questions asked on the guild channel get an answer, never a whisper from anyone else.
+ns.onMessage("RQ", function(body, sender, channel)
+  if channel ~= "GUILD" or not sender or not ns.opt("recipeShare") or sender == ns.me() then return end
   local low = string.lower(body or "")
   for _, e in ipairs(P.all()) do
     if string.lower(e.name) == low then ns.send("RA", e.name, "WHISPER", sender) return end
   end
 end)
-ns.onMessage("RA", function(body, sender)
+-- Answers are kept only for a recipe I asked about in the last couple of minutes, from a guildmate, a few per recipe.
+ns.onMessage("RA", function(body, sender, channel)
+  if channel ~= "WHISPER" or not sender or sender == ns.me() then return end
   local low = string.lower(body or "")
-  P.answers[low] = P.answers[low] or {}
-  P.answers[low][sender] = true
+  local at = P.asked[low]
+  if not at or ns.now() - at > P.ASK_WINDOW then return end
+  local got = P.answers[low] or {}
+  if got[sender] then return end
+  local n = 0
+  for _ in pairs(got) do n = n + 1 end
+  if n >= P.MAX_ANSWERS or not P.isGuildmate(sender) then return end
+  got[sender] = true
+  P.answers[low] = got
   ns.shell.refresh("professions")
 end)
 

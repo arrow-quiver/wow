@@ -11,8 +11,8 @@
 --   GuildCampAPI.groupNew(role, dungeon) / groupJoin(n, role) / groupLeave(n)     n as in groups()
 --   GuildCampAPI.raids()                         { { title, startsAt, coming, signup, role } } from the app's news
 --   GuildCampAPI.crafters(itemName)              "Name1,Name2" of guild crafters, or nil
---   GuildCampAPI.publish(addon, key, value)      keep a table in WowGuildDB.ext[addon][key] (saved with the addon's
---                                                data, where the Guild Camp app can read it)
+--   GuildCampAPI.publish(addon, key, value)      keep a plain copy of a table (at most 32 KB) in WowGuildDB.ext[addon][key]
+--                                                (saved with the addon's data, where the Guild Camp app can read it)
 --   GuildCampAPI.open(page)                      open the guild window on a page
 local ADDON, ns = ...
 if type(ns) ~= "table" then ns = {} end
@@ -69,12 +69,45 @@ function api.crafters(itemName)
 end
 
 -- One table per addon and key, at most 32 KB when the game writes it: a snapshot, not a log.
+-- The value is copied: only strings, numbers, booleans and tables of them, keyed by strings or numbers, nested at most
+-- PUBLISH_DEPTH deep. Functions, userdata and cycles are left out. Too big → nothing is kept, false.
+api.PUBLISH_MAX = 32 * 1024
+api.PUBLISH_DEPTH = 8
+local function plainCopy(v, depth, seen, budget)
+  local tv = type(v)
+  if tv == "string" then budget.n = budget.n + #v + 4 return v end
+  if tv == "number" then
+    if v ~= v or v == math.huge or v == -math.huge then return nil end
+    budget.n = budget.n + 24 return v
+  end
+  if tv == "boolean" then budget.n = budget.n + 6 return v end
+  if tv ~= "table" or depth > api.PUBLISH_DEPTH or seen[v] then return nil end
+  seen[v] = true
+  local out = {}
+  budget.n = budget.n + 4
+  for k, x in pairs(v) do
+    if budget.n > api.PUBLISH_MAX then break end
+    local tk = type(k)
+    if tk == "string" or (tk == "number" and k == k and k ~= math.huge and k ~= -math.huge) then
+      local c = plainCopy(x, depth + 1, seen, budget)
+      if c ~= nil then
+        out[k] = c
+        budget.n = budget.n + (tk == "string" and #k + 8 or 24)
+      end
+    end
+  end
+  seen[v] = nil
+  return out
+end
 function api.publish(addon, key, value)
   if type(addon) ~= "string" or type(key) ~= "string" or type(value) ~= "table" or not ns.db then return false end
   if not string.match(addon, "^[%w_]+$") or not string.match(key, "^[%w_]+$") then return false end
+  local budget = { n = 0 }
+  local data = plainCopy(value, 1, {}, budget)
+  if not data or budget.n > api.PUBLISH_MAX then return false end
   ns.db.ext = type(ns.db.ext) == "table" and ns.db.ext or {}
   ns.db.ext[addon] = type(ns.db.ext[addon]) == "table" and ns.db.ext[addon] or {}
-  ns.db.ext[addon][key] = { at = (GetServerTime and ns.try(GetServerTime)) or time(), data = value }
+  ns.db.ext[addon][key] = { at = (GetServerTime and ns.try(GetServerTime)) or time(), data = data }
   return true
 end
 

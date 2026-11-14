@@ -323,8 +323,52 @@ test('professions: records recipes, knows who can make what, asks and answers ov
   assert.deepStrictEqual(wow.get('__sent'), [['WBCodex', 'RA:Copper Chain Vest', 'WHISPER', 'Mokra']]);
   assert.strictEqual(wow.eval(`tostring(${P}.ask("Runecloth Bag"))`), 'true');
   assert.deepStrictEqual(wow.get('__sent[2]'), ['WBCodex', 'RQ:Runecloth Bag', 'GUILD']);
+  wow.exec('__roster = { "Zed-Forever", "Mokra-Forever" }; GetNumGuildMembers = function() return #__roster end; GetGuildRosterInfo = function(i) return __roster[i] end');
   wow.fire('CHAT_MSG_ADDON', 'WBCodex', 'RA:Runecloth Bag', 'WHISPER', 'Zed');
   assert.deepStrictEqual(wow.get(`${P}.who("runecloth bag").codex`), ['Zed']);
+  noError(wow);
+});
+
+test('professions: recipe answers only for guildmates on the guild channel, and only for what I asked (review of #78)', () => {
+  const wow = client();
+  const P = '__ns.professions';
+  wow.fire('TRADE_SKILL_SHOW');
+  wow.exec(`__sent = {}; C_ChatInfo.SendAddonMessage = function(prefix, text, channel, target) __sent[#__sent + 1] = { prefix, text, channel, target }; return true end
+    __roster = { "Zed-Forever", "Mokra-Forever" }; GetNumGuildMembers = function() return #__roster end; GetGuildRosterInfo = function(i) return __roster[i] end`);
+  // A whisper from anyone (guildmate or not) is never answered: only the guild channel is.
+  wow.fire('CHAT_MSG_ADDON', 'WBCodex', 'RQ:copper chain vest', 'WHISPER', 'Stranger');
+  wow.fire('CHAT_MSG_ADDON', 'WBCodex', 'RQ:copper chain vest', 'WHISPER', 'Mokra');
+  wow.fire('CHAT_MSG_ADDON', 'WBCodex', 'RQ:copper chain vest', 'GUILD', null);
+  assert.ok(empty(wow.get('__sent')), 'no answer outside the guild channel');
+  // An unsolicited answer is dropped, and a nil sender raises nothing.
+  wow.fire('CHAT_MSG_ADDON', 'WBCodex', 'RA:Runecloth Bag', 'WHISPER', 'Zed');
+  wow.fire('CHAT_MSG_ADDON', 'WBCodex', 'RA:Runecloth Bag', 'WHISPER', null);
+  assert.ok(empty(wow.get(`${P}.who("runecloth bag").codex`)), 'nothing kept without a question');
+  assert.ok(empty(wow.get(`${P}.answers`)));
+  // After I ask: a guildmate's whisper counts, a stranger's and one on another channel don't.
+  wow.exec(`${P}.ask("Runecloth Bag")`);
+  wow.fire('CHAT_MSG_ADDON', 'WBCodex', 'RA:Runecloth Bag', 'WHISPER', 'Stranger');
+  wow.fire('CHAT_MSG_ADDON', 'WBCodex', 'RA:Runecloth Bag', 'GUILD', 'Mokra');
+  wow.fire('CHAT_MSG_ADDON', 'WBCodex', 'RA:Some Other Thing', 'WHISPER', 'Mokra');
+  wow.fire('CHAT_MSG_ADDON', 'WBCodex', 'RA:Runecloth Bag', 'WHISPER', 'Zed-Forever');
+  assert.deepStrictEqual(wow.get(`${P}.who("runecloth bag").codex`), ['Zed']);
+  assert.ok(!wow.get(`${P}.answers["some other thing"]`), 'answers to questions I never asked are dropped');
+  // Answers per recipe are capped, and a late answer is dropped.
+  wow.exec(`for i = 1, 60 do __roster[#__roster + 1] = "Alt" .. i end
+`);
+  for (let i = 1; i <= 60; i++) wow.fire('CHAT_MSG_ADDON', 'WBCodex', 'RA:Runecloth Bag', 'WHISPER', `Alt${i}`);
+  assert.strictEqual(wow.get(`${P}.who("runecloth bag").codex`).length, wow.get(`${P}.MAX_ANSWERS`));
+  wow.exec(`${P}.asked["runecloth bag"] = __ns.now() - ${P}.ASK_WINDOW - 1; ${P}.answers = {}`);
+  wow.fire('CHAT_MSG_ADDON', 'WBCodex', 'RA:Runecloth Bag', 'WHISPER', 'Mokra');
+  assert.ok(empty(wow.get(`${P}.who("runecloth bag").codex`)), 'an answer after the window is dropped');
+  noError(wow);
+});
+
+test('professions: trainers and the page', () => {
+  const wow = client();
+  const P = '__ns.professions';
+  wow.fire('TRADE_SKILL_SHOW');
+  wow.exec(`__sent = {}; C_ChatInfo.SendAddonMessage = function(prefix, text, channel, target) __sent[#__sent + 1] = { prefix, text, channel, target }; return true end`);
   wow.exec('__ns.setOpt("recipeShare", false); __sent = {}');
   wow.fire('CHAT_MSG_ADDON', 'WBCodex', 'RQ:copper chain vest', 'GUILD', 'Mokra');
   assert.ok(empty(wow.get('__sent')), 'answers can be switched off');
