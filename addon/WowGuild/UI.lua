@@ -110,7 +110,7 @@ function ns.textGuild()
 end
 
 -- Kept for /wow: opens the main window.
-function ns.togglePanel() ns.ui.toggle() end
+function ns.togglePanel() ns.quick.open() end
 
 -- The update notice shows at most once per session, however often login news runs.
 function ns.showUpdateNotice()

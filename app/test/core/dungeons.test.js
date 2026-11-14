@@ -36,8 +36,8 @@ test('dungeon groups: post, edit, guildmates join first come first in, wait, lea
     assert.deepEqual([r.status, r.body.error], [400, 'Pick your role: tank, healer or dps.']);
     r = await api.post('/api/dungeons', { dungeon: 'Deadmines', role: 'healer', character: 'Somebody' });
     assert.deepEqual([r.status, r.body.error], [400, 'Pick one of your characters.']);
-    r = await api.post('/api/dungeons', { dungeon: 'Deadmines', role: 'healer', slots: { tank: 5, healer: 5, dps: 5 } });
-    assert.deepEqual([r.status, r.body.error], [400, 'A group can have at most 10 people.']);
+    r = await api.post('/api/dungeons', { dungeon: 'Deadmines', role: 'healer', slots: { tank: 6, healer: 6, dps: 6 } });
+    assert.deepEqual([r.status, r.body.error], [400, 'A group can have at most 15 people.']);
     r = await api.post('/api/dungeons', { dungeon: 'Deadmines', role: 'healer', startsAt: '2001-01-01T00:00:00Z' });
     assert.deepEqual([r.status, r.body.error], [400, 'That time has already passed.']);
 

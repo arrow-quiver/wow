@@ -43,6 +43,7 @@ Celebrate.lua
 Welcome.lua
 Trail.lua
 MainUI.lua
+Quick.lua
 Tooltip.lua
 Helpers.lua
 Report.lua

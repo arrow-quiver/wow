@@ -54,9 +54,9 @@ Open and full groups that started at most 3 hours ago, soonest first, and my cha
 ### `POST /api/dungeons` (guild)
 `{ dungeon, role: 'tank'|'healer'|'dps', character?, startsAt? (ISO; empty = now), slots?: { tank, healer, dps }, note? }`
 → `201 { group, message }`. Slots default to 1 / 1 / 3 and count the leader (the leader's role gets at least 1); a
-group has 2 to 10 people. `startsAt` may not be in the past or more than two weeks ahead. `character` defaults to
+group has 2 to 15 people, at most 10 in one role (a dungeon run is 5; a PvP premade is 10 or 15). `startsAt` may not be in the past or more than two weeks ahead. `character` defaults to
 my main. Errors: `400` "Name the dungeon.", "Pick your role: tank, healer or dps.", "Pick one of your characters.",
-"A group can have at most 10 people.", "That time has already passed.", "Plan at most two weeks ahead."
+"A group can have at most 15 people.", "That time has already passed.", "Plan at most two weeks ahead."
 
 ### `POST /api/dungeons/:key` (guild, the leader)
 `{ dungeon?, startsAt?, slots?, note? }` → `{ ok, group, message }`. `403` for anyone else, `409` once it is over.

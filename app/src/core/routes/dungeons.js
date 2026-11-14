@@ -21,7 +21,9 @@ const KEY_RE = /^[0-9a-z]{6}$/;
 const SHOW_AFTER_START = 3 * 3600;
 // How far ahead a group can be planned, and the most people in one (UBRS-sized).
 const AHEAD_MAX = 14 * 86400;
-const SIZE_MAX = 10;
+// A dungeon group is 5; a PvP premade is 10 or 15 (the addon's premades page starts the same record).
+const SIZE_MAX = 15;
+const ROLE_MAX = 10; // per role, the most the shared record carries
 const VERBS = ['join', 'leave', 'cancel', 'done', 'guest', 'unguest'];
 // Players from outside the guild: a character name, optionally with its realm (Name-Realm).
 // Letters only (any script), 2-24 of them, then an optional "-Realm" (letters, spaces and apostrophes removed).
@@ -111,7 +113,7 @@ function register(app, ctx) {
 
   // Slots wanted per role, the leader's included: { t, h, d } with 2..SIZE_MAX people and the leader's role in it.
   function slotsFrom(b, role) {
-    const n = (v, d) => { const x = int(v, 0, SIZE_MAX); return x == null ? d : x; };
+    const n = (v, d) => { const x = int(v, 0, ROLE_MAX); return x == null ? d : x; };
     const s = b.slots || {};
     const slots = { t: n(s.tank ?? b.tank, 1), h: n(s.healer ?? b.healer, 1), d: n(s.dps ?? b.dps, 3) };
     if (slots[role] < 1) slots[role] = 1;

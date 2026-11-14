@@ -124,7 +124,7 @@ function ns.updateAvailable()
 end
 
 -- Options (Settings → AddOns → Guild Camp). Defaults are on.
-ns.DEFAULTS = { shareLocation = false, smartOpen = true, blizzardStyle = false, ahTab = true, dealsPanel = true, coachTalents = true, liveLink = false, warMap = true, warHelp = true, seasonTooltips = true, ctaChat = true, kosAlerts = true, dungeonQuests = true, priceAlerts = true, matsNudges = true, celebrate = true, radar = true, instanceHelper = true, reminders = true, craftLookup = true, tooltips = true, minimapButton = true, loginNews = true, autoGuide = true, trackerOnLogin = true, collectBank = true, updateNotice = true }
+ns.DEFAULTS = { fullWindow = false, shareLocation = false, smartOpen = true, blizzardStyle = false, ahTab = true, dealsPanel = true, coachTalents = true, liveLink = false, warMap = true, warHelp = true, seasonTooltips = true, ctaChat = true, kosAlerts = true, dungeonQuests = true, priceAlerts = true, matsNudges = true, celebrate = true, radar = true, instanceHelper = true, reminders = true, craftLookup = true, tooltips = true, minimapButton = true, loginNews = true, autoGuide = true, trackerOnLogin = true, collectBank = true, updateNotice = true }
 function ns.opt(key)
   local o = ns.db and ns.db.options
   if o and o[key] ~= nil then return o[key] end
@@ -371,7 +371,8 @@ local function slash(input)
   elseif cmd == "debug" then
     ns.showReport()
   elseif cmd == "help" then
-    ns.print("/wow  open the guild window (everything below is in it too)")
+    ns.print("/wow  open the quick panel (the guild's pages are on the war table: Ctrl+Shift+G)")
+    ns.print("/wow full  open the full in-game window")
     ns.print("/wow camp | dungeons | raids | hunt | prof | market | guild | settings  open the window on that page")
     ns.print("/wow cta [zone] [number] [message]  call guildies to a fight")
     ns.print("/wow lfg  guild dungeon groups: list, new, join, leave")
@@ -394,6 +395,9 @@ local function slash(input)
     ns.print("/wow live on  turn on combat logging at every login, for the Guild Camp app's live link and Coach overlay")
     ns.print("/wow options  addon settings")
     ns.print("/wow debug  problem report to copy and send")
+  elseif cmd == "full" then
+    -- The full in-game window, for a look without changing the setting.
+    ns.ui.show()
   elseif cmd ~= "" and ns.ui.has(cmd) then
     -- A section or page of the window by name: /wow raids, /wow market, /wow hunt…
     ns.ui.show(cmd)
