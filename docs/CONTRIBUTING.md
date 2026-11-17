@@ -60,8 +60,13 @@ and the game's Terms of Use. Every change keeps to these:
 
 ## Character names
 
-Some realms (WoW Forever) show a surname after the name: the roster, `/who`, the raid roster, chat lines and system
-messages say "Gorm Tshabalala", while `UnitName("player")`, whispers and every shared record use "Gorm". The
-character is always the first word. In the addon, take names from the game with `string.match(n, "^([^%-%s]+)")`
-(no realm, no surname); in the app, `baseName` from `shared/names.js`. Migration 32 merged the roster's surname copies
-into the real characters.
+On WoW Forever every character has a first name and a surname: the roster, `/who`, the raid roster, chat lines and
+system messages say "Gorm Tshabalala", while `UnitName("player")` and every shared record use "Gorm". The record key is
+always the first word. In the addon, take it from the game with `string.match(n, "^([^%-%s]+)")` (no realm, no
+surname); in the app, `baseName` from `shared/names.js`. Migration 32 merged the roster's surname copies into the real
+characters.
+
+**To reach a player, use the name exactly as the game wrote it.** A first name is not unique on WoW Forever, so a
+whisper, invite or player link to "Gorm" answers "No player named 'Gorm' is currently playing". Keep the full name the
+game gave (from `/who`, a whisper's sender, the roster) beside the record key and pass that to `SendChatMessage`,
+invites and `|Hplayer:…|h` links. `Recruit.lua` does this with `R.remember` / `R.fullName`.

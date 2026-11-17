@@ -50,6 +50,30 @@ local function store()
 end
 local function today() return math.floor(now() / 86400) end
 
+-- The name the game knows a player by. On WoW Forever every character has a first name and a surname, and a first
+-- name alone is not unique, so a whisper or an invite to "Be" finds nobody ("No player named 'Be' is currently
+-- playing"): the game wants the name as it wrote it, "Be Fachada". The guild's records stay keyed by the first
+-- word; this client remembers the full name beside it, from /who and from whispers received.
+R.MAX_FULL = 400
+function R.remember(name, full)
+  if type(name) ~= "string" or type(full) ~= "string" or full == "" then return end
+  if issecretvalue and issecretvalue(full) then return end
+  local d = store()
+  d.full = d.full or {}
+  d.full[string.lower(name)] = { n = full, t = now() }
+  local count, oldest, oldestAt = 0, nil, nil
+  for k, e in pairs(d.full) do
+    count = count + 1
+    if not oldestAt or (e.t or 0) < oldestAt then oldest, oldestAt = k, e.t or 0 end
+  end
+  if count > R.MAX_FULL and oldest then d.full[oldest] = nil end
+end
+-- → the name to whisper or invite: as the game wrote it when this client has seen it, else the name given.
+function R.fullName(name)
+  local e = type(name) == "string" and (store().full or {})[string.lower(name)]
+  return (type(e) == "table" and type(e.n) == "string" and e.n ~= "") and e.n or name
+end
+
 function R.isOfficer()
   if C_GuildInfo and C_GuildInfo.CanEditOfficerNote and ns.try(C_GuildInfo.CanEditOfficerNote) then return true end
   if CanGuildInvite and ns.try(CanGuildInvite) then return true end
@@ -146,11 +170,12 @@ function R.results()
   local n = (C_FriendList and C_FriendList.GetNumWhoResults and ns.try(C_FriendList.GetNumWhoResults)) or (GetNumWhoResults and ns.try(GetNumWhoResults)) or 0
   local d, known, added = store(), R.known(), 0
   for i = 1, math.min(n or 0, 50) do
-    local name, guild, level, class, zone, file = whoInfo(i)
-    name = short(name)
+    local full, guild, level, class, zone, file = whoInfo(i)
+    local name = short(full)
     if name and name ~= me() and (guild == nil or guild == "") and not known[string.lower(name)] and not d.skip[string.lower(name)] then
       if not d.queue[name] then added = added + 1 end
-      d.queue[name] = { name = name, level = level or 0, class = class, file = file and string.upper(file) or nil, zone = zone, seen = now() }
+      d.queue[name] = { name = name, full = full, level = level or 0, class = class, file = file and string.upper(file) or nil, zone = zone, seen = now() }
+      R.remember(name, full)
     end
   end
   -- A full list means there were more than /who shows: search that bracket again one class at a time.
@@ -166,8 +191,9 @@ end
 function R.prune()
   local d, known, list = store(), R.known(), {}
   for name, p in pairs(d.queue) do
-    -- Names saved with a surname (0.18.0) aren't whisperable: the first word is the character.
-    if now() - (p.seen or 0) > R.KEEP or known[string.lower(name)] or string.find(name, "%s") then d.queue[name] = nil else list[#list + 1] = p end
+    -- Entries keyed with a surname (0.18.0) and entries saved without the full name (before 0.22.1) can't be
+    -- whispered on WoW Forever: they go, and the next /who finds those players again.
+    if now() - (p.seen or 0) > R.KEEP or known[string.lower(name)] or string.find(name, "%s") or (R.onForever() and not p.full) then d.queue[name] = nil else list[#list + 1] = p end
   end
   if #list > R.MAX_QUEUE then
     table.sort(list, function(a, b) return (a.seen or 0) > (b.seen or 0) end)
@@ -215,6 +241,14 @@ function R.message(name)
   local d = store()
   local p = d.queue[name]
   if not p then return false end
+  local to = p.full or R.fullName(p.name)
+  -- Found before the addon kept full names: a first name alone reaches nobody on WoW Forever. The next search finds them again.
+  if R.onForever() and not p.full and to == p.name then
+    d.queue[name] = nil
+    ns.print(string.format("%sRecruiting:|r %s was found before this update and can't be messaged by first name. Search again and they'll be back.", GOLD, p.name))
+    if R.panel and R.panel:IsShown() then R.refresh() end
+    return false
+  end
   if R.sentToday() >= R.DAILY then ns.print(string.format("That's %d messages today: more gets reported as spam. Try again tomorrow.", R.DAILY)); return false end
   local s = sh()
   local pid = s and s.myPid and ns.try(s.myPid)
@@ -227,10 +261,10 @@ function R.message(name)
   d.msgAt = now()
   local text = R.messageFor(p)
   local send = (C_ChatInfo and C_ChatInfo.SendChatMessage) or SendChatMessage
-  if send and pcall(send, text, "WHISPER", nil, p.name) then
-    ns.print(string.format("%sRecruiting:|r messaged %s (%d of %d today).", GOLD, p.name, R.sentToday(), R.DAILY))
-  elseif ChatFrame_OpenChat then ns.try(ChatFrame_OpenChat, "/w " .. p.name .. " " .. text)
-  else ns.print("/w " .. p.name .. " " .. text) end
+  if send and pcall(send, text, "WHISPER", nil, to) then
+    ns.print(string.format("%sRecruiting:|r messaged %s (%d of %d today).", GOLD, to, R.sentToday(), R.DAILY))
+  elseif ChatFrame_OpenChat then ns.try(ChatFrame_OpenChat, "/w " .. to .. " " .. text)
+  else ns.print("/w " .. to .. " " .. text) end
   if R.panel and R.panel:IsShown() then R.refresh() end
   return true
 end
@@ -251,6 +285,7 @@ end
 -- Their whisper back. → "i" (interested), "n" (no thanks) or nil.
 function R.whisper(text, sender)
   local name = short(sender)
+  if name then R.remember(name, sender) end
   local k = name and R.known()[string.lower(name)]
   if name and not k then return R.asked(text, name) end
   if not k or k.state ~= "c" then return nil end
@@ -320,7 +355,10 @@ function R.canInviteByAddon() return not R.onForever() and not store().inviteBlo
 
 -- The line an officer invites from: the name is a player link, so right-click → Invite to guild works on it.
 function R.inviteLine(name)
-  local line = string.format("%s|Hplayer:%s|h[%s]|h wants to join the guild.|r Right-click the name and choose Invite to guild.", GOLD, name, name)
+  -- The link carries the name as the game wrote it (surname, realm); the text shows it without the realm.
+  local full = R.fullName(name)
+  local shown = string.gsub(full, "%-[^%-]*$", "")
+  local line = string.format("%s|Hplayer:%s|h[%s]|h wants to join the guild.|r Right-click the name and choose Invite to guild.", GOLD, full, shown)
   ns.print(line)
   store().shown = store().shown or {}
   store().shown[name] = now()
@@ -336,7 +374,7 @@ function R.invite(name)
   local inv = (C_GuildInfo and C_GuildInfo.Invite) or GuildInvite
   if not inv or not R.canInviteByAddon() then R.inviteLine(name); return "link" end
   R.inviting = name
-  if not pcall(inv, name) then store().inviteBlocked = true; R.inviting = nil; R.inviteLine(name); return "link" end
+  if not pcall(inv, R.fullName(name)) then store().inviteBlocked = true; R.inviting = nil; R.inviteLine(name); return "link" end
   ns.print(string.format("Asked the game to invite %s. You'll see them join in guild chat.", name))
   return "asked"
 end
