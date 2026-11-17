@@ -79,12 +79,12 @@ test('Message: one whisper, the guild told, the daily cap; replies; invite; join
   wow.fire('CHAT_MSG_WHISPER', 'Yeah sure!', 'Healer-Forever');
   assert.strictEqual(wow.eval('__ns.Share.get("rk:Healer").fields.state'), 'i');
   assert.strictEqual(wow.eval('__ns.Share.get("rk:Healer").fields.pid'), 'Thrallia.p4m7', 'the finder stays');
-  assert.match(wow.printed(), /\|Hplayer:Healer\|h\[Healer\]\|h wants to join the guild/, 'the name is a link to right-click');
+  assert.match(wow.printed(), /\|Hplayer:Healer-Forever\|h\[Healer\]\|h wants to join the guild/, 'the name is a link to right-click');
   // Officers: invite on a click.
   wow.exec('__ns.recruit.show()');
   assert.match(wow.eval('WowGuildRecruit.rows[1].name:GetText()'), /Healer.*wants in/);
   wow.click('WowGuildRecruit.rows[1].go');
-  assert.strictEqual(wow.eval('__invites[1]'), 'Healer');
+  assert.strictEqual(wow.eval('__invites[1]'), 'Healer-Forever');
   wow.fire('CHAT_MSG_SYSTEM', 'Healer has joined the guild.');
   assert.strictEqual(wow.eval('__ns.Share.get("rk:Healer").fields.state'), 'j');
   // The daily cap.
@@ -116,7 +116,7 @@ test('a "no thanks"; Skip; the ad once every 15 minutes; members can\'t invite',
   assert.strictEqual(wow.eval('__ns.debugError'), null);
 });
 
-test('surnames (WoW Forever): "Be Fachada" is Be, queued and whispered as Be', () => {
+test('surnames (WoW Forever): "Be Fachada" is queued as Be and whispered by the full name the game gave', () => {
   const wow = client();
   wow.exec(`__who = { { fullName = "Be Fachada", fullGuildName = "", level = 12, classStr = "Paladin", area = "Durotar", filename = "PALADIN" } }
 __ns.db.recruit = { queue = { ["Korty Ul"] = { name = "Korty Ul", level = 11, seen = GetServerTime() } }, skip = {}, sent = {}, bracket = 0 }`);
@@ -125,12 +125,40 @@ __ns.db.recruit = { queue = { ["Korty Ul"] = { name = "Korty Ul", level = 11, se
   assert.strictEqual(wow.eval('#__ns.recruit.queue()'), '1', 'the old "Korty Ul" entry is dropped');
   assert.strictEqual(wow.eval('__ns.recruit.queue()[1].name'), 'Be');
   assert.strictEqual(wow.eval('tostring(__ns.recruit.message("Be"))'), 'true');
-  assert.strictEqual(wow.eval('__sent[1]'), 'WHISPER|Be|Hey Be, want in?');
-  assert.strictEqual(wow.eval('__ns.Share.get("rk:Be").fields.state'), 'c');
+  // A first name alone is not unique on WoW Forever: "Be" would get "No player named 'Be' is currently playing".
+  assert.strictEqual(wow.eval('__sent[1]'), 'WHISPER|Be Fachada|Hey Be, want in?');
+  assert.strictEqual(wow.eval('__ns.Share.get("rk:Be").fields.state'), 'c', 'the guild\'s record stays keyed by the first name');
   wow.fire('CHAT_MSG_WHISPER', 'yes please', 'Be Fachada');
   assert.strictEqual(wow.eval('__ns.Share.get("rk:Be").fields.state'), 'i');
   wow.fire('CHAT_MSG_SYSTEM', 'Be Fachada has joined the guild.');
   assert.strictEqual(wow.eval('__ns.Share.get("rk:Be").fields.state'), 'j');
+  assert.strictEqual(wow.eval('__ns.debugError'), null);
+});
+
+test('WoW Forever: the invite link carries the full name; a player found before full names were kept is not whispered', () => {
+  const wow = client();
+  wow.exec('WOW_PROJECT_CAMELOT = 18; WOW_PROJECT_ID = 18');
+  // An officer who has seen the full name (their /who, or a whisper from the player) gets it in the link.
+  wow.exec('table.insert(__recs, { type = "rk", key = "Zara", author = "Mokra", fields = { pid = "Mokra.m1", state = "c", at = 1 } })');
+  wow.clearOutput();
+  wow.fire('CHAT_MSG_WHISPER', 'yes', 'Zara Moonfall');
+  assert.match(wow.printed(), /\|Hplayer:Zara Moonfall\|h\[Zara Moonfall\]\|h wants to join the guild\./);
+  assert.strictEqual(wow.eval('__ns.recruit.fullName("zara")'), 'Zara Moonfall');
+  assert.strictEqual(wow.eval('__ns.recruit.fullName("Stranger")'), 'Stranger', 'a name this client never saw stays as given');
+  // A queue entry saved by 0.22.0 has no full name: no whisper, no message counted, and it leaves the queue.
+  wow.exec('__ns.db.recruit.queue.Old = { name = "Old", level = 20, seen = GetServerTime() }; __sent = {}');
+  wow.clearOutput();
+  assert.strictEqual(wow.eval('tostring(__ns.recruit.message("Old"))'), 'false');
+  assert.strictEqual(wow.eval('#__sent'), '0');
+  assert.strictEqual(wow.eval('__ns.recruit.sentToday()'), '0');
+  assert.strictEqual(wow.eval('tostring(__ns.db.recruit.queue.Old)'), 'nil');
+  assert.match(wow.printed(), /Old was found before this update and can't be messaged by first name\. Search again/);
+  assert.strictEqual(wow.eval('tostring(__ns.Share.get("rk:Old") == nil)'), 'true', 'the guild is not told we messaged them');
+  // The same player found again by /who is whispered by the full name.
+  wow.exec('__who = { { fullName = "Old Greymane", fullGuildName = "", level = 20, classStr = "Mage", area = "Durotar", filename = "MAGE" } }; __ns.recruit.scan()');
+  wow.fire('WHO_LIST_UPDATE');
+  assert.strictEqual(wow.eval('tostring(__ns.recruit.message("Old"))'), 'true');
+  assert.strictEqual(wow.eval('__sent[1]'), 'WHISPER|Old Greymane|Hey Old, want in?');
   assert.strictEqual(wow.eval('__ns.debugError'), null);
 });
 
@@ -256,7 +284,7 @@ test('someone we never messaged asks to join the guild: they go on the list as i
   wow.fire('CHAT_MSG_WHISPER', 'Hi! Can I join your guild?', 'Stranger-Zuljin');
   assert.strictEqual(wow.eval('__ns.Share.get("rk:Stranger").fields.state'), 'i');
   assert.strictEqual(wow.eval('__ns.Share.get("rk:Stranger").fields.pid'), 'Thrallia.p4m7');
-  assert.match(wow.printed(), /\|Hplayer:Stranger\|h\[Stranger\]\|h wants to join the guild/);
+  assert.match(wow.printed(), /\|Hplayer:Stranger-Zuljin\|h\[Stranger\]\|h wants to join the guild/);
   // A guildmate saying the same words is not a recruit.
   wow.fire('CHAT_MSG_WHISPER', 'did you invite him to the guild?', 'Guildmate');
   assert.strictEqual(wow.eval('tostring((__ns.Share.get("rk:Guildmate")))'), 'nil');
